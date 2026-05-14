@@ -1,5 +1,9 @@
 const TOKEN_KEY = 'utir_auth_token';
 
+// On Vercel set VITE_API_BASE_URL to the Railway URL (e.g. https://utir-soft-production.up.railway.app).
+// In local dev leave empty — Vite proxies /api to localhost:4010.
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+
 export function getToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
@@ -13,7 +17,8 @@ export function setToken(t: string | null) {
 
 async function request<T>(method: string, url: string, body?: any): Promise<T> {
   const token = getToken();
-  const res = await fetch(url, {
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
+  const res = await fetch(fullUrl, {
     method,
     headers: {
       'Content-Type': 'application/json',
