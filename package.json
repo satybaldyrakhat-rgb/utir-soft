@@ -72,6 +72,7 @@
     "recharts": "2.15.2",
     "sonner": "2.0.3",
     "tailwind-merge": "3.2.0",
+    "tsx": "^4.19.2",
     "tw-animate-css": "1.3.8",
     "vaul": "1.1.2"
   },
@@ -87,7 +88,6 @@
     "@vitejs/plugin-react": "4.7.0",
     "concurrently": "^9.1.2",
     "tailwindcss": "4.1.12",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vite": "6.3.5"
   }
