@@ -4,7 +4,7 @@ import profileLogo from '../../imports/utirsoft.png';
 import { api, setToken } from '../utils/api';
 
 interface AuthProps {
-  onLogin: (user: { name: string; email: string; avatar?: string }) => void;
+  onLogin: (user: { name: string; email: string; avatar?: string; teamRole?: 'admin' | 'manager' | 'employee' }) => void;
   language: 'kz' | 'ru' | 'eng';
   onLanguageChange: (lang: 'kz' | 'ru' | 'eng') => void;
 }
@@ -114,10 +114,10 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     setTimeout(() => { setIsLoading(false); callback(); }, ms);
   };
 
-  const finishAuth = (data: { token: string; user: { id: string; name: string; email: string } }) => {
+  const finishAuth = (data: { token: string; user: { id: string; name: string; email: string; teamRole?: 'admin' | 'manager' | 'employee' } }) => {
     setToken(data.token);
     window.dispatchEvent(new Event('utir:auth-changed'));
-    onLogin({ name: data.user.name, email: data.user.email });
+    onLogin({ name: data.user.name, email: data.user.email, teamRole: data.user.teamRole });
   };
 
   const handleEmailContinue = (mode: 'login' | 'signup') => {

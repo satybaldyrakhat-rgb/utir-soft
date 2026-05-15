@@ -266,6 +266,22 @@ function newId(prefix: string) {
   return prefix + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 }
 
+// ─── Role-based access (Phase 1) ──────────────────────────────────
+// Hierarchy: admin > manager > employee. A handler that requires at least
+// 'manager' lets admins through too; 'employee' lets everyone in the team.
+const ROLE_RANK: Record<string, number> = { admin: 3, manager: 2, employee: 1 };
+function roleAtLeast(role: string | undefined, min: 'admin' | 'manager' | 'employee'): boolean {
+  return (ROLE_RANK[role || ''] || 0) >= ROLE_RANK[min];
+}
+function requireRole(min: 'admin' | 'manager' | 'employee') {
+  return (req: AuthedRequest, res: Response, next: NextFunction) => {
+    if (!roleAtLeast(req.teamRole, min)) {
+      return res.status(403).json({ error: `requires ${min} role` });
+    }
+    next();
+  };
+}
+
 // Append an entry to the user's activity log. Used by auth handlers so we can record
 // login/signup/verify events server-side (frontend can't insert before it has a token).
 function logActivity(userId: string, entry: Record<string, any>) {
@@ -487,7 +503,7 @@ app.use('/api/deals', makeCrud('deals', 'D'));
 // corresponds to an actual user (matched by email), also disable that user
 // and detach them from the team so they lose access. For manually-added
 // employee records (no matching auth user) the behaviour is unchanged.
-app.delete('/api/employees/:id', authMiddleware, (req: AuthedRequest, res) => {
+app.delete('/api/employees/:id', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
   const row = db.prepare('SELECT data FROM employees WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
   if (!row) return res.status(404).json({ error: 'not found' });
   let email = '';
@@ -515,7 +531,8 @@ app.delete('/api/employees/:id', authMiddleware, (req: AuthedRequest, res) => {
 app.use('/api/employees', makeCrud('employees', 'e'));
 app.use('/api/tasks', makeCrud('tasks', 't'));
 app.use('/api/products', makeCrud('products', 'p'));
-app.use('/api/transactions', makeCrud('transactions', 'f'));
+// Finance is gated — only admin and manager can read or write transactions.
+app.use('/api/transactions', authMiddleware, requireRole('manager'), makeCrud('transactions', 'f'));
 
 // ─── AI SETTINGS (per-user JSON blob, Block F.4) ──────────────────
 // The Telegram bot reads `assistant.modulePermissions` from here to decide
@@ -530,7 +547,8 @@ aiSettingsRouter.get('/', (req: AuthedRequest, res) => {
   catch { res.json(null); }
 });
 
-aiSettingsRouter.put('/', (req: AuthedRequest, res) => {
+// Only the admin can change AI settings (they govern the bot for the team).
+aiSettingsRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
   const blob = JSON.stringify(req.body || {});
   db.prepare('UPDATE users SET ai_settings = ? WHERE id = ?').run(blob, req.userId!);
   res.json({ ok: true });
@@ -561,11 +579,8 @@ const ROLE_VALUES = new Set(['admin', 'manager', 'employee']);
 const invitationsRouter = express.Router();
 invitationsRouter.use(authMiddleware);
 
-// Only the team admin can manage invites. (Future C.3 may relax this.)
-function requireAdmin(req: AuthedRequest, res: Response, next: NextFunction) {
-  if (req.teamRole !== 'admin') return res.status(403).json({ error: 'admin only' });
-  next();
-}
+// Convenience alias — admin-level access for the invitations router.
+const requireAdmin = requireRole('admin');
 
 invitationsRouter.get('/', requireAdmin, (req: AuthedRequest, res) => {
   // LEFT JOIN on users so the admin sees WHO accepted each used invite, not just
@@ -676,8 +691,9 @@ app.use('/api/integrations', integrationsRouter);
 const activityRouter = express.Router();
 activityRouter.use(authMiddleware);
 
-activityRouter.get('/', (req: AuthedRequest, res) => {
+activityRouter.get('/', requireRole('admin'), (req: AuthedRequest, res) => {
   // Full Activity Log page filters client-side; return a generous window (10k most recent).
+  // Admin-only — managers/employees don't see the audit log.
   const rows = db.prepare('SELECT data FROM activity_logs WHERE team_id = ? ORDER BY rowid DESC LIMIT 10000').all(req.teamId!) as any[];
   res.json(rows.map(r => JSON.parse(r.data)));
 });

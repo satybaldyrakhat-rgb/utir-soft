@@ -32,7 +32,7 @@ function AppContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ name: string; email: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; teamRole: 'admin' | 'manager' | 'employee' } | null>(null);
   const dataStore = useDataStore();
 
   // If a logged-in user opens an invite link, the invite is meant for someone
@@ -77,9 +77,23 @@ function AppContent() {
     }
   };
 
+  // Role-based hiding for non-admins (Phase 1 of role gating).
+  // The matrix is intentionally simple and lives on the client for now — the
+  // backend already enforces the same restrictions on the corresponding APIs.
+  const role = currentUser?.teamRole || 'admin';
+  const moduleAllowedByRole = (id: string): boolean => {
+    if (role === 'admin') return true;
+    // Manager loses access to whole-team settings management.
+    if (role === 'manager') return id !== 'settings';
+    // Employee: no Finance, no Settings.
+    if (role === 'employee') return id !== 'finance' && id !== 'settings';
+    return true;
+  };
+
   // Sidebar visibility is data-driven from Settings → Модули (Block B.1).
   // Locked modules (dashboard, settings) are always visible regardless of the toggle.
   const isModuleVisible = (id: string) => {
+    if (!moduleAllowedByRole(id)) return false;
     const m = dataStore.modules.find(x => x.id === id);
     if (!m) return true; // unknown ids stay visible (e.g. legacy pages)
     return m.enabled || !!m.locked;
@@ -95,9 +109,9 @@ function AppContent() {
   useEffect(() => {
     const token = getToken();
     if (!token) { setAuthChecked(true); return; }
-    api.get<{ user: { id: string; name: string; email: string } }>('/api/auth/me')
+    api.get<{ user: { id: string; name: string; email: string; teamRole?: 'admin' | 'manager' | 'employee' } }>('/api/auth/me')
       .then(({ user }) => {
-        setCurrentUser({ name: user.name, email: user.email });
+        setCurrentUser({ name: user.name, email: user.email, teamRole: user.teamRole || 'admin' });
         setIsAuthenticated(true);
       })
       .catch(() => {
@@ -119,8 +133,8 @@ function AppContent() {
     return () => window.removeEventListener('utir:auth-changed', onAuth);
   }, []);
 
-  const handleLogin = (user: { name: string; email: string }) => {
-    setCurrentUser(user);
+  const handleLogin = (user: { name: string; email: string; teamRole?: 'admin' | 'manager' | 'employee' }) => {
+    setCurrentUser({ name: user.name, email: user.email, teamRole: user.teamRole || 'admin' });
     setIsAuthenticated(true);
   };
 
@@ -450,19 +464,21 @@ function AppContent() {
             </button>
           ))}
 
-          <button
-            onClick={() => handleMenuClick('settings')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'settings' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
-            }`}
-            title={isSidebarCollapsed ? getMenuText('settings') : ''}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            {!isSidebarCollapsed && <span>{getMenuText('settings')}</span>}
-          </button>
+          {moduleAllowedByRole('settings') && (
+            <button
+              onClick={() => handleMenuClick('settings')}
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
+                currentPage === 'settings' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+              title={isSidebarCollapsed ? getMenuText('settings') : ''}
+            >
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {!isSidebarCollapsed && <span>{getMenuText('settings')}</span>}
+            </button>
+          )}
         </nav>
 
         <div className="p-4 border-t border-gray-200">
@@ -478,16 +494,24 @@ function AppContent() {
 
           {!isSidebarCollapsed && (
             <>
-              {/* Profile */}
+              {/* Profile — clickable for admin (opens Settings), informational for others */}
               <button
-                onClick={() => handleMenuClick('settings')}
-                className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                onClick={() => { if (moduleAllowedByRole('settings')) handleMenuClick('settings'); }}
+                disabled={!moduleAllowedByRole('settings')}
+                className={`w-full flex items-center gap-3 p-3 bg-gray-50 rounded-lg transition-colors ${
+                  moduleAllowedByRole('settings') ? 'hover:bg-gray-100' : 'cursor-default'
+                }`}
               >
                 {(() => {
                   const profile = dataStore.profile;
                   const displayName = profile.name || currentUser?.name || '';
                   const displayEmail = profile.email || currentUser?.email || '';
                   const initials = (displayName || displayEmail).trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                  const roleLabel: Record<string, string> = {
+                    admin:    language === 'kz' ? 'Әкімші'    : language === 'eng' ? 'Admin'    : 'Админ',
+                    manager:  language === 'kz' ? 'Менеджер'  : language === 'eng' ? 'Manager'  : 'Менеджер',
+                    employee: language === 'kz' ? 'Қызметкер' : language === 'eng' ? 'Employee' : 'Сотрудник',
+                  };
                   return (
                     <>
                       <div className="w-10 h-10 rounded-md overflow-hidden bg-gray-200 flex items-center justify-center text-sm text-gray-600 flex-shrink-0">
@@ -497,7 +521,14 @@ function AppContent() {
                       </div>
                       <div className="flex-1 min-w-0 text-left">
                         <div className="text-sm truncate">{displayName}</div>
-                        <div className="text-xs text-gray-500 truncate">{displayEmail}</div>
+                        <div className="text-[10px] text-gray-500 truncate flex items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded ${
+                            role === 'admin' ? 'bg-purple-50 text-purple-700' :
+                            role === 'manager' ? 'bg-blue-50 text-blue-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>{roleLabel[role]}</span>
+                          <span className="truncate">{displayEmail}</span>
+                        </div>
                       </div>
                     </>
                   );
