@@ -24,9 +24,13 @@ interface Employee {
 
 interface ActivityLog { id: string; user: string; action: string; target: string; timestamp: string; type: 'create' | 'update' | 'delete' | 'login' | 'logout'; }
 
-interface SettingsProps { language: 'kz' | 'ru' | 'eng'; onLanguageChange?: (language: 'kz' | 'ru' | 'eng') => void; }
+interface SettingsProps {
+  language: 'kz' | 'ru' | 'eng';
+  onLanguageChange?: (language: 'kz' | 'ru' | 'eng') => void;
+  currentUserEmail?: string;
+}
 
-export function Settings({ language, onLanguageChange }: SettingsProps) {
+export function Settings({ language, onLanguageChange, currentUserEmail }: SettingsProps) {
   const store = useDataStore();
   const profile = store.profile;
   const catalogs = store.catalogs;
@@ -131,7 +135,25 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
     return s && r;
   });
 
-  const deleteEmployee = (id: string) => { if (confirm('Удалить?')) store.deleteEmployee(id); };
+  const deleteEmployee = (id: string) => {
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+    const isSelf = !!currentUserEmail && emp.email.toLowerCase() === currentUserEmail.toLowerCase();
+    if (isSelf) {
+      alert(l(
+        'Нельзя удалить самого себя из команды. Передайте управление другому администратору, затем попросите его удалить вас.',
+        'Командадан өзіңізді жоюға болмайды. Басқаруды басқа әкімшіге беріңіз, содан кейін олардан жоюды сұраңыз.',
+        "You can't remove yourself from the team. Hand admin off first, then ask the other admin to remove you.",
+      ));
+      return;
+    }
+    const msg = l(
+      `Удалить ${emp.name} из команды? Сотрудник потеряет доступ к данным и не сможет войти.`,
+      `${emp.name} командадан жойылсын ба? Қызметкер деректерге қол жеткізе алмайды және кіре алмайды.`,
+      `Remove ${emp.name} from the team? They will lose access to all data and won't be able to sign in.`,
+    );
+    if (confirm(msg)) store.deleteEmployee(id);
+  };
 
   const Toggle = ({ value, onChange }: { value: boolean; onChange: () => void }) => (
     <button onClick={onChange} className={`relative w-10 h-5 rounded-full transition-colors ${value ? 'bg-gray-900' : 'bg-gray-200'}`}>
@@ -396,7 +418,9 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
                     </div>
                     <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setEditingEmployee(emp); setEmpRole(emp.role); setShowEmployeeModal(true); }} className="p-1.5 hover:bg-gray-100 rounded-lg"><Edit2 className="w-3.5 h-3.5 text-gray-400" /></button>
-                      <button onClick={() => deleteEmployee(emp.id)} className="p-1.5 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                      {(!currentUserEmail || emp.email.toLowerCase() !== currentUserEmail.toLowerCase()) && (
+                        <button onClick={() => deleteEmployee(emp.id)} className="p-1.5 hover:bg-red-50 rounded-lg" title={l('Удалить из команды', 'Командадан жою', 'Remove from team')}><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                      )}
                     </div>
                   </div>
                 ))}

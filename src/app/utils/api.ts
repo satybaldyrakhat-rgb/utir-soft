@@ -29,6 +29,15 @@ async function request<T>(method: string, url: string, body?: any): Promise<T> {
   if (!res.ok) {
     let msg = `${res.status}`;
     try { const j = await res.json(); if (j?.error) msg = j.error; } catch {}
+    // If the server tells us this token belongs to a disabled / kicked account,
+    // drop it locally and bounce back to the auth screen — otherwise the user
+    // sees the platform UI while every call fails with 403.
+    if (res.status === 403 && msg === 'account disabled') {
+      try {
+        localStorage.removeItem(TOKEN_KEY);
+        window.dispatchEvent(new Event('utir:auth-changed'));
+      } catch { /* ignore */ }
+    }
     throw new Error(msg);
   }
   if (res.status === 204) return undefined as T;

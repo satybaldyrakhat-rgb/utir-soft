@@ -145,6 +145,8 @@ if (verifiedJustAdded) {
 const teamIdJustAdded = migrateColumn('users', 'team_id', 'TEXT');
 migrateColumn('users', 'team_role', "TEXT DEFAULT 'admin'");
 migrateColumn('users', 'invited_by', 'TEXT');
+// Set when an admin removes a teammate from the team — blocks future logins.
+migrateColumn('users', 'disabled_at', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -248,7 +250,10 @@ function authMiddleware(req: AuthedRequest, res: Response, next: NextFunction) {
     req.userId = payload.sub;
     // Resolve the team this user belongs to. Single extra SELECT per request —
     // fine for SQLite. Falls back to user_id so legacy tokens always work.
-    const row = db.prepare('SELECT team_id, team_role FROM users WHERE id = ?').get(payload.sub) as any;
+    const row = db.prepare('SELECT team_id, team_role, disabled_at FROM users WHERE id = ?').get(payload.sub) as any;
+    // Disabled users (kicked from team) lose access immediately — their existing
+    // tokens stop working until an admin re-enables them.
+    if (row?.disabled_at) return res.status(403).json({ error: 'account disabled' });
     req.teamId = row?.team_id || payload.sub;
     req.teamRole = (row?.team_role as 'admin' | 'manager' | 'employee') || 'admin';
     next();
@@ -386,8 +391,9 @@ app.post('/api/auth/signup', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
-  const user = db.prepare('SELECT id, email, name, company, password_hash, email_verified, verification_code, team_role FROM users WHERE email = ?').get(String(email).toLowerCase()) as any;
+  const user = db.prepare('SELECT id, email, name, company, password_hash, email_verified, verification_code, team_role, disabled_at FROM users WHERE email = ?').get(String(email).toLowerCase()) as any;
   if (!user) return res.status(401).json({ error: 'invalid credentials' });
+  if (user.disabled_at) return res.status(403).json({ error: 'account disabled' });
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return res.status(401).json({ error: 'invalid credentials' });
   seedIntegrations(user.id);
@@ -475,6 +481,37 @@ function makeCrud(table: string, idPrefix: string) {
 }
 
 app.use('/api/deals', makeCrud('deals', 'D'));
+
+// Custom DELETE on /api/employees/:id — must register BEFORE the generic
+// makeCrud router so this handler matches first. When the employees row
+// corresponds to an actual user (matched by email), also disable that user
+// and detach them from the team so they lose access. For manually-added
+// employee records (no matching auth user) the behaviour is unchanged.
+app.delete('/api/employees/:id', authMiddleware, (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT data FROM employees WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  let email = '';
+  try { email = JSON.parse(row.data)?.email || ''; } catch { /* ignore */ }
+  let kickedUser: { id: string; name: string } | null = null;
+  if (email) {
+    const user = db.prepare('SELECT id, name FROM users WHERE email = ? AND team_id = ?').get(email.toLowerCase(), req.teamId!) as any;
+    if (user) {
+      // Safety: an admin cannot remove themselves this way — would orphan the team.
+      if (user.id === req.userId) return res.status(400).json({ error: 'cannot remove yourself' });
+      db.prepare(`UPDATE users SET team_id = id, disabled_at = datetime('now') WHERE id = ?`).run(user.id);
+      kickedUser = { id: user.id, name: user.name };
+    }
+  }
+  db.prepare('DELETE FROM employees WHERE id = ? AND team_id = ?').run(req.params.id, req.teamId!);
+  if (kickedUser) {
+    logActivity(req.userId!, {
+      user: '', action: 'Удалил сотрудника из команды',
+      target: kickedUser.name, type: 'delete', page: 'team',
+    });
+  }
+  res.json({ ok: true, kicked: !!kickedUser });
+});
+
 app.use('/api/employees', makeCrud('employees', 'e'));
 app.use('/api/tasks', makeCrud('tasks', 't'));
 app.use('/api/products', makeCrud('products', 'p'));

@@ -106,6 +106,19 @@ function AppContent() {
       .finally(() => setAuthChecked(true));
   }, []);
 
+  // React to forced logout (e.g. api.ts dropped the token after a 'account
+  // disabled' response): bounce back to the Auth screen so the user knows.
+  useEffect(() => {
+    const onAuth = () => {
+      if (!getToken()) {
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+      }
+    };
+    window.addEventListener('utir:auth-changed', onAuth);
+    return () => window.removeEventListener('utir:auth-changed', onAuth);
+  }, []);
+
   const handleLogin = (user: { name: string; email: string }) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
@@ -166,7 +179,7 @@ function AppContent() {
       case 'tasks':
         return <Tasks language={language} />;
       case 'settings':
-        return <Settings language={language} onLanguageChange={setLanguage} />;
+        return <Settings language={language} onLanguageChange={setLanguage} currentUserEmail={currentUser?.email} />;
       default: {
         // Custom modules from Settings → Модули render through the generic page.
         const customMod = dataStore.modules.find(m => m.id === currentPage && m.custom);
