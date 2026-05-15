@@ -77,16 +77,23 @@ function AppContent() {
     }
   };
 
-  // Role-based hiding for non-admins (Phase 1 of role gating).
-  // The matrix is intentionally simple and lives on the client for now — the
-  // backend already enforces the same restrictions on the corresponding APIs.
+  // Role-based hiding driven by the role-permissions matrix (Phase 2).
+  // The matrix lives in dataStore.rolePermissions, synced from the backend.
+  // Admin is never gated even if the matrix tries — protects against an admin
+  // accidentally locking themselves out.
   const role = currentUser?.teamRole || 'admin';
+  // Sidebar ids vs matrix keys aren't 1-to-1 — map at the boundary so we can
+  // keep the matrix UI in Settings unchanged for now (Phase 2a).
+  const sidebarToMatrixKey = (sidebarId: string): string => {
+    const map: Record<string, string> = { sales: 'orders', warehouse: 'production' };
+    return map[sidebarId] || sidebarId;
+  };
   const moduleAllowedByRole = (id: string): boolean => {
     if (role === 'admin') return true;
-    // Manager loses access to whole-team settings management.
-    if (role === 'manager') return id !== 'settings';
-    // Employee: no Finance, no Settings.
-    if (role === 'employee') return id !== 'finance' && id !== 'settings';
+    const matrixKey = sidebarToMatrixKey(id);
+    // 'none' → hidden; 'view'/'full' → visible (write restrictions handled by buttons).
+    const level = (dataStore.rolePermissions as any)?.[role]?.[matrixKey];
+    if (level === 'none') return false;
     return true;
   };
 

@@ -217,6 +217,14 @@ function loadRolePermissions(): RolePermissions {
 
 function saveRolePermissions(p: RolePermissions) {
   try { localStorage.setItem(ROLE_PERMS_STORAGE_KEY, JSON.stringify(p)); } catch {}
+  // Mirror to the backend so the matrix follows the team across devices and
+  // — eventually — server-side enforcement (Phase 2b). Admin-only on the PUT;
+  // non-admins get a 403 here which we silently ignore.
+  api.put('/api/team-permissions', p).catch(err => {
+    if (String(err?.message || '') !== 'requires admin role') {
+      console.error('[saveRolePermissions]', err);
+    }
+  });
 }
 
 // ─── Module settings (Block B.1) ────────────────────────
@@ -715,18 +723,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const reloadAll = useCallback(async () => {
     if (!getToken()) { setLoaded(true); return; }
     try {
-      const [d, e, t, p, tx, ig, al, ai] = await Promise.all([
+      // Note: /api/transactions and /api/activity are role-gated on the
+      // backend, so non-admins may get 403 here — swallow to null and use
+      // empty lists locally rather than tearing down the whole reload.
+      const [d, e, t, p, tx, ig, al, ai, rp] = await Promise.all([
         api.get<Deal[]>('/api/deals'),
         api.get<Employee[]>('/api/employees'),
         api.get<Task[]>('/api/tasks'),
         api.get<Product[]>('/api/products'),
-        api.get<FinanceTransaction[]>('/api/transactions'),
+        api.get<FinanceTransaction[]>('/api/transactions').catch(() => [] as FinanceTransaction[]),
         api.get<Integration[]>('/api/integrations'),
-        api.get<ActivityLog[]>('/api/activity'),
+        api.get<ActivityLog[]>('/api/activity').catch(() => [] as ActivityLog[]),
         api.get<AISettings | null>('/api/ai-settings').catch(() => null),
+        api.get<RolePermissions | null>('/api/team-permissions').catch(() => null),
       ]);
       setDeals(d); setEmployees(e); setTasks(t); setProducts(p);
       setTransactions(tx); setIntegrations(ig); setActivityLogs(al);
+      // Role permission matrix is sourced from the backend so all teammates
+      // see the same rules. Merge with defaults to absorb new module keys.
+      if (rp) {
+        const merged: RolePermissions = {
+          admin:    { ...DEFAULT_ROLE_PERMISSIONS.admin,    ...((rp as any).admin || {}) },
+          manager:  { ...DEFAULT_ROLE_PERMISSIONS.manager,  ...((rp as any).manager || {}) },
+          employee: { ...DEFAULT_ROLE_PERMISSIONS.employee, ...((rp as any).employee || {}) },
+        };
+        setRolePermissions(merged);
+        try { localStorage.setItem(ROLE_PERMS_STORAGE_KEY, JSON.stringify(merged)); } catch {}
+      }
       // Backend is the source of truth for AI settings — merge with defaults so
       // newly-added fields don't crash older saved blobs.
       if (ai) {

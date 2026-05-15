@@ -110,6 +110,14 @@ CREATE TABLE IF NOT EXISTS invitations (
 );
 CREATE INDEX IF NOT EXISTS idx_invitations_team ON invitations(team_id);
 CREATE INDEX IF NOT EXISTS idx_invitations_code ON invitations(code);
+
+-- Phase 2 of role gating — per-team role permissions matrix.
+-- One row per team, holding the JSON-encoded {role: {module: 'full'|'view'|'none'}}.
+CREATE TABLE IF NOT EXISTS team_settings (
+  team_id TEXT PRIMARY KEY,
+  role_permissions TEXT,
+  updated_at TEXT
+);
 `);
 
 // Idempotent migration: add columns if missing. Returns true when column was just added.
@@ -589,6 +597,76 @@ aiSettingsRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
 });
 
 app.use('/api/ai-settings', aiSettingsRouter);
+
+// ─── TEAM PERMISSIONS (Phase 2 — role × module matrix) ────────────
+// Single JSON blob per team, written by admins, read by every member.
+// Frontend uses it to decide what's visible; backend uses it (via the
+// requirePermission middleware below) to enforce the same rules.
+const teamPermsRouter = express.Router();
+teamPermsRouter.use(authMiddleware);
+
+teamPermsRouter.get('/', (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT role_permissions FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+  if (!row?.role_permissions) return res.json(null);
+  try { res.json(JSON.parse(row.role_permissions)); }
+  catch { res.json(null); }
+});
+
+teamPermsRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
+  const blob = JSON.stringify(req.body || {});
+  db.prepare(`
+    INSERT INTO team_settings (team_id, role_permissions, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET
+      role_permissions = excluded.role_permissions,
+      updated_at = excluded.updated_at
+  `).run(req.teamId!, blob);
+  res.json({ ok: true });
+});
+
+app.use('/api/team-permissions', teamPermsRouter);
+
+// ─── Permission check helper (used by route guards) ────────────────
+// Looks up the current request's role × module permission and returns the
+// level ('full' | 'view' | 'none'). Defaults to 'full' for admins regardless
+// of matrix (they can't lock themselves out) and to the hardcoded defaults
+// otherwise so a missing matrix doesn't accidentally open everything up.
+const DEFAULT_MATRIX: Record<string, Record<string, 'full' | 'view' | 'none'>> = {
+  admin:    { orders: 'full', sales: 'full', chats: 'full', finance: 'full', production: 'full', warehouse: 'full', analytics: 'full', settings: 'full', tasks: 'full' },
+  manager:  { orders: 'full', sales: 'full', chats: 'full', finance: 'view', production: 'view', warehouse: 'view', analytics: 'view', settings: 'none', tasks: 'full' },
+  employee: { orders: 'view', sales: 'view', chats: 'view', finance: 'none', production: 'view', warehouse: 'view', analytics: 'none', settings: 'none', tasks: 'view' },
+};
+
+function getPermissionLevel(teamId: string, role: string, moduleKey: string): 'full' | 'view' | 'none' {
+  // Admin always 'full' — protects against accidentally locking out the admin.
+  if (role === 'admin') return 'full';
+  try {
+    const row = db.prepare('SELECT role_permissions FROM team_settings WHERE team_id = ?').get(teamId) as any;
+    if (row?.role_permissions) {
+      const matrix = JSON.parse(row.role_permissions);
+      const v = matrix?.[role]?.[moduleKey];
+      if (v === 'full' || v === 'view' || v === 'none') return v;
+    }
+  } catch { /* fall through */ }
+  // Fallback to defaults table.
+  return DEFAULT_MATRIX[role]?.[moduleKey] ?? 'full';
+}
+
+// Express middleware factory: blocks the request when the caller's role has
+// no access to `moduleKey` (level === 'none'), or when the call is a write
+// (POST/PATCH/PUT/DELETE) and the level is read-only ('view').
+function requirePermission(moduleKey: string) {
+  return (req: AuthedRequest, res: Response, next: NextFunction) => {
+    const level = getPermissionLevel(req.teamId!, req.teamRole || 'admin', moduleKey);
+    if (level === 'none') return res.status(403).json({ error: `no access to ${moduleKey}` });
+    const isWrite = req.method !== 'GET' && req.method !== 'HEAD';
+    if (isWrite && level !== 'full') return res.status(403).json({ error: `${moduleKey} is read-only for your role` });
+    next();
+  };
+}
+// Touch the helper so unused-export linters don't complain while Phase 2b
+// (route-level enforcement) is still in flight.
+void requirePermission;
 
 // ─── INVITATIONS (Block C.2 — team invites) ───────────────────────
 // Flow:
