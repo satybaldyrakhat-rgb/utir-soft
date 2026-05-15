@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, Bot, Sparkles, Users, Settings as SettingsIcon, Zap, Activity, Plus, Search, Edit2, Trash2, UserPlus, Star, CheckCircle, X, Shield, Check, Eye, ChevronDown, LayoutGrid, Camera, BookOpen, Send } from 'lucide-react';
 import { ModulesSettings } from './ModulesSettings';
 import { ActivityLog } from './ActivityLog';
@@ -148,17 +148,31 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
   const saveEmployeeRole = async () => {
     if (!editingEmployee) { closeEmployeeModal(); return; }
     setRoleError('');
-    // Nothing to update yet other than role (the form's name/email/phone fields
-    // are still display-only). If role didn't change, just close.
-    if (editingEmployee.role === empRole) { closeEmployeeModal(); return; }
+
+    const name = empName.trim();
+    const phone = empPhone.trim();
+    const profileChanged = name !== (editingEmployee.name || '') || phone !== (editingEmployee.phone || '');
+    const roleChanged = editingEmployee.role !== empRole;
+
     // Self-protection mirrors the backend rule.
-    if (currentUserEmail && editingEmployee.email.toLowerCase() === currentUserEmail.toLowerCase()) {
+    const isSelf = !!currentUserEmail && editingEmployee.email.toLowerCase() === currentUserEmail.toLowerCase();
+    if (roleChanged && isSelf) {
       setRoleError(l('Нельзя менять собственную роль.', 'Өз рөліңізді өзгерте алмайсыз.', "You can't change your own role."));
       return;
     }
+
+    if (!profileChanged && !roleChanged) { closeEmployeeModal(); return; }
+
     setRoleSaving(true);
     try {
-      await api.patch(`/api/employees/${editingEmployee.id}/role`, { role: empRole });
+      // Profile fields go through the generic employees PATCH endpoint.
+      if (profileChanged) {
+        store.updateEmployee(editingEmployee.id, { name, phone });
+      }
+      // Role goes through the dedicated endpoint so it also updates users.team_role.
+      if (roleChanged) {
+        await api.patch(`/api/employees/${editingEmployee.id}/role`, { role: empRole });
+      }
       await store.reloadAll();
       closeEmployeeModal();
     } catch (e: any) {
@@ -172,7 +186,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
           'Бұл қызметкердің аккаунты жоқ — рөл тек жергілікті өзгереді.',
           "This teammate has no auth account — role change applies locally only."));
       } else {
-        setRoleError(msg || l('Не удалось обновить роль.', 'Рөлді жаңарту мүмкін болмады.', 'Could not update role.'));
+        setRoleError(msg || l('Не удалось обновить.', 'Жаңарту мүмкін болмады.', 'Could not save changes.'));
       }
     } finally {
       setRoleSaving(false);
@@ -248,8 +262,21 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
 
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
+
+  // Re-seed the controlled fields each time a different employee is opened
+  // (or the modal is dismissed). Without this the inputs keep stale values
+  // from the previously-edited row.
+  useEffect(() => {
+    setEmpName(editingEmployee?.name || '');
+    setEmpEmail(editingEmployee?.email || '');
+    setEmpPhone(editingEmployee?.phone || '');
+  }, [editingEmployee]);
   const [empRole, setEmpRole] = useState<string>('manager');
-  const [empPermissions, setEmpPermissions] = useState({ allOrders: true, finance: false, editTeam: false, export: false });
+  // Controlled state for the edit-employee modal. Initialised from
+  // editingEmployee when it opens (see useEffect below).
+  const [empName, setEmpName] = useState('');
+  const [empEmail, setEmpEmail] = useState('');
+  const [empPhone, setEmpPhone] = useState('');
 
   return (
     <div className="p-4 md:p-8 max-w-[1000px]">
@@ -860,9 +887,40 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
               <button onClick={() => { setShowEmployeeModal(false); setEditingEmployee(null); }} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-gray-400" /></button>
             </div>
             <div className="p-5 space-y-4">
-              <div><label className="block text-[11px] text-gray-400 mb-1">Имя</label><input type="text" defaultValue={editingEmployee?.name || ''} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
-              <div><label className="block text-[11px] text-gray-400 mb-1">Email</label><input type="email" defaultValue={editingEmployee?.email || ''} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
-              <div><label className="block text-[11px] text-gray-400 mb-1">Телефон</label><input type="text" defaultValue={editingEmployee?.phone || ''} placeholder="+7 ___ ___ __ __" className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
+              <div>
+                <label className="block text-[11px] text-gray-400 mb-1">{l('Имя', 'Аты', 'Name')}</label>
+                <input
+                  type="text"
+                  value={empName}
+                  onChange={e => setEmpName(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-gray-400 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={empEmail}
+                  readOnly
+                  disabled
+                  className="w-full px-3 py-2.5 bg-gray-100 border-0 rounded-xl text-sm text-gray-500 cursor-not-allowed"
+                />
+                <div className="text-[10px] text-gray-400 mt-1">
+                  {l('Email привязан к аккаунту и не редактируется.',
+                     'Email аккаунтпен байланысты және өзгертілмейді.',
+                     'Email is tied to the auth account and cannot be changed.')}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] text-gray-400 mb-1">{l('Телефон', 'Телефон', 'Phone')}</label>
+                <input
+                  type="text"
+                  value={empPhone}
+                  onChange={e => setEmpPhone(e.target.value)}
+                  placeholder="+7 ___ ___ __ __"
+                  className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+                />
+              </div>
               {/* Role block */}
               <div className="border border-gray-100 rounded-2xl p-4 space-y-3">
                 <div className="text-[11px] text-gray-500">Роль и доступ</div>
@@ -880,16 +938,16 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
                     ))}
                   </div>
                 </div>
-                <div>
-                  <label className="block text-[11px] text-gray-400 mb-2">Дополнительные права</label>
-                  <div className="space-y-1">
-                    {([['allOrders', 'Видит все заказы (если выкл — только свои)'], ['finance', 'Видит финансовую информацию'], ['editTeam', 'Может редактировать настройки команды'], ['export', 'Может экспортировать данные']] as [keyof typeof empPermissions, string][]).map(([key, label]) => (
-                      <label key={key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl cursor-pointer hover:bg-gray-50">
-                        <input type="checkbox" checked={empPermissions[key]} onChange={e => setEmpPermissions({ ...empPermissions, [key]: e.target.checked })} className="w-3.5 h-3.5 rounded accent-gray-900" />
-                        <span className="text-xs text-gray-700">{label}</span>
-                      </label>
-                    ))}
-                  </div>
+                {/* The old per-employee 'Дополнительные права' checkboxes were
+                    legacy — they didn't save anywhere and overlapped with the
+                    team-wide matrix below. Removed; matrix is the source of
+                    truth for what each role can do. */}
+                <div className="text-[10px] text-gray-400 leading-relaxed">
+                  {l(
+                    'Подробные права настраиваются в матрице ниже — общие правила для всей роли.',
+                    'Толық рұқсаттар төмендегі матрицада — рөл бойынша жалпы ережелер.',
+                    'Detailed permissions are configured in the matrix below — they apply to the whole role.',
+                  )}
                 </div>
               </div>
             </div>
