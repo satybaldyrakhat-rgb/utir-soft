@@ -508,10 +508,11 @@ invitationsRouter.delete('/:id', requireAdmin, (req: AuthedRequest, res) => {
   res.json({ ok: true });
 });
 
-app.use('/api/invitations', invitationsRouter);
-
-// Public preview — anyone landing on /auth?invite=XYZ can see who invited them
+// Public preview — anyone landing on /?invite=XYZ can see who invited them
 // before they decide to sign up. Returns minimal info.
+// IMPORTANT: this route MUST be registered BEFORE `app.use('/api/invitations', …)`
+// — otherwise the authenticated router below catches the request and rejects it
+// with 401 before this handler ever runs.
 app.get('/api/invitations/preview/:code', (req, res) => {
   const code = String(req.params.code || '').toUpperCase().trim();
   const row = db.prepare(
@@ -536,6 +537,8 @@ app.get('/api/invitations/preview/:code', (req, res) => {
     expiresAt: row.expires_at,
   });
 });
+
+app.use('/api/invitations', invitationsRouter);
 
 // ─── INTEGRATIONS (per-user list with stable ids) ──────
 const integrationsRouter = express.Router();
