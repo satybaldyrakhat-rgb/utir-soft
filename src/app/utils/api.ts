@@ -38,6 +38,7 @@ async function request<T>(method: string, url: string, body?: any): Promise<T> {
 export const api = {
   get: <T>(u: string) => request<T>('GET', u),
   post: <T>(u: string, b?: any) => request<T>('POST', u, b),
+  put: <T>(u: string, b?: any) => request<T>('PUT', u, b),
   patch: <T>(u: string, b?: any) => request<T>('PATCH', u, b),
   delete: <T>(u: string) => request<T>('DELETE', u),
 };

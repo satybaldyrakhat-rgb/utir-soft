@@ -111,6 +111,9 @@ migrateColumn('users', 'company', "TEXT DEFAULT ''");
 migrateColumn('users', 'verification_code', 'TEXT');
 const verifiedJustAdded = migrateColumn('users', 'email_verified', 'INTEGER DEFAULT 0');
 migrateColumn('users', 'terms_accepted_at', 'TEXT');
+// AI assistant settings (Block F.4 — per-module permissions for Telegram bot)
+// Stored as a JSON blob of the same shape as AISettings on the frontend.
+migrateColumn('users', 'ai_settings', 'TEXT');
 
 // First time email_verified column appears → all pre-existing users predate verification, mark them verified.
 if (verifiedJustAdded) {
@@ -310,6 +313,27 @@ app.use('/api/employees', makeCrud('employees', 'e'));
 app.use('/api/tasks', makeCrud('tasks', 't'));
 app.use('/api/products', makeCrud('products', 'p'));
 app.use('/api/transactions', makeCrud('transactions', 'f'));
+
+// ─── AI SETTINGS (per-user JSON blob, Block F.4) ──────────────────
+// The Telegram bot reads `assistant.modulePermissions` from here to decide
+// whether to auto-execute / ask for confirmation / refuse for each tool call.
+const aiSettingsRouter = express.Router();
+aiSettingsRouter.use(authMiddleware);
+
+aiSettingsRouter.get('/', (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT ai_settings FROM users WHERE id = ?').get(req.userId!) as any;
+  if (!row || !row.ai_settings) return res.json(null);
+  try { res.json(JSON.parse(row.ai_settings)); }
+  catch { res.json(null); }
+});
+
+aiSettingsRouter.put('/', (req: AuthedRequest, res) => {
+  const blob = JSON.stringify(req.body || {});
+  db.prepare('UPDATE users SET ai_settings = ? WHERE id = ?').run(blob, req.userId!);
+  res.json({ ok: true });
+});
+
+app.use('/api/ai-settings', aiSettingsRouter);
 
 // ─── INTEGRATIONS (per-user list with stable ids) ──────
 const integrationsRouter = express.Router();

@@ -126,6 +126,36 @@ function clearPending(db: Database.Database, chatId: number) {
   db.prepare('UPDATE telegram_links SET pending_action = NULL WHERE chat_id = ?').run(chatId);
 }
 
+// ─── Per-module AI permissions (Block F.4) ────────────────────────────────
+// Each user can configure per-module behaviour in Settings → AI-assistant:
+//   - 'auto'    → bot executes the tool immediately, no confirmation
+//   - 'confirm' → bot summarises and waits for "Да" (default, current behaviour)
+//   - 'none'    → bot refuses, tells the admin the module is disabled
+type ModulePermission = 'auto' | 'confirm' | 'none';
+
+const HUMAN_MODULE_NAMES: Record<string, string> = {
+  sales: 'Продажи / Сделки',
+  finance: 'Финансы / Оплаты',
+  tasks: 'Задачи',
+  analytics: 'Аналитика',
+  chats: 'Чаты',
+  warehouse: 'Производство / Склад',
+};
+
+function getModulePermission(db: Database.Database, userId: string, moduleKey: string): ModulePermission {
+  try {
+    const row = db.prepare('SELECT ai_settings FROM users WHERE id = ?').get(userId) as any;
+    if (!row?.ai_settings) return 'confirm';
+    const parsed = JSON.parse(row.ai_settings);
+    const perms = parsed?.assistant?.modulePermissions;
+    const v = perms?.[moduleKey];
+    if (v === 'auto' || v === 'confirm' || v === 'none') return v;
+    return 'confirm';
+  } catch {
+    return 'confirm';
+  }
+}
+
 // ─── Conversation history (last N messages per chat) ──────────────
 // Stored as a JSON array on telegram_links.chat_history so Claude can see prior turns
 // and reason about pronoun references like "доплатил 300 000" → which client.
@@ -358,8 +388,41 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     return;
   }
 
-  // Write tools — store as pending and ask the user to confirm before executing.
-  // Record the summary in history so subsequent turns know what's about to be saved.
+  // Write tools — gate by the user's per-module permission setting.
+  const toolModule = tools.getToolModule(agentResult.toolName);
+  if (!toolModule) {
+    const errReply = `Неизвестное действие: <code>${agentResult.toolName}</code>`;
+    await sendMessage(chatId, errReply);
+    appendHistory(db, chatId, 'assistant', stripHtml(errReply));
+    return;
+  }
+  const permission = getModulePermission(db, user.id, toolModule);
+  const moduleName = HUMAN_MODULE_NAMES[toolModule] || toolModule;
+
+  if (permission === 'none') {
+    const reply = `🚫 Модуль <b>${moduleName}</b> отключён для AI-ассистента в настройках.\n\n` +
+      `Чтобы включить — Платформа → Настройки → AI-ассистент → разрешения по модулям.`;
+    await sendMessage(chatId, reply);
+    appendHistory(db, chatId, 'assistant', stripHtml(reply));
+    return;
+  }
+
+  if (permission === 'auto') {
+    // No confirmation step — execute immediately, send the brief summary as a heads-up.
+    try {
+      const result = await tools.execute(db, user.id, user.name, agentResult.toolName, agentResult.toolInput, logActivity);
+      const reply = `⚡ Автоматически (${moduleName}):\n${agentResult.summary}\n\n${result}`;
+      await sendMessage(chatId, reply);
+      appendHistory(db, chatId, 'assistant', stripHtml(reply));
+    } catch (e: any) {
+      const errReply = `❌ Ошибка: ${e.message || e}`;
+      await sendMessage(chatId, errReply);
+      appendHistory(db, chatId, 'assistant', errReply);
+    }
+    return;
+  }
+
+  // permission === 'confirm' (default) — current behaviour: store as pending, ask "Да".
   setPending(db, chatId, { toolName: agentResult.toolName, toolInput: agentResult.toolInput, summary: agentResult.summary });
   const fullSummary = agentResult.summary + `\n\n<i>Подтвердите — «Да» или «Нет».</i>`;
   await sendMessage(chatId, fullSummary);

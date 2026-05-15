@@ -15,10 +15,16 @@ export interface ToolContext {
   logActivity: (userId: string, entry: any) => void;
 }
 
+// Module key matches the frontend's AISettings.assistant.modulePermissions keys —
+// the Telegram bot uses this to look up the user's per-module permission
+// (auto / confirm / none) before executing a write tool.
+export type ToolModule = 'sales' | 'finance' | 'tasks' | 'analytics' | 'chats' | 'warehouse' | 'readonly';
+
 interface ToolDef {
   description: string;
   input_schema: any;
   readOnly?: boolean;
+  module: ToolModule;
   summarize: (input: any) => string;
   execute: (ctx: ToolContext, input: any) => Promise<string>;
 }
@@ -55,6 +61,7 @@ function patchDeal(db: Database.Database, dealId: string, updates: Record<string
 
 // ─── add_deal ─────────────────────────────────────────────────────
 const addDeal: ToolDef = {
+  module: 'sales',
   description:
     'Создать новую сделку (deal). ВЫЗЫВАЙ когда админ описывает нового клиента, продажу, заказ. ' +
     'Не задавай уточняющих вопросов про второстепенные поля (адрес, источник) — оставляй пустыми. ' +
@@ -121,6 +128,7 @@ const addDeal: ToolDef = {
 
 // ─── log_payment ──────────────────────────────────────────────────
 const logPayment: ToolDef = {
+  module: 'finance',
   description:
     'Зафиксировать оплату по существующей сделке. ВЫЗЫВАЙ когда админ говорит "X оплатил/доплатил/закинул Y тенге". ' +
     'Прибавит сумму к уже оплаченному в сделке клиента. Если такого клиента нет — вернёт ошибку.',
@@ -185,6 +193,7 @@ const STATUS_MAP: Record<string, { code: string; label: string }> = {
 };
 
 const updateDealStatus: ToolDef = {
+  module: 'sales',
   description:
     'Изменить статус сделки. ВЫЗЫВАЙ когда админ говорит "X подписал договор", "Y отказался", "сделка с Z завершена". ' +
     'Допустимые статусы (выбери ближайший): new, measured, project (проект и договор), production (производство), ' +
@@ -234,6 +243,7 @@ const updateDealStatus: ToolDef = {
 const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const;
 
 const addTask: ToolDef = {
+  module: 'tasks',
   description:
     'Создать новую задачу для команды. ВЫЗЫВАЙ когда админ говорит "нужно сделать X к Y дате", "поставь задачу", "напомни X-у про Y". ' +
     'Сегодняшнюю дату подставляй САМ исходя из текущей даты в системе.',
@@ -286,6 +296,7 @@ const addTask: ToolDef = {
 
 // ─── find_client (read-only) ──────────────────────────────────────
 const findClient: ToolDef = {
+  module: 'readonly',
   description:
     'Найти сделку и показать её сводку. ВЫЗЫВАЙ когда админ спрашивает "что по X?", "сколько у Y?", "статус Z?", "найди клиента". ' +
     'Это инструмент чтения — не пишет в базу.',
@@ -342,6 +353,12 @@ export function isReadOnly(toolName: string): boolean {
   return !!TOOLS[toolName]?.readOnly;
 }
 
+// Return the module key the tool belongs to (used for per-module permission lookup).
+// Returns `null` for unknown tools so the bot can refuse safely.
+export function getToolModule(toolName: string): ToolModule | null {
+  return TOOLS[toolName]?.module ?? null;
+}
+
 export function summarize(toolName: string, input: any): string {
   const t = TOOLS[toolName];
   if (!t) return `Действие «${toolName}»: ${JSON.stringify(input)}`;
@@ -354,4 +371,4 @@ async function execute(db: Database.Database, userId: string, userName: string, 
   return t.execute({ db, userId, userName, logActivity }, input);
 }
 
-export default { toolsForClaude, isReadOnly, summarize, execute };
+export default { toolsForClaude, isReadOnly, getToolModule, summarize, execute };

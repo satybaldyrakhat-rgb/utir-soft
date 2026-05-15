@@ -379,6 +379,9 @@ function loadAISettings(): AISettings {
 
 function saveAISettings(s: AISettings) {
   try { localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(s)); } catch {}
+  // Also persist to the backend so the Telegram bot (server-side) can honour
+  // `assistant.modulePermissions` for auto / confirm / none gating.
+  api.put('/api/ai-settings', s).catch(err => console.error('[saveAISettings]', err));
 }
 
 // ─── CONTEXT ─────────────────────────────────────
@@ -712,7 +715,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const reloadAll = useCallback(async () => {
     if (!getToken()) { setLoaded(true); return; }
     try {
-      const [d, e, t, p, tx, ig, al] = await Promise.all([
+      const [d, e, t, p, tx, ig, al, ai] = await Promise.all([
         api.get<Deal[]>('/api/deals'),
         api.get<Employee[]>('/api/employees'),
         api.get<Task[]>('/api/tasks'),
@@ -720,9 +723,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
         api.get<FinanceTransaction[]>('/api/transactions'),
         api.get<Integration[]>('/api/integrations'),
         api.get<ActivityLog[]>('/api/activity'),
+        api.get<AISettings | null>('/api/ai-settings').catch(() => null),
       ]);
       setDeals(d); setEmployees(e); setTasks(t); setProducts(p);
       setTransactions(tx); setIntegrations(ig); setActivityLogs(al);
+      // Backend is the source of truth for AI settings — merge with defaults so
+      // newly-added fields don't crash older saved blobs.
+      if (ai) {
+        const merged: AISettings = {
+          client: { ...DEFAULT_AI_SETTINGS.client, ...(ai.client || {}) },
+          assistant: {
+            ...DEFAULT_AI_SETTINGS.assistant,
+            ...(ai.assistant || {}),
+            modulePermissions: {
+              ...DEFAULT_AI_SETTINGS.assistant.modulePermissions,
+              ...((ai.assistant && ai.assistant.modulePermissions) || {}),
+            },
+          },
+        };
+        setAISettings(merged);
+        try { localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(merged)); } catch {}
+      }
     } catch (err) {
       console.error('[dataStore] reloadAll failed', err);
     } finally {
