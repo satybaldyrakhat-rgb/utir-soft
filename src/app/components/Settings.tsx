@@ -6,6 +6,7 @@ import { TelegramPairing } from './TelegramPairing';
 import { TeamInvitePanel } from './TeamInvitePanel';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
 import { useDataStore, ALL_MODULES, ALL_ROLES, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
+import { api } from '../utils/api';
 import { t } from '../utils/translations';
 
 // Until C.2 (invitations) ships, the workspace owner is always the admin.
@@ -134,6 +135,49 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
     const r = filterRole === 'all' || e.role === filterRole;
     return s && r;
   });
+
+  const [roleSaving, setRoleSaving] = useState(false);
+  const [roleError, setRoleError] = useState<string>('');
+
+  const closeEmployeeModal = () => {
+    setShowEmployeeModal(false);
+    setEditingEmployee(null);
+    setRoleError('');
+  };
+
+  const saveEmployeeRole = async () => {
+    if (!editingEmployee) { closeEmployeeModal(); return; }
+    setRoleError('');
+    // Nothing to update yet other than role (the form's name/email/phone fields
+    // are still display-only). If role didn't change, just close.
+    if (editingEmployee.role === empRole) { closeEmployeeModal(); return; }
+    // Self-protection mirrors the backend rule.
+    if (currentUserEmail && editingEmployee.email.toLowerCase() === currentUserEmail.toLowerCase()) {
+      setRoleError(l('Нельзя менять собственную роль.', 'Өз рөліңізді өзгерте алмайсыз.', "You can't change your own role."));
+      return;
+    }
+    setRoleSaving(true);
+    try {
+      await api.patch(`/api/employees/${editingEmployee.id}/role`, { role: empRole });
+      await store.reloadAll();
+      closeEmployeeModal();
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (msg === 'team must keep at least one admin') {
+        setRoleError(l('Нельзя оставить команду без админа.', 'Команданы әкімшісіз қалдыруға болмайды.', "Team must keep at least one admin."));
+      } else if (msg === 'cannot change own role') {
+        setRoleError(l('Нельзя менять собственную роль.', 'Өз рөліңізді өзгерте алмайсыз.', "You can't change your own role."));
+      } else if (msg === 'no linked auth account') {
+        setRoleError(l('У этого сотрудника нет аккаунта — изменение роли применится только локально.',
+          'Бұл қызметкердің аккаунты жоқ — рөл тек жергілікті өзгереді.',
+          "This teammate has no auth account — role change applies locally only."));
+      } else {
+        setRoleError(msg || l('Не удалось обновить роль.', 'Рөлді жаңарту мүмкін болмады.', 'Could not update role.'));
+      }
+    } finally {
+      setRoleSaving(false);
+    }
+  };
 
   const deleteEmployee = (id: string) => {
     const emp = employees.find(e => e.id === id);
@@ -846,9 +890,18 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
                 </div>
               </div>
             </div>
+            {roleError && (
+              <div className="mx-5 mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-lg text-xs text-red-700">{roleError}</div>
+            )}
             <div className="p-5 pt-0 flex gap-2">
-              <button onClick={() => { setShowEmployeeModal(false); setEditingEmployee(null); }} className="flex-1 px-3 py-2.5 border border-gray-100 rounded-xl text-xs hover:bg-gray-50">Отмена</button>
-              <button onClick={() => { setShowEmployeeModal(false); setEditingEmployee(null); }} className="flex-1 px-3 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">Сохранить</button>
+              <button onClick={closeEmployeeModal} className="flex-1 px-3 py-2.5 border border-gray-100 rounded-xl text-xs hover:bg-gray-50">{l('Отмена', 'Бас тарту', 'Cancel')}</button>
+              <button
+                onClick={saveEmployeeRole}
+                disabled={roleSaving}
+                className="flex-1 px-3 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 disabled:opacity-50"
+              >
+                {roleSaving ? l('Сохраняю…', 'Сақталуда…', 'Saving…') : l('Сохранить', 'Сақтау', 'Save')}
+              </button>
             </div>
           </div>
         </div>

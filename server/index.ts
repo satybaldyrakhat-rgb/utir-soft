@@ -503,6 +503,40 @@ app.use('/api/deals', makeCrud('deals', 'D'));
 // corresponds to an actual user (matched by email), also disable that user
 // and detach them from the team so they lose access. For manually-added
 // employee records (no matching auth user) the behaviour is unchanged.
+// Promote / demote a teammate (Phase 3 of role gating).
+// Resolves the linked auth user via the employees row's email, refuses self,
+// updates users.team_role and the employees data blob in one shot.
+app.patch('/api/employees/:id/role', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
+  const role = String(req.body?.role || '');
+  if (!ROLE_RANK[role]) return res.status(400).json({ error: 'invalid role' });
+  const empRow = db.prepare('SELECT data FROM employees WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!empRow) return res.status(404).json({ error: 'not found' });
+  const data = JSON.parse(empRow.data);
+  const email = String(data.email || '').toLowerCase();
+  if (!email) return res.status(400).json({ error: 'employee has no email' });
+  const target = db.prepare('SELECT id, name, team_role FROM users WHERE email = ? AND team_id = ?').get(email, req.teamId!) as any;
+  if (!target) return res.status(400).json({ error: 'no linked auth account' });
+  if (target.id === req.userId) return res.status(400).json({ error: 'cannot change own role' });
+  // If demoting an admin, make sure the team still has at least one other admin.
+  if (target.team_role === 'admin' && role !== 'admin') {
+    const adminCount = (db.prepare(
+      'SELECT COUNT(*) AS c FROM users WHERE team_id = ? AND team_role = ? AND (disabled_at IS NULL)'
+    ).get(req.teamId!, 'admin') as any).c as number;
+    if (adminCount <= 1) return res.status(400).json({ error: 'team must keep at least one admin' });
+  }
+  db.prepare('UPDATE users SET team_role = ? WHERE id = ?').run(role, target.id);
+  data.role = role;
+  db.prepare('UPDATE employees SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(data), req.params.id, req.teamId!);
+  const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  logActivity(req.userId!, {
+    user: actor?.name || '', actor: 'human',
+    action: `Изменил роль сотрудника на ${role}`,
+    target: target.name,
+    type: 'permission', page: 'team',
+  });
+  res.json({ ok: true, role });
+});
+
 app.delete('/api/employees/:id', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
   const row = db.prepare('SELECT data FROM employees WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
   if (!row) return res.status(404).json({ error: 'not found' });
