@@ -142,6 +142,30 @@ const HUMAN_MODULE_NAMES: Record<string, string> = {
   warehouse: 'Производство / Склад',
 };
 
+// Hand-off / failure logging (Block F.5) — every time the bot couldn't or
+// wouldn't act, drop an entry into the user's activity log so the admin can
+// review what was missed without scrolling through Telegram chat history.
+function logHandoff(
+  logActivity: (userId: string, entry: any) => void,
+  userId: string,
+  userName: string,
+  reason: string,
+  detail: string,
+) {
+  try {
+    logActivity(userId, {
+      user: userName,
+      actor: 'ai',
+      type: 'ai',
+      page: 'ai',
+      action: `AI handoff: ${reason}`,
+      target: detail.slice(0, 240),
+    });
+  } catch (err) {
+    console.error('[telegram] logHandoff failed', err);
+  }
+}
+
 function getModulePermission(db: Database.Database, userId: string, moduleKey: string): ModulePermission {
   try {
     const row = db.prepare('SELECT ai_settings FROM users WHERE id = ?').get(userId) as any;
@@ -322,17 +346,24 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
         const errReply = `❌ Не удалось сохранить: ${e.message || e}`;
         await sendMessage(chatId, errReply);
         appendHistory(db, chatId, 'assistant', errReply);
+        logHandoff(logActivity, user.id, user.name, 'tool execute failed',
+          `${pendingAction.toolName}: ${e.message || e}`);
       } finally {
         clearPending(db, chatId);
       }
       return;
     }
     if (NO_RE.test(text)) {
+      const user = findUserByChat(db, chatId);
       clearPending(db, chatId);
       appendHistory(db, chatId, 'user', text);
       const reply = `Отменил. Можете написать новый запрос.`;
       await sendMessage(chatId, reply);
       appendHistory(db, chatId, 'assistant', reply);
+      if (user) {
+        logHandoff(logActivity, user.id, user.name, 'rejected by admin',
+          `${pendingAction.toolName}: ${stripHtml(pendingAction.summary).slice(0, 200)}`);
+      }
       return;
     }
     // Anything else → treat as a new request (correction or fresh topic). Don't clearPending
@@ -364,6 +395,8 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     const errReply = `Не получилось обработать запрос. Попробуйте переформулировать.`;
     await sendMessage(chatId, errReply + `\n\n<code>${(e.message || e).toString().slice(0, 200)}</code>`);
     appendHistory(db, chatId, 'assistant', errReply);
+    logHandoff(logActivity, user.id, user.name, 'Claude API failed',
+      `User: "${text.slice(0, 120)}" — ${e.message || e}`);
     return;
   }
 
@@ -384,6 +417,8 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       const errReply = `❌ Ошибка: ${e.message || e}`;
       await sendMessage(chatId, errReply);
       appendHistory(db, chatId, 'assistant', errReply);
+      logHandoff(logActivity, user.id, user.name, 'read-only tool failed',
+        `${agentResult.toolName}: ${e.message || e}`);
     }
     return;
   }
@@ -394,6 +429,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     const errReply = `Неизвестное действие: <code>${agentResult.toolName}</code>`;
     await sendMessage(chatId, errReply);
     appendHistory(db, chatId, 'assistant', stripHtml(errReply));
+    logHandoff(logActivity, user.id, user.name, 'unknown tool', agentResult.toolName);
     return;
   }
   const permission = getModulePermission(db, user.id, toolModule);
@@ -404,6 +440,8 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       `Чтобы включить — Платформа → Настройки → AI-ассистент → разрешения по модулям.`;
     await sendMessage(chatId, reply);
     appendHistory(db, chatId, 'assistant', stripHtml(reply));
+    logHandoff(logActivity, user.id, user.name, 'module disabled',
+      `${moduleName} (${agentResult.toolName}): user said "${text.slice(0, 120)}"`);
     return;
   }
 
@@ -418,6 +456,8 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       const errReply = `❌ Ошибка: ${e.message || e}`;
       await sendMessage(chatId, errReply);
       appendHistory(db, chatId, 'assistant', errReply);
+      logHandoff(logActivity, user.id, user.name, 'auto tool execute failed',
+        `${agentResult.toolName}: ${e.message || e}`);
     }
     return;
   }
