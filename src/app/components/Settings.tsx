@@ -38,6 +38,28 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
   // Real admin check. Used for hard-gated sub-tabs (Команда и права, Журнал)
   // that should never be visible to non-admins regardless of the matrix.
   const isAdmin = store.currentUserRole === 'admin';
+
+  // Pending matrix state — clicks on permission cells update this locally;
+  // nothing hits the backend until the admin clicks 'Сохранить'. Null means
+  // 'no pending edits, show store values'.
+  const [pendingMatrix, setPendingMatrix] = useState<Record<string, Record<string, PermissionLevel>> | null>(null);
+  const currentMatrix: Record<string, Record<string, PermissionLevel>> = pendingMatrix ?? (store.rolePermissions as any);
+  const matrixDirty = pendingMatrix !== null;
+  const updateMatrixCell = (role: string, module: string, level: PermissionLevel) => {
+    setPendingMatrix(prev => {
+      const base = prev ?? (store.rolePermissions as any);
+      return {
+        ...base,
+        [role]: { ...(base[role] || {}), [module]: level },
+      };
+    });
+  };
+  const saveMatrix = () => {
+    if (!pendingMatrix) return;
+    store.bulkSetRolePermissions(pendingMatrix as any);
+    setPendingMatrix(null);
+  };
+  const discardMatrix = () => setPendingMatrix(null);
   const profile = store.profile;
   const catalogs = store.catalogs;
   const aiClient = store.aiSettings.client;
@@ -664,9 +686,30 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
 
           {/* ===== Permissions matrix (merged from the old 'Роли и права' tab) ===== */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <Shield className="w-4 h-4 text-gray-400" />
-              <div className="text-sm text-gray-900">{tt('permissionsMatrixTitle')}</div>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-gray-400" />
+                <div className="text-sm text-gray-900">{tt('permissionsMatrixTitle')}</div>
+              </div>
+              {/* Save / Discard appear only when there's a pending diff.
+                  Cell clicks no longer auto-save — they update local state. */}
+              {matrixDirty && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={discardMatrix}
+                    className="px-2.5 py-1.5 text-xs text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    {l('Отменить', 'Бас тарту', 'Discard')}
+                  </button>
+                  <button
+                    onClick={saveMatrix}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs hover:bg-gray-800 transition-colors"
+                  >
+                    <Check className="w-3 h-3" />
+                    {l('Сохранить', 'Сақтау', 'Save')}
+                  </button>
+                </div>
+              )}
             </div>
             <div className="text-[11px] text-gray-400 mb-4 max-w-xl">{tt('permissionsMatrixHint')}</div>
             <div className="overflow-x-auto">
@@ -703,14 +746,16 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
                         <span className={`px-2 py-0.5 rounded text-[11px] ${roleBg(roleK)}`}>{roleLabel(roleK)}</span>
                       </td>
                       {MODULE_GROUPS.flatMap(g => g.modules).map(module => {
-                        const current = store.rolePermissions[roleK]?.[module] || 'none';
+                        // Read from the pending matrix so unsaved cell clicks
+                        // are visible immediately; commit happens on 'Save'.
+                        const current = currentMatrix[roleK]?.[module] || 'none';
                         const isAdminFull = roleK === 'admin';
                         const cycle: PermissionLevel[] = ['full', 'view', 'none'];
                         const nextLevel = cycle[(cycle.indexOf(current) + 1) % cycle.length];
                         return (
                           <td key={module} className="py-3 px-2 text-center">
                             <button
-                              onClick={() => !isAdminFull && store.setRolePermission(roleK, module, nextLevel)}
+                              onClick={() => !isAdminFull && updateMatrixCell(roleK, module, nextLevel)}
                               disabled={isAdminFull}
                               title={isAdminFull ? tt('roleAdmin') : ''}
                               className={`inline-flex items-center justify-center w-7 h-7 rounded-full transition ${

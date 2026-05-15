@@ -685,6 +685,44 @@ app.post('/api/tasks', authMiddleware, async (req: AuthedRequest, res) => {
   res.json(data);
 });
 
+// Catch task updates too — if the assignee changes (e.g. admin edits the
+// task and picks an исполнитель) we need to notify the NEW assignee. Same
+// flow as the POST above, just keyed off the diff.
+app.patch('/api/tasks/:id', authMiddleware, async (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT data FROM tasks WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  const before = JSON.parse(row.data);
+  const updated = { ...before, ...req.body, id: req.params.id };
+  db.prepare('UPDATE tasks SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(updated), req.params.id, req.teamId!);
+
+  const assigneeChanged = updated.assigneeId && updated.assigneeId !== before.assigneeId;
+  if (assigneeChanged && isTelegramReady()) {
+    try {
+      const emp = db.prepare('SELECT data FROM employees WHERE id = ? AND team_id = ?').get(updated.assigneeId, req.teamId!) as any;
+      if (emp) {
+        const empData = JSON.parse(emp.data) as { email?: string; name?: string };
+        const email = (empData.email || '').toLowerCase();
+        if (email) {
+          const user = db.prepare('SELECT id FROM users WHERE email = ? AND team_id = ?').get(email, req.teamId!) as any;
+          if (user) {
+            const link = db.prepare('SELECT chat_id FROM telegram_links WHERE user_id = ? AND chat_id IS NOT NULL').get(user.id) as any;
+            if (link?.chat_id) {
+              const due = updated.dueDate ? `\n📅 Срок: ${updated.dueDate}` : '';
+              const desc = updated.description ? `\n\n${updated.description}` : '';
+              const cat = updated.category ? ` · <i>${updated.category}</i>` : '';
+              await tgSendMessage(link.chat_id,
+                `<b>📝 На вас назначена задача${cat}</b>\n${updated.title}${desc}${due}\n\n<i>Открыть на платформе → Задачи</i>`,
+              );
+            }
+          }
+        }
+      }
+    } catch (e) { console.warn('[tasks] telegram notify on patch failed', e); }
+  }
+
+  res.json(updated);
+});
+
 app.use('/api/tasks', makeCrud('tasks', 't'));
 app.use('/api/products', authMiddleware, requirePermission('production'), makeCrud('products', 'p'));
 // Finance gated by the matrix (was requireRole('manager') — now matrix-driven

@@ -502,19 +502,9 @@ export function Tasks({ language }: TasksProps) {
               assigneeId: updates.assigneeId,
               dueDate: updates.dueDate,
             });
-            setSelectedTask(prev => prev ? {
-              ...prev,
-              title: updates.title,
-              description: updates.description,
-              priority: updates.priority,
-              category: updates.category,
-              dueDate: updates.dueDate,
-              // assignee object: try to pick from store employees, else keep current
-              assignee: (() => {
-                const emp = store.getEmployeeById(updates.assigneeId);
-                return emp ? { id: emp.id, name: emp.name, role: emp.department, avatar: emp.avatar, telegramUsername: '@' + emp.name.split(' ')[0].toLowerCase(), telegramConnected: emp.status === 'active', tasksToday: 0, tasksDone: 0 } : prev.assignee;
-              })(),
-            } : null);
+            // Close the modal so the admin doesn't have to dismiss it manually
+            // after Save. The board will reload from the store on the next render.
+            setSelectedTask(null);
           }}
           onDelete={() => {
             store.deleteTask(selectedTask.id);

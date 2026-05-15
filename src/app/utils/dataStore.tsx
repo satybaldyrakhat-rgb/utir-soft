@@ -550,6 +550,9 @@ interface DataStore {
   addCatalogItem: (key: CatalogKey, value: string) => void;
   removeCatalogItem: (key: CatalogKey, value: string) => void;
   setRolePermission: (role: RoleKey, module: ModuleKey, level: PermissionLevel) => void;
+  // Bulk replace — used by the matrix UI to commit multiple cell changes in
+  // one click instead of saving on every toggle.
+  bulkSetRolePermissions: (next: RolePermissions) => void;
   // Manage the role list (admins only — backend rejects non-admins).
   addRole: (name: string) => string; // returns generated id
   renameRole: (roleId: string, name: string) => void;
@@ -645,6 +648,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
       page: 'roles',
       before: beforeLevel,
       after: level,
+    });
+  }, [addActivity, roles]);
+
+  // Used by the matrix UI: commit a whole pending matrix in one PUT instead of
+  // saving on each cell toggle. Logs a single 'matrix updated' activity entry
+  // rather than one per changed cell.
+  const bulkSetRolePermissions = useCallback((next: RolePermissions) => {
+    setRolePermissions(next);
+    saveTeamSettings(roles, next);
+    addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Обновил матрицу прав',
+      target: '', type: 'permission', page: 'roles',
     });
   }, [addActivity, roles]);
 
@@ -1136,6 +1152,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateProfile,
     addCatalogItem, removeCatalogItem,
     setRolePermission,
+    bulkSetRolePermissions,
     addRole, renameRole, deleteRole,
     updateModule, reorderModules, resetModules,
     addCustomModule, deleteCustomModule,
