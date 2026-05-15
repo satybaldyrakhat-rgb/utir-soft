@@ -130,8 +130,11 @@ function clearPending(db: Database.Database, chatId: number) {
 }
 
 // Affirmative / negative phrases used to confirm or cancel a pending action.
-const YES_RE = /^(да|ага|ок|окей|ok|yes|y|sure|sохрани|сохранить|запиши|записать|подтверждаю|верно|подтверди|підтверд|растайман|раста|иә|ия|жа|ja)\b/i;
-const NO_RE = /^(нет|не|cancel|отмена|стоп|неверно|жоқ|отменить|отменяю|не надо)\b/i;
+// Note: JavaScript `\b` is ASCII-only — it treats Cyrillic letters as non-word, so `\b`
+// after «да» wouldn't fire and the match would fail. We use a non-capturing trailing
+// class (space / punctuation / end-of-string) instead, which works for both alphabets.
+const YES_RE = /^(да|ага|ок|окей|ok|yes|y|sure|\+|👍|сохрани|сохранить|запиши|записать|подтверждаю|верно|подтверди|растайман|раста|иә|ия|жа|ja)(?:[\s.,!?]|$)/i;
+const NO_RE = /^(нет|не|cancel|отмена|стоп|неверно|жоқ|отменить|отменяю|не надо)(?:[\s.,!?]|$)/i;
 
 // ─── Main webhook entry point ─────────────────────────────────────
 export interface IncomingUpdate {
