@@ -111,10 +111,12 @@ const PENDING_TTL_MS = 10 * 60 * 1000;
 
 function setPending(db: Database.Database, chatId: number, p: Omit<PendingAction, 'expiresAt'>) {
   const payload = JSON.stringify({ ...p, expiresAt: Date.now() + PENDING_TTL_MS });
-  db.prepare('UPDATE telegram_links SET pending_action = ? WHERE chat_id = ?').run(payload, chatId);
+  const r = db.prepare('UPDATE telegram_links SET pending_action = ? WHERE chat_id = ?').run(payload, chatId);
+  console.log(`[pending] SET chat=${chatId} tool=${p.toolName} rows=${r.changes}`);
 }
 function getPending(db: Database.Database, chatId: number): PendingAction | null {
   const row = db.prepare('SELECT pending_action FROM telegram_links WHERE chat_id = ?').get(chatId) as any;
+  console.log(`[pending] GET chat=${chatId} raw=${row?.pending_action ? row.pending_action.slice(0, 80) : 'null'}`);
   if (!row?.pending_action) return null;
   try {
     const p = JSON.parse(row.pending_action) as PendingAction;
@@ -124,6 +126,7 @@ function getPending(db: Database.Database, chatId: number): PendingAction | null
 }
 function clearPending(db: Database.Database, chatId: number) {
   db.prepare('UPDATE telegram_links SET pending_action = NULL WHERE chat_id = ?').run(chatId);
+  console.log(`[pending] CLEAR chat=${chatId}`);
 }
 
 // Affirmative / negative phrases used to confirm or cancel a pending action.
@@ -245,6 +248,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
 
   // --- Confirmation of pending tool? -------------------------------
   const pendingAction = getPending(db, chatId);
+  console.log(`[webhook] chat=${chatId} text="${text.slice(0, 60)}" pending=${pendingAction ? pendingAction.toolName : 'no'}`);
   if (pendingAction) {
     if (YES_RE.test(text)) {
       const user = findUserByChat(db, chatId);
@@ -265,8 +269,10 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       await sendMessage(chatId, `Отменил. Можете написать новый запрос.`);
       return;
     }
-    // Anything else → treat as a correction, fall through to the AI handler below.
-    clearPending(db, chatId);
+    // Anything else → treat as a new request (correction or fresh topic). Don't clearPending
+    // here — Telegram occasionally redelivers the same message twice, which used to wipe
+    // the pending slot before the user's "Да" arrived. Let it expire naturally via TTL or
+    // /cancel. setPending below will overwrite it if Claude proposes another tool.
   }
 
   // --- Free-form text → Claude agent --------------------------------
