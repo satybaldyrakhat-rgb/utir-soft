@@ -95,6 +95,23 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
   }));
   const employees = allEmployees.filter(e => !e.removedAt);
   const removedEmployees = allEmployees.filter(e => e.removedAt);
+
+  // Team-wide Telegram pairings — fetched once on mount + refreshed on the
+  // 'utir:auth-changed' event. Used to show a paperplane badge on each
+  // teammate row so admin sees who can receive bot notifications.
+  const [pairedEmails, setPairedEmails] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      api.get<Array<{ email: string }>>('/api/team/pairings')
+        .then(rows => { if (!cancelled) setPairedEmails(new Set(rows.map(r => (r.email || '').toLowerCase()))); })
+        .catch(() => { /* non-admin or empty — ignore */ });
+    };
+    load();
+    const reload = () => load();
+    window.addEventListener('utir:auth-changed', reload);
+    return () => { cancelled = true; window.removeEventListener('utir:auth-changed', reload); };
+  }, []);
   const setEmployees = (updater: any) => {
     // Handle updates through store
   };
@@ -523,6 +540,16 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
                       <div className="flex items-center gap-1.5 mb-0.5">
                         <span className="text-sm text-gray-900 truncate">{emp.name}</span>
                         <span className={`px-1.5 py-0.5 rounded text-[10px] ${roleBg(emp.role)}`}>{roleLabel(emp.role)}</span>
+                        {/* Paperplane badge — this teammate has paired Telegram and
+                            can receive task notifications via the team bot. */}
+                        {pairedEmails.has(emp.email.toLowerCase()) && (
+                          <span
+                            className="inline-flex items-center gap-0.5 text-[10px] text-[#2AABEE] bg-blue-50 px-1.5 py-0.5 rounded"
+                            title={l('Telegram-бот подключён', 'Telegram-бот қосылған', 'Telegram bot connected')}
+                          >
+                            <Send className="w-2.5 h-2.5" />
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] text-gray-400">{emp.email}{emp.department ? ` · ${emp.department}` : ''}</div>
                     </div>

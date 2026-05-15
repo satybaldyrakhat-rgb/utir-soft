@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady } from './telegram.js';
+import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage } from './telegram.js';
 import { isClaudeReady } from './claudeAgent.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -644,6 +644,47 @@ app.post('/api/employees/:id/restore', authMiddleware, requireRole('admin'), (re
 });
 
 app.use('/api/employees', makeCrud('employees', 'e'));
+// Team-wide Telegram notification on task assignment. Runs BEFORE the generic
+// CRUD mount so POST /api/tasks lands here first — we insert manually, then
+// look up the assignee's Telegram pairing and ping them in their bot chat.
+// For GET/PATCH/DELETE Express falls through to makeCrud below.
+app.post('/api/tasks', authMiddleware, async (req: AuthedRequest, res) => {
+  const body = req.body || {};
+  const id = body.id || newId('t');
+  const data = { ...body, id };
+  db.prepare('INSERT INTO tasks (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, req.userId!, req.teamId!, JSON.stringify(data));
+
+  // Best-effort assignee notification. Wrapped so a Telegram outage / missing
+  // pairing / no token never blocks task creation.
+  if (data.assigneeId && isTelegramReady()) {
+    try {
+      const emp = db.prepare('SELECT data FROM employees WHERE id = ? AND team_id = ?').get(data.assigneeId, req.teamId!) as any;
+      if (emp) {
+        const empData = JSON.parse(emp.data) as { email?: string; name?: string };
+        const email = (empData.email || '').toLowerCase();
+        if (email) {
+          const user = db.prepare('SELECT id FROM users WHERE email = ? AND team_id = ?').get(email, req.teamId!) as any;
+          if (user) {
+            const link = db.prepare('SELECT chat_id FROM telegram_links WHERE user_id = ? AND chat_id IS NOT NULL').get(user.id) as any;
+            if (link?.chat_id) {
+              const due = data.dueDate ? `\n📅 Срок: ${data.dueDate}` : '';
+              const desc = data.description ? `\n\n${data.description}` : '';
+              const cat = data.category ? ` · <i>${data.category}</i>` : '';
+              await tgSendMessage(link.chat_id,
+                `<b>📝 Новая задача${cat}</b>\n${data.title}${desc}${due}\n\n<i>Открыть на платформе → Задачи</i>`,
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[tasks] telegram notify failed', e);
+    }
+  }
+
+  res.json(data);
+});
+
 app.use('/api/tasks', makeCrud('tasks', 't'));
 app.use('/api/products', authMiddleware, requirePermission('production'), makeCrud('products', 'p'));
 // Finance gated by the matrix (was requireRole('manager') — now matrix-driven
@@ -714,6 +755,26 @@ teamPermsRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
 });
 
 app.use('/api/team-permissions', teamPermsRouter);
+
+// Map of team-wide Telegram pairings (Block F.6). Used by the team panel to
+// show which teammates have linked their account to the bot — admin sees who
+// can receive notifications and whose chat will route through the AI tools.
+app.get('/api/team/pairings', authMiddleware, (req: AuthedRequest, res) => {
+  const rows = db.prepare(`
+    SELECT u.id as user_id, u.email, u.name, tl.chat_id, tl.username, tl.linked_at
+    FROM users u
+    JOIN telegram_links tl ON tl.user_id = u.id
+    WHERE u.team_id = ? AND tl.chat_id IS NOT NULL
+  `).all(req.teamId!) as any[];
+  res.json(rows.map(r => ({
+    userId: r.user_id,
+    email: r.email,
+    name: r.name,
+    chatId: r.chat_id,
+    username: r.username,
+    linkedAt: r.linked_at,
+  })));
+});
 
 // ─── Permission check helper (used by route guards) ────────────────
 // Looks up the current request's role × module permission and returns the
