@@ -359,7 +359,11 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         {/* Footer */}
         <div className="px-5 py-3 border-t border-gray-50 flex justify-end gap-2 flex-shrink-0">
           <button onClick={onClose} className="px-4 py-2 border border-gray-100 rounded-xl text-xs hover:bg-gray-50">{tt('cancel')}</button>
-          <button onClick={handleSave} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">{tt('save')}</button>
+          {/* Save hidden for roles with only 'view' permission on orders/sales.
+              Without this they'd hit the form, edit, click Save and get a 403. */}
+          {store.canWriteModule('orders') && (
+            <button onClick={handleSave} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">{tt('save')}</button>
+          )}
         </div>
       </div>
     </div>

@@ -408,6 +408,16 @@ interface DataStore {
   customRecords: CustomRecordsByModule;
   aiSettings: AISettings;
   loaded: boolean;
+  // Current user's role — set by App.tsx after auth. Used together with
+  // `rolePermissions` so any page can ask "can I write this module?".
+  currentUserRole: RoleKey;
+  setCurrentUserRole: (role: RoleKey) => void;
+  // Returns the matrix level ('full' | 'view' | 'none') for the current user
+  // on the given module key. Admin always full. Sidebar ids like 'sales' are
+  // mapped to matrix keys ('orders') automatically.
+  getModuleLevel: (moduleKey: string) => PermissionLevel;
+  // Sugar around getModuleLevel.
+  canWriteModule: (moduleKey: string) => boolean;
 
   addDeal: (deal: Omit<Deal, 'id' | 'createdAt'>) => Deal;
   updateDeal: (id: string, updates: Partial<Deal>) => void;
@@ -480,6 +490,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile>(() => loadProfile());
   const [catalogs, setCatalogs] = useState<UserCatalogs>(() => loadCatalogs());
   const [rolePermissions, setRolePermissions] = useState<RolePermissions>(() => loadRolePermissions());
+  // Default to 'admin' so single-user installs work before App.tsx wires the
+  // real value — admins always get 'full' so this is the safest fallback.
+  const [currentUserRole, setCurrentUserRole] = useState<RoleKey>('admin');
   const [modules, setModules] = useState<PlatformModule[]>(() => loadModules());
   const [customRecords, setCustomRecords] = useState<CustomRecordsByModule>(() => loadCustomRecords());
   const [aiSettings, setAISettings] = useState<AISettings>(() => loadAISettings());
@@ -926,8 +939,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [deals]);
   const getTotalClients = useCallback(() => deals.length, [deals]);
 
+  // Sidebar ids like 'sales' / 'warehouse' don't match matrix keys 'orders' /
+  // 'production' — translate at the boundary so callers can pass either.
+  const sidebarToMatrixKey = (id: string): string => {
+    const map: Record<string, string> = { sales: 'orders', warehouse: 'production' };
+    return map[id] || id;
+  };
+  const getModuleLevel = useCallback((moduleKey: string): PermissionLevel => {
+    if (currentUserRole === 'admin') return 'full';
+    const key = sidebarToMatrixKey(moduleKey);
+    const level = (rolePermissions as any)?.[currentUserRole]?.[key];
+    if (level === 'full' || level === 'view' || level === 'none') return level;
+    return 'full'; // permissive fallback for unknown keys (e.g. tasks)
+  }, [currentUserRole, rolePermissions]);
+  const canWriteModule = useCallback((moduleKey: string) => getModuleLevel(moduleKey) === 'full', [getModuleLevel]);
+
   const store: DataStore = {
     deals, employees, tasks, products, transactions, integrations, activityLogs, profile, catalogs, rolePermissions, modules, customRecords, aiSettings, loaded,
+    currentUserRole, setCurrentUserRole, getModuleLevel, canWriteModule,
     addDeal, updateDeal, deleteDeal,
     addEmployee, updateEmployee, deleteEmployee,
     addTask, updateTask, deleteTask,

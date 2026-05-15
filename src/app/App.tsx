@@ -77,6 +77,12 @@ function AppContent() {
     }
   };
 
+  // Keep dataStore aware of the current user's role so any page can call
+  // store.canWriteModule('orders') without threading the role down via props.
+  useEffect(() => {
+    if (currentUser?.teamRole) dataStore.setCurrentUserRole(currentUser.teamRole);
+  }, [currentUser?.teamRole, dataStore]);
+
   // Role-based hiding driven by the role-permissions matrix (Phase 2).
   // The matrix lives in dataStore.rolePermissions, synced from the backend.
   // Admin is never gated even if the matrix tries — protects against an admin
