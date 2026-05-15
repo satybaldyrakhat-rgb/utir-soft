@@ -126,6 +126,33 @@ function clearPending(db: Database.Database, chatId: number) {
   db.prepare('UPDATE telegram_links SET pending_action = NULL WHERE chat_id = ?').run(chatId);
 }
 
+// ─── Conversation history (last N messages per chat) ──────────────
+// Stored as a JSON array on telegram_links.chat_history so Claude can see prior turns
+// and reason about pronoun references like "доплатил 300 000" → which client.
+export interface ChatMessage { role: 'user' | 'assistant'; content: string }
+const HISTORY_LIMIT = 20; // keep last 10 exchanges; older trimmed
+
+function getHistory(db: Database.Database, chatId: number): ChatMessage[] {
+  const row = db.prepare('SELECT chat_history FROM telegram_links WHERE chat_id = ?').get(chatId) as any;
+  if (!row?.chat_history) return [];
+  try {
+    const arr = JSON.parse(row.chat_history);
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+function appendHistory(db: Database.Database, chatId: number, role: 'user' | 'assistant', content: string) {
+  if (!content) return;
+  const cur = getHistory(db, chatId);
+  cur.push({ role, content });
+  const trimmed = cur.slice(-HISTORY_LIMIT);
+  db.prepare('UPDATE telegram_links SET chat_history = ? WHERE chat_id = ?').run(JSON.stringify(trimmed), chatId);
+}
+
+function clearHistory(db: Database.Database, chatId: number) {
+  db.prepare('UPDATE telegram_links SET chat_history = NULL WHERE chat_id = ?').run(chatId);
+}
+
 // Affirmative / negative phrases used to confirm or cancel a pending action.
 // Note: JavaScript `\b` is ASCII-only — it treats Cyrillic letters as non-word, so `\b`
 // after «да» wouldn't fire and the match would fail. We use a non-capturing trailing
@@ -155,6 +182,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     const cmd = cmdRaw.replace(/@.*$/, '').toLowerCase(); // strip @botname suffix
 
     if (cmd === '/start') {
+      clearHistory(db, chatId);
       const paired = findUserByChat(db, chatId);
       if (paired) {
         await sendMessage(chatId,
@@ -219,7 +247,8 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     if (cmd === '/cancel') {
       const had = getPending(db, chatId);
       clearPending(db, chatId);
-      await sendMessage(chatId, had ? 'Действие отменено.' : 'Нечего отменять.');
+      clearHistory(db, chatId);
+      await sendMessage(chatId, had ? 'Действие отменено. История диалога очищена.' : 'История диалога очищена.');
       return;
     }
 
@@ -252,12 +281,17 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     if (YES_RE.test(text)) {
       const user = findUserByChat(db, chatId);
       if (!user) { clearPending(db, chatId); await sendMessage(chatId, 'Аккаунт не привязан. /link КОД'); return; }
+      appendHistory(db, chatId, 'user', text);
       try {
         const { default: tools } = await import('./aiTools.js');
         const result = await tools.execute(db, user.id, user.name, pendingAction.toolName, pendingAction.toolInput, logActivity);
-        await sendMessage(chatId, `✅ Готово.\n\n${result}`);
+        const reply = `✅ Готово.\n\n${result}`;
+        await sendMessage(chatId, reply);
+        appendHistory(db, chatId, 'assistant', stripHtml(reply));
       } catch (e: any) {
-        await sendMessage(chatId, `❌ Не удалось сохранить: ${e.message || e}`);
+        const errReply = `❌ Не удалось сохранить: ${e.message || e}`;
+        await sendMessage(chatId, errReply);
+        appendHistory(db, chatId, 'assistant', errReply);
       } finally {
         clearPending(db, chatId);
       }
@@ -265,7 +299,10 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     }
     if (NO_RE.test(text)) {
       clearPending(db, chatId);
-      await sendMessage(chatId, `Отменил. Можете написать новый запрос.`);
+      appendHistory(db, chatId, 'user', text);
+      const reply = `Отменил. Можете написать новый запрос.`;
+      await sendMessage(chatId, reply);
+      appendHistory(db, chatId, 'assistant', reply);
       return;
     }
     // Anything else → treat as a new request (correction or fresh topic). Don't clearPending
@@ -284,17 +321,25 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     return;
   }
 
-  const ctx: AgentTurnContext = { db, userId: user.id, userName: user.name, userText: text };
+  // Pull prior conversation for context (last 20 messages). Record this user turn first
+  // so that even if Claude crashes the message is still in history.
+  const history = getHistory(db, chatId);
+  appendHistory(db, chatId, 'user', text);
+
+  const ctx: AgentTurnContext = { db, userId: user.id, userName: user.name, userText: text, history };
   let agentResult;
   try { agentResult = await runAgent(ctx); }
   catch (e: any) {
     console.error('[telegram] agent failed', e);
-    await sendMessage(chatId, `Не получилось обработать запрос. Попробуйте переформулировать.\n\n<code>${e.message || e}</code>`);
+    const errReply = `Не получилось обработать запрос. Попробуйте переформулировать.`;
+    await sendMessage(chatId, errReply + `\n\n<code>${(e.message || e).toString().slice(0, 200)}</code>`);
+    appendHistory(db, chatId, 'assistant', errReply);
     return;
   }
 
   if (agentResult.kind === 'reply') {
     await sendMessage(chatId, agentResult.text);
+    appendHistory(db, chatId, 'assistant', agentResult.text);
     return;
   }
 
@@ -304,13 +349,24 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     try {
       const result = await tools.execute(db, user.id, user.name, agentResult.toolName, agentResult.toolInput, logActivity);
       await sendMessage(chatId, result);
+      appendHistory(db, chatId, 'assistant', stripHtml(result));
     } catch (e: any) {
-      await sendMessage(chatId, `❌ Ошибка: ${e.message || e}`);
+      const errReply = `❌ Ошибка: ${e.message || e}`;
+      await sendMessage(chatId, errReply);
+      appendHistory(db, chatId, 'assistant', errReply);
     }
     return;
   }
 
   // Write tools — store as pending and ask the user to confirm before executing.
+  // Record the summary in history so subsequent turns know what's about to be saved.
   setPending(db, chatId, { toolName: agentResult.toolName, toolInput: agentResult.toolInput, summary: agentResult.summary });
-  await sendMessage(chatId, agentResult.summary + `\n\n<i>Подтвердите — «Да» или «Нет».</i>`);
+  const fullSummary = agentResult.summary + `\n\n<i>Подтвердите — «Да» или «Нет».</i>`;
+  await sendMessage(chatId, fullSummary);
+  appendHistory(db, chatId, 'assistant', stripHtml(agentResult.summary));
+}
+
+// Strip Telegram HTML tags so history entries stay clean text for Claude's context window.
+function stripHtml(s: string): string {
+  return s.replace(/<\/?[a-z][^>]*>/gi, '').replace(/\s+\n/g, '\n').trim();
 }

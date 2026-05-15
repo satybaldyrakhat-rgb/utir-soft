@@ -63,6 +63,7 @@ export interface AgentTurnContext {
   userId: string;
   userName: string;
   userText: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 export type AgentResult =
@@ -75,12 +76,32 @@ export async function runAgent(ctx: AgentTurnContext): Promise<AgentResult> {
     return { kind: 'reply', text: 'AI-ассистент пока не настроен (нет ANTHROPIC_API_KEY на сервере). Сообщите Админу.' };
   }
 
+  // Build message list: prior turns from history (if any) + current user turn.
+  // Claude needs the conversation to alternate user/assistant strictly. Dedupe consecutive
+  // same-role messages just in case and ensure history ends with assistant before our user turn.
+  const history = (ctx.history || []).filter(m => m.content && (m.role === 'user' || m.role === 'assistant'));
+  const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  for (const m of history) {
+    // collapse repeated same-role into the last one (keeps strict alternation)
+    if (messages.length && messages[messages.length - 1].role === m.role) {
+      messages[messages.length - 1] = m;
+    } else {
+      messages.push(m);
+    }
+  }
+  // Make sure last item is assistant before appending the user — if it's already user, replace it.
+  if (messages.length && messages[messages.length - 1].role === 'user') {
+    messages[messages.length - 1] = { role: 'user', content: ctx.userText };
+  } else {
+    messages.push({ role: 'user', content: ctx.userText });
+  }
+
   const resp = await c.messages.create({
     model: MODEL,
     max_tokens: 1024,
     system: buildSystemPrompt(),
     tools: tools.toolsForClaude() as any,
-    messages: [{ role: 'user', content: ctx.userText }],
+    messages: messages as any,
   });
 
   // Pick the first tool_use block if Claude decided to call a tool.

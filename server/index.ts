@@ -106,6 +106,7 @@ function migrateColumn(table: string, column: string, ddl: string): boolean {
 // Pending tool-confirmation state for the Telegram bot — moved from in-memory to DB
 // after we observed Railway restarting the process between requests and dropping the Map.
 migrateColumn('telegram_links', 'pending_action', 'TEXT');
+migrateColumn('telegram_links', 'chat_history', 'TEXT');
 migrateColumn('users', 'company', "TEXT DEFAULT ''");
 migrateColumn('users', 'verification_code', 'TEXT');
 const verifiedJustAdded = migrateColumn('users', 'email_verified', 'INTEGER DEFAULT 0');
