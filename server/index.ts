@@ -513,12 +513,19 @@ app.use('/api/invitations', invitationsRouter);
 // Public preview — anyone landing on /auth?invite=XYZ can see who invited them
 // before they decide to sign up. Returns minimal info.
 app.get('/api/invitations/preview/:code', (req, res) => {
+  const code = String(req.params.code || '').toUpperCase().trim();
   const row = db.prepare(
     `SELECT i.role, i.email, i.expires_at, i.used_at, u.name AS inviter_name, u.company AS inviter_company
      FROM invitations i JOIN users u ON u.id = i.created_by
      WHERE i.code = ?`
-  ).get(String(req.params.code).toUpperCase()) as any;
-  if (!row) return res.status(404).json({ error: 'invalid code' });
+  ).get(code) as any;
+  if (!row) {
+    // Diagnostic: log the mismatch so we can see in Railway logs whether the issue
+    // is a typo, a casing problem, or the row genuinely doesn't exist.
+    const allCodes = db.prepare('SELECT code FROM invitations ORDER BY rowid DESC LIMIT 5').all() as any[];
+    console.warn(`[invitations/preview] not found: "${code}". Recent codes: ${allCodes.map(r => r.code).join(', ')}`);
+    return res.status(404).json({ error: 'invalid code' });
+  }
   if (row.used_at) return res.status(410).json({ error: 'already used' });
   if (new Date(row.expires_at).getTime() < Date.now()) return res.status(410).json({ error: 'expired' });
   res.json({

@@ -54,8 +54,18 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
         if (p.email && !email) setEmail(p.email);
         if (p.company) setCompany(p.company);
       }).catch(err => {
-        const msg = String(err?.message || 'invalid');
-        setInvitePreview({ error: msg === 'expired' ? 'expired' : msg === 'already used' ? 'used' : 'invalid' });
+        // Log full details to the console so we can see exactly what went wrong
+        // (network failure, 404, CORS) — the UI message stays user-friendly.
+        console.warn('[invite preview] failed', { code, err });
+        const msg = String(err?.message || 'invalid').toLowerCase();
+        const bucket = msg.includes('expired')
+          ? 'expired'
+          : msg.includes('already used')
+            ? 'used'
+            : msg.includes('invalid code')
+              ? 'invalid'
+              : 'network'; // any other error (network, CORS, server down) lands here
+        setInvitePreview({ error: bucket });
       });
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -435,6 +445,10 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                     ? l('Срок действия приглашения истёк.', 'Шақырудың мерзімі өтті.', 'This invitation has expired.')
                     : invitePreview.error === 'used'
                     ? l('Это приглашение уже использовано.', 'Бұл шақыру пайдаланылған.', 'This invitation was already used.')
+                    : invitePreview.error === 'network'
+                    ? l('Не удалось проверить код приглашения (нет связи с сервером). Попробуйте обновить страницу или открыть ссылку позже.',
+                        'Шақыру кодын тексеру мүмкін болмады (сервермен байланыс жоқ). Бетті жаңартып көріңіз немесе кейінірек ашыңыз.',
+                        'Could not verify the invitation (server unreachable). Try refreshing or opening the link again later.')
                     : l('Недействительный код приглашения.', 'Жарамсыз шақыру коды.', 'Invalid invitation code.')}
                 </div>
                 <div className="text-xs text-red-600 mt-1">
