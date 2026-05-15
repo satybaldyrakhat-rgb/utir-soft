@@ -98,26 +98,33 @@ function consumeLinkCode(db: Database.Database, code: string, chatId: number, us
   return { ok: true, userId: row.user_id, userName: row.name };
 }
 
-// ─── Pending tool confirmation state (in-memory) ──────────────────
-// One slot per chat — second pending request overwrites the first. Fine for MVP.
+// ─── Pending tool confirmation state (persisted in telegram_links.pending_action) ────
+// Originally kept in-memory, but Railway proved to restart the process between webhook
+// calls, so we serialise the pending action into SQLite. One slot per chat.
 interface PendingAction {
   toolName: string;
   toolInput: any;
   summary: string;
   expiresAt: number;
 }
-const pending = new Map<number, PendingAction>();
 const PENDING_TTL_MS = 10 * 60 * 1000;
-function setPending(chatId: number, p: Omit<PendingAction, 'expiresAt'>) {
-  pending.set(chatId, { ...p, expiresAt: Date.now() + PENDING_TTL_MS });
+
+function setPending(db: Database.Database, chatId: number, p: Omit<PendingAction, 'expiresAt'>) {
+  const payload = JSON.stringify({ ...p, expiresAt: Date.now() + PENDING_TTL_MS });
+  db.prepare('UPDATE telegram_links SET pending_action = ? WHERE chat_id = ?').run(payload, chatId);
 }
-function getPending(chatId: number): PendingAction | null {
-  const p = pending.get(chatId);
-  if (!p) return null;
-  if (p.expiresAt < Date.now()) { pending.delete(chatId); return null; }
-  return p;
+function getPending(db: Database.Database, chatId: number): PendingAction | null {
+  const row = db.prepare('SELECT pending_action FROM telegram_links WHERE chat_id = ?').get(chatId) as any;
+  if (!row?.pending_action) return null;
+  try {
+    const p = JSON.parse(row.pending_action) as PendingAction;
+    if (!p || p.expiresAt < Date.now()) { clearPending(db, chatId); return null; }
+    return p;
+  } catch { clearPending(db, chatId); return null; }
 }
-function clearPending(chatId: number) { pending.delete(chatId); }
+function clearPending(db: Database.Database, chatId: number) {
+  db.prepare('UPDATE telegram_links SET pending_action = NULL WHERE chat_id = ?').run(chatId);
+}
 
 // Affirmative / negative phrases used to confirm or cancel a pending action.
 const YES_RE = /^(да|ага|ок|окей|ok|yes|y|sure|sохрани|сохранить|запиши|записать|подтверждаю|верно|подтверди|підтверд|растайман|раста|иә|ия|жа|ja)\b/i;
@@ -207,8 +214,8 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     }
 
     if (cmd === '/cancel') {
-      const had = getPending(chatId);
-      clearPending(chatId);
+      const had = getPending(db, chatId);
+      clearPending(db, chatId);
       await sendMessage(chatId, had ? 'Действие отменено.' : 'Нечего отменять.');
       return;
     }
@@ -237,11 +244,11 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
   }
 
   // --- Confirmation of pending tool? -------------------------------
-  const pendingAction = getPending(chatId);
+  const pendingAction = getPending(db, chatId);
   if (pendingAction) {
     if (YES_RE.test(text)) {
       const user = findUserByChat(db, chatId);
-      if (!user) { clearPending(chatId); await sendMessage(chatId, 'Аккаунт не привязан. /link КОД'); return; }
+      if (!user) { clearPending(db, chatId); await sendMessage(chatId, 'Аккаунт не привязан. /link КОД'); return; }
       try {
         const { default: tools } = await import('./aiTools.js');
         const result = await tools.execute(db, user.id, user.name, pendingAction.toolName, pendingAction.toolInput, logActivity);
@@ -249,17 +256,17 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       } catch (e: any) {
         await sendMessage(chatId, `❌ Не удалось сохранить: ${e.message || e}`);
       } finally {
-        clearPending(chatId);
+        clearPending(db, chatId);
       }
       return;
     }
     if (NO_RE.test(text)) {
-      clearPending(chatId);
+      clearPending(db, chatId);
       await sendMessage(chatId, `Отменил. Можете написать новый запрос.`);
       return;
     }
     // Anything else → treat as a correction, fall through to the AI handler below.
-    clearPending(chatId);
+    clearPending(db, chatId);
   }
 
   // --- Free-form text → Claude agent --------------------------------
@@ -287,6 +294,6 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
   }
 
   // Tool was proposed → store as pending and ask the user to confirm.
-  setPending(chatId, { toolName: agentResult.toolName, toolInput: agentResult.toolInput, summary: agentResult.summary });
+  setPending(db, chatId, { toolName: agentResult.toolName, toolInput: agentResult.toolInput, summary: agentResult.summary });
   await sendMessage(chatId, agentResult.summary + `\n\n<i>Подтвердите — «Да» или «Нет».</i>`);
 }
