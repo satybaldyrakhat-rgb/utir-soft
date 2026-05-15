@@ -19,6 +19,8 @@ interface Invitation {
   expiresAt: string;
   usedAt?: string | null;
   usedBy?: string | null;
+  usedByName?: string | null;
+  usedByEmail?: string | null;
   createdAt: string;
 }
 
@@ -208,12 +210,22 @@ export function TeamInvitePanel({ language }: Props) {
           </summary>
           <div className="mt-2 space-y-1.5">
             {archive.slice(0, 10).map(inv => (
-              <div key={inv.id} className="flex items-center justify-between px-2 py-1.5 text-[11px] text-gray-500">
-                <span className="font-mono">{inv.code}</span>
-                <span>
-                  {inv.usedAt
-                    ? l('Использовано', 'Пайдаланылды', 'Used')
-                    : l('Просрочено', 'Мерзімі өтті', 'Expired')}
+              <div key={inv.id} className="flex items-center justify-between gap-3 px-2 py-1.5 text-[11px] text-gray-500">
+                <span className="font-mono flex-shrink-0">{inv.code}</span>
+                <span className="text-right truncate">
+                  {inv.usedAt ? (
+                    <>
+                      {l('Использовано', 'Пайдаланылды', 'Used')}
+                      {inv.usedByName && (
+                        <span className="text-gray-700"> · {inv.usedByName}</span>
+                      )}
+                      {inv.usedByEmail && !inv.usedByName && (
+                        <span className="text-gray-700"> · {inv.usedByEmail}</span>
+                      )}
+                    </>
+                  ) : (
+                    l('Просрочено', 'Мерзімі өтті', 'Expired')
+                  )}
                 </span>
               </div>
             ))}

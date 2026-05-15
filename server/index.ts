@@ -464,13 +464,21 @@ function requireAdmin(req: AuthedRequest, res: Response, next: NextFunction) {
 }
 
 invitationsRouter.get('/', requireAdmin, (req: AuthedRequest, res) => {
+  // LEFT JOIN on users so the admin sees WHO accepted each used invite, not just
+  // a raw user id. For pending invites usedByName stays null.
   const rows = db.prepare(
-    `SELECT id, code, role, email, expires_at, used_at, used_by, created_at
-     FROM invitations WHERE team_id = ? ORDER BY rowid DESC`
+    `SELECT i.id, i.code, i.role, i.email, i.expires_at, i.used_at, i.used_by, i.created_at,
+            u.name AS used_by_name, u.email AS used_by_email
+     FROM invitations i
+     LEFT JOIN users u ON u.id = i.used_by
+     WHERE i.team_id = ?
+     ORDER BY i.rowid DESC`
   ).all(req.teamId!) as any[];
   res.json(rows.map(r => ({
     id: r.id, code: r.code, role: r.role, email: r.email,
     expiresAt: r.expires_at, usedAt: r.used_at, usedBy: r.used_by,
+    usedByName: r.used_by_name || null,
+    usedByEmail: r.used_by_email || null,
     createdAt: r.created_at,
   })));
 });
