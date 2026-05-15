@@ -12,9 +12,13 @@ import { Chats } from './components/Chats';
 import { Analytics } from './components/Analytics';
 import { Tasks } from './components/Tasks';
 import { Settings } from './components/Settings';
+import { CustomModulePage } from './components/CustomModulePage';
+import { CustomIcon } from './components/CustomIcons';
 import { AIAssistant } from './components/AIAssistant';
 import { Auth } from './components/Auth';
 import { ComingSoon } from './components/ComingSoon';
+import { Terms } from './components/Terms';
+import { Privacy } from './components/Privacy';
 import { Menu, X, LogOut } from 'lucide-react';
 import profileLogo from '../imports/utirsoft.png';
 import { t } from './utils/translations';
@@ -30,6 +34,20 @@ function AppContent() {
   const [authChecked, setAuthChecked] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ name: string; email: string } | null>(null);
   const dataStore = useDataStore();
+
+  // Sidebar visibility is data-driven from Settings → Модули (Block B.1).
+  // Locked modules (dashboard, settings) are always visible regardless of the toggle.
+  const isModuleVisible = (id: string) => {
+    const m = dataStore.modules.find(x => x.id === id);
+    if (!m) return true; // unknown ids stay visible (e.g. legacy pages)
+    return m.enabled || !!m.locked;
+  };
+
+  // If the currently open page got disabled, fall back to dashboard.
+  useEffect(() => {
+    if (!isModuleVisible(currentPage)) setCurrentPage('dashboard');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataStore.modules, currentPage]);
 
   // Restore session on mount
   useEffect(() => {
@@ -51,7 +69,9 @@ function AppContent() {
     setIsAuthenticated(true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Fire-and-forget logout activity log before clearing the token (server-side handler reads JWT).
+    try { await api.post('/api/auth/logout', {}); } catch { /* non-fatal */ }
     setToken(null);
     dataStore.resetLocal();
     window.dispatchEvent(new Event('utir:auth-changed'));
@@ -80,11 +100,7 @@ function AppContent() {
       case 'ai-design':
         return <AIDesign language={language} />;
       case 'sales':
-        return <ComingSoon
-          language={language}
-          title={language === 'kz' ? 'Тапсырыстар' : language === 'eng' ? 'Orders' : 'Заказы'}
-          onBack={() => setCurrentPage('dashboard')}
-        />;
+        return <SalesKanban language={language} />;
       case 'warehouse':
         return <ComingSoon
           language={language}
@@ -109,8 +125,14 @@ function AppContent() {
         return <Tasks language={language} />;
       case 'settings':
         return <Settings language={language} onLanguageChange={setLanguage} />;
-      default:
+      default: {
+        // Custom modules from Settings → Модули render through the generic page.
+        const customMod = dataStore.modules.find(m => m.id === currentPage && m.custom);
+        if (customMod) {
+          return <CustomModulePage moduleId={customMod.id} language={language} onNotFound={() => setCurrentPage('dashboard')} />;
+        }
         return <Dashboard language={language} />;
+      }
     }
   };
 
@@ -215,24 +237,27 @@ function AppContent() {
             {!isSidebarCollapsed && <span>{getMenuText('home')}</span>}
           </button>
 
-          <button
-            onClick={() => handleMenuClick('ai-design')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'ai-design' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
-            }`}
-            title={isSidebarCollapsed ? getMenuText('aiDesign') : ''}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-            </svg>
-            {!isSidebarCollapsed && (
-              <span className="flex items-center gap-1.5">
-                {getMenuText('aiDesign')}
-                <span className="text-[9px] bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-1.5 py-0.5 rounded">AI</span>
-              </span>
-            )}
-          </button>
+          {isModuleVisible('ai-design') && (
+            <button
+              onClick={() => handleMenuClick('ai-design')}
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
+                currentPage === 'ai-design' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+              title={isSidebarCollapsed ? getMenuText('aiDesign') : ''}
+            >
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+              </svg>
+              {!isSidebarCollapsed && (
+                <span className="flex items-center gap-1.5">
+                  {dataStore.modules.find(m => m.id === 'ai-design')?.labels[language] || getMenuText('aiDesign')}
+                  <span className="text-[9px] bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-1.5 py-0.5 rounded">AI</span>
+                </span>
+              )}
+            </button>
+          )}
 
+          {isModuleVisible('sales') && (
           <button
             onClick={() => handleMenuClick('sales')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
@@ -243,9 +268,11 @@ function AppContent() {
             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            {!isSidebarCollapsed && <span>{getMenuText('orders')}</span>}
+            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'sales')?.labels[language] || getMenuText('orders')}</span>}
           </button>
+          )}
 
+          {isModuleVisible('warehouse') && (
           <button
             onClick={() => handleMenuClick('warehouse')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
@@ -256,9 +283,11 @@ function AppContent() {
             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
             </svg>
-            {!isSidebarCollapsed && <span>{getMenuText('production')}</span>}
+            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'warehouse')?.labels[language] || getMenuText('production')}</span>}
           </button>
+          )}
 
+          {isModuleVisible('chats') && (
           <button
             onClick={() => handleMenuClick('chats')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
@@ -269,9 +298,11 @@ function AppContent() {
             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            {!isSidebarCollapsed && <span>{getMenuText('chats')}</span>}
+            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'chats')?.labels[language] || getMenuText('chats')}</span>}
           </button>
+          )}
 
+          {isModuleVisible('tasks') && (
           <button
             onClick={() => handleMenuClick('tasks')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
@@ -282,9 +313,11 @@ function AppContent() {
             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            {!isSidebarCollapsed && <span>{getMenuText('tasks')}</span>}
+            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'tasks')?.labels[language] || getMenuText('tasks')}</span>}
           </button>
+          )}
 
+          {isModuleVisible('analytics') && (
           <button
             onClick={() => handleMenuClick('analytics')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
@@ -295,8 +328,24 @@ function AppContent() {
             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            {!isSidebarCollapsed && <span>{getMenuText('analytics')}</span>}
+            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'analytics')?.labels[language] || getMenuText('analytics')}</span>}
           </button>
+          )}
+
+          {/* Custom modules — rendered in the order they appear in dataStore.modules */}
+          {dataStore.modules.filter(m => m.custom && m.enabled).map(m => (
+            <button
+              key={m.id}
+              onClick={() => handleMenuClick(m.id)}
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
+                currentPage === m.id ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+              title={isSidebarCollapsed ? m.labels[language] : ''}
+            >
+              <CustomIcon name={m.icon} className="w-5 h-5 flex-shrink-0" />
+              {!isSidebarCollapsed && <span>{m.labels[language]}</span>}
+            </button>
+          ))}
 
           <button
             onClick={() => handleMenuClick('settings')}
@@ -327,17 +376,29 @@ function AppContent() {
           {!isSidebarCollapsed && (
             <>
               {/* Profile */}
-              <button 
+              <button
                 onClick={() => handleMenuClick('settings')}
                 className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <div className="w-10 h-10 rounded-md flex items-center justify-center overflow-hidden">
-                  <img src={profileLogo} alt="Profile" className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="text-sm truncate">{currentUser?.name || ''}</div>
-                  <div className="text-xs text-gray-500 truncate">{currentUser?.email || ''}</div>
-                </div>
+                {(() => {
+                  const profile = dataStore.profile;
+                  const displayName = profile.name || currentUser?.name || '';
+                  const displayEmail = profile.email || currentUser?.email || '';
+                  const initials = (displayName || displayEmail).trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                  return (
+                    <>
+                      <div className="w-10 h-10 rounded-md overflow-hidden bg-gray-200 flex items-center justify-center text-sm text-gray-600 flex-shrink-0">
+                        {profile.avatar
+                          ? <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover" />
+                          : <span>{initials || '👤'}</span>}
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="text-sm truncate">{displayName}</div>
+                        <div className="text-xs text-gray-500 truncate">{displayEmail}</div>
+                      </div>
+                    </>
+                  );
+                })()}
               </button>
               {/* Logout */}
               <button 
@@ -352,13 +413,13 @@ function AppContent() {
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* Main Content. Platform AI assistant lives in two places per user's request:
+          Telegram-bot is the primary channel (Block F), but a floating in-platform popup is also kept here for quick UI prompts. */}
       <main className="flex-1 overflow-y-auto pt-[57px] lg:pt-0 relative">
         {renderPage()}
-        {/* AI Assistant - показывается на всех страницах */}
-        <AIAssistant 
-          context={currentPage as 'dashboard' | 'ai-design' | 'sales' | 'warehouse' | 'finance' | 'chats' | 'analytics' | 'tasks' | 'settings'} 
-          language={language} 
+        <AIAssistant
+          context={currentPage as 'dashboard' | 'ai-design' | 'sales' | 'warehouse' | 'finance' | 'chats' | 'analytics' | 'tasks' | 'settings'}
+          language={language}
         />
       </main>
     </div>
@@ -377,6 +438,7 @@ function ClientCabinetRoute() {
 
 function PublicRouter({ children }: { children: React.ReactNode }) {
   const [hash, setHash] = useState(typeof window !== 'undefined' ? window.location.hash : '');
+  const [legalLang, setLegalLang] = useState<'kz' | 'ru' | 'eng'>('ru');
   useEffect(() => {
     const onChange = () => setHash(window.location.hash);
     window.addEventListener('hashchange', onChange);
@@ -385,6 +447,8 @@ function PublicRouter({ children }: { children: React.ReactNode }) {
   if (hash.startsWith('#/track/')) return <ClientTrack orderId={hash.replace('#/track/', '')} />;
   if (hash === '#/cabinet' || hash.startsWith('#/cabinet/')) return <ClientCabinetRoute />;
   if (hash === '#/booking') return <Booking />;
+  if (hash === '#/terms') return <Terms language={legalLang} onLanguageChange={setLegalLang} />;
+  if (hash === '#/privacy') return <Privacy language={legalLang} onLanguageChange={setLegalLang} />;
   return <>{children}</>;
 }
 

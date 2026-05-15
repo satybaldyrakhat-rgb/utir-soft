@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Instagram, Phone, X, Users, MessageCircle, Mail, Calendar, TrendingUp, AlertCircle, CheckCircle, Package, Hammer, FileCheck, XCircle, Plus, Search, Filter, Archive } from 'lucide-react';
 import { ClientOrderModal } from './ClientOrderModal';
 import { NewDealModal } from './NewDealModal';
-import { useDataStore, Deal } from '../utils/dataStore';
+import { useDataStore, type Deal } from '../utils/dataStore';
+import { t } from '../utils/translations';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo } from './PlatformLogos';
 import { Finance } from './Finance';
 import { PaymentsHub } from './PaymentsHub';
@@ -48,6 +49,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
   const [activeTab, setActiveTab] = useState<'funnel' | 'payments'>('funnel');
 
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const tt = (key: Parameters<typeof t>[0]) => t(key, language);
 
   // Deals excluding rejected
   const activeDeals = store.deals.filter(d => d.status !== 'rejected');
@@ -186,9 +188,9 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                         className="bg-white border border-gray-100 rounded-xl p-3 cursor-pointer hover:shadow-sm hover:border-gray-200 transition-all group">
                         {/* Top row */}
                         <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center">{iconMap(deal.icon)}</div>
-                            <span className="text-xs text-gray-900 truncate max-w-[130px]">{deal.customerName}</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0">{iconMap(deal.icon)}</div>
+                            <span className="text-xs text-gray-900 truncate">{deal.customerName}</span>
                           </div>
                           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={e => { e.stopPropagation(); handleRejectDeal(deal.id); }} className="p-0.5 hover:bg-red-50 rounded" title="Отказ">
@@ -240,8 +242,8 @@ export function SalesKanban({ language }: SalesKanbanProps) {
               <button onClick={() => setShowNewDealModal(false)} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-gray-400" /></button>
             </div>
             <div className="p-5 space-y-4">
-              <div><label className="block text-[11px] text-gray-400 mb-1">{l('Имя клиента', 'Клиент аты', 'Client Name')}</label><input type="text" value={newDeal.customerName} onChange={e => setNewDeal({ ...newDeal, customerName: e.target.value })} placeholder={l('Иван Иванов', 'Иван Иванов', 'John Doe')} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
-              <div><label className="block text-[11px] text-gray-400 mb-1">{l('Телефон', 'Телефон', 'Phone')}</label><input type="text" value={newDeal.phone} onChange={e => setNewDeal({ ...newDeal, phone: e.target.value })} placeholder="+7 (700) 123-45-67" className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
+              <div><label className="block text-[11px] text-gray-400 mb-1">{l('Имя клиента', 'Клиент аты', 'Client Name')}</label><input type="text" value={newDeal.customerName} onChange={e => setNewDeal({ ...newDeal, customerName: e.target.value })} placeholder={tt('customerNameMask')} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
+              <div><label className="block text-[11px] text-gray-400 mb-1">{l('Телефон', 'Телефон', 'Phone')}</label><input type="text" value={newDeal.phone} onChange={e => setNewDeal({ ...newDeal, phone: e.target.value })} placeholder={tt('phoneMask')} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
               <div><label className="block text-[11px] text-gray-400 mb-1">{l('Продукт', 'Өнім', 'Product')}</label><input type="text" value={newDeal.product} onChange={e => setNewDeal({ ...newDeal, product: e.target.value })} placeholder={l('Шкаф-купе', 'Сырғымалы шкаф', 'Wardrobe')} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
               <div><label className="block text-[11px] text-gray-400 mb-1">{l('Сумма (₸)', 'Сома (₸)', 'Amount (₸)')}</label><input type="number" value={newDeal.amount} onChange={e => setNewDeal({ ...newDeal, amount: e.target.value })} placeholder="0" className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
               <div><label className="block text-[11px] text-gray-400 mb-1">{l('Тип мебели', 'Мебел түрі', 'Furniture Type')}</label><input type="text" value={newDeal.furnitureType} onChange={e => setNewDeal({ ...newDeal, furnitureType: e.target.value })} placeholder={l('Кухня', 'Кухня', 'Kitchen')} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>

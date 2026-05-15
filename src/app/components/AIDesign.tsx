@@ -7,9 +7,9 @@ interface AIDesignProps {
 }
 
 const galleryItems = [
-  { id: 1, img: 'https://images.unsplash.com/photo-1668026694348-b73c5eb5e299?w=600', label: 'Кухня Модерн', style: 'Минимализм', time: '52с' },
-  { id: 2, img: 'https://images.unsplash.com/photo-1571164860029-856acbc24b4a?w=600', label: 'Гостиная Сканди', style: 'Скандинавский', time: '47с' },
-  { id: 3, img: 'https://images.unsplash.com/photo-1765434670070-c0ec576eebf3?w=600', label: 'Спальня Уют', style: 'Современный', time: '61с' },
+  { id: 1, img: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600', label: 'Кухня', style: 'Минимализм', time: '52с' },
+  { id: 2, img: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=600', label: 'Гостиная', style: 'Минимализм', time: '47с' },
+  { id: 3, img: 'https://images.unsplash.com/photo-1631049552057-403cdb8f0658?w=600', label: 'Спальня', style: 'Минимализм', time: '61с' },
 ];
 
 const AI_MODELS = [
@@ -52,10 +52,10 @@ export function AIDesign({ language }: AIDesignProps) {
   ];
 
   const styles = [
-    { id: 'modern', img: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300', ru: 'Современный', kz: 'Заманауи', eng: 'Modern' },
-    { id: 'classic', img: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=300', ru: 'Классика', kz: 'Классика', eng: 'Classic' },
-    { id: 'minimalist', img: 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=300', ru: 'Минимализм', kz: 'Минимализм', eng: 'Minimalist' },
+    { id: 'minimalist', img: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=300', ru: 'Минимализм', kz: 'Минимализм', eng: 'Minimalist' },
+    { id: 'modern', img: 'https://images.unsplash.com/photo-1616594039964-ae9021a400a0?w=300', ru: 'Современный', kz: 'Заманауи', eng: 'Modern' },
     { id: 'scandinavian', img: 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=300', ru: 'Сканди', kz: 'Сканди', eng: 'Scandi' },
+    { id: 'classic', img: 'https://images.unsplash.com/photo-1615873968403-89e068629265?w=300', ru: 'Классика', kz: 'Классика', eng: 'Classic' },
     { id: 'loft', img: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=300', ru: 'Лофт', kz: 'Лофт', eng: 'Loft' },
     { id: 'provence', img: 'https://images.unsplash.com/photo-1567016376408-0226e4d0c1ea?w=300', ru: 'Прованс', kz: 'Прованс', eng: 'Provence' },
   ];

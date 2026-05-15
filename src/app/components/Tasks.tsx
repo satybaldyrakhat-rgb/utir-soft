@@ -38,74 +38,14 @@ interface Employee {
   tasksDone: number;
 }
 
-// ─── MOCK DATA ───────────────────────────────────────────────
+// Placeholder team slots — real names + telegramConnected flip to true once Block C.2 invitations
+// and Block F Telegram-bot pairing are wired. Kept non-empty so legacy hardcoded tasks below
+// still have valid `assignee` references at render time.
 const employees: Employee[] = [
-  { id: 'e1', name: 'Алихан Серікұлы', role: 'Мастер-сборщик', avatar: 'АС', telegramUsername: '@alikhan_s', telegramConnected: true, tasksToday: 5, tasksDone: 3 },
-  { id: 'e2', name: 'Нұрлан Бекетов', role: 'Замерщик', avatar: 'НБ', telegramUsername: '@nurlan_b', telegramConnected: true, tasksToday: 4, tasksDone: 2 },
-  { id: 'e3', name: 'Ерлан Қасымов', role: 'Дизайнер', avatar: 'ЕҚ', telegramUsername: '@erlan_k', telegramConnected: true, tasksToday: 3, tasksDone: 1 },
-  { id: 'e4', name: 'Дана Жұмабаева', role: 'Менеджер продаж', avatar: 'ДЖ', telegramUsername: '@dana_zh', telegramConnected: true, tasksToday: 6, tasksDone: 4 },
-  { id: 'e5', name: 'Арман Тұрсынов', role: 'Мастер-столяр', avatar: 'АТ', telegramUsername: '@arman_t', telegramConnected: false, tasksToday: 0, tasksDone: 0 },
-];
-
-const initialTasks: Task[] = [
-  {
-    id: 't1', title: 'Замер кухни — ул. Абая 45', description: 'Клиент Сериков А. Замер кухни 3.2м, угловая планировка. Взять с собой каталог фасадов.',
-    status: 'new', priority: 'high', assignee: employees[1], createdAt: '2026-04-03T08:15:00', dueDate: '2026-04-03',
-    source: 'telegram', telegramConfirmed: true, category: 'Замер',
-    subtasks: [{ id: 's1', title: 'Подготовить инструменты', done: true }, { id: 's2', title: 'Связаться с клиентом', done: true }, { id: 's3', title: 'Провести замер', done: false }]
-  },
-  {
-    id: 't2', title: 'Сборка шкафа-купе — заказ #1847', description: 'Шкаф-купе 2.4м x 2.8м, 3 двери, зеркало. Адрес: ЖК Алтын Орда, кв 56.',
-    status: 'in_progress', priority: 'high', assignee: employees[0], createdAt: '2026-04-03T07:30:00', dueDate: '2026-04-03',
-    source: 'telegram', telegramConfirmed: true, category: 'Сборка',
-    subtasks: [{ id: 's4', title: 'Каркас собран', done: true }, { id: 's5', title: 'Полки установлены', done: true }, { id: 's6', title: 'Двери навешены', done: false }, { id: 's7', title: 'Финальная проверка', done: false }]
-  },
-  {
-    id: 't3', title: 'Дизайн-проект — кухня Белоусовых', description: '3D визуализация кухни. Стиль: современный минимализм. Цвет: белый + дуб.',
-    status: 'in_progress', priority: 'medium', assignee: employees[2], createdAt: '2026-04-02T14:00:00', dueDate: '2026-04-03',
-    source: 'telegram', telegramConfirmed: true, category: 'Дизайн',
-    subtasks: [{ id: 's8', title: 'Планировка готова', done: true }, { id: 's9', title: 'Рендер фронтальный', done: false }, { id: 's10', title: 'Рендер перспектива', done: false }]
-  },
-  {
-    id: 't4', title: 'Позвонить 5 новым лидам из Instagram', description: 'Лиды за вчера: Асемгуль, Бауыржан, Карина, Тимур, Мадина. Записать в CRM.',
-    status: 'review', priority: 'medium', assignee: employees[3], createdAt: '2026-04-03T09:00:00', dueDate: '2026-04-03',
-    source: 'telegram', telegramConfirmed: true, category: 'Продажи',
-    completionNote: 'Позвонила всем 5 лидам. Асемгуль — хочет кухню, записала на замер. Бауыржан — думает. Карина — заказала шкаф. Тимур — не ответил. Мадина — перезвонить завтра.'
-  },
-  {
-    id: 't5', title: 'Подготовить смету — заказ #1852', description: 'Кухня П-образная 4.5м. Фасады МДФ эмаль, столешница кварц.',
-    status: 'done', priority: 'medium', assignee: employees[3], createdAt: '2026-04-03T08:00:00', dueDate: '2026-04-03',
-    source: 'telegram', telegramConfirmed: true, category: 'Продажи', completedAt: '2026-04-03T11:30:00',
-    completionNote: 'Смета готова: 2 450 000 ₸. Отправила клиенту в WhatsApp. Клиент просит скидку, обсудить с руководством.'
-  },
-  {
-    id: 't6', title: 'Закупка фурнитуры Blum', description: 'Петли, направляющие, подъёмники для 3 заказов. Список в чате.',
-    status: 'done', priority: 'low', assignee: employees[0], createdAt: '2026-04-03T07:00:00', dueDate: '2026-04-03',
-    source: 'telegram', telegramConfirmed: true, category: 'Закупки', completedAt: '2026-04-03T10:00:00',
-    completionNote: 'Всё закупил в Blum-центре. Чек на 185 000 ₸. Фото чека отправил в бухгалтерию.'
-  },
-  {
-    id: 't7', title: 'Отправить коммерческое предложение — Назарбаев Университет', description: 'Мебель для 3 аудиторий. Столы, стулья, шкафы.',
-    status: 'new', priority: 'urgent', assignee: employees[3], createdAt: '2026-04-03T09:45:00', dueDate: '2026-04-03',
-    source: 'telegram', telegramConfirmed: true, category: 'Продажи'
-  },
-  {
-    id: 't8', title: 'Монтаж кухни — ЖК Премиум, кв 112', description: 'Финальный этап. Подключение мойки, варочной, вытяжки. Клиент будет дома с 14:00.',
-    status: 'in_progress', priority: 'high', assignee: employees[0], createdAt: '2026-04-03T06:45:00', dueDate: '2026-04-03',
-    source: 'telegram', telegramConfirmed: true, category: 'Монтаж',
-    subtasks: [{ id: 's11', title: 'Доставка модулей', done: true }, { id: 's12', title: 'Монтаж нижних модулей', done: true }, { id: 's13', title: 'Монтаж верхних модулей', done: false }, { id: 's14', title: 'Столешница', done: false }, { id: 's15', title: 'Подключение техники', done: false }]
-  },
-  {
-    id: 't9', title: 'Фотосессия готового проекта', description: 'Кухня клиента Жумагулова. Сделать 10+ фото для портфолио и Instagram.',
-    status: 'new', priority: 'low', assignee: employees[2], createdAt: '2026-04-03T10:00:00', dueDate: '2026-04-04',
-    source: 'platform', telegramConfirmed: false, category: 'Маркетинг'
-  },
-  {
-    id: 't10', title: 'Замер гардеробной — мкр. Самал', description: 'Гардеробная 2x3м. Клиентка: Айгерим. Тел: +7 707 xxx xx xx.',
-    status: 'done', priority: 'medium', assignee: employees[1], createdAt: '2026-04-03T08:30:00', dueDate: '2026-04-03',
-    source: 'telegram', telegramConfirmed: true, category: 'Замер', completedAt: '2026-04-03T12:15:00',
-    completionNote: 'Замер сделан. Размеры: 2050x3120мм, потолок 2700мм. Есть вентиляционный короб 300x300мм в углу. Фото и чертёж отправил дизайнеру.'
-  },
+  { id: 'e1', name: '—', role: '—', avatar: '?', telegramUsername: '', telegramConnected: false, tasksToday: 0, tasksDone: 0 },
+  { id: 'e2', name: '—', role: '—', avatar: '?', telegramUsername: '', telegramConnected: false, tasksToday: 0, tasksDone: 0 },
+  { id: 'e3', name: '—', role: '—', avatar: '?', telegramUsername: '', telegramConnected: false, tasksToday: 0, tasksDone: 0 },
+  { id: 'e4', name: '—', role: '—', avatar: '?', telegramUsername: '', telegramConnected: false, tasksToday: 0, tasksDone: 0 },
 ];
 
 const columns = [
@@ -220,92 +160,70 @@ export function Tasks({ language }: TasksProps) {
         </div>
       </div>
 
-      {/* Telegram Bot Panel */}
+      {/* Telegram Bot Panel — minimalist, honest empty state until Block F wires the real bot */}
       {showTelegramPanel && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#2AABEE] rounded-full flex items-center justify-center">
-                <Bot className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 bg-[#2AABEE]/10 rounded-xl flex items-center justify-center">
+                <Bot className="w-5 h-5 text-[#2AABEE]" />
               </div>
               <div>
-                <div className="text-sm text-gray-900">@UtirSoft_TaskBot</div>
-                <div className="text-xs text-green-600 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                  Бот активен
+                <div className="text-sm text-gray-900">Telegram-бот платформы</div>
+                <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                  <span className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
+                  Не подключён
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowBotSettings(true)} className="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs hover:bg-gray-800">Расширенные настройки</button>
-              <button onClick={() => setShowTelegramPanel(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
+              <button onClick={() => setShowBotSettings(true)} className="px-3 py-1.5 border border-gray-100 text-gray-700 rounded-lg text-xs hover:bg-gray-50">Настройки</button>
+              <button onClick={() => setShowTelegramPanel(false)} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center hover:bg-gray-100">
+                <X className="w-3.5 h-3.5 text-gray-400" />
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            {/* How it works */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="text-sm text-gray-900 mb-3">Как это работает:</div>
-              <div className="space-y-3">
+          {/* Body — 2 clean sections */}
+          <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* How it will work */}
+            <section>
+              <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">Как это будет работать</div>
+              <ol className="space-y-2.5">
                 {[
-                  { step: '1', text: 'Сотрудник пишет боту свои задачи на день', icon: '📝' },
-                  { step: '2', text: 'Бот форматирует и спрашивает: "Ваши задачи на сегодня:"', icon: '🤖' },
-                  { step: '3', text: 'Сотрудник нажимает "Да ✅" для подтверждения', icon: '✅' },
-                  { step: '4', text: 'Задачи появляются на платформе', icon: '📋' },
-                  { step: '5', text: 'При выполнении — пишет отчёт боту, подтверждает', icon: '🏁' },
-                ].map(s => (
-                  <div key={s.step} className="flex items-start gap-2">
-                    <span className="text-sm">{s.icon}</span>
-                    <span className="text-xs text-gray-600">{s.text}</span>
-                  </div>
+                  'Сотрудник пишет боту свои задачи на день',
+                  'Бот форматирует список и просит подтверждения',
+                  'Сотрудник подтверждает — задачи попадают на платформу',
+                  'По завершении сотрудник пишет отчёт боту',
+                ].map((step, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-xs text-gray-600">
+                    <span className="w-5 h-5 flex-shrink-0 rounded-md bg-gray-50 text-gray-500 text-[10px] flex items-center justify-center tabular-nums">{i + 1}</span>
+                    <span className="leading-relaxed">{step}</span>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ol>
+            </section>
 
-            {/* Connected employees */}
-            <div>
-              <div className="text-sm text-gray-900 mb-3">Подключённые сотрудники:</div>
-              <div className="space-y-2">
-                {employees.map(emp => (
-                  <div key={emp.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center text-xs text-gray-600">
-                        {emp.avatar}
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-900">{emp.name}</div>
-                        <div className="text-[10px] text-gray-500">{emp.telegramUsername}</div>
-                      </div>
-                    </div>
-                    {emp.telegramConnected ? (
-                      <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Подключён</span>
-                    ) : (
-                      <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Не подключён</span>
-                    )}
-                  </div>
-                ))}
+            {/* Connected employees — empty state */}
+            <section>
+              <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">Подключённые сотрудники</div>
+              <div className="bg-gray-50 rounded-xl p-6 text-center">
+                <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-white border border-gray-100 flex items-center justify-center">
+                  <Send className="w-4 h-4 text-gray-300" />
+                </div>
+                <div className="text-xs text-gray-700 mb-1">Пока никто не подключён</div>
+                <div className="text-[11px] text-gray-400 leading-relaxed max-w-[260px] mx-auto">
+                  Сотрудники появятся здесь после того, как Админ настроит Telegram-бот и пригласит команду.
+                </div>
               </div>
-            </div>
+            </section>
           </div>
 
-          {/* Bot message preview */}
-          <div className="bg-[#0E1621] rounded-lg p-4 text-sm">
-            <div className="text-gray-400 text-xs mb-2">Пример диалога в Telegram:</div>
-            <div className="space-y-2">
-              <div className="flex justify-end"><div className="bg-[#2B5278] text-white px-3 py-1.5 rounded-xl rounded-tr-sm text-xs max-w-[280px]">Сегодня: замер кухни Абая 45, потом сборка шкафа ЖК Премиум, закупка фурнитуры</div></div>
-              <div className="flex justify-start"><div className="bg-[#182533] text-white px-3 py-1.5 rounded-xl rounded-tl-sm text-xs max-w-[300px]">
-                <div className="text-[#2AABEE] mb-1">🤖 UtirSoft TaskBot</div>
-                📋 <strong>Ваши задачи на 3 апреля:</strong><br/>
-                1. Замер кухни — ул. Абая 45<br/>
-                2. Сборка шкафа — ЖК Премиум<br/>
-                3. Закупка фурнитуры<br/><br/>
-                Всё верно?
-              </div></div>
-              <div className="flex justify-end"><div className="bg-[#2B5278] text-white px-3 py-1.5 rounded-xl rounded-tr-sm text-xs">Да ✅</div></div>
-              <div className="flex justify-start"><div className="bg-[#182533] text-white px-3 py-1.5 rounded-xl rounded-tl-sm text-xs"><div className="text-[#2AABEE] mb-1">🤖 UtirSoft TaskBot</div>✅ Задачи добавлены! Удачного дня! 💪</div></div>
-            </div>
+          {/* Footer hint */}
+          <div className="px-5 py-3 border-t border-gray-50 text-[11px] text-gray-400 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 bg-amber-400 rounded-full" />
+            Полная интеграция Telegram-бота — в следующем обновлении. Сейчас задачи добавляются вручную.
           </div>
         </div>
       )}

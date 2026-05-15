@@ -1,12 +1,19 @@
-import { useState } from 'react';
-import { MessageCircle, Bot, Sparkles, Users, Settings as SettingsIcon, Zap, Activity, Plus, Search, Edit2, Trash2, UserPlus, Star, CheckCircle, X, Shield, Check, Eye, ChevronDown, LayoutGrid } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { MessageCircle, Bot, Sparkles, Users, Settings as SettingsIcon, Zap, Activity, Plus, Search, Edit2, Trash2, UserPlus, Star, CheckCircle, X, Shield, Check, Eye, ChevronDown, LayoutGrid, Camera, BookOpen, Send } from 'lucide-react';
 import { ModulesSettings } from './ModulesSettings';
+import { ActivityLog } from './ActivityLog';
+import { TelegramPairing } from './TelegramPairing';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
-import { useDataStore } from '../utils/dataStore';
+import { useDataStore, ALL_MODULES, ALL_ROLES, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
+import { t } from '../utils/translations';
+
+// Until C.2 (invitations) ships, the workspace owner is always the admin.
+// Once server returns real per-user role, replace this with a store/prop value.
+const IS_CURRENT_USER_ADMIN = true;
 
 interface Employee {
   id: string; name: string; email: string; phone: string;
-  role: 'admin' | 'manager' | 'designer' | 'production' | 'sales' | 'accountant';
+  role: RoleKey;
   department: string; status: 'active' | 'inactive' | 'vacation'; salary: number;
   joinDate: string; lastActive: string;
   permissions: { sales: boolean; finance: boolean; warehouse: boolean; chats: boolean; analytics: boolean; settings: boolean; };
@@ -20,16 +27,54 @@ interface SettingsProps { language: 'kz' | 'ru' | 'eng'; onLanguageChange?: (lan
 
 export function Settings({ language, onLanguageChange }: SettingsProps) {
   const store = useDataStore();
-  const [activeTab, setActiveTab] = useState<'general' | 'employees' | 'ai' | 'modules' | 'integrations' | 'logs' | 'roles'>('general');
-  const [aiChatEnabled, setAiChatEnabled] = useState(true);
-  const [aiGlobalEnabled, setAiGlobalEnabled] = useState(true);
-  const [selectedAiModel, setSelectedAiModel] = useState('default');
-  const [aiTone, setAiTone] = useState<'professional' | 'friendly' | 'casual'>('friendly');
-  const [companyName, setCompanyName] = useState('Utir Soft');
-  const [companyAddress, setCompanyAddress] = useState('Алматы, ул. Сейфуллина 458');
-  const [companyPhone, setCompanyPhone] = useState('+7 (727) 250-00-00');
-  const [companyEmail, setCompanyEmail] = useState('admin@utirsoft.kz');
-  const [companyBIN, setCompanyBIN] = useState('123456789012');
+  const profile = store.profile;
+  const catalogs = store.catalogs;
+  const aiClient = store.aiSettings.client;
+  const aiAssistant = store.aiSettings.assistant;
+  const [activeTab, setActiveTab] = useState<'general' | 'employees' | 'ai-client' | 'ai-assistant' | 'modules' | 'integrations' | 'roles' | 'catalogs' | 'activity'>('general');
+  const tt = (key: Parameters<typeof t>[0]) => t(key, language);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleAvatarPick = (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 4 * 1024 * 1024) {
+      alert('Файл больше 4 МБ. Выберите меньшее фото.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      // Downscale via canvas to keep localStorage small
+      const img = new Image();
+      img.onload = () => {
+        const max = 256;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          store.updateProfile({ avatar: canvas.toDataURL('image/jpeg', 0.85) });
+        } else {
+          store.updateProfile({ avatar: dataUrl });
+        }
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleProfileSave = () => {
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1500);
+    store.addActivity({ user: 'Вы', action: 'Обновили профиль и компанию', target: '', type: 'update', page: 'settings' });
+  };
+
+  const initials = (profile.name || '').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   // Use store employees mapped to local format
   const employees = store.employees.map(e => ({
@@ -45,7 +90,6 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('all');
 
-  const activityLogs = store.activityLogs;
 
   const integrationIcons: Record<string, JSX.Element> = {
     whatsapp: <WhatsAppLogo className="w-5 h-5" />, telegram: <TelegramLogo className="w-5 h-5" />,
@@ -60,8 +104,24 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
   }));
 
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
-  const roleLabel = (r: string) => ({ admin: 'Админ', manager: 'Менеджер продаж', designer: 'Дизайнер', production: 'Производство', sales: 'Продажи', accountant: 'Бухгалтер' }[r] || r);
-  const roleBg = (r: string) => ({ admin: 'bg-gray-200 text-gray-700', manager: 'bg-blue-50 text-blue-600', designer: 'bg-purple-50 text-purple-600', production: 'bg-orange-50 text-orange-600', sales: 'bg-green-50 text-green-600', accountant: 'bg-green-50 text-green-600' }[r] || 'bg-gray-50 text-gray-600');
+  const roleLabel = (r: string) => ({
+    admin: tt('roleAdmin'),
+    manager: tt('roleManager'),
+    employee: tt('roleEmployee'),
+  } as Record<string, string>)[r] || r;
+  const roleBg = (r: string) => ({
+    admin: 'bg-gray-200 text-gray-700',
+    manager: 'bg-blue-50 text-blue-600',
+    employee: 'bg-emerald-50 text-emerald-600',
+  } as Record<string, string>)[r] || 'bg-gray-50 text-gray-600';
+  const moduleLabel = (m: ModuleKey) => ({
+    orders: tt('modOrders'),
+    chats: tt('modChats'),
+    finance: tt('modFinance'),
+    production: tt('modProduction'),
+    analytics: tt('modAnalytics'),
+    settings: tt('modSettings'),
+  })[m];
   const statusDot = (s: string) => s === 'active' ? 'bg-green-500' : s === 'vacation' ? 'bg-blue-500' : 'bg-gray-300';
 
   const filteredEmployees = employees.filter(e => {
@@ -88,12 +148,34 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
   const tabs = [
     { id: 'general' as const, icon: SettingsIcon, label: l('Основные', 'Негізгі', 'General') },
     { id: 'employees' as const, icon: Users, label: l('Команда', 'Команда', 'Team') },
-    { id: 'ai' as const, icon: Bot, label: 'AI' },
+    { id: 'catalogs' as const, icon: BookOpen, label: tt('catalogs') },
+    { id: 'ai-client' as const, icon: MessageCircle, label: tt('aiClientTab') },
+    { id: 'ai-assistant' as const, icon: Bot, label: tt('aiAssistantTab') },
     { id: 'modules' as const, icon: LayoutGrid, label: l('Модули', 'Модульдер', 'Modules') },
     { id: 'integrations' as const, icon: Zap, label: l('Интеграции', 'Интеграциялар', 'Integrations') },
     { id: 'roles' as const, icon: Shield, label: l('Роли и права', 'Рөлдер', 'Roles') },
-    { id: 'logs' as const, icon: Activity, label: l('Журнал', 'Журнал', 'Logs') },
+    // Admin-only: hidden from tab list for non-admins.
+    ...(IS_CURRENT_USER_ADMIN ? [{ id: 'activity' as const, icon: Activity, label: tt('activityLog') }] : []),
   ];
+
+  const CATALOG_KEYS: { key: CatalogKey; titleKey: Parameters<typeof t>[0] }[] = [
+    { key: 'productTemplates', titleKey: 'catalogProductTemplates' },
+    { key: 'materials',         titleKey: 'catalogMaterials' },
+    { key: 'hardware',          titleKey: 'catalogHardware' },
+    { key: 'addons',            titleKey: 'catalogAddons' },
+    { key: 'furnitureTypes',    titleKey: 'catalogFurnitureTypes' },
+  ];
+
+  const [catalogDraft, setCatalogDraft] = useState<Record<CatalogKey, string>>({
+    productTemplates: '', materials: '', hardware: '', addons: '', furnitureTypes: '',
+  });
+
+  const submitCatalogItem = (key: CatalogKey) => {
+    const value = catalogDraft[key];
+    if (!value.trim()) return;
+    store.addCatalogItem(key, value);
+    setCatalogDraft({ ...catalogDraft, [key]: '' });
+  };
 
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
@@ -128,14 +210,44 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
             </div>
             <div className="flex flex-col md:flex-row gap-5">
               <div className="flex flex-col items-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-500 text-xl mb-2">Р</div>
-                <button className="text-[10px] text-gray-400 hover:text-gray-600">{l('Изменить', 'Өзгерту', 'Change')}</button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => handleAvatarPick(e.target.files?.[0] || null)}
+                />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="relative w-20 h-20 bg-gray-100 rounded-2xl overflow-hidden mb-2 group"
+                  title={l('Загрузить фото', 'Сурет жүктеу', 'Upload photo')}
+                >
+                  {profile.avatar ? (
+                    <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-lg">
+                      {initials || <Camera className="w-5 h-5" />}
+                    </span>
+                  )}
+                  <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                    <Camera className="w-5 h-5 text-white" />
+                  </span>
+                </button>
+                {profile.avatar && (
+                  <button
+                    onClick={() => store.updateProfile({ avatar: '' })}
+                    className="text-[10px] text-gray-400 hover:text-red-500"
+                  >
+                    {l('Удалить', 'Жою', 'Remove')}
+                  </button>
+                )}
               </div>
               <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input label={l('Имя', 'Аты', 'Name')} value="Рахат Сатыбалды" onChange={() => {}} />
-                <Input label={l('Должность', 'Лауазым', 'Position')} value="Директор" onChange={() => {}} />
-                <Input label="Email" value="rakhat@utir.kz" onChange={() => {}} />
-                <Input label={l('Телефон', 'Телефон', 'Phone')} value="+7 701 234 5678" onChange={() => {}} />
+                <Input label={l('Имя', 'Аты', 'Name')} value={profile.name} onChange={v => store.updateProfile({ name: v })} placeholder={l('Введите имя', 'Атыңызды енгізіңіз', 'Enter name')} />
+                <Input label={l('Должность', 'Лауазым', 'Position')} value={profile.position} onChange={v => store.updateProfile({ position: v })} placeholder={l('Например: Директор', 'Мысалы: Директор', 'e.g. Director')} />
+                <Input label="Email" value={profile.email} onChange={v => store.updateProfile({ email: v })} placeholder="email@домен.kz" />
+                <Input label={l('Телефон', 'Телефон', 'Phone')} value={profile.phone} onChange={v => store.updateProfile({ phone: v })} placeholder="+7 ___ ___ __ __" />
               </div>
             </div>
           </div>
@@ -144,13 +256,15 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <div className="text-sm text-gray-900 mb-5">{l('Компания', 'Компания', 'Company')}</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input label={l('Название', 'Атауы', 'Name')} value={companyName} onChange={setCompanyName} />
-              <Input label={l('БИН', 'БСН', 'BIN')} value={companyBIN} onChange={setCompanyBIN} />
-              <div className="md:col-span-2"><Input label={l('Адрес', 'Мекенжай', 'Address')} value={companyAddress} onChange={setCompanyAddress} /></div>
-              <Input label="Email" value={companyEmail} onChange={setCompanyEmail} />
-              <Input label={l('Телефон', 'Телефон', 'Phone')} value={companyPhone} onChange={setCompanyPhone} />
+              <Input label={l('Название', 'Атауы', 'Name')} value={profile.companyName} onChange={v => store.updateProfile({ companyName: v })} placeholder={l('Название компании', 'Компания атауы', 'Company name')} />
+              <Input label={l('БИН', 'БСН', 'BIN')} value={profile.companyBIN} onChange={v => store.updateProfile({ companyBIN: v })} placeholder="000000000000" />
+              <div className="md:col-span-2"><Input label={l('Адрес', 'Мекенжай', 'Address')} value={profile.companyAddress} onChange={v => store.updateProfile({ companyAddress: v })} placeholder={l('Город, улица, дом', 'Қала, көше, үй', 'City, street, building')} /></div>
+              <Input label="Email" value={profile.companyEmail} onChange={v => store.updateProfile({ companyEmail: v })} placeholder="info@company.kz" />
+              <Input label={l('Телефон', 'Телефон', 'Phone')} value={profile.companyPhone} onChange={v => store.updateProfile({ companyPhone: v })} placeholder="+7 ___ ___ __ __" />
             </div>
-            <button onClick={() => alert('Сохранено!')} className="mt-4 px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">{l('Сохранить', 'Сақтау', 'Save')}</button>
+            <button onClick={handleProfileSave} className="mt-4 px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">
+              {savedFlash ? l('Сохранено ✓', 'Сақталды ✓', 'Saved ✓') : l('Сохранить', 'Сақтау', 'Save')}
+            </button>
           </div>
 
           {/* Language */}
@@ -168,150 +282,402 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
         </div>
       )}
 
-      {/* ===== EMPLOYEES ===== */}
+      {/* ===== CATALOGS (Справочники) ===== */}
+      {activeTab === 'catalogs' && (
+        <div className="space-y-5">
+          <div className="text-[11px] text-gray-400 max-w-xl">{tt('catalogsDesc')}</div>
+          {CATALOG_KEYS.map(({ key, titleKey }) => (
+            <div key={key} className="bg-white rounded-2xl border border-gray-100 p-5">
+              <div className="text-sm text-gray-900 mb-3">{tt(titleKey)}</div>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {catalogs[key].map(item => (
+                  <span key={item} className="group inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 rounded-lg text-xs text-gray-700">
+                    {item}
+                    <button
+                      onClick={() => store.removeCatalogItem(key, item)}
+                      className="text-gray-300 hover:text-red-500 transition"
+                      title={tt('delete')}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+                {catalogs[key].length === 0 && (
+                  <span className="text-[11px] text-gray-300 italic">{tt('catalogEmpty')}</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={catalogDraft[key]}
+                  onChange={e => setCatalogDraft({ ...catalogDraft, [key]: e.target.value })}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitCatalogItem(key); } }}
+                  placeholder={tt('catalogAddItemHint')}
+                  className="flex-1 px-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+                />
+                <button
+                  onClick={() => submitCatalogItem(key)}
+                  disabled={!catalogDraft[key].trim()}
+                  className="px-3 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 disabled:opacity-30 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />{tt('add')}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ===== EMPLOYEES — invite-only (no manual add until invite flow ships) ===== */}
       {activeTab === 'employees' && (
         <div className="space-y-5">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-            <div className="flex-1 flex gap-2">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
-                <input type="text" placeholder={l('Поиск...', 'Іздеу...', 'Search...')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+          {employees.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+              <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Users className="w-6 h-6 text-gray-400" />
               </div>
-              <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="px-3 py-2 bg-gray-50 border-0 rounded-xl text-xs focus:outline-none text-gray-600">
-                <option value="all">{l('Все', 'Бәрі', 'All')}</option>
-                <option value="admin">{l('Админ', 'Админ', 'Admin')}</option>
-                <option value="manager">{l('Менеджер', 'Менеджер', 'Manager')}</option>
-                <option value="designer">{l('Дизайнер', 'Дизайнер', 'Designer')}</option>
-                <option value="production">{l('Производство', 'Өндіріс', 'Production')}</option>
-                <option value="sales">{l('Продажи', 'Сату', 'Sales')}</option>
-                <option value="accountant">{l('Бухгалтер', 'Бухгалтер', 'Accountant')}</option>
+              <div className="text-sm text-gray-900 mb-2">{tt('teamEmptyTitle')}</div>
+              <div className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed mb-5">{tt('teamEmptyDesc')}</div>
+              <button
+                disabled
+                title={tt('inviteComingSoon')}
+                className="px-4 py-2 bg-gray-100 text-gray-400 rounded-xl text-xs cursor-not-allowed inline-flex items-center gap-1.5"
+              >
+                <UserPlus className="w-3.5 h-3.5" />{tt('inviteEmployee')}
+              </button>
+              <div className="text-[11px] text-gray-400 mt-3">{tt('inviteComingSoon')}</div>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+                <div className="flex-1 flex gap-2">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
+                    <input type="text" placeholder={l('Поиск...', 'Іздеу...', 'Search...')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                  </div>
+                  <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="px-3 py-2 bg-gray-50 border-0 rounded-xl text-xs focus:outline-none text-gray-600">
+                    <option value="all">{tt('all')}</option>
+                    <option value="admin">{tt('roleAdmin')}</option>
+                    <option value="manager">{tt('roleManager')}</option>
+                    <option value="employee">{tt('roleEmployee')}</option>
+                  </select>
+                </div>
+                <button
+                  disabled
+                  title={tt('inviteComingSoon')}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-400 rounded-xl text-xs cursor-not-allowed"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />{tt('inviteEmployee')}
+                </button>
+              </div>
+
+              {/* Stats — only when team exists */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: l('Всего', 'Барлығы', 'Total'), value: employees.length },
+                  { label: l('Активны', 'Белсенді', 'Active'), value: employees.filter(e => e.status === 'active').length },
+                  { label: tt('roleManager'), value: employees.filter(e => e.role === 'manager').length },
+                  { label: tt('roleEmployee'), value: employees.filter(e => e.role === 'employee').length },
+                ].map((s, i) => <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4"><div className="text-[10px] text-gray-400 mb-2">{s.label}</div><div className="text-lg text-gray-900">{s.value}</div></div>)}
+              </div>
+
+              {/* Employee list */}
+              <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
+                {filteredEmployees.map(emp => (
+                  <div key={emp.id} className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50/50 transition-colors group">
+                    <div className="relative flex-shrink-0">
+                      <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 text-sm">{emp.name.charAt(0) || '?'}</div>
+                      <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 ${statusDot(emp.status)} border-2 border-white rounded-full`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-sm text-gray-900 truncate">{emp.name}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${roleBg(emp.role)}`}>{roleLabel(emp.role)}</span>
+                      </div>
+                      <div className="text-[10px] text-gray-400">{emp.email}{emp.department ? ` · ${emp.department}` : ''}</div>
+                    </div>
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => { setEditingEmployee(emp); setEmpRole(emp.role); setShowEmployeeModal(true); }} className="p-1.5 hover:bg-gray-100 rounded-lg"><Edit2 className="w-3.5 h-3.5 text-gray-400" /></button>
+                      <button onClick={() => deleteEmployee(emp.id)} className="p-1.5 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                    </div>
+                  </div>
+                ))}
+                {filteredEmployees.length === 0 && (
+                  <div className="py-12 text-center"><Users className="w-8 h-8 text-gray-200 mx-auto mb-2" /><p className="text-xs text-gray-400">{l('Не найдено', 'Табылмады', 'Not found')}</p></div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ===== AI for clients (Block E1) — independent product ===== */}
+      {activeTab === 'ai-client' && (
+        <div className="space-y-5">
+          {/* Product header — green theme so it never visually mixes with the assistant */}
+          <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-100 p-5">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <MessageCircle className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="text-sm text-gray-900">{tt('aiClientHeader')}</div>
+                  <span className="text-[9px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">{tt('aiTwoProductsBadge')}</span>
+                </div>
+                <div className="text-[11px] text-gray-500 leading-relaxed">{tt('aiClientDesc')}</div>
+              </div>
+              <Toggle value={aiClient.enabled} onChange={() => store.updateAIClient({ enabled: !aiClient.enabled })} />
+            </div>
+          </div>
+
+          {/* Personality / role prompt */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="text-sm text-gray-900 mb-1">{tt('aiClientPersonality')}</div>
+            <div className="text-[11px] text-gray-400 mb-3">{tt('aiClientPersonalityHint')}</div>
+            <textarea
+              value={aiClient.personality}
+              onChange={e => store.updateAIClient({ personality: e.target.value })}
+              rows={4}
+              className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none"
+            />
+          </div>
+
+          {/* Tone + Language */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <div className="text-sm text-gray-900 mb-3">{tt('aiClientTone')}</div>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { id: 'professional' as const, emoji: '👔', label: tt('aiTonePro') },
+                  { id: 'friendly' as const,     emoji: '😊', label: tt('aiToneFriendly') },
+                  { id: 'casual' as const,       emoji: '✌️', label: tt('aiToneCasual') },
+                ]).map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => store.updateAIClient({ tone: opt.id })}
+                    className={`p-3 rounded-xl border text-center transition ${aiClient.tone === opt.id ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}
+                  >
+                    <div className="text-lg mb-1">{opt.emoji}</div>
+                    <div className="text-[10px] text-gray-600">{opt.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-900 mb-3">{tt('aiClientLang')}</div>
+              <select
+                value={aiClient.language}
+                onChange={e => store.updateAIClient({ language: e.target.value as any })}
+                className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+              >
+                <option value="auto">{tt('aiLangAuto')}</option>
+                <option value="ru">Русский</option>
+                <option value="kz">Қазақша</option>
+                <option value="eng">English</option>
               </select>
             </div>
-            <button onClick={() => setShowEmployeeModal(true)} className="flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800"><UserPlus className="w-3.5 h-3.5" />{l('Добавить', 'Қосу', 'Add')}</button>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-4 gap-3">
-            {[
-              { label: l('Всего', 'Барлығы', 'Total'), value: employees.length },
-              { label: l('Активны', 'Белсенді', 'Active'), value: employees.filter(e => e.status === 'active').length },
-              { label: l('Рейтинг', 'Рейтинг', 'Rating'), value: (employees.reduce((s, e) => s + e.performance.rating, 0) / employees.length).toFixed(1) },
-              { label: l('Эффект.', 'Тиімд.', 'Effic.'), value: `${Math.round(employees.reduce((s, e) => s + e.performance.efficiency, 0) / employees.length)}%` },
-            ].map((s, i) => <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4"><div className="text-[10px] text-gray-400 mb-2">{s.label}</div><div className="text-lg text-gray-900">{s.value}</div></div>)}
+          {/* Connected channels — read from integrations table */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="text-sm text-gray-900 mb-1">{tt('aiClientChannels')}</div>
+            <div className="text-[11px] text-gray-400 mb-3">{tt('aiClientChannelsHint')}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {store.integrations.filter(i => i.cat === 'msg').map(i => (
+                <span key={i.id} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs ${i.connected ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-400'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${i.connected ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                  {i.name}
+                </span>
+              ))}
+              {store.integrations.filter(i => i.cat === 'msg').length === 0 && (
+                <span className="text-[11px] text-gray-400 italic">{l('Каналы не настроены', 'Арналар бапталмаған', 'No channels configured')}</span>
+              )}
+            </div>
           </div>
 
-          {/* Employee list */}
-          <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
-            {filteredEmployees.map(emp => (
-              <div key={emp.id} className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50/50 transition-colors group">
-                <div className="relative flex-shrink-0">
-                  <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 text-sm">{emp.name.charAt(0)}</div>
-                  <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 ${statusDot(emp.status)} border-2 border-white rounded-full`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="text-sm text-gray-900 truncate">{emp.name}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${roleBg(emp.role)}`}>{roleLabel(emp.role)}</span>
-                  </div>
-                  <div className="text-[10px] text-gray-400">{emp.email} · {emp.department}</div>
-                </div>
-                <div className="hidden sm:flex items-center gap-4 text-center">
-                  <div><div className="text-[10px] text-gray-400">{l('Заказов', 'Тапсырыс', 'Orders')}</div><div className="text-xs text-gray-900">{emp.performance.ordersCompleted}</div></div>
-                  <div><div className="text-[10px] text-gray-400">{l('Рейтинг', 'Рейтинг', 'Rating')}</div><div className="text-xs text-gray-900 flex items-center gap-0.5 justify-center"><Star className="w-2.5 h-2.5 text-yellow-500 fill-yellow-500" />{emp.performance.rating}</div></div>
-                  <div><div className="text-[10px] text-gray-400">{l('ЗП', 'Жалақы', 'Salary')}</div><div className="text-xs text-gray-900">{(emp.salary / 1000).toFixed(0)}К₸</div></div>
-                </div>
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => { setEditingEmployee(emp); setEmpRole(emp.role); setShowEmployeeModal(true); }} className="p-1.5 hover:bg-gray-100 rounded-lg"><Edit2 className="w-3.5 h-3.5 text-gray-400" /></button>
-                  <button onClick={() => deleteEmployee(emp.id)} className="p-1.5 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
-                </div>
+          {/* Knowledge base */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="text-sm text-gray-900 mb-1">{tt('aiClientKnowledge')}</div>
+            <div className="text-[11px] text-gray-400 mb-3">{tt('aiClientKnowledgeHint')}</div>
+            {aiClient.knowledgeSources.length === 0 ? (
+              <div className="bg-gray-50 rounded-xl px-3 py-4 text-center text-[11px] text-gray-400 italic">
+                {l('Пока пусто', 'Әзірге бос', 'Empty')}
               </div>
-            ))}
-            {filteredEmployees.length === 0 && (
-              <div className="py-12 text-center"><Users className="w-8 h-8 text-gray-200 mx-auto mb-2" /><p className="text-xs text-gray-400">{l('Не найдено', 'Табылмады', 'Not found')}</p></div>
+            ) : (
+              <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl">
+                {aiClient.knowledgeSources.map(s => (
+                  <div key={s.id} className="px-3 py-2 flex items-center justify-between text-xs">
+                    <span className="text-gray-700">{s.name}</span>
+                    <span className="text-[10px] text-gray-400">{s.type}</span>
+                  </div>
+                ))}
+              </div>
             )}
+            <button
+              disabled
+              title={l('Скоро', 'Жақын арада', 'Coming soon')}
+              className="mt-3 px-3 py-2 bg-gray-100 text-gray-400 rounded-xl text-xs cursor-not-allowed inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-3 h-3" />{l('Добавить источник', 'Дереккөз қосу', 'Add source')}
+              <span className="text-[9px] opacity-70">{l('скоро', 'жақын арада', 'soon')}</span>
+            </button>
+          </div>
+
+          {/* Reply templates */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="text-sm text-gray-900 mb-1">{tt('aiClientTemplates')}</div>
+            <div className="text-[11px] text-gray-400 mb-3">{tt('aiClientTemplatesHint')}</div>
+            <textarea
+              value={aiClient.replyTemplates.join('\n')}
+              onChange={e => store.updateAIClient({ replyTemplates: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+              rows={4}
+              className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none"
+            />
+          </div>
+
+          {/* Hand-off to human */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="text-sm text-gray-900 mb-1">{tt('aiClientHandoff')}</div>
+            <div className="text-[11px] text-gray-400 mb-3">{tt('aiClientHandoffHint')}</div>
+            <input
+              type="text"
+              value={aiClient.handoffKeywords.join(', ')}
+              onChange={e => store.updateAIClient({ handoffKeywords: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+              placeholder={tt('aiClientHandoffPlaceholder')}
+              className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+            />
+          </div>
+
+          {/* Dialog analytics placeholder */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="text-sm text-gray-900 mb-1">{tt('aiClientAnalytics')}</div>
+            <div className="text-[11px] text-gray-400">{tt('aiClientAnalyticsSoon')}</div>
           </div>
         </div>
       )}
 
-      {/* ===== AI ===== */}
-      {activeTab === 'ai' && (
+      {/* ===== AI assistant for platform (Block E2) — independent product ===== */}
+      {activeTab === 'ai-assistant' && (
         <div className="space-y-5">
-          {/* AI Model Picker */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <div className="text-sm text-gray-900">{l('Модель AI', 'AI моделі', 'AI Model')}</div>
-                <div className="text-[10px] text-gray-400">{l('Выберите модель по умолчанию для всех модулей', 'Барлық модульдер үшін әдепкі модель', 'Default model for all modules')}</div>
+          {/* Product header — violet theme so it never visually mixes with the client AI */}
+          <div className="bg-gradient-to-br from-violet-50 to-white rounded-2xl border border-violet-100 p-5">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-10 h-10 bg-violet-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Bot className="w-5 h-5 text-white" />
               </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="text-sm text-gray-900">{tt('aiAssistantHeader')}</div>
+                  <span className="text-[9px] px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded">{tt('aiTwoProductsBadge')}</span>
+                </div>
+                <div className="text-[11px] text-gray-500 leading-relaxed">{tt('aiAssistantDesc')}</div>
+              </div>
+              <Toggle value={aiAssistant.enabled} onChange={() => store.updateAIAssistant({ enabled: !aiAssistant.enabled })} />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {[
-                { id: 'default', name: 'Utir AI', desc: l('По умолчанию · быстро', 'Әдепкі · жылдам', 'Default · fast'), badge: l('Базовая', 'Базалық', 'Base') },
-                { id: 'gemini', name: 'Gemini 3.1 Pro', desc: 'Google · 2M context', badge: 'Google' },
-                { id: 'claude', name: 'Claude Opus 4.7', desc: l('Anthropic · точность', 'Anthropic · дәлдік', 'Anthropic · accuracy'), badge: 'Anthropic' },
-                { id: 'gpt', name: 'ChatGPT 5', desc: l('OpenAI · универсальная', 'OpenAI · әмбебап', 'OpenAI · universal'), badge: 'OpenAI' },
-                { id: 'deepseek', name: 'DeepSeek V3', desc: l('Open-source', 'Ашық код', 'Open-source'), badge: 'Open' },
-                { id: 'grok', name: 'Grok 3', desc: 'xAI · realtime', badge: 'xAI' },
-              ].map(m => (
-                <button key={m.id} onClick={() => setSelectedAiModel(m.id)}
-                  className={`p-3.5 rounded-xl border text-left transition ${selectedAiModel === m.id ? 'border-gray-900 bg-gray-50' : 'border-gray-100 hover:bg-gray-50'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="text-sm text-gray-900">{m.name}</div>
-                    <span className="text-[9px] px-1.5 py-0.5 bg-white rounded text-gray-500">{m.badge}</span>
-                  </div>
-                  <div className="text-[10px] text-gray-400">{m.desc}</div>
-                </button>
-              ))}
-            </div>
-            <div className="text-[10px] text-gray-400 mt-3">{l('Также можно выбрать модель прямо в окне AI-ассистента (правый нижний угол).', 'Модельді AI-көмекші терезесінде де таңдауға болады.', 'You can also pick a model directly in the AI assistant popup.')}</div>
           </div>
 
-          {/* Global AI */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center"><Sparkles className="w-4 h-4 text-white" /></div>
-                <div><div className="text-sm text-gray-900">{l('Глобальный AI', 'Жаһандық AI', 'Global AI')}</div><div className="text-[10px] text-gray-400">{l('Помощник на всех страницах', 'Барлық беттердегі көмекші', 'Assistant on all pages')}</div></div>
-              </div>
-              <Toggle value={aiGlobalEnabled} onChange={() => setAiGlobalEnabled(!aiGlobalEnabled)} />
-            </div>
-            {aiGlobalEnabled && (
-              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-50">
-                {[l('Подсказки', 'Кеңестер', 'Tips'), l('Заполнение форм', 'Форма толтыру', 'Form fill'), l('Ответы', 'Жауаптар', 'Answers'), l('Рекомендации', 'Ұсыныстар', 'Recs')].map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs text-gray-500"><CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />{f}</div>
+          {/* Telegram pairing — server-managed; token lives in Railway env, never in the browser. */}
+          <TelegramPairing language={language} />
+
+          {/* Tone + Language */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <div className="text-sm text-gray-900 mb-3">{tt('aiClientTone')}</div>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { id: 'professional' as const, emoji: '👔', label: tt('aiTonePro') },
+                  { id: 'friendly' as const,     emoji: '😊', label: tt('aiToneFriendly') },
+                  { id: 'casual' as const,       emoji: '✌️', label: tt('aiToneCasual') },
+                ]).map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => store.updateAIAssistant({ tone: opt.id })}
+                    className={`p-3 rounded-xl border text-center transition ${aiAssistant.tone === opt.id ? 'border-violet-500 bg-violet-50' : 'border-gray-100 hover:bg-gray-50'}`}
+                  >
+                    <div className="text-lg mb-1">{opt.emoji}</div>
+                    <div className="text-[10px] text-gray-600">{opt.label}</div>
+                  </button>
                 ))}
               </div>
-            )}
+            </div>
+            <div>
+              <div className="text-sm text-gray-900 mb-3">{tt('aiClientLang')}</div>
+              <select
+                value={aiAssistant.language}
+                onChange={e => store.updateAIAssistant({ language: e.target.value as any })}
+                className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+              >
+                <option value="auto">{tt('aiLangAuto')}</option>
+                <option value="ru">Русский</option>
+                <option value="kz">Қазақша</option>
+                <option value="eng">English</option>
+              </select>
+            </div>
           </div>
 
-          {/* Chat AI */}
+          {/* Per-module permissions */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center"><MessageCircle className="w-4 h-4 text-green-600" /></div>
-                <div><div className="text-sm text-gray-900">{l('AI в чатах', 'Чаттардағы AI', 'Chat AI')}</div><div className="text-[10px] text-gray-400">{l('Автоответы клиентам', 'Клиенттерге автожауап', 'Auto-replies')}</div></div>
-              </div>
-              <Toggle value={aiChatEnabled} onChange={() => setAiChatEnabled(!aiChatEnabled)} />
-            </div>
-            {aiChatEnabled && (
-              <div className="space-y-4 pt-3 border-t border-gray-50">
-                <div>
-                  <div className="text-[11px] text-gray-400 mb-2">{l('Тон общения', 'Қарым-қатынас тоны', 'Tone')}</div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[{ id: 'professional' as const, emoji: '👔', label: l('Профессиональный', 'Кәсіби', 'Professional') }, { id: 'friendly' as const, emoji: '😊', label: l('Дружелюбный', 'Достық', 'Friendly') }, { id: 'casual' as const, emoji: '✌️', label: l('Неформальный', 'Бейресми', 'Casual') }].map(t => (
-                      <button key={t.id} onClick={() => setAiTone(t.id)} className={`p-3 rounded-xl border text-center transition-all ${aiTone === t.id ? 'border-gray-900 bg-gray-50' : 'border-gray-100'}`}>
-                        <div className="text-lg mb-1">{t.emoji}</div>
-                        <div className="text-[10px] text-gray-600">{t.label}</div>
-                      </button>
-                    ))}
+            <div className="text-sm text-gray-900 mb-1">{tt('aiAssistantPermissions')}</div>
+            <div className="text-[11px] text-gray-400 mb-4">{tt('aiAssistantPermissionsHint')}</div>
+            <div className="space-y-1.5">
+              {store.modules.filter(m => !m.locked || m.id === 'settings').map(m => {
+                const current = aiAssistant.modulePermissions[m.id] || 'confirm';
+                return (
+                  <div key={m.id} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-xl">
+                    <span className="text-xs text-gray-700 flex-1 truncate">{m.labels[language]}</span>
+                    <div className="flex gap-1">
+                      {(['auto', 'confirm', 'none'] as const).map(level => {
+                        const labelKey = level === 'auto' ? 'aiPermAuto' : level === 'confirm' ? 'aiPermConfirm' : 'aiPermNone';
+                        const active = current === level;
+                        const colour =
+                          level === 'auto'    ? (active ? 'bg-emerald-600 text-white' : 'text-emerald-700 hover:bg-emerald-50') :
+                          level === 'confirm' ? (active ? 'bg-amber-500 text-white'   : 'text-amber-700 hover:bg-amber-50') :
+                                                (active ? 'bg-gray-700 text-white'   : 'text-gray-500 hover:bg-gray-100');
+                        return (
+                          <button
+                            key={level}
+                            onClick={() => store.updateAIAssistant({ modulePermissions: { ...aiAssistant.modulePermissions, [m.id]: level } })}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] transition ${colour}`}
+                          >
+                            {tt(labelKey as Parameters<typeof t>[0])}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-gray-400 mb-1">{l('Инструкции', 'Нұсқаулар', 'Instructions')}</div>
-                  <textarea defaultValue="Вы - консультант по мебели. Помогайте выбрать мебель и рассчитывать стоимость." rows={3} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none" />
-                </div>
-              </div>
-            )}
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Clarifying questions verbosity */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="text-sm text-gray-900 mb-1">{tt('aiClarifying')}</div>
+            <div className="text-[11px] text-gray-400 mb-3">{tt('aiClarifyingHint')}</div>
+            <div className="space-y-1.5">
+              {([
+                { id: 'minimal' as const,  label: tt('aiClarifyingMinimal') },
+                { id: 'balanced' as const, label: tt('aiClarifyingBalanced') },
+                { id: 'verbose' as const,  label: tt('aiClarifyingVerbose') },
+              ]).map(opt => (
+                <label key={opt.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border cursor-pointer transition ${aiAssistant.clarifyingLevel === opt.id ? 'border-violet-500 bg-violet-50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                  <input
+                    type="radio"
+                    checked={aiAssistant.clarifyingLevel === opt.id}
+                    onChange={() => store.updateAIAssistant({ clarifyingLevel: opt.id })}
+                    className="accent-violet-600"
+                  />
+                  <span className="text-xs text-gray-700">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Interaction history placeholder */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="text-sm text-gray-900 mb-1">{tt('aiAssistantHistory')}</div>
+            <div className="text-[11px] text-gray-400 leading-relaxed">{tt('aiAssistantHistoryEmpty')}</div>
           </div>
         </div>
       )}
@@ -349,73 +715,70 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
         </div>
       )}
 
-      {/* ===== ROLES & PERMISSIONS ===== */}
+      {/* ===== ROLES & PERMISSIONS — editable matrix ===== */}
       {activeTab === 'roles' && (
         <div className="space-y-5">
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-sm text-gray-900 mb-4">Матрица доступа</div>
+            <div className="mb-1 text-sm text-gray-900">{tt('permissionsMatrixTitle')}</div>
+            <div className="text-[11px] text-gray-400 mb-4 max-w-xl">{tt('permissionsMatrixHint')}</div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr>
-                    <th className="text-left text-[11px] text-gray-400 pb-3 pr-4">Роль</th>
-                    {['Заказы', 'Чаты', 'Финансы', 'Производство', 'Аналитика', 'Настройки'].map(m => (
-                      <th key={m} className="text-center text-[11px] text-gray-400 pb-3 px-2 whitespace-nowrap">{m}</th>
+                    <th className="text-left text-[11px] text-gray-400 pb-3 pr-4">{tt('roleAdmin').replace(/Админ$/, 'Роль')}</th>
+                    {ALL_MODULES.map(m => (
+                      <th key={m} className="text-center text-[11px] text-gray-400 pb-3 px-2 whitespace-nowrap">{moduleLabel(m)}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {([
-                    { role: 'Админ', badge: 'bg-gray-200 text-gray-700', access: ['full','full','full','full','full','full'] },
-                    { role: 'Менеджер продаж', badge: 'bg-blue-50 text-blue-600', access: ['full','full','none','view','view','none'] },
-                    { role: 'Дизайнер', badge: 'bg-purple-50 text-purple-600', access: ['view','full','none','none','none','none'] },
-                    { role: 'Производство', badge: 'bg-orange-50 text-orange-600', access: ['view','none','none','full','none','none'] },
-                    { role: 'Бухгалтер', badge: 'bg-green-50 text-green-600', access: ['view','none','full','none','view','none'] },
-                  ]).map((row, ri) => (
-                    <tr key={ri} className="hover:bg-gray-50/50">
+                  {ALL_ROLES.map(role => (
+                    <tr key={role} className="hover:bg-gray-50/50">
                       <td className="py-3 pr-4">
-                        <span className={`px-2 py-0.5 rounded text-[11px] ${row.badge}`}>{row.role}</span>
+                        <span className={`px-2 py-0.5 rounded text-[11px] ${roleBg(role)}`}>{roleLabel(role)}</span>
                       </td>
-                      {row.access.map((acc, ai) => (
-                        <td key={ai} className="py-3 px-2 text-center">
-                          {acc === 'full' && <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-50"><Check className="w-3.5 h-3.5 text-green-600" /></span>}
-                          {acc === 'view' && <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-50"><Eye className="w-3.5 h-3.5 text-gray-400" /></span>}
-                          {acc === 'none' && <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-50"><X className="w-3.5 h-3.5 text-red-400" /></span>}
-                        </td>
-                      ))}
+                      {ALL_MODULES.map(module => {
+                        const current = store.rolePermissions[role][module];
+                        const isAdminFull = role === 'admin';
+                        const cycle: PermissionLevel[] = ['full', 'view', 'none'];
+                        const nextLevel = cycle[(cycle.indexOf(current) + 1) % cycle.length];
+                        return (
+                          <td key={module} className="py-3 px-2 text-center">
+                            <button
+                              onClick={() => !isAdminFull && store.setRolePermission(role, module, nextLevel)}
+                              disabled={isAdminFull}
+                              title={isAdminFull ? tt('roleAdmin') : ''}
+                              className={`inline-flex items-center justify-center w-7 h-7 rounded-full transition ${
+                                current === 'full' ? 'bg-green-50 hover:bg-green-100' :
+                                current === 'view' ? 'bg-gray-50 hover:bg-gray-100' :
+                                                     'bg-red-50 hover:bg-red-100'
+                              } ${isAdminFull ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                            >
+                              {current === 'full' && <Check className="w-3.5 h-3.5 text-green-600" />}
+                              {current === 'view' && <Eye className="w-3.5 h-3.5 text-gray-400" />}
+                              {current === 'none' && <X className="w-3.5 h-3.5 text-red-400" />}
+                            </button>
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div className="mt-4 flex items-center gap-4 text-[11px] text-gray-400">
-              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-50"><Check className="w-3 h-3 text-green-600" /></span>Полный доступ</span>
-              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-50"><Eye className="w-3 h-3 text-gray-400" /></span>Только просмотр</span>
-              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-50"><X className="w-3 h-3 text-red-400" /></span>Нет доступа</span>
+              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-50"><Check className="w-3 h-3 text-green-600" /></span>{tt('permLevelFull')}</span>
+              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-50"><Eye className="w-3 h-3 text-gray-400" /></span>{tt('permLevelView')}</span>
+              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-50"><X className="w-3 h-3 text-red-400" /></span>{tt('permLevelNone')}</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* ===== LOGS ===== */}
-      {activeTab === 'logs' && (
-        <div className="bg-white rounded-2xl border border-gray-100">
-          <div className="px-4 py-3 border-b border-gray-50">
-            <div className="text-sm text-gray-900">{l('Последние действия', 'Соңғы әрекеттер', 'Recent Activity')}</div>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {activityLogs.map(log => (
-              <div key={log.id} className="px-4 py-3 flex items-center gap-3">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${log.type === 'create' ? 'bg-green-50' : log.type === 'update' ? 'bg-blue-50' : log.type === 'delete' ? 'bg-red-50' : 'bg-gray-50'}`}>
-                  {log.type === 'create' ? <Plus className="w-3 h-3 text-green-500" /> : log.type === 'update' ? <Edit2 className="w-3 h-3 text-blue-500" /> : log.type === 'logout' ? <X className="w-3 h-3 text-gray-400" /> : <Trash2 className="w-3 h-3 text-red-500" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-gray-900"><span className="text-gray-500">{log.user}</span> {log.action} {log.target && <span className="text-gray-900">{log.target}</span>}</div>
-                </div>
-                <span className="text-[10px] text-gray-300 flex-shrink-0">{log.timestamp}</span>
-              </div>
-            ))}
-          </div>
+      {/* ===== ACTIVITY LOG — admin-only ===== */}
+      {activeTab === 'activity' && IS_CURRENT_USER_ADMIN && (
+        <div className="-mx-4 md:-mx-8">
+          <ActivityLog language={language} />
         </div>
       )}
 
@@ -430,14 +793,18 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
             <div className="p-5 space-y-4">
               <div><label className="block text-[11px] text-gray-400 mb-1">Имя</label><input type="text" defaultValue={editingEmployee?.name || ''} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
               <div><label className="block text-[11px] text-gray-400 mb-1">Email</label><input type="email" defaultValue={editingEmployee?.email || ''} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
-              <div><label className="block text-[11px] text-gray-400 mb-1">Телефон</label><input type="text" defaultValue={editingEmployee?.phone || ''} placeholder="+7 (700) 123-45-67" className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
+              <div><label className="block text-[11px] text-gray-400 mb-1">Телефон</label><input type="text" defaultValue={editingEmployee?.phone || ''} placeholder="+7 ___ ___ __ __" className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
               {/* Role block */}
               <div className="border border-gray-100 rounded-2xl p-4 space-y-3">
                 <div className="text-[11px] text-gray-500">Роль и доступ</div>
                 <div>
                   <label className="block text-[11px] text-gray-400 mb-2">Роль</label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {([['admin', 'Админ', 'bg-gray-200 text-gray-700'], ['manager', 'Менеджер продаж', 'bg-blue-50 text-blue-600'], ['designer', 'Дизайнер', 'bg-purple-50 text-purple-600'], ['production', 'Производство', 'bg-orange-50 text-orange-600'], ['accountant', 'Бухгалтер', 'bg-green-50 text-green-600']] as [string, string, string][]).map(([id, label, cls]) => (
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([
+                      ['admin', tt('roleAdmin'), 'bg-gray-200 text-gray-700'],
+                      ['manager', tt('roleManager'), 'bg-blue-50 text-blue-600'],
+                      ['employee', tt('roleEmployee'), 'bg-emerald-50 text-emerald-600'],
+                    ] as [string, string, string][]).map(([id, label, cls]) => (
                       <button key={id} onClick={() => setEmpRole(id)} className={`px-3 py-2 rounded-xl text-[11px] border transition-all text-left ${empRole === id ? cls + ' border-current' : 'border-gray-100 text-gray-500 hover:border-gray-200'}`}>
                         {empRole === id && <span className="mr-1">✓</span>}{label}
                       </button>

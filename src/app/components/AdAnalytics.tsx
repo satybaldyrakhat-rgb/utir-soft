@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Calendar, Search, Download, X, ArrowUpDown, Filter, ChevronRight, ArrowLeft, ToggleLeft, ToggleRight, BarChart3 } from 'lucide-react';
+import { useDataStore } from '../utils/dataStore';
+import { MetaLogo } from './PlatformLogos';
 
 const creativeImages = [
   'https://images.unsplash.com/photo-1668026694348-b73c5eb5e299?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBraXRjaGVuJTIwaW50ZXJpb3IlMjBkZXNpZ258ZW58MXx8fHwxNzc1MTkxMjk2fDA&ixlib=rb-4.1.0&q=80&w=1080',
@@ -181,6 +183,10 @@ const SortHeader = ({ label, field, currentSort, currentDir, onSort }: { label: 
 );
 
 export function AdAnalytics({ language }: AdAnalyticsProps) {
+  const dataStore = useDataStore();
+  const metaIntegration = dataStore.integrations.find(i => i.id === 'meta');
+  const metaConnected = !!metaIntegration?.connected;
+
   const [activeTab, setActiveTab] = useState<TabType>('ads');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<string | null>('romi');
@@ -190,6 +196,45 @@ export function AdAnalytics({ language }: AdAnalyticsProps) {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+
+  // MVP: hardcoded mock data hidden until real Meta Ads API integration ships.
+  // Until then, render an empty state (connect CTA or "awaiting first sync").
+  const hasRealAdsData = false;
+  if (!hasRealAdsData) {
+    return (
+      <div className="max-w-2xl mx-auto py-16 px-6">
+        <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center">
+          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <MetaLogo className="w-8 h-8" />
+          </div>
+          <div className="text-lg text-gray-900 mb-2">
+            {metaConnected ? 'Ждём первую синхронизацию' : 'Реклама ещё не подключена'}
+          </div>
+          <div className="text-sm text-gray-500 mb-6 max-w-md mx-auto leading-relaxed">
+            {metaConnected
+              ? 'Кабинет Meta подключён. Данные кампаний, расходы, лиды и ROMI появятся после первой синхронизации.'
+              : 'Подключите рекламный кабинет Meta (Facebook + Instagram), чтобы видеть кампании, бюджеты, лиды и ROMI прямо здесь.'}
+          </div>
+          {!metaConnected ? (
+            <button
+              onClick={() => dataStore.toggleIntegration('meta')}
+              className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800"
+            >
+              Подключить Meta Ads
+            </button>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-full">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+              Подключено
+            </div>
+          )}
+          <div className="text-[11px] text-gray-400 mt-6">
+            {language === 'kz' ? 'Толық интеграция жақын арада' : language === 'eng' ? 'Full integration coming soon' : 'Полная интеграция — скоро'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Breadcrumb navigation
   const breadcrumbs: { label: string; onClick: () => void }[] = [];

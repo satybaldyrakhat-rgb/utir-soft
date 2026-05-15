@@ -89,7 +89,19 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     if (!password) { setError(l('Введите пароль', 'Құпия сөзді енгізіңіз', 'Enter password')); return; }
     setIsLoading(true); setError('');
     try {
-      const data = await api.post<{ token: string; user: { id: string; name: string; email: string } }>('/api/auth/login', { email, password });
+      const data = await api.post<{ token: string; user: { id: string; name: string; email: string; company?: string; emailVerified?: boolean }; verificationCode?: string }>(
+        '/api/auth/login',
+        { email, password }
+      );
+      setToken(data.token);
+      setName(data.user.name);
+      if (data.user.company) setCompany(data.user.company);
+      if (data.user.emailVerified === false) {
+        // Account exists but email never confirmed — push them to the OTP screen with the dev code.
+        setDevVerificationCode(data.verificationCode || '');
+        setStep('otp');
+        return;
+      }
       finishAuth(data);
     } catch (err: any) {
       setError(err?.message === 'invalid credentials'
@@ -101,31 +113,77 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
   };
 
   const handleSignupNameContinue = () => {
-    if (!name) { setError(l('Введите имя', 'Атыңызды енгізіңіз', 'Enter your name')); return; }
+    if (!name.trim()) { setError(l('Введите имя', 'Атыңызды енгізіңіз', 'Enter your name')); return; }
+    if (!company.trim()) { setError(l('Введите название компании', 'Компания атауын енгізіңіз', 'Enter your company name')); return; }
     simulateLoading(() => setStep('signup-password'), 300);
   };
 
+  // Dev-mode verification code received from the signup/resend response.
+  // Displayed on the OTP screen so the tester doesn't need a real inbox.
+  const [devVerificationCode, setDevVerificationCode] = useState<string>('');
+
   const handleSignup = async () => {
     if (password.length < 8) { setError(l('Минимум 8 символов', 'Кемінде 8 таңба', 'Minimum 8 characters')); return; }
+    if (!/[A-Za-zА-Яа-яЁё]/.test(password) || !/\d/.test(password)) {
+      setError(l('Пароль должен содержать букву и цифру', 'Құпия сөз әріп пен цифрдан тұруы керек', 'Password must contain a letter and a digit'));
+      return;
+    }
     if (password !== confirmPassword) { setError(l('Пароли не совпадают', 'Құпия сөздер сәйкес келмейді', 'Passwords do not match')); return; }
-    if (!agreeTerms) { setError(l('Примите условия', 'Шарттарды қабылдаңыз', 'Accept terms')); return; }
+    if (!agreeTerms) { setError(l('Необходимо принять условия использования', 'Пайдалану шарттарын қабылдау керек', 'You must accept the terms of use')); return; }
     setIsLoading(true); setError('');
     try {
-      const data = await api.post<{ token: string; user: { id: string; name: string; email: string } }>('/api/auth/signup', { email, password, name });
-      finishAuth(data);
+      const data = await api.post<{ token: string; user: { id: string; name: string; email: string; company: string; emailVerified: boolean }; verificationCode?: string }>(
+        '/api/auth/signup',
+        { email, password, name, company, termsAccepted: true }
+      );
+      // Account created; email not yet verified. Authorize subsequent verify calls with the token
+      // and stash the dev-mode code so the OTP screen can show it (no real email is sent).
+      setToken(data.token);
+      setDevVerificationCode(data.verificationCode || '');
+      setStep('otp');
     } catch (err: any) {
-      setError(err?.message === 'email already registered'
-        ? l('Этот email уже зарегистрирован', 'Бұл email тіркелген', 'Email already registered')
-        : (err?.message || l('Ошибка регистрации', 'Тіркелу қатесі', 'Signup failed')));
+      const msg = String(err?.message || '');
+      if (msg === 'email already registered') setError(l('Этот email уже зарегистрирован', 'Бұл email тіркелген', 'Email already registered'));
+      else if (msg === 'terms must be accepted') setError(l('Необходимо принять условия использования', 'Пайдалану шарттарын қабылдау керек', 'You must accept the terms of use'));
+      else if (msg === 'company required') setError(l('Введите название компании', 'Компания атауын енгізіңіз', 'Enter your company name'));
+      else if (msg === 'invalid email') setError(l('Некорректный email', 'Жарамсыз email', 'Invalid email'));
+      else if (msg.startsWith('password must')) setError(l('Пароль должен содержать букву и цифру, минимум 8 символов', 'Құпия сөз әріп пен цифрдан тұруы керек, кемінде 8 таңба', 'Password must contain a letter and a digit, at least 8 chars'));
+      else setError(msg || l('Ошибка регистрации', 'Тіркелу қатесі', 'Signup failed'));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleOtpVerify = () => {
-    // Account is already created on signup; OTP screen is informational only.
-    if (otp.join('').length < 6) { setError(l('Введите все 6 цифр', 'Барлық 6 цифрды енгізіңіз', 'Enter all 6 digits')); return; }
-    onLogin({ name, email });
+  const handleOtpVerify = async () => {
+    const code = otp.join('');
+    if (code.length < 6) { setError(l('Введите все 6 цифр', 'Барлық 6 цифрды енгізіңіз', 'Enter all 6 digits')); return; }
+    setIsLoading(true); setError('');
+    try {
+      await api.post('/api/auth/verify-email', { code });
+      // Verified — finalise the session.
+      window.dispatchEvent(new Event('utir:auth-changed'));
+      onLogin({ name, email });
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (msg === 'invalid code') setError(l('Неверный код', 'Қате код', 'Invalid code'));
+      else setError(msg || l('Ошибка подтверждения', 'Растау қатесі', 'Verification failed'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setIsLoading(true); setError('');
+    try {
+      const data = await api.post<{ verificationCode?: string }>('/api/auth/resend-code', {});
+      if (data.verificationCode) setDevVerificationCode(data.verificationCode);
+      setOtpTimer(60);
+      setOtp(['', '', '', '', '', '']);
+    } catch (err: any) {
+      setError(String(err?.message || ''));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSocialLogin = (_provider: string) => {
@@ -346,7 +404,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
           </div>
         );
 
-      /* ===== SIGNUP: NAME ===== */
+      /* ===== SIGNUP: NAME + COMPANY (both required) ===== */
       case 'signup-name':
         return (
           <div>
@@ -355,16 +413,33 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
 
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-[11px] text-gray-400 mb-1.5">{l('Ваше имя', 'Атыңыз', 'Your Name')} *</label>
-                <input type="text" value={name} onChange={e => { setName(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleSignupNameContinue()} placeholder={l('Рахат Сатыбалды', 'Рахат Сатыбалды', 'John Doe')} autoFocus className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                <label className="block text-[11px] text-gray-400 mb-1.5">
+                  {l('Ваше имя', 'Атыңыз', 'Your Name')} <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => { setName(e.target.value); setError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleSignupNameContinue()}
+                  autoFocus
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                />
               </div>
               <div>
-                <label className="block text-[11px] text-gray-400 mb-1.5">{l('Название компании', 'Компания атауы', 'Company Name')} <span className="text-gray-300">({l('необязательно', 'міндетті емес', 'optional')})</span></label>
-                <input type="text" value={company} onChange={e => setCompany(e.target.value)} placeholder={l('ТОО "Мебель КЗ"', 'ЖШС "Жиһаз KZ"', 'Furniture LLC')} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                <label className="block text-[11px] text-gray-400 mb-1.5">
+                  {l('Название компании', 'Компания атауы', 'Company Name')} <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={company}
+                  onChange={e => { setCompany(e.target.value); setError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleSignupNameContinue()}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                />
               </div>
             </div>
 
-            <button onClick={handleSignupNameContinue} disabled={isLoading || !name} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleSignupNameContinue} disabled={isLoading || !name.trim() || !company.trim()} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
@@ -403,17 +478,32 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             </div>
 
             <label className="flex items-start gap-2.5 mb-6 cursor-pointer">
-              <input type="checkbox" checked={agreeTerms} onChange={e => { setAgreeTerms(e.target.checked); setError(''); }} className="w-3.5 h-3.5 rounded accent-gray-900 mt-0.5" />
-              <span className="text-xs text-gray-500">{l('Я принимаю', 'Мен қабылдаймын', 'I accept the')} <button className="text-gray-900 hover:underline">{l('условия использования', 'пайдалану шарттары', 'terms of use')}</button> {l('и', 'және', 'and')} <button className="text-gray-900 hover:underline">{l('политику конфиденциальности', 'құпиялылық саясаты', 'privacy policy')}</button></span>
+              <input
+                type="checkbox"
+                checked={agreeTerms}
+                onChange={e => { setAgreeTerms(e.target.checked); setError(''); }}
+                className="w-3.5 h-3.5 rounded accent-gray-900 mt-0.5"
+              />
+              <span className="text-xs text-gray-500">
+                {l('Я принимаю', 'Мен қабылдаймын', 'I accept the')}{' '}
+                <a href="#/terms" target="_blank" rel="noreferrer" className="text-gray-900 hover:underline">
+                  {l('условия использования', 'пайдалану шарттары', 'terms of use')}
+                </a>{' '}
+                {l('и', 'және', 'and')}{' '}
+                <a href="#/privacy" target="_blank" rel="noreferrer" className="text-gray-900 hover:underline">
+                  {l('политику конфиденциальности', 'құпиялылық саясаты', 'privacy policy')}
+                </a>
+                <span className="text-red-400 ml-0.5">*</span>
+              </span>
             </label>
 
-            <button onClick={handleSignup} disabled={isLoading || !password || !confirmPassword} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleSignup} disabled={isLoading || !password || !confirmPassword || !agreeTerms} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Создать аккаунт', 'Аккаунт жасау', 'Create account')} <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
         );
 
-      /* ===== OTP VERIFICATION ===== */
+      /* ===== OTP VERIFICATION (dev mode: code is shown on screen) ===== */
       case 'otp':
         return (
           <div className="text-center">
@@ -421,8 +511,31 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               <ShieldCheck className="w-7 h-7 text-gray-900" />
             </div>
             <h2 className="text-xl text-gray-900 mb-1">{l('Подтвердите email', 'Email-ді растаңыз', 'Verify your email')}</h2>
-            <p className="text-sm text-gray-400 mb-1">{l('Мы отправили 6-значный код на', 'Біз 6 санды код жібердік', 'We sent a 6-digit code to')}</p>
-            <p className="text-sm text-gray-900 mb-6">{email}</p>
+            <p className="text-sm text-gray-400 mb-1">{l('Введите 6-значный код для', 'Растау үшін 6 санды кодты енгізіңіз', 'Enter the 6-digit code for')}</p>
+            <p className="text-sm text-gray-900 mb-5">{email}</p>
+
+            {/* Dev mode banner — real email sending is OFF; surface the code right here. */}
+            {devVerificationCode && (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-5 text-left">
+                <div className="text-[10px] uppercase tracking-wider text-amber-700 mb-1">
+                  {l('Демо-режим · email не отправляется', 'Демо-режим · email жіберілмейді', 'Demo mode · no email is sent')}
+                </div>
+                <div className="text-sm text-amber-900 flex items-center justify-between gap-3">
+                  <span>{l('Ваш код:', 'Сіздің кодыңыз:', 'Your code:')}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtp(devVerificationCode.split('').slice(0, 6) as string[]);
+                      otpRefs.current[5]?.focus();
+                    }}
+                    className="font-mono text-lg tracking-[0.3em] text-amber-900 hover:underline"
+                    title={l('Подставить', 'Қою', 'Auto-fill')}
+                  >
+                    {devVerificationCode}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-center gap-2 mb-4" onPaste={handleOtpPaste}>
               {otp.map((digit, i) => (
@@ -435,7 +548,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             {otpTimer > 0 ? (
               <p className="text-xs text-gray-400 mb-6">{l('Отправить повторно через', 'Қайта жіберу', 'Resend in')} <span className="text-gray-900">{otpTimer}{l('с', 'с', 's')}</span></p>
             ) : (
-              <button onClick={() => setOtpTimer(60)} className="text-xs text-gray-900 hover:underline mb-6">{l('Отправить код повторно', 'Кодты қайта жіберу', 'Resend code')}</button>
+              <button onClick={handleResendCode} disabled={isLoading} className="text-xs text-gray-900 hover:underline mb-6 disabled:opacity-40">{l('Отправить код повторно', 'Кодты қайта жіберу', 'Resend code')}</button>
             )}
 
             <button onClick={handleOtpVerify} disabled={isLoading || otp.join('').length < 6} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">

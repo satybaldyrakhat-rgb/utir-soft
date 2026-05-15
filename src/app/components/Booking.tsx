@@ -173,7 +173,7 @@ export function Booking() {
               </div>
               {selectedDate !== null && (() => {
                 const measurers = store.employees
-                  .filter(e => e.status === 'active' && (e.department === 'Замеры' || e.role === 'production'))
+                  .filter(e => e.status === 'active' && (e.department === 'Замеры' || e.role === 'employee'))
                   .map(e => e.name);
                 return (
                   <div className="space-y-2">

@@ -1,12 +1,18 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { api, getToken } from './api';
 
+const newId = (prefix: string) => prefix + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
 // ─── TYPES ─────────────────────────────────────────
+export type WorkTypeKey = 'house' | 'finishing' | 'facade' | 'furniture' | 'other';
+
 export interface Deal {
   id: string;
   customerName: string;
   phone: string;
-  address: string;
+  address: string;          // client / billing address
+  siteAddress?: string;     // site / object address
+  workType?: WorkTypeKey;   // user-picked classifier
   product: string;
   furnitureType: string;
   amount: number;
@@ -17,9 +23,14 @@ export interface Deal {
   date: string;
   progress: number;
   source: string;
+  // Furniture-team fields (shown when workType = 'furniture')
   measurer: string;
   designer: string;
+  // Construction-team fields (shown when workType is house/finishing/facade)
+  foreman?: string;
+  architect?: string;
   materials: string;
+  // Dates — labels reinterpreted by workType
   measurementDate: string;
   completionDate: string;
   installationDate: string;
@@ -28,12 +39,16 @@ export interface Deal {
   createdAt: string;
 }
 
+export type RoleKey = 'admin' | 'manager' | 'employee';
+export type PermissionLevel = 'full' | 'view' | 'none';
+export type ModuleKey = 'orders' | 'chats' | 'finance' | 'production' | 'analytics' | 'settings';
+
 export interface Employee {
   id: string;
   name: string;
   email: string;
   phone: string;
-  role: 'admin' | 'manager' | 'designer' | 'production' | 'sales' | 'accountant';
+  role: RoleKey;
   department: string;
   status: 'active' | 'inactive' | 'vacation';
   salary: number;
@@ -43,6 +58,18 @@ export interface Employee {
   permissions: { sales: boolean; finance: boolean; warehouse: boolean; chats: boolean; analytics: boolean; settings: boolean; };
   performance: { ordersCompleted: number; rating: number; efficiency: number; };
 }
+
+// Role → per-module permission level. Stored in localStorage so Admin can tune.
+export type RolePermissions = Record<RoleKey, Record<ModuleKey, PermissionLevel>>;
+
+const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
+  admin:    { orders: 'full', chats: 'full', finance: 'full', production: 'full', analytics: 'full', settings: 'full' },
+  manager:  { orders: 'full', chats: 'full', finance: 'view', production: 'view', analytics: 'view', settings: 'none' },
+  employee: { orders: 'view', chats: 'view', finance: 'none', production: 'view', analytics: 'none', settings: 'none' },
+};
+
+export const ALL_MODULES: ModuleKey[] = ['orders', 'chats', 'finance', 'production', 'analytics', 'settings'];
+export const ALL_ROLES: RoleKey[] = ['admin', 'manager', 'employee'];
 
 export interface Task {
   id: string;
@@ -93,14 +120,265 @@ export interface Integration {
   lastSync?: string;
 }
 
+export type ActivityType = 'create' | 'update' | 'delete' | 'login' | 'logout' | 'invite' | 'permission' | 'settings' | 'ai';
+export type ActivityActor = 'human' | 'ai';
+export type ActivityModule = 'sales' | 'finance' | 'tasks' | 'warehouse' | 'analytics' | 'chats' | 'settings' | 'auth' | 'catalog' | 'team' | 'roles' | 'ai';
+
 export interface ActivityLog {
   id: string;
-  user: string;
-  action: string;
-  target: string;
+  user: string;             // display name of the actor (or 'AI-ассистент')
+  actor?: ActivityActor;    // 'human' (default) or 'ai'
+  action: string;           // short verb-phrase, e.g. 'Создал сделку'
+  target: string;           // what was acted upon
   timestamp: string;
-  type: 'create' | 'update' | 'delete' | 'login' | 'logout';
-  page?: string;
+  type: ActivityType;
+  page?: ActivityModule | string;
+  before?: string;          // optional: previous value (stringified short summary)
+  after?: string;           // optional: new value
+}
+
+export interface UserProfile {
+  name: string;
+  position: string;
+  email: string;
+  phone: string;
+  avatar: string;
+  companyName: string;
+  companyBIN: string;
+  companyAddress: string;
+  companyEmail: string;
+  companyPhone: string;
+}
+
+const EMPTY_PROFILE: UserProfile = {
+  name: '', position: '', email: '', phone: '', avatar: '',
+  companyName: '', companyBIN: '', companyAddress: '', companyEmail: '', companyPhone: '',
+};
+
+const PROFILE_STORAGE_KEY = 'utir_user_profile';
+
+function loadProfile(): UserProfile {
+  try {
+    const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
+    if (!raw) return EMPTY_PROFILE;
+    return { ...EMPTY_PROFILE, ...JSON.parse(raw) };
+  } catch { return EMPTY_PROFILE; }
+}
+
+function saveProfile(p: UserProfile) {
+  try { localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(p)); } catch {}
+}
+
+// ─── User-managed catalogs (Справочники) ─────────────────────
+// Empty defaults — user fills them in Settings → Справочники.
+// Used by deal modals as <datalist> autocomplete suggestions.
+export type CatalogKey = 'productTemplates' | 'materials' | 'hardware' | 'addons' | 'furnitureTypes';
+
+export interface UserCatalogs {
+  productTemplates: string[];
+  materials: string[];
+  hardware: string[];
+  addons: string[];
+  furnitureTypes: string[];
+}
+
+const EMPTY_CATALOGS: UserCatalogs = {
+  productTemplates: [], materials: [], hardware: [], addons: [], furnitureTypes: [],
+};
+
+const CATALOGS_STORAGE_KEY = 'utir_user_catalogs';
+
+function loadCatalogs(): UserCatalogs {
+  try {
+    const raw = localStorage.getItem(CATALOGS_STORAGE_KEY);
+    if (!raw) return EMPTY_CATALOGS;
+    return { ...EMPTY_CATALOGS, ...JSON.parse(raw) };
+  } catch { return EMPTY_CATALOGS; }
+}
+
+function saveCatalogs(c: UserCatalogs) {
+  try { localStorage.setItem(CATALOGS_STORAGE_KEY, JSON.stringify(c)); } catch {}
+}
+
+const ROLE_PERMS_STORAGE_KEY = 'utir_role_permissions';
+
+function loadRolePermissions(): RolePermissions {
+  try {
+    const raw = localStorage.getItem(ROLE_PERMS_STORAGE_KEY);
+    if (!raw) return DEFAULT_ROLE_PERMISSIONS;
+    const parsed = JSON.parse(raw) as Partial<RolePermissions>;
+    return {
+      admin:    { ...DEFAULT_ROLE_PERMISSIONS.admin,    ...(parsed.admin || {}) },
+      manager:  { ...DEFAULT_ROLE_PERMISSIONS.manager,  ...(parsed.manager || {}) },
+      employee: { ...DEFAULT_ROLE_PERMISSIONS.employee, ...(parsed.employee || {}) },
+    };
+  } catch { return DEFAULT_ROLE_PERMISSIONS; }
+}
+
+function saveRolePermissions(p: RolePermissions) {
+  try { localStorage.setItem(ROLE_PERMS_STORAGE_KEY, JSON.stringify(p)); } catch {}
+}
+
+// ─── Module settings (Block B.1) ────────────────────────
+// User-tunable per-platform-module config: order, on/off toggle, custom labels, role-access flags.
+// Custom modules added in B.2 will append to the same `modules` list with `custom: true`.
+export type CustomFieldType = 'text' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox';
+
+export interface CustomFieldDef {
+  id: string;              // stable key inside the record.values map
+  type: CustomFieldType;
+  label: { ru: string; kz: string; eng: string };
+  required?: boolean;
+  options?: string[];      // only meaningful for type='select'
+}
+
+export interface PlatformModule {
+  id: string;              // navigation key — must match App.tsx case ids (e.g. 'dashboard', 'sales')
+  enabled: boolean;
+  locked?: boolean;        // 'dashboard' and 'settings' cannot be disabled
+  custom?: boolean;        // true for user-created modules (B.2)
+  icon?: string;           // lucide icon name (custom modules)
+  fields?: CustomFieldDef[]; // schema for custom modules
+  labels: { ru: string; kz: string; eng: string };
+  // Which roles may open this module (besides admin, who always can).
+  roleAccess: { manager: boolean; employee: boolean };
+}
+
+// One row of data inside a custom module — stored locally; backend persistence is a follow-up.
+export interface CustomRecord {
+  id: string;
+  moduleId: string;
+  createdAt: string;
+  updatedAt?: string;
+  values: Record<string, any>;   // keyed by CustomFieldDef.id
+}
+
+export type CustomRecordsByModule = Record<string, CustomRecord[]>;
+
+const DEFAULT_MODULES: PlatformModule[] = [
+  { id: 'dashboard',  enabled: true, locked: true,  labels: { ru: 'Главная',       kz: 'Басты бет',    eng: 'Home' },        roleAccess: { manager: true,  employee: true  } },
+  { id: 'ai-design',  enabled: true,                labels: { ru: 'AI Дизайн',     kz: 'AI Дизайн',    eng: 'AI Design' },   roleAccess: { manager: true,  employee: false } },
+  { id: 'sales',      enabled: true,                labels: { ru: 'Заказы',        kz: 'Тапсырыстар',  eng: 'Orders' },      roleAccess: { manager: true,  employee: true  } },
+  { id: 'warehouse',  enabled: true,                labels: { ru: 'Производство',  kz: 'Өндіріс',      eng: 'Production' },  roleAccess: { manager: true,  employee: true  } },
+  { id: 'chats',      enabled: true,                labels: { ru: 'Чаты',          kz: 'Чаттар',       eng: 'Chats' },       roleAccess: { manager: true,  employee: false } },
+  { id: 'tasks',      enabled: true,                labels: { ru: 'Задачи',        kz: 'Тапсырмалар',  eng: 'Tasks' },       roleAccess: { manager: true,  employee: true  } },
+  { id: 'analytics',  enabled: true,                labels: { ru: 'Аналитика',     kz: 'Аналитика',    eng: 'Analytics' },   roleAccess: { manager: true,  employee: false } },
+  { id: 'settings',   enabled: true, locked: true,  labels: { ru: 'Настройки',     kz: 'Баптаулар',    eng: 'Settings' },    roleAccess: { manager: false, employee: false } },
+];
+
+const MODULES_STORAGE_KEY = 'utir_module_settings';
+
+function loadModules(): PlatformModule[] {
+  try {
+    const raw = localStorage.getItem(MODULES_STORAGE_KEY);
+    if (!raw) return DEFAULT_MODULES;
+    const stored = JSON.parse(raw) as PlatformModule[];
+    // Merge any new default modules that didn't exist when the user last saved
+    // (so adding a module in code doesn't disappear from existing workspaces).
+    const byId = new Map(stored.map(m => [m.id, m]));
+    const merged: PlatformModule[] = stored.filter(m => DEFAULT_MODULES.some(d => d.id === m.id) || m.custom);
+    for (const d of DEFAULT_MODULES) {
+      if (!byId.has(d.id)) merged.push(d);
+    }
+    return merged;
+  } catch { return DEFAULT_MODULES; }
+}
+
+function saveModules(m: PlatformModule[]) {
+  try { localStorage.setItem(MODULES_STORAGE_KEY, JSON.stringify(m)); } catch {}
+}
+
+const CUSTOM_RECORDS_STORAGE_KEY = 'utir_custom_records';
+
+function loadCustomRecords(): CustomRecordsByModule {
+  try {
+    const raw = localStorage.getItem(CUSTOM_RECORDS_STORAGE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as CustomRecordsByModule;
+  } catch { return {}; }
+}
+
+function saveCustomRecords(r: CustomRecordsByModule) {
+  try { localStorage.setItem(CUSTOM_RECORDS_STORAGE_KEY, JSON.stringify(r)); } catch {}
+}
+
+// ─── AI settings (Block E) ────────────────────────────
+// Two completely separate products:
+//   - clientAI: chats with customers in WhatsApp/Telegram/Instagram
+//   - platformAssistant: helps Admin manage the platform — via Telegram bot only
+export type AITone = 'professional' | 'friendly' | 'casual';
+export type AILanguage = 'auto' | 'kz' | 'ru' | 'eng';
+export type AIModulePermission = 'auto' | 'confirm' | 'none';
+export type ClarifyingLevel = 'minimal' | 'balanced' | 'verbose';
+
+export interface KnowledgeSource {
+  id: string;
+  name: string;
+  type: 'doc' | 'faq' | 'pricelist';
+  addedAt: string;
+}
+
+export interface AISettings {
+  client: {
+    enabled: boolean;
+    personality: string;
+    tone: AITone;
+    language: AILanguage;
+    replyTemplates: string[];
+    handoffKeywords: string[];
+    knowledgeSources: KnowledgeSource[];
+  };
+  assistant: {
+    enabled: boolean;
+    botToken: string;
+    botUsername: string;
+    tone: AITone;
+    language: AILanguage;
+    clarifyingLevel: ClarifyingLevel;
+    modulePermissions: Record<string, AIModulePermission>;
+  };
+}
+
+const DEFAULT_AI_SETTINGS: AISettings = {
+  client: {
+    enabled: false,
+    personality: '',
+    tone: 'friendly',
+    language: 'auto',
+    replyTemplates: [],
+    handoffKeywords: [],
+    knowledgeSources: [],
+  },
+  assistant: {
+    enabled: false,
+    botToken: '',
+    botUsername: '',
+    tone: 'friendly',
+    language: 'auto',
+    clarifyingLevel: 'balanced',
+    modulePermissions: {
+      sales: 'confirm', finance: 'confirm', tasks: 'auto',
+      analytics: 'auto', chats: 'confirm', warehouse: 'confirm',
+    },
+  },
+};
+
+const AI_SETTINGS_STORAGE_KEY = 'utir_ai_settings';
+
+function loadAISettings(): AISettings {
+  try {
+    const raw = localStorage.getItem(AI_SETTINGS_STORAGE_KEY);
+    if (!raw) return DEFAULT_AI_SETTINGS;
+    const parsed = JSON.parse(raw) as Partial<AISettings>;
+    return {
+      client: { ...DEFAULT_AI_SETTINGS.client, ...(parsed.client || {}) },
+      assistant: { ...DEFAULT_AI_SETTINGS.assistant, ...(parsed.assistant || {}) },
+    };
+  } catch { return DEFAULT_AI_SETTINGS; }
+}
+
+function saveAISettings(s: AISettings) {
+  try { localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(s)); } catch {}
 }
 
 // ─── CONTEXT ─────────────────────────────────────
@@ -112,6 +390,12 @@ interface DataStore {
   transactions: FinanceTransaction[];
   integrations: Integration[];
   activityLogs: ActivityLog[];
+  profile: UserProfile;
+  catalogs: UserCatalogs;
+  rolePermissions: RolePermissions;
+  modules: PlatformModule[];
+  customRecords: CustomRecordsByModule;
+  aiSettings: AISettings;
   loaded: boolean;
 
   addDeal: (deal: Omit<Deal, 'id' | 'createdAt'>) => Deal;
@@ -137,6 +421,21 @@ interface DataStore {
   updateIntegration: (id: string, updates: Partial<Integration>) => void;
 
   addActivity: (log: Omit<ActivityLog, 'id' | 'timestamp'>) => void;
+
+  updateProfile: (updates: Partial<UserProfile>) => void;
+  addCatalogItem: (key: CatalogKey, value: string) => void;
+  removeCatalogItem: (key: CatalogKey, value: string) => void;
+  setRolePermission: (role: RoleKey, module: ModuleKey, level: PermissionLevel) => void;
+  updateModule: (id: string, updates: Partial<PlatformModule>) => void;
+  reorderModules: (orderedIds: string[]) => void;
+  resetModules: () => void;
+  addCustomModule: (mod: Omit<PlatformModule, 'enabled' | 'custom'>) => PlatformModule;
+  deleteCustomModule: (id: string) => void;
+  addCustomRecord: (moduleId: string, values: Record<string, any>) => CustomRecord;
+  updateCustomRecord: (moduleId: string, recordId: string, values: Record<string, any>) => void;
+  deleteCustomRecord: (moduleId: string, recordId: string) => void;
+  updateAIClient: (updates: Partial<AISettings['client']>) => void;
+  updateAIAssistant: (updates: Partial<AISettings['assistant']>) => void;
 
   reloadAll: () => Promise<void>;
   resetLocal: () => void;
@@ -167,7 +466,248 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [profile, setProfile] = useState<UserProfile>(() => loadProfile());
+  const [catalogs, setCatalogs] = useState<UserCatalogs>(() => loadCatalogs());
+  const [rolePermissions, setRolePermissions] = useState<RolePermissions>(() => loadRolePermissions());
+  const [modules, setModules] = useState<PlatformModule[]>(() => loadModules());
+  const [customRecords, setCustomRecords] = useState<CustomRecordsByModule>(() => loadCustomRecords());
+  const [aiSettings, setAISettings] = useState<AISettings>(() => loadAISettings());
   const [loaded, setLoaded] = useState(false);
+
+  const updateAIClient = useCallback((updates: Partial<AISettings['client']>) => {
+    setAISettings(prev => {
+      const next: AISettings = { ...prev, client: { ...prev.client, ...updates } };
+      saveAISettings(next);
+      return next;
+    });
+  }, []);
+
+  const updateAIAssistant = useCallback((updates: Partial<AISettings['assistant']>) => {
+    setAISettings(prev => {
+      const next: AISettings = { ...prev, assistant: { ...prev.assistant, ...updates } };
+      saveAISettings(next);
+      return next;
+    });
+  }, []);
+
+  // Hoisted above settings/catalog callbacks so they can fire activity events.
+  const addActivity = useCallback((log: Omit<ActivityLog, 'id' | 'timestamp'>) => {
+    api.post<ActivityLog>('/api/activity', log)
+      .then(created => setActivityLogs(prev => [created, ...prev].slice(0, 10000)))
+      .catch(err => console.warn('[activity] failed', err));
+  }, []);
+
+  const setRolePermission = useCallback((role: RoleKey, module: ModuleKey, level: PermissionLevel) => {
+    let beforeLevel: PermissionLevel | undefined;
+    setRolePermissions(prev => {
+      beforeLevel = prev[role][module];
+      const next: RolePermissions = { ...prev, [role]: { ...prev[role], [module]: level } };
+      saveRolePermissions(next);
+      return next;
+    });
+    addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Изменил права роли',
+      target: `${role} · ${module}`,
+      type: 'permission',
+      page: 'roles',
+      before: beforeLevel,
+      after: level,
+    });
+  }, [addActivity]);
+
+  const updateProfile = useCallback((updates: Partial<UserProfile>) => {
+    setProfile(prev => {
+      const next = { ...prev, ...updates };
+      saveProfile(next);
+      return next;
+    });
+  }, []);
+
+  const addCatalogItem = useCallback((key: CatalogKey, value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    let added = false;
+    setCatalogs(prev => {
+      if (prev[key].includes(trimmed)) return prev;
+      added = true;
+      const next: UserCatalogs = { ...prev, [key]: [...prev[key], trimmed] };
+      saveCatalogs(next);
+      return next;
+    });
+    if (added) addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Добавил в справочник',
+      target: `${key} · ${trimmed}`,
+      type: 'create',
+      page: 'catalog',
+    });
+  }, [addActivity]);
+
+  const updateModule = useCallback((id: string, updates: Partial<PlatformModule>) => {
+    let before: PlatformModule | undefined;
+    let after: PlatformModule | undefined;
+    setModules(prev => {
+      before = prev.find(m => m.id === id);
+      const next = prev.map(m => m.id === id ? { ...m, ...updates } : m);
+      after = next.find(m => m.id === id);
+      saveModules(next);
+      return next;
+    });
+    // Targeted activity entry — only for the meaningful flips, not every label keystroke.
+    if (before && after && before.enabled !== after.enabled) {
+      addActivity({
+        user: 'Вы', actor: 'human',
+        action: after.enabled ? 'Включил модуль' : 'Отключил модуль',
+        target: after.labels.ru,
+        type: 'settings', page: 'settings',
+        before: before.enabled ? 'enabled' : 'disabled',
+        after: after.enabled ? 'enabled' : 'disabled',
+      });
+    }
+  }, [addActivity]);
+
+  const reorderModules = useCallback((orderedIds: string[]) => {
+    setModules(prev => {
+      const byId = new Map(prev.map(m => [m.id, m]));
+      const next = orderedIds.map(id => byId.get(id)).filter((m): m is PlatformModule => !!m);
+      // Keep any module that was somehow missing from the input (defensive).
+      for (const m of prev) if (!orderedIds.includes(m.id)) next.push(m);
+      saveModules(next);
+      return next;
+    });
+    addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Изменил порядок модулей',
+      target: '',
+      type: 'settings', page: 'settings',
+    });
+  }, [addActivity]);
+
+  const resetModules = useCallback(() => {
+    setModules(DEFAULT_MODULES);
+    saveModules(DEFAULT_MODULES);
+    addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Сбросил настройки модулей по умолчанию',
+      target: '',
+      type: 'settings', page: 'settings',
+    });
+  }, [addActivity]);
+
+  const addCustomModule = useCallback((mod: Omit<PlatformModule, 'enabled' | 'custom'>): PlatformModule => {
+    const full: PlatformModule = { ...mod, enabled: true, custom: true };
+    setModules(prev => {
+      const next = [...prev, full];
+      saveModules(next);
+      return next;
+    });
+    addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Создал кастомный модуль',
+      target: full.labels.ru || full.id,
+      type: 'create', page: 'settings',
+    });
+    return full;
+  }, [addActivity]);
+
+  const deleteCustomModule = useCallback((id: string) => {
+    let label: string | undefined;
+    setModules(prev => {
+      const target = prev.find(m => m.id === id);
+      if (!target || !target.custom) return prev;
+      label = target.labels.ru;
+      const next = prev.filter(m => m.id !== id);
+      saveModules(next);
+      return next;
+    });
+    // Also drop the data rows that belonged to this module.
+    setCustomRecords(prev => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      saveCustomRecords(next);
+      return next;
+    });
+    if (label) addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Удалил кастомный модуль',
+      target: label,
+      type: 'delete', page: 'settings',
+    });
+  }, [addActivity]);
+
+  const addCustomRecord = useCallback((moduleId: string, values: Record<string, any>): CustomRecord => {
+    const record: CustomRecord = {
+      id: newId('r_'),
+      moduleId,
+      createdAt: new Date().toISOString(),
+      values,
+    };
+    setCustomRecords(prev => {
+      const next = { ...prev, [moduleId]: [record, ...(prev[moduleId] || [])] };
+      saveCustomRecords(next);
+      return next;
+    });
+    const modLabel = modules.find(m => m.id === moduleId)?.labels.ru || moduleId;
+    addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Добавил запись',
+      target: modLabel,
+      type: 'create', page: 'settings',
+    });
+    return record;
+  }, [addActivity, modules]);
+
+  const updateCustomRecord = useCallback((moduleId: string, recordId: string, values: Record<string, any>) => {
+    setCustomRecords(prev => {
+      const list = prev[moduleId] || [];
+      const next = { ...prev, [moduleId]: list.map(r => r.id === recordId ? { ...r, values, updatedAt: new Date().toISOString() } : r) };
+      saveCustomRecords(next);
+      return next;
+    });
+    const modLabel = modules.find(m => m.id === moduleId)?.labels.ru || moduleId;
+    addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Обновил запись',
+      target: `${modLabel} · #${recordId}`,
+      type: 'update', page: 'settings',
+    });
+  }, [addActivity, modules]);
+
+  const deleteCustomRecord = useCallback((moduleId: string, recordId: string) => {
+    setCustomRecords(prev => {
+      const list = prev[moduleId] || [];
+      const next = { ...prev, [moduleId]: list.filter(r => r.id !== recordId) };
+      saveCustomRecords(next);
+      return next;
+    });
+    const modLabel = modules.find(m => m.id === moduleId)?.labels.ru || moduleId;
+    addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Удалил запись',
+      target: `${modLabel} · #${recordId}`,
+      type: 'delete', page: 'settings',
+    });
+  }, [addActivity, modules]);
+
+  const removeCatalogItem = useCallback((key: CatalogKey, value: string) => {
+    let removed = false;
+    setCatalogs(prev => {
+      if (!prev[key].includes(value)) return prev;
+      removed = true;
+      const next: UserCatalogs = { ...prev, [key]: prev[key].filter(v => v !== value) };
+      saveCatalogs(next);
+      return next;
+    });
+    if (removed) addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Удалил из справочника',
+      target: `${key} · ${value}`,
+      type: 'delete',
+      page: 'catalog',
+    });
+  }, [addActivity]);
 
   const reloadAll = useCallback(async () => {
     if (!getToken()) { setLoaded(true); return; }
@@ -193,6 +733,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const resetLocal = useCallback(() => {
     setDeals([]); setEmployees([]); setTasks([]); setProducts([]);
     setTransactions([]); setIntegrations([]); setActivityLogs([]);
+    setProfile(EMPTY_PROFILE);
+    setCatalogs(EMPTY_CATALOGS);
+    setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
+    setModules(DEFAULT_MODULES);
+    setCustomRecords({});
+    setAISettings(DEFAULT_AI_SETTINGS);
+    try { localStorage.removeItem(PROFILE_STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(CATALOGS_STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(ROLE_PERMS_STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(MODULES_STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(CUSTOM_RECORDS_STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(AI_SETTINGS_STORAGE_KEY); } catch {}
     setLoaded(false);
   }, []);
 
@@ -202,12 +754,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     window.addEventListener('utir:auth-changed', onAuth);
     return () => window.removeEventListener('utir:auth-changed', onAuth);
   }, [reloadAll]);
-
-  const addActivity = useCallback((log: Omit<ActivityLog, 'id' | 'timestamp'>) => {
-    api.post<ActivityLog>('/api/activity', log)
-      .then(created => setActivityLogs(prev => [created, ...prev].slice(0, 50)))
-      .catch(err => console.warn('[activity] failed', err));
-  }, []);
 
   // Deal CRUD
   const addDeal = useCallback((deal: Omit<Deal, 'id' | 'createdAt'>) => {
@@ -334,7 +880,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const getTotalClients = useCallback(() => deals.length, [deals]);
 
   const store: DataStore = {
-    deals, employees, tasks, products, transactions, integrations, activityLogs, loaded,
+    deals, employees, tasks, products, transactions, integrations, activityLogs, profile, catalogs, rolePermissions, modules, customRecords, aiSettings, loaded,
     addDeal, updateDeal, deleteDeal,
     addEmployee, updateEmployee, deleteEmployee,
     addTask, updateTask, deleteTask,
@@ -342,6 +888,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     addTransaction, updateTransaction,
     toggleIntegration, updateIntegration,
     addActivity,
+    updateProfile,
+    addCatalogItem, removeCatalogItem,
+    setRolePermission,
+    updateModule, reorderModules, resetModules,
+    addCustomModule, deleteCustomModule,
+    addCustomRecord, updateCustomRecord, deleteCustomRecord,
+    updateAIClient, updateAIAssistant,
     reloadAll, resetLocal,
     getEmployeeById, getDealsByStatus, getTotalRevenue, getTotalExpenses, getActiveDealsCount, getTotalPipeline, getAverageCheck, getTotalClients,
   };
