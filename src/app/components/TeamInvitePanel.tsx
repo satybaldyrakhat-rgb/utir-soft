@@ -83,12 +83,23 @@ export function TeamInvitePanel({ language }: Props) {
 
   useEffect(() => { void load(); }, []);
 
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [lastSent, setLastSent] = useState<string>('');
+
   const createInvite = async () => {
-    setCreating(true); setError('');
+    setCreating(true); setError(''); setLastSent('');
     try {
-      await api.post<Invitation>('/api/invitations', { role });
+      // emailSent comes back true only if backend dispatched via Resend/SMTP.
+      // If email field is blank, backend just returns the code — admin shares
+      // the link manually via the copy button.
+      const result = await api.post<Invitation & { emailSent?: boolean }>('/api/invitations', {
+        role,
+        email: inviteEmail.trim() || undefined,
+      });
       setShowCreate(false);
       setRole(defaultRoleId);
+      if (inviteEmail && result.emailSent) setLastSent(inviteEmail);
+      setInviteEmail('');
       await load();
     } catch (e: any) {
       setError(String(e?.message || 'create failed'));
@@ -151,6 +162,21 @@ export function TeamInvitePanel({ language }: Props) {
               <option key={r.id} value={r.id}>{labelForRole(r.id)}</option>
             ))}
           </select>
+          <label className="block text-[11px] text-gray-500 mb-1.5">
+            {l('Email сотрудника (необязательно)', 'Қызметкер email (міндетті емес)', 'Teammate email (optional)')}
+          </label>
+          <input
+            type="email"
+            value={inviteEmail}
+            onChange={e => setInviteEmail(e.target.value)}
+            placeholder="name@example.com"
+            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 mb-1"
+          />
+          <div className="text-[10px] text-gray-400 mb-3">
+            {l('Если заполнить — ссылка уйдёт на email автоматически. Иначе можно отправить вручную.',
+               'Толтырсаңыз — сілтеме автоматты түрде email-ге жіберіледі. Әйтпесе қолмен жібересіз.',
+               'Filled — the link is emailed automatically. Empty — copy and send it yourself.')}
+          </div>
           <div className="flex gap-2">
             <button
               onClick={createInvite}
@@ -170,6 +196,12 @@ export function TeamInvitePanel({ language }: Props) {
       )}
 
       {error && <div className="mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-lg text-xs text-red-700">{error}</div>}
+      {lastSent && (
+        <div className="mb-3 px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-lg text-xs text-emerald-700 flex items-center justify-between">
+          <span>{l('Ссылка отправлена на', 'Сілтеме жіберілді', 'Invite emailed to')} <b>{lastSent}</b></span>
+          <button onClick={() => setLastSent('')} className="text-emerald-600 hover:text-emerald-800">×</button>
+        </div>
+      )}
 
       {loading && list.length === 0 && (
         <div className="text-xs text-gray-400 py-3">{l('Загрузка…', 'Жүктелуде…', 'Loading…')}</div>

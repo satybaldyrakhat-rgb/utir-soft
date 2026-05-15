@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage } from './telegram.js';
 import { isClaudeReady } from './claudeAgent.js';
+import { sendEmail, isEmailReady, otpTemplate, inviteTemplate } from './email.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || 'utir-soft-dev-secret-change-me';
@@ -429,12 +430,20 @@ app.post('/api/auth/signup', async (req, res) => {
     action: invitationRow ? `Присоединился к команде (роль: ${joinRole})` : 'Зарегистрировался в системе',
     target: String(email).toLowerCase(), type: invitationRow ? 'invite' : 'login', page: 'auth',
   });
+
+  // Fire-and-forget OTP email. If Resend / SMTP isn't configured we still
+  // surface the code in the JSON response so dev / local works as before.
+  const otp = otpTemplate(verifyCode);
+  const emailResult = await sendEmail(String(email).toLowerCase(), otp.subject, otp.html, otp.text);
+
   const token = jwt.sign({ sub: id }, JWT_SECRET, { expiresIn: '30d' });
-  // verificationCode is returned in dev mode (no real email sending). Frontend displays it on the OTP screen.
   res.json({
     token,
     user: { id, email, name, company: finalCompany, emailVerified: false, teamRole: joinRole },
-    verificationCode: verifyCode,
+    // Only include the code when no email was actually sent — protects against
+    // leaking the code in the response once real email is wired up.
+    verificationCode: emailResult.ok ? undefined : verifyCode,
+    emailSent: emailResult.ok,
   });
 });
 
@@ -471,14 +480,19 @@ app.post('/api/auth/verify-email', authMiddleware, (req: AuthedRequest, res) => 
   res.json({ emailVerified: true });
 });
 
-app.post('/api/auth/resend-code', authMiddleware, (req: AuthedRequest, res) => {
-  const user = db.prepare('SELECT email_verified FROM users WHERE id = ?').get(req.userId!) as any;
+app.post('/api/auth/resend-code', authMiddleware, async (req: AuthedRequest, res) => {
+  const user = db.prepare('SELECT email, email_verified FROM users WHERE id = ?').get(req.userId!) as any;
   if (!user) return res.status(404).json({ error: 'user not found' });
   if (user.email_verified) return res.status(400).json({ error: 'already verified' });
   const code = genVerificationCode();
   db.prepare('UPDATE users SET verification_code = ? WHERE id = ?').run(code, req.userId!);
-  // Dev mode: return the new code in the response so the UI can display it.
-  res.json({ verificationCode: code });
+  const otp = otpTemplate(code);
+  const emailResult = await sendEmail(user.email, otp.subject, otp.html, otp.text);
+  res.json({
+    // Dev fallback: surface the code so the OTP screen still works when no email provider.
+    verificationCode: emailResult.ok ? undefined : code,
+    emailSent: emailResult.ok,
+  });
 });
 
 app.get('/api/auth/me', authMiddleware, (req: AuthedRequest, res) => {
@@ -906,7 +920,7 @@ invitationsRouter.get('/', requireAdmin, (req: AuthedRequest, res) => {
   })));
 });
 
-invitationsRouter.post('/', requireAdmin, (req: AuthedRequest, res) => {
+invitationsRouter.post('/', requireAdmin, async (req: AuthedRequest, res) => {
   const { role, email } = req.body || {};
   // Allow any non-admin role id. If the team defined custom roles in
   // team_settings, accept those too; otherwise fall back to the built-in list.
@@ -931,13 +945,28 @@ invitationsRouter.post('/', requireAdmin, (req: AuthedRequest, res) => {
     `INSERT INTO invitations (id, team_id, created_by, code, role, email, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(id, req.teamId!, req.userId!, code, safeRole, email || null, expires);
-  const inviter = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  const inviter = db.prepare('SELECT name, company FROM users WHERE id = ?').get(req.userId!) as any;
   logActivity(req.userId!, {
     user: inviter?.name || '', action: 'Создал приглашение в команду',
     target: `${safeRole}${email ? ` → ${email}` : ''}`,
     type: 'invite', page: 'team',
   });
-  res.json({ id, code, role: safeRole, email: email || null, expiresAt: expires });
+
+  // If admin pre-filled an email AND a provider is configured, send the
+  // invitation link automatically. Falls back to dev-mode (no send) when
+  // RESEND_API_KEY isn't set — admin shares the link manually as before.
+  let emailSent = false;
+  if (email && isEmailReady()) {
+    try {
+      const origin = (req.headers.origin as string) || (req.headers.referer as string) || 'https://utir-soft.vercel.app';
+      const link = `${origin.replace(/\/$/, '')}/?invite=${code}`;
+      const tpl = inviteTemplate(inviter?.name || 'Admin', inviter?.company || '', safeRole, link);
+      const r = await sendEmail(String(email).toLowerCase(), tpl.subject, tpl.html, tpl.text);
+      emailSent = r.ok;
+    } catch (e) { console.warn('[invite email]', e); }
+  }
+
+  res.json({ id, code, role: safeRole, email: email || null, expiresAt: expires, emailSent });
 });
 
 invitationsRouter.delete('/:id', requireAdmin, (req: AuthedRequest, res) => {
