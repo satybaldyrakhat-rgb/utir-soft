@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   CheckCircle2, Circle, Clock, AlertCircle, Plus, Search, Filter,
   ChevronDown, ChevronRight, MoreHorizontal, Calendar, User, Send,
@@ -474,138 +474,39 @@ export function Tasks({ language }: TasksProps) {
 
       {/* TASK DETAIL MODAL */}
       {selectedTask && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedTask(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="p-5 border-b border-gray-100">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColors[selectedTask.category] || 'bg-gray-100 text-gray-600'}`}>{selectedTask.category}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded ${priorityConfig[selectedTask.priority].bg} ${priorityConfig[selectedTask.priority].color}`}>
-                      {priorityConfig[selectedTask.priority].label}
-                    </span>
-                    {selectedTask.source === 'telegram' && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-[#2AABEE] bg-blue-50 px-2 py-0.5 rounded-full">
-                        <Send className="w-3 h-3" /> Telegram
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="text-gray-900 mb-1">{selectedTask.title}</h2>
-                </div>
-                <button onClick={() => setSelectedTask(null)} className="text-gray-400 hover:text-gray-600 p-1">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-5 space-y-5">
-              {/* Description */}
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Описание</div>
-                <p className="text-sm text-gray-700">{selectedTask.description}</p>
-              </div>
-
-              {/* Assignee */}
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs text-gray-600">{selectedTask.assignee.avatar}</div>
-                <div>
-                  <div className="text-sm text-gray-900">{selectedTask.assignee.name}</div>
-                  <div className="text-xs text-gray-500">{selectedTask.assignee.role} · {selectedTask.assignee.telegramUsername}</div>
-                </div>
-              </div>
-
-              {/* Status flow */}
-              <div>
-                <div className="text-xs text-gray-500 mb-2">Статус</div>
-                <div className="flex items-center gap-1">
-                  {columns.map((col, i) => {
-                    const isActive = col.id === selectedTask.status;
-                    const isPast = columns.findIndex(c => c.id === selectedTask.status) > i;
-                    const Icon = col.icon;
-                    return (
-                      <div key={col.id} className="flex items-center gap-1">
-                        <button
-                          onClick={() => moveTask(selectedTask.id, col.id)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors ${
-                            isActive ? `${col.bg} ${col.color} border ${col.border}` :
-                            isPast ? 'bg-green-50 text-green-600' :
-                            'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                          }`}
-                        >
-                          <Icon className="w-3.5 h-3.5" />
-                          {col.title}
-                        </button>
-                        {i < columns.length - 1 && <ArrowRight className="w-3 h-3 text-gray-300 flex-shrink-0" />}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Subtasks */}
-              {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
-                <div>
-                  <div className="text-xs text-gray-500 mb-2">Подзадачи ({selectedTask.subtasks.filter(s => s.done).length}/{selectedTask.subtasks.length})</div>
-                  <div className="space-y-1.5">
-                    {selectedTask.subtasks.map(sub => (
-                      <div key={sub.id} className="flex items-center gap-2 py-1">
-                        {sub.done ? (
-                          <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                        ) : (
-                          <Circle className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                        )}
-                        <span className={`text-sm ${sub.done ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{sub.title}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Completion note */}
-              {selectedTask.completionNote && (
-                <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                    <span className="text-xs text-green-700">Отчёт о выполнении (через Telegram)</span>
-                  </div>
-                  <p className="text-sm text-green-800">{selectedTask.completionNote}</p>
-                </div>
-              )}
-
-              {/* Dates */}
-              <div className="flex items-center gap-6 text-xs text-gray-500">
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" />
-                  Создано: {new Date(selectedTask.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                </div>
-                {selectedTask.completedAt && (
-                  <div className="flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-green-500" />
-                    Выполнено: {new Date(selectedTask.completedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                )}
-              </div>
-
-              {/* Action buttons */}
-              {selectedTask.status !== 'done' && (
-                <div className="flex gap-2 pt-2">
-                  {getNextStatus(selectedTask.status) && (
-                    <button
-                      onClick={() => {
-                        const next = getNextStatus(selectedTask.status);
-                        if (next) moveTask(selectedTask.id, next);
-                      }}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800 transition-colors"
-                    >
-                      <ArrowRight className="w-4 h-4" />
-                      {selectedTask.status === 'new' ? 'Начать' : selectedTask.status === 'in_progress' ? 'На проверку' : 'Завершить'}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <TaskDetailModal
+          task={selectedTask}
+          storeEmployees={store.employees}
+          onClose={() => setSelectedTask(null)}
+          onMoveStatus={(status) => moveTask(selectedTask.id, status)}
+          onSave={(updates) => {
+            store.updateTask(selectedTask.id, {
+              title: updates.title,
+              description: updates.description,
+              priority: updates.priority,
+              category: updates.category,
+              assigneeId: updates.assigneeId,
+              dueDate: updates.dueDate,
+            });
+            setSelectedTask(prev => prev ? {
+              ...prev,
+              title: updates.title,
+              description: updates.description,
+              priority: updates.priority,
+              category: updates.category,
+              dueDate: updates.dueDate,
+              // assignee object: try to pick from store employees, else keep current
+              assignee: (() => {
+                const emp = store.getEmployeeById(updates.assigneeId);
+                return emp ? { id: emp.id, name: emp.name, role: emp.department, avatar: emp.avatar, telegramUsername: '@' + emp.name.split(' ')[0].toLowerCase(), telegramConnected: emp.status === 'active', tasksToday: 0, tasksDone: 0 } : prev.assignee;
+              })(),
+            } : null);
+          }}
+          onDelete={() => {
+            store.deleteTask(selectedTask.id);
+            setSelectedTask(null);
+          }}
+        />
       )}
 
       {/* NEW TASK MODAL */}
@@ -765,6 +666,293 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
           >
             Создать задачу
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TASK DETAIL MODAL (editable) ────────────────────────────
+interface TaskUpdates {
+  title: string;
+  description: string;
+  priority: Task['priority'];
+  category: string;
+  assigneeId: string;
+  dueDate: string;
+}
+
+function TaskDetailModal({
+  task,
+  storeEmployees,
+  onClose,
+  onMoveStatus,
+  onSave,
+  onDelete,
+}: {
+  task: Task;
+  storeEmployees: { id: string; name: string }[];
+  onClose: () => void;
+  onMoveStatus: (s: Task['status']) => void;
+  onSave: (u: TaskUpdates) => void;
+  onDelete: () => void;
+}) {
+  // Local edit state — initialized from task and reset when a different task is opened.
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description);
+  const [priority, setPriority] = useState<Task['priority']>(task.priority);
+  const [category, setCategory] = useState(task.category);
+  const [assigneeId, setAssigneeId] = useState(task.assignee.id);
+  const [dueDate, setDueDate] = useState(task.dueDate || '');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    setTitle(task.title);
+    setDescription(task.description);
+    setPriority(task.priority);
+    setCategory(task.category);
+    setAssigneeId(task.assignee.id);
+    setDueDate(task.dueDate || '');
+    setConfirmDelete(false);
+  }, [task.id]);
+
+  const dirty =
+    title !== task.title ||
+    description !== task.description ||
+    priority !== task.priority ||
+    category !== task.category ||
+    assigneeId !== task.assignee.id ||
+    (dueDate || '') !== (task.dueDate || '');
+
+  // Category options: predefined + current value if it's not in the list (so AI-generated
+  // categories like "Прочее" still appear and are editable).
+  const categoryOptions = Array.from(new Set([...Object.keys(categoryColors), 'Прочее', category])).filter(Boolean);
+
+  const handleSave = () => {
+    if (!title.trim()) return;
+    onSave({
+      title: title.trim(),
+      description: description.trim(),
+      priority,
+      category,
+      assigneeId,
+      dueDate,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="p-5 border-b border-gray-100">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColors[category] || 'bg-gray-100 text-gray-600'}`}>{category}</span>
+                <span className={`text-xs px-2 py-0.5 rounded ${priorityConfig[priority].bg} ${priorityConfig[priority].color}`}>
+                  {priorityConfig[priority].label}
+                </span>
+                {task.source === 'telegram' && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-[#2AABEE] bg-blue-50 px-2 py-0.5 rounded-full">
+                    <Send className="w-3 h-3" /> Telegram
+                  </span>
+                )}
+              </div>
+              <input
+                type="text"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Название задачи"
+                className="w-full text-gray-900 text-base bg-transparent border-0 border-b border-transparent hover:border-gray-200 focus:border-gray-300 focus:outline-none px-0 py-0.5"
+              />
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* Description */}
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Описание</label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={3}
+              placeholder="Подробности задачи…"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 resize-none"
+            />
+          </div>
+
+          {/* Assignee + Priority */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Исполнитель</label>
+              <select
+                value={assigneeId}
+                onChange={e => setAssigneeId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+              >
+                {/* Keep current assignee even if it's not in the store list (e.g. placeholder ids). */}
+                {!storeEmployees.find(e => e.id === assigneeId) && (
+                  <option value={assigneeId}>{task.assignee.name || '—'}</option>
+                )}
+                {storeEmployees.map(e => (
+                  <option key={e.id} value={e.id}>{e.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Приоритет</label>
+              <select
+                value={priority}
+                onChange={e => setPriority(e.target.value as Task['priority'])}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+              >
+                <option value="low">Низкий</option>
+                <option value="medium">Средний</option>
+                <option value="high">Высокий</option>
+                <option value="urgent">Срочно</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Category + Due date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Категория</label>
+              <select
+                value={category}
+                onChange={e => setCategory(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+              >
+                {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Срок</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={e => setDueDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+              />
+            </div>
+          </div>
+
+          {/* Status flow */}
+          <div>
+            <label className="text-xs text-gray-500 mb-2 block">Статус</label>
+            <div className="flex items-center gap-1 flex-wrap">
+              {columns.map((col, i) => {
+                const isActive = col.id === task.status;
+                const isPast = columns.findIndex(c => c.id === task.status) > i;
+                const Icon = col.icon;
+                return (
+                  <div key={col.id} className="flex items-center gap-1">
+                    <button
+                      onClick={() => onMoveStatus(col.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        isActive ? `${col.bg} ${col.color} border ${col.border}` :
+                        isPast ? 'bg-green-50 text-green-600' :
+                        'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {col.title}
+                    </button>
+                    {i < columns.length - 1 && <ArrowRight className="w-3 h-3 text-gray-300 flex-shrink-0" />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Subtasks (read-only — separate editor would be a bigger feature) */}
+          {task.subtasks && task.subtasks.length > 0 && (
+            <div>
+              <div className="text-xs text-gray-500 mb-2">Подзадачи ({task.subtasks.filter(s => s.done).length}/{task.subtasks.length})</div>
+              <div className="space-y-1.5">
+                {task.subtasks.map(sub => (
+                  <div key={sub.id} className="flex items-center gap-2 py-1">
+                    {sub.done ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4 text-gray-300" />}
+                    <span className={`text-sm ${sub.done ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{sub.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Completion note (read-only, from Telegram) */}
+          {task.completionNote && (
+            <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                <span className="text-xs text-green-700">Отчёт о выполнении (через Telegram)</span>
+              </div>
+              <p className="text-sm text-green-800">{task.completionNote}</p>
+            </div>
+          )}
+
+          {/* Created / completed dates */}
+          <div className="flex items-center gap-6 text-xs text-gray-500 flex-wrap">
+            <div className="flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5" />
+              Создано: {new Date(task.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </div>
+            {task.completedAt && (
+              <div className="flex items-center gap-1">
+                <Check className="w-3.5 h-3.5 text-green-500" />
+                Выполнено: {new Date(task.completedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
+            <div className="flex gap-2">
+              <button
+                onClick={handleSave}
+                disabled={!dirty || !title.trim()}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Check className="w-4 h-4" />
+                Сохранить
+              </button>
+              <button
+                onClick={onClose}
+                className="px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+            {confirmDelete ? (
+              <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-lg">
+                <span className="text-xs text-red-700 flex-1">Удалить задачу безвозвратно?</span>
+                <button
+                  onClick={onDelete}
+                  className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors"
+                >
+                  Да, удалить
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="px-3 py-1 text-gray-600 rounded text-xs hover:bg-white transition-colors"
+                >
+                  Отмена
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2 text-red-600 rounded-lg text-sm hover:bg-red-50 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Удалить задачу
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
