@@ -298,7 +298,19 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     return;
   }
 
-  // Tool was proposed → store as pending and ask the user to confirm.
+  // Read-only tools (find_client and similar) run immediately and reply with the result.
+  const { default: tools } = await import('./aiTools.js');
+  if (tools.isReadOnly(agentResult.toolName)) {
+    try {
+      const result = await tools.execute(db, user.id, user.name, agentResult.toolName, agentResult.toolInput, logActivity);
+      await sendMessage(chatId, result);
+    } catch (e: any) {
+      await sendMessage(chatId, `❌ Ошибка: ${e.message || e}`);
+    }
+    return;
+  }
+
+  // Write tools — store as pending and ask the user to confirm before executing.
   setPending(db, chatId, { toolName: agentResult.toolName, toolInput: agentResult.toolInput, summary: agentResult.summary });
   await sendMessage(chatId, agentResult.summary + `\n\n<i>Подтвердите — «Да» или «Нет».</i>`);
 }
