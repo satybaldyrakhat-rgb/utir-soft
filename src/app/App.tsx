@@ -1,24 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { Dashboard } from './components/Dashboard';
-import { ClientTrack } from './components/ClientTrack';
-import { ClientCabinet } from './components/ClientCabinet';
 import { ClientAuth, readClientSession, clearClientSession, type ClientSession } from './components/ClientAuth';
-import { Booking } from './components/Booking';
-import { AIDesign } from './components/AIDesign';
 import { SalesKanban } from './components/SalesKanban';
-import { Warehouse } from './components/Warehouse';
-import { Finance } from './components/Finance';
-import { Chats } from './components/Chats';
-import { Analytics } from './components/Analytics';
 import { Tasks } from './components/Tasks';
-import { Settings } from './components/Settings';
-import { CustomModulePage } from './components/CustomModulePage';
-import { CustomIcon } from './components/CustomIcons';
-import { AIAssistant } from './components/AIAssistant';
 import { Auth } from './components/Auth';
 import { ComingSoon } from './components/ComingSoon';
 import { Terms } from './components/Terms';
 import { Privacy } from './components/Privacy';
+import { CustomIcon } from './components/CustomIcons';
+import { AIAssistant } from './components/AIAssistant';
+// Heavy or rarely-used pages are lazy-loaded — their JS only downloads when
+// the user actually navigates there. Cuts the first-paint bundle by a lot.
+// (Each lazy import becomes its own Vite chunk in dist/assets/.)
+const ClientTrack      = lazy(() => import('./components/ClientTrack').then(m => ({ default: m.ClientTrack })));
+const ClientCabinet    = lazy(() => import('./components/ClientCabinet').then(m => ({ default: m.ClientCabinet })));
+const Booking          = lazy(() => import('./components/Booking').then(m => ({ default: m.Booking })));
+const AIDesign         = lazy(() => import('./components/AIDesign').then(m => ({ default: m.AIDesign })));
+const Warehouse        = lazy(() => import('./components/Warehouse').then(m => ({ default: m.Warehouse })));
+const Finance          = lazy(() => import('./components/Finance').then(m => ({ default: m.Finance })));
+const Chats            = lazy(() => import('./components/Chats').then(m => ({ default: m.Chats })));
+const Analytics        = lazy(() => import('./components/Analytics').then(m => ({ default: m.Analytics })));
+const Settings         = lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })));
+const CustomModulePage = lazy(() => import('./components/CustomModulePage').then(m => ({ default: m.CustomModulePage })));
 import { Menu, X, LogOut } from 'lucide-react';
 import profileLogo from '../imports/utirsoft.png';
 import { t } from './utils/translations';
@@ -563,7 +566,15 @@ function AppContent() {
       {/* Main Content. Platform AI assistant lives in two places per user's request:
           Telegram-bot is the primary channel (Block F), but a floating in-platform popup is also kept here for quick UI prompts. */}
       <main className="flex-1 overflow-y-auto pt-[57px] lg:pt-0 relative">
-        {renderPage()}
+        {/* Suspense covers the lazy-loaded pages (Analytics, Settings, etc.)
+            so React can render a small placeholder while the chunk downloads. */}
+        <Suspense fallback={
+          <div className="min-h-[60vh] flex items-center justify-center">
+            <div className="text-sm text-gray-400">Загрузка…</div>
+          </div>
+        }>
+          {renderPage()}
+        </Suspense>
         <AIAssistant
           context={currentPage as 'dashboard' | 'ai-design' | 'sales' | 'warehouse' | 'finance' | 'chats' | 'analytics' | 'tasks' | 'settings'}
           language={language}
@@ -591,10 +602,15 @@ function PublicRouter({ children }: { children: React.ReactNode }) {
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
-  if (hash.startsWith('#/track/')) return <ClientTrack orderId={hash.replace('#/track/', '')} />;
-  if (hash === '#/cabinet' || hash.startsWith('#/cabinet/')) return <ClientCabinetRoute />;
-  if (hash === '#/booking') return <Booking />;
-  if (hash === '#/terms') return <Terms language={legalLang} onLanguageChange={setLegalLang} />;
+  // The client-facing routes (Track, Cabinet, Booking) are lazy-loaded — they
+  // ship in their own chunks and won't be in the main bundle that platform
+  // users download. Wrap them in Suspense so React has a fallback while the
+  // chunk arrives.
+  const fallback = <div className="min-h-screen flex items-center justify-center text-sm text-gray-400">Загрузка…</div>;
+  if (hash.startsWith('#/track/'))                            return <Suspense fallback={fallback}><ClientTrack orderId={hash.replace('#/track/', '')} /></Suspense>;
+  if (hash === '#/cabinet' || hash.startsWith('#/cabinet/')) return <Suspense fallback={fallback}><ClientCabinetRoute /></Suspense>;
+  if (hash === '#/booking')                                   return <Suspense fallback={fallback}><Booking /></Suspense>;
+  if (hash === '#/terms')   return <Terms language={legalLang} onLanguageChange={setLegalLang} />;
   if (hash === '#/privacy') return <Privacy language={legalLang} onLanguageChange={setLegalLang} />;
   return <>{children}</>;
 }
