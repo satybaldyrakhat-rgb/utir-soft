@@ -5,13 +5,15 @@ import { ActivityLog } from './ActivityLog';
 import { TelegramPairing } from './TelegramPairing';
 import { TeamInvitePanel } from './TeamInvitePanel';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
-import { useDataStore, ALL_MODULES, ALL_ROLES, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
+import { useDataStore, ALL_MODULES, ALL_ROLES, MODULE_GROUPS, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
 import { api } from '../utils/api';
 import { t } from '../utils/translations';
 
 // Until C.2 (invitations) ships, the workspace owner is always the admin.
 // Once server returns real per-user role, replace this with a store/prop value.
-const IS_CURRENT_USER_ADMIN = true;
+// isAdmin was a hardcoded placeholder before the role system
+// landed. Now it's computed at render time from store.currentUserRole below.
+const ADMIN_ONLY_TABS: ReadonlyArray<string> = ['employees', 'activity'];
 
 interface Employee {
   id: string; name: string; email: string; phone: string;
@@ -33,6 +35,9 @@ interface SettingsProps {
 
 export function Settings({ language, onLanguageChange, currentUserEmail }: SettingsProps) {
   const store = useDataStore();
+  // Real admin check. Used for hard-gated sub-tabs (Команда и права, Журнал)
+  // that should never be visible to non-admins regardless of the matrix.
+  const isAdmin = store.currentUserRole === 'admin';
   const profile = store.profile;
   const catalogs = store.catalogs;
   const aiClient = store.aiSettings.client;
@@ -151,17 +156,21 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
     employee: 'bg-emerald-50 text-emerald-600',
   } as Record<string, string>)[r] || 'bg-gray-50 text-gray-600';
   const moduleLabel = (m: ModuleKey) => ({
-    dashboard:    l('Главная',         'Басты бет',    'Home'),
-    'ai-design':  l('AI Дизайн',       'AI Дизайн',    'AI Design'),
-    orders:       tt('modOrders'),
-    production:   tt('modProduction'),
-    finance:      l('Финансы',         'Қаржы',        'Finance'),
-    payments:     l('Платежи',         'Төлемдер',     'Payments'),
-    chats:        tt('modChats'),
-    tasks:        l('Задачи',          'Тапсырмалар',  'Tasks'),
-    analytics:    tt('modAnalytics'),
-    marketing:    l('Реклама',         'Жарнама',      'Marketing'),
-    settings:     tt('modSettings'),
+    dashboard:               l('Главная',             'Басты бет',         'Home'),
+    'ai-design':             l('AI Дизайн',           'AI Дизайн',         'AI Design'),
+    orders:                  tt('modOrders'),
+    production:              tt('modProduction'),
+    finance:                 l('Финансы',             'Қаржы',             'Finance'),
+    payments:                l('Платежи',             'Төлемдер',          'Payments'),
+    chats:                   tt('modChats'),
+    tasks:                   l('Задачи',              'Тапсырмалар',       'Tasks'),
+    analytics:               tt('modAnalytics'),
+    marketing:               l('Реклама',             'Жарнама',           'Marketing'),
+    settings:                l('Настройки (общее)',   'Баптаулар (жалпы)', 'Settings (overview)'),
+    'settings-catalogs':     l('Справочники',         'Анықтамалықтар',    'Catalogs'),
+    'settings-modules':      l('Модули',              'Модульдер',         'Modules'),
+    'settings-integrations': l('Интеграции',          'Интеграциялар',     'Integrations'),
+    'settings-ai':           l('AI-настройки',        'AI баптаулары',     'AI settings'),
   })[m];
   const statusDot = (s: string) => s === 'active' ? 'bg-green-500' : s === 'vacation' ? 'bg-blue-500' : 'bg-gray-300';
 
@@ -283,16 +292,38 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
   // 'roles' tab was merged into 'employees' — the permission matrix now lives
   // at the bottom of the Команда tab so admin can manage who is in the team
   // and what each role can do in one place.
+  // If the currently selected tab disappeared (admin yanked access), fall
+  // back to 'general' so the page doesn't render a blank section.
+  useEffect(() => {
+    const ok =
+      activeTab === 'general' ||
+      (activeTab === 'employees' && isAdmin) ||
+      (activeTab === 'activity'  && isAdmin) ||
+      (activeTab === 'catalogs'     && store.getModuleLevel('settings-catalogs') !== 'none') ||
+      (activeTab === 'ai-client'    && store.getModuleLevel('settings-ai') !== 'none') ||
+      (activeTab === 'ai-assistant' && store.getModuleLevel('settings-ai') !== 'none') ||
+      (activeTab === 'modules'      && store.getModuleLevel('settings-modules') !== 'none') ||
+      (activeTab === 'integrations' && store.getModuleLevel('settings-integrations') !== 'none');
+    if (!ok) setActiveTab('general');
+  }, [activeTab, isAdmin, store.rolePermissions, store.currentUserRole]);
+
+  // Tab visibility rules:
+  //   - 'general' is always shown — every user can see/edit their own profile.
+  //   - 'employees' (Команда и права) is HARD admin-only regardless of matrix.
+  //     Otherwise a manager with settings=full could rewrite their own
+  //     permissions, which the user explicitly called out as a hole.
+  //   - 'activity' is HARD admin-only (audit log).
+  //   - The rest are matrix-driven via settings-* sub-keys.
+  const matrixShow = (key: string) => store.getModuleLevel(key) !== 'none';
   const tabs = [
     { id: 'general' as const, icon: SettingsIcon, label: l('Основные', 'Негізгі', 'General') },
-    { id: 'employees' as const, icon: Users, label: l('Команда и права', 'Команда және рұқсаттар', 'Team & permissions') },
-    { id: 'catalogs' as const, icon: BookOpen, label: tt('catalogs') },
-    { id: 'ai-client' as const, icon: MessageCircle, label: tt('aiClientTab') },
-    { id: 'ai-assistant' as const, icon: Bot, label: tt('aiAssistantTab') },
-    { id: 'modules' as const, icon: LayoutGrid, label: l('Модули', 'Модульдер', 'Modules') },
-    { id: 'integrations' as const, icon: Zap, label: l('Интеграции', 'Интеграциялар', 'Integrations') },
-    // Admin-only: hidden from tab list for non-admins.
-    ...(IS_CURRENT_USER_ADMIN ? [{ id: 'activity' as const, icon: Activity, label: tt('activityLog') }] : []),
+    ...(isAdmin ? [{ id: 'employees' as const, icon: Users, label: l('Команда и права', 'Команда және рұқсаттар', 'Team & permissions') }] : []),
+    ...(matrixShow('settings-catalogs')     ? [{ id: 'catalogs'     as const, icon: BookOpen,      label: tt('catalogs') }] : []),
+    ...(matrixShow('settings-ai')           ? [{ id: 'ai-client'    as const, icon: MessageCircle, label: tt('aiClientTab') }] : []),
+    ...(matrixShow('settings-ai')           ? [{ id: 'ai-assistant' as const, icon: Bot,           label: tt('aiAssistantTab') }] : []),
+    ...(matrixShow('settings-modules')      ? [{ id: 'modules'      as const, icon: LayoutGrid,    label: l('Модули', 'Модульдер', 'Modules') }] : []),
+    ...(matrixShow('settings-integrations') ? [{ id: 'integrations' as const, icon: Zap,           label: l('Интеграции', 'Интеграциялар', 'Integrations') }] : []),
+    ...(isAdmin ? [{ id: 'activity' as const, icon: Activity, label: tt('activityLog') }] : []),
   ];
 
   const CATALOG_KEYS: { key: CatalogKey; titleKey: Parameters<typeof t>[0] }[] = [
@@ -479,7 +510,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
       )}
 
       {/* ===== EMPLOYEES — invite-only (no manual add until invite flow ships) ===== */}
-      {activeTab === 'employees' && (
+      {activeTab === 'employees' && isAdmin && (
         <div className="space-y-5">
           {/* Invitation links (Block C.2 / P4) — visible to admins only.
               Non-admins get a 403 inside and the panel quietly hides itself. */}
@@ -641,9 +672,23 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
+                  {/* Section row — visually groups modules into 'Рабочие модули'
+                      and 'Настройки' so the wide matrix is easier to scan. */}
+                  <tr>
+                    <th className="pb-2"></th>
+                    {MODULE_GROUPS.map(g => (
+                      <th
+                        key={g.id}
+                        colSpan={g.modules.length}
+                        className="text-center text-[10px] uppercase tracking-wide text-gray-400 pb-1 px-2 border-l border-gray-100 first:border-l-0"
+                      >
+                        {g.id === 'settings' ? l(g.ru, g.kz, g.eng) : l(g.ru, g.kz, g.eng)}
+                      </th>
+                    ))}
+                  </tr>
                   <tr>
                     <th className="text-left text-[11px] text-gray-400 pb-3 pr-4">{l('Роль', 'Рөл', 'Role')}</th>
-                    {ALL_MODULES.map(m => (
+                    {MODULE_GROUPS.flatMap(g => g.modules).map(m => (
                       <th key={m} className="text-center text-[11px] text-gray-400 pb-3 px-2 whitespace-nowrap">{moduleLabel(m)}</th>
                     ))}
                   </tr>
@@ -657,7 +702,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
                       <td className="py-3 pr-4">
                         <span className={`px-2 py-0.5 rounded text-[11px] ${roleBg(roleK)}`}>{roleLabel(roleK)}</span>
                       </td>
-                      {ALL_MODULES.map(module => {
+                      {MODULE_GROUPS.flatMap(g => g.modules).map(module => {
                         const current = store.rolePermissions[roleK]?.[module] || 'none';
                         const isAdminFull = roleK === 'admin';
                         const cycle: PermissionLevel[] = ['full', 'view', 'none'];
@@ -1003,7 +1048,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
       {/* ===== ROLES & PERMISSIONS — editable matrix ===== */}
 
       {/* ===== ACTIVITY LOG — admin-only ===== */}
-      {activeTab === 'activity' && IS_CURRENT_USER_ADMIN && (
+      {activeTab === 'activity' && isAdmin && (
         <div className="-mx-4 md:-mx-8">
           <ActivityLog language={language} />
         </div>

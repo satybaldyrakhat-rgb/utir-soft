@@ -66,7 +66,13 @@ export type ModuleKey =
   | 'tasks'      // Задачи
   | 'analytics'  // Аналитика
   | 'marketing'  // Реклама — tab inside Аналитика
-  | 'settings';  // Настройки
+  | 'settings'           // Настройки (umbrella — controls sidebar visibility)
+  | 'settings-catalogs'  // Настройки → Справочники
+  | 'settings-modules'   // Настройки → Модули
+  | 'settings-integrations' // Настройки → Интеграции
+  | 'settings-ai';       // Настройки → AI (assistant + client)
+// Note: 'Команда и права' and 'Журнал' are intentionally NOT in the matrix —
+// they are hard admin-only at the UI layer, so the matrix can't grant access.
 
 export interface Employee {
   id: string;
@@ -88,12 +94,48 @@ export interface Employee {
 export type RolePermissions = Record<RoleKey, Record<ModuleKey, PermissionLevel>>;
 
 const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
-  admin:    { dashboard: 'full', 'ai-design': 'full', orders: 'full', production: 'full', finance: 'full', payments: 'full', chats: 'full', tasks: 'full', analytics: 'full', marketing: 'full', settings: 'full' },
-  manager:  { dashboard: 'full', 'ai-design': 'full', orders: 'full', production: 'view', finance: 'view', payments: 'full', chats: 'full', tasks: 'full', analytics: 'view', marketing: 'view', settings: 'none' },
-  employee: { dashboard: 'full', 'ai-design': 'view', orders: 'view', production: 'view', finance: 'none', payments: 'none', chats: 'view', tasks: 'full', analytics: 'none', marketing: 'none', settings: 'none' },
+  admin: {
+    dashboard: 'full', 'ai-design': 'full', orders: 'full', production: 'full',
+    finance: 'full', payments: 'full', chats: 'full', tasks: 'full',
+    analytics: 'full', marketing: 'full',
+    settings: 'full', 'settings-catalogs': 'full', 'settings-modules': 'full',
+    'settings-integrations': 'full', 'settings-ai': 'full',
+  },
+  manager: {
+    dashboard: 'full', 'ai-design': 'full', orders: 'full', production: 'view',
+    finance: 'view', payments: 'full', chats: 'full', tasks: 'full',
+    analytics: 'view', marketing: 'view',
+    settings: 'full', 'settings-catalogs': 'full', 'settings-modules': 'none',
+    'settings-integrations': 'none', 'settings-ai': 'none',
+  },
+  employee: {
+    dashboard: 'full', 'ai-design': 'view', orders: 'view', production: 'view',
+    finance: 'none', payments: 'none', chats: 'view', tasks: 'full',
+    analytics: 'none', marketing: 'none',
+    settings: 'view', 'settings-catalogs': 'view', 'settings-modules': 'none',
+    'settings-integrations': 'none', 'settings-ai': 'none',
+  },
 };
 
-export const ALL_MODULES: ModuleKey[] = ['dashboard', 'ai-design', 'orders', 'production', 'finance', 'payments', 'chats', 'tasks', 'analytics', 'marketing', 'settings'];
+export const ALL_MODULES: ModuleKey[] = [
+  'dashboard', 'ai-design', 'orders', 'production', 'finance', 'payments',
+  'chats', 'tasks', 'analytics', 'marketing',
+  'settings', 'settings-catalogs', 'settings-modules', 'settings-integrations', 'settings-ai',
+];
+
+// Groups for rendering the matrix with section headers (UI helper).
+export const MODULE_GROUPS: { id: string; ru: string; kz: string; eng: string; modules: ModuleKey[] }[] = [
+  {
+    id: 'operations',
+    ru: 'Рабочие модули', kz: 'Жұмыс модульдері', eng: 'Operations',
+    modules: ['dashboard', 'ai-design', 'orders', 'production', 'finance', 'payments', 'chats', 'tasks', 'analytics', 'marketing'],
+  },
+  {
+    id: 'settings',
+    ru: 'Настройки', kz: 'Баптаулар', eng: 'Settings',
+    modules: ['settings', 'settings-catalogs', 'settings-modules', 'settings-integrations', 'settings-ai'],
+  },
+];
 // Default roles every brand-new team starts with. Admin is system (locked);
 // the other two are convenience pre-fills that the admin can rename or delete.
 export const DEFAULT_ROLES: TeamRole[] = [
@@ -254,7 +296,9 @@ function loadRolePermissions(): RolePermissions {
 const EMPTY_PERMS: Record<ModuleKey, PermissionLevel> = {
   dashboard: 'none', 'ai-design': 'none', orders: 'none', production: 'none',
   finance: 'none', payments: 'none', chats: 'none', tasks: 'none',
-  analytics: 'none', marketing: 'none', settings: 'none',
+  analytics: 'none', marketing: 'none',
+  settings: 'none', 'settings-catalogs': 'none', 'settings-modules': 'none',
+  'settings-integrations': 'none', 'settings-ai': 'none',
 };
 
 const ROLES_STORAGE_KEY = 'utir_team_roles';
