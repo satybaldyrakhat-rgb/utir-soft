@@ -726,11 +726,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Note: /api/transactions and /api/activity are role-gated on the
       // backend, so non-admins may get 403 here — swallow to null and use
       // empty lists locally rather than tearing down the whole reload.
+      // Matrix-gated reads (deals/products/transactions/activity) may return
+      // 403 for a role whose matrix entry is 'none'. Swallow so the UI still
+      // boots — the sidebar item for that module is hidden anyway.
       const [d, e, t, p, tx, ig, al, ai, rp] = await Promise.all([
-        api.get<Deal[]>('/api/deals'),
+        api.get<Deal[]>('/api/deals').catch(() => [] as Deal[]),
         api.get<Employee[]>('/api/employees'),
         api.get<Task[]>('/api/tasks'),
-        api.get<Product[]>('/api/products'),
+        api.get<Product[]>('/api/products').catch(() => [] as Product[]),
         api.get<FinanceTransaction[]>('/api/transactions').catch(() => [] as FinanceTransaction[]),
         api.get<Integration[]>('/api/integrations'),
         api.get<ActivityLog[]>('/api/activity').catch(() => [] as ActivityLog[]),

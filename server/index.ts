@@ -504,7 +504,12 @@ function makeCrud(table: string, idPrefix: string) {
   return r;
 }
 
-app.use('/api/deals', makeCrud('deals', 'D'));
+// Data routes are gated by the team's role-permissions matrix (Phase 2b):
+//   - none  → 403 on anything (the route is hidden in the sidebar anyway)
+//   - view  → 403 on POST/PATCH/PUT/DELETE; GET allowed
+//   - full  → all methods allowed
+// Tasks intentionally stay open to every team member — no matrix key for it.
+app.use('/api/deals', authMiddleware, requirePermission('orders'), makeCrud('deals', 'D'));
 
 // Custom DELETE on /api/employees/:id — must register BEFORE the generic
 // makeCrud router so this handler matches first. When the employees row
@@ -572,9 +577,10 @@ app.delete('/api/employees/:id', authMiddleware, requireRole('admin'), (req: Aut
 
 app.use('/api/employees', makeCrud('employees', 'e'));
 app.use('/api/tasks', makeCrud('tasks', 't'));
-app.use('/api/products', makeCrud('products', 'p'));
-// Finance is gated — only admin and manager can read or write transactions.
-app.use('/api/transactions', authMiddleware, requireRole('manager'), makeCrud('transactions', 'f'));
+app.use('/api/products', authMiddleware, requirePermission('production'), makeCrud('products', 'p'));
+// Finance gated by the matrix (was requireRole('manager') — now matrix-driven
+// so admin can hand finance to specific roles without touching code).
+app.use('/api/transactions', authMiddleware, requirePermission('finance'), makeCrud('transactions', 'f'));
 
 // ─── AI SETTINGS (per-user JSON blob, Block F.4) ──────────────────
 // The Telegram bot reads `assistant.modulePermissions` from here to decide
@@ -664,9 +670,6 @@ function requirePermission(moduleKey: string) {
     next();
   };
 }
-// Touch the helper so unused-export linters don't complain while Phase 2b
-// (route-level enforcement) is still in flight.
-void requirePermission;
 
 // ─── INVITATIONS (Block C.2 — team invites) ───────────────────────
 // Flow:
