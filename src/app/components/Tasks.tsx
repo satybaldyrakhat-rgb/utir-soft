@@ -6,6 +6,7 @@ import {
   Check, RefreshCw, Eye, Trash2, Edit3, Flag
 } from 'lucide-react';
 import { useDataStore, Task as StoreTask } from '../utils/dataStore';
+import { useAutoRefresh } from '../utils/useAutoRefresh';
 import { TelegramBotPanel } from './TelegramBotPanel';
 
 // ─── TYPES ───────────────────────────────────────────────────
@@ -80,6 +81,8 @@ type ViewMode = 'board' | 'list' | 'employees';
 
 export function Tasks({ language }: TasksProps) {
   const store = useDataStore();
+  // Poll backend every 15s so tasks created via Telegram bot show up without manual reload.
+  useAutoRefresh(store.reloadAll, 15000);
 
   // Map store tasks to local Task format
   const mapStoreTask = (st: StoreTask): Task => {

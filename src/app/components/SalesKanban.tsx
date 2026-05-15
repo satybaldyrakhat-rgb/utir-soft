@@ -3,6 +3,7 @@ import { Instagram, Phone, X, Users, MessageCircle, Mail, Calendar, TrendingUp, 
 import { ClientOrderModal } from './ClientOrderModal';
 import { NewDealModal } from './NewDealModal';
 import { useDataStore, type Deal } from '../utils/dataStore';
+import { useAutoRefresh } from '../utils/useAutoRefresh';
 import { t } from '../utils/translations';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo } from './PlatformLogos';
 import { Finance } from './Finance';
@@ -41,6 +42,8 @@ const statusToStage = (status: string): string => {
 
 export function SalesKanban({ language }: SalesKanbanProps) {
   const store = useDataStore();
+  // Poll backend every 15s so deals created/updated via Telegram bot show up live.
+  useAutoRefresh(store.reloadAll, 15000);
   const [showNewDealModal, setShowNewDealModal] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [newDeal, setNewDeal] = useState({ customerName: '', phone: '', product: '', amount: '', furnitureType: 'Кухня', source: 'phone' as Deal['icon'] });

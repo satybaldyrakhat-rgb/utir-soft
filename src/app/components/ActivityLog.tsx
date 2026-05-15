@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Search, Download, Plus, Edit2, Trash2, LogIn, LogOut, Shield, Settings as SettingsIcon, Sparkles, BookOpen } from 'lucide-react';
 import { useDataStore, type ActivityType, type ActivityLog as ActivityLogEntry } from '../utils/dataStore';
+import { useAutoRefresh } from '../utils/useAutoRefresh';
 import { t } from '../utils/translations';
 
 interface Props {
@@ -62,6 +63,8 @@ function toCSV(rows: ActivityLogEntry[]): string {
 
 export function ActivityLog({ language }: Props) {
   const store = useDataStore();
+  // Poll backend every 15s so AI/bot-triggered activity entries appear live.
+  useAutoRefresh(store.reloadAll, 15000);
   const logs = store.activityLogs;
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const tt = (key: Parameters<typeof t>[0]) => t(key, language);
