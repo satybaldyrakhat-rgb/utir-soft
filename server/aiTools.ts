@@ -10,7 +10,8 @@ import Database from 'better-sqlite3';
 
 export interface ToolContext {
   db: Database.Database;
-  userId: string;
+  userId: string;  // creator / actor — used as audit field on inserts
+  teamId: string;  // scoping key — every read/write filters by this
   userName: string;
   logActivity: (userId: string, entry: any) => void;
 }
@@ -36,15 +37,15 @@ const fmtKZT = (n: number) => `${Math.round(n).toLocaleString('ru-RU').replace(/
 // ─── Generic helpers around the JSON-blob deals table ─────────────
 interface DealRow { id: string; data: any }
 
-function listUserDeals(db: Database.Database, userId: string): DealRow[] {
-  const rows = db.prepare('SELECT id, data FROM deals WHERE user_id = ? ORDER BY rowid DESC').all(userId) as any[];
+function listTeamDeals(db: Database.Database, teamId: string): DealRow[] {
+  const rows = db.prepare('SELECT id, data FROM deals WHERE team_id = ? ORDER BY rowid DESC').all(teamId) as any[];
   return rows.map(r => ({ id: r.id, data: JSON.parse(r.data) }));
 }
 
-function findDealByCustomer(db: Database.Database, userId: string, customerQuery: string): { single?: DealRow; multiple?: DealRow[] } {
+function findDealByCustomer(db: Database.Database, teamId: string, customerQuery: string): { single?: DealRow; multiple?: DealRow[] } {
   const q = customerQuery.trim().toLowerCase();
   if (!q) return {};
-  const all = listUserDeals(db, userId);
+  const all = listTeamDeals(db, teamId);
   const matches = all.filter(d => String(d.data.customerName || '').toLowerCase().includes(q));
   if (matches.length === 0) return {};
   if (matches.length === 1) return { single: matches[0] };
@@ -115,7 +116,7 @@ const addDeal: ToolDef = {
       workType: 'furniture',
       createdAt: new Date().toISOString(),
     };
-    ctx.db.prepare('INSERT INTO deals (id, user_id, data) VALUES (?, ?, ?)').run(id, ctx.userId, JSON.stringify(data));
+    ctx.db.prepare('INSERT INTO deals (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, ctx.userId, ctx.teamId, JSON.stringify(data));
     ctx.logActivity(ctx.userId, {
       user: 'AI-ассистент', actor: 'ai',
       action: `Создал сделку (по запросу ${ctx.userName})`,
@@ -151,7 +152,7 @@ const logPayment: ToolDef = {
     return lines.join('\n');
   },
   execute: async (ctx, i) => {
-    const r = findDealByCustomer(ctx.db, ctx.userId, String(i.customerName));
+    const r = findDealByCustomer(ctx.db, ctx.teamId, String(i.customerName));
     if (!r.single && !r.multiple) throw new Error(`сделка по «${i.customerName}» не найдена`);
     if (r.multiple) {
       const names = r.multiple.slice(0, 5).map(d => `«${d.data.customerName}» (${fmtKZT(d.data.amount)})`).join(', ');
@@ -217,7 +218,7 @@ const updateDealStatus: ToolDef = {
     ].filter(Boolean).join('\n');
   },
   execute: async (ctx, i) => {
-    const r = findDealByCustomer(ctx.db, ctx.userId, String(i.customerName));
+    const r = findDealByCustomer(ctx.db, ctx.teamId, String(i.customerName));
     if (!r.single && !r.multiple) throw new Error(`сделка по «${i.customerName}» не найдена`);
     if (r.multiple) {
       const names = r.multiple.slice(0, 5).map(d => `«${d.data.customerName}»`).join(', ');
@@ -290,7 +291,7 @@ const addTask: ToolDef = {
       category: i.category || 'Прочее',
       subtasks: [],
     };
-    ctx.db.prepare('INSERT INTO tasks (id, user_id, data) VALUES (?, ?, ?)').run(id, ctx.userId, JSON.stringify(data));
+    ctx.db.prepare('INSERT INTO tasks (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, ctx.userId, ctx.teamId, JSON.stringify(data));
     ctx.logActivity(ctx.userId, {
       user: 'AI-ассистент', actor: 'ai',
       action: `Создал задачу (по запросу ${ctx.userName})`,
@@ -317,7 +318,7 @@ const findClient: ToolDef = {
   readOnly: true,
   summarize: () => '', // unused — readOnly tools bypass confirmation
   execute: async (ctx, i) => {
-    const r = findDealByCustomer(ctx.db, ctx.userId, String(i.query));
+    const r = findDealByCustomer(ctx.db, ctx.teamId, String(i.query));
     if (!r.single && !r.multiple) return `По запросу «${i.query}» сделок не нашёл.`;
     const matches = r.single ? [r.single] : r.multiple!;
     const lines = matches.slice(0, 5).map(d => {
@@ -372,10 +373,18 @@ export function summarize(toolName: string, input: any): string {
   return t.summarize(input);
 }
 
-async function execute(db: Database.Database, userId: string, userName: string, toolName: string, input: any, logActivity: (userId: string, entry: any) => void): Promise<string> {
+async function execute(
+  db: Database.Database,
+  userId: string,
+  teamId: string,
+  userName: string,
+  toolName: string,
+  input: any,
+  logActivity: (userId: string, entry: any) => void,
+): Promise<string> {
   const t = TOOLS[toolName];
   if (!t) throw new Error(`unknown tool: ${toolName}`);
-  return t.execute({ db, userId, userName, logActivity }, input);
+  return t.execute({ db, userId, teamId, userName, logActivity }, input);
 }
 
 export default { toolsForClaude, isReadOnly, getToolModule, summarize, execute };

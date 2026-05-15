@@ -28,6 +28,39 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
   const [otpTimer, setOtpTimer] = useState(60);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // ── Team invitation flow ────────────────────────────────────────
+  // If the URL has ?invite=XYZ we fetch a preview (company + inviter + role)
+  // and prefill the signup form. Company field becomes hidden — the invited
+  // user inherits the inviter's company.
+  const [inviteCode, setInviteCode] = useState<string>('');
+  const [invitePreview, setInvitePreview] = useState<
+    | { company: string; inviter: string; role: 'admin' | 'manager' | 'employee'; email?: string }
+    | { error: string }
+    | null
+  >(null);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('invite');
+      if (!code) return;
+      setInviteCode(code.toUpperCase());
+      // Jump straight into the signup flow so the user doesn't see the welcome screen.
+      setStep('signup-email');
+      api.get<{ company: string; inviter: string; role: 'admin' | 'manager' | 'employee'; email?: string | null }>(
+        `/api/invitations/preview/${encodeURIComponent(code)}`,
+      ).then(p => {
+        setInvitePreview({ company: p.company, inviter: p.inviter, role: p.role, email: p.email || undefined });
+        if (p.email && !email) setEmail(p.email);
+        if (p.company) setCompany(p.company);
+      }).catch(err => {
+        const msg = String(err?.message || 'invalid');
+        setInvitePreview({ error: msg === 'expired' ? 'expired' : msg === 'already used' ? 'used' : 'invalid' });
+      });
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
 
   // OTP timer
@@ -114,7 +147,12 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
 
   const handleSignupNameContinue = () => {
     if (!name.trim()) { setError(l('Введите имя', 'Атыңызды енгізіңіз', 'Enter your name')); return; }
-    if (!company.trim()) { setError(l('Введите название компании', 'Компания атауын енгізіңіз', 'Enter your company name')); return; }
+    // Invited users skip the company step — they inherit the inviter's company.
+    const hasValidInvite = invitePreview && !('error' in invitePreview);
+    if (!hasValidInvite && !company.trim()) {
+      setError(l('Введите название компании', 'Компания атауын енгізіңіз', 'Enter your company name'));
+      return;
+    }
     simulateLoading(() => setStep('signup-password'), 300);
   };
 
@@ -134,7 +172,10 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     try {
       const data = await api.post<{ token: string; user: { id: string; name: string; email: string; company: string; emailVerified: boolean }; verificationCode?: string }>(
         '/api/auth/signup',
-        { email, password, name, company, termsAccepted: true }
+        // inviteCode (if present) tells the backend to join an existing team
+        // rather than create a new one. Backend then ignores the `company` field
+        // and uses the inviter's instead.
+        { email, password, name, company, termsAccepted: true, inviteCode: inviteCode || undefined }
       );
       // Account created; email not yet verified. Authorize subsequent verify calls with the token
       // and stash the dev-mode code so the OTP screen can show it (no real email is sent).
@@ -373,6 +414,35 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             <h2 className="text-xl text-gray-900 mb-1">{l('Создать аккаунт', 'Аккаунт жасау', 'Create your account')}</h2>
             <p className="text-sm text-gray-400 mb-6">{l('Начните управлять бизнесом эффективно', 'Бизнесті тиімді басқара бастаңыз', 'Start managing your business efficiently')}</p>
 
+            {/* Invitation banner */}
+            {invitePreview && !('error' in invitePreview) && (
+              <div className="mb-5 p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+                <div className="text-xs text-emerald-700 mb-0.5">
+                  {l('Приглашение от', 'Шақыру', 'Invitation from')} <b>{invitePreview.inviter}</b>
+                </div>
+                <div className="text-sm text-emerald-900">
+                  {l('Вы присоединяетесь к команде', 'Командаға қосыласыз', 'You are joining team')}{' '}
+                  <b>{invitePreview.company}</b>
+                  {' · '}
+                  <span className="text-xs">{l('Роль', 'Рөл', 'Role')}: {invitePreview.role}</span>
+                </div>
+              </div>
+            )}
+            {invitePreview && 'error' in invitePreview && (
+              <div className="mb-5 p-3 rounded-xl bg-red-50 border border-red-100">
+                <div className="text-sm text-red-700">
+                  {invitePreview.error === 'expired'
+                    ? l('Срок действия приглашения истёк.', 'Шақырудың мерзімі өтті.', 'This invitation has expired.')
+                    : invitePreview.error === 'used'
+                    ? l('Это приглашение уже использовано.', 'Бұл шақыру пайдаланылған.', 'This invitation was already used.')
+                    : l('Недействительный код приглашения.', 'Жарамсыз шақыру коды.', 'Invalid invitation code.')}
+                </div>
+                <div className="text-xs text-red-600 mt-1">
+                  {l('Можно зарегистрироваться без приглашения как обычный пользователь.', 'Шақырусыз жалпы пайдаланушы ретінде тіркелуге болады.', 'You can still sign up as a regular user.')}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4 mb-4">
               <div>
                 <label className="block text-[11px] text-gray-400 mb-1.5">Email</label>
@@ -425,21 +495,34 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                   className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10"
                 />
               </div>
-              <div>
-                <label className="block text-[11px] text-gray-400 mb-1.5">
-                  {l('Название компании', 'Компания атауы', 'Company Name')} <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={company}
-                  onChange={e => { setCompany(e.target.value); setError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && handleSignupNameContinue()}
-                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10"
-                />
-              </div>
+              {invitePreview && !('error' in invitePreview) ? (
+                /* Invited user — company is inherited from the team, show read-only. */
+                <div>
+                  <label className="block text-[11px] text-gray-400 mb-1.5">
+                    {l('Команда', 'Команда', 'Team')}
+                  </label>
+                  <div className="w-full px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-900">
+                    {invitePreview.company}
+                    <span className="text-xs text-emerald-600 ml-2">· {invitePreview.role}</span>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[11px] text-gray-400 mb-1.5">
+                    {l('Название компании', 'Компания атауы', 'Company Name')} <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={company}
+                    onChange={e => { setCompany(e.target.value); setError(''); }}
+                    onKeyDown={e => e.key === 'Enter' && handleSignupNameContinue()}
+                    className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                  />
+                </div>
+              )}
             </div>
 
-            <button onClick={handleSignupNameContinue} disabled={isLoading || !name.trim() || !company.trim()} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleSignupNameContinue} disabled={isLoading || !name.trim() || (!(invitePreview && !('error' in invitePreview)) && !company.trim())} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>

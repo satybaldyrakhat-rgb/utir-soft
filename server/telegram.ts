@@ -72,13 +72,13 @@ export function unlink(db: Database.Database, userId: string) {
   db.prepare('DELETE FROM telegram_links WHERE user_id = ?').run(userId);
 }
 
-function findUserByChat(db: Database.Database, chatId: number): { id: string; name: string } | undefined {
+function findUserByChat(db: Database.Database, chatId: number): { id: string; teamId: string; name: string } | undefined {
   const row = db.prepare(`
-    SELECT u.id, u.name FROM telegram_links tl
+    SELECT u.id, u.team_id, u.name FROM telegram_links tl
     JOIN users u ON u.id = tl.user_id
     WHERE tl.chat_id = ?
   `).get(chatId) as any;
-  return row ? { id: row.id, name: row.name } : undefined;
+  return row ? { id: row.id, teamId: row.team_id || row.id, name: row.name } : undefined;
 }
 
 function consumeLinkCode(db: Database.Database, code: string, chatId: number, username?: string): { ok: true; userId: string; userName: string } | { ok: false; reason: string } {
@@ -310,7 +310,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       const user = findUserByChat(db, chatId);
       if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт: <code>/link КОД</code>'); return; }
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-      const rows = db.prepare(`SELECT data FROM activity_logs WHERE user_id = ? ORDER BY rowid DESC LIMIT 100`).all(user.id) as any[];
+      const rows = db.prepare(`SELECT data FROM activity_logs WHERE team_id = ? ORDER BY rowid DESC LIMIT 100`).all(user.teamId) as any[];
       const today = rows.map(r => JSON.parse(r.data)).filter(a => new Date(a.timestamp).getTime() >= startOfDay.getTime());
       if (today.length === 0) {
         await sendMessage(chatId, `Сегодня в журнале пусто. Все действия попадут в Журнал автоматически.`);
@@ -338,7 +338,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       appendHistory(db, chatId, 'user', text);
       try {
         const { default: tools } = await import('./aiTools.js');
-        const result = await tools.execute(db, user.id, user.name, pendingAction.toolName, pendingAction.toolInput, logActivity);
+        const result = await tools.execute(db, user.id, user.teamId, user.name, pendingAction.toolName, pendingAction.toolInput, logActivity);
         const reply = `✅ Готово.\n\n${result}`;
         await sendMessage(chatId, reply);
         appendHistory(db, chatId, 'assistant', stripHtml(reply));
@@ -410,7 +410,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
   const { default: tools } = await import('./aiTools.js');
   if (tools.isReadOnly(agentResult.toolName)) {
     try {
-      const result = await tools.execute(db, user.id, user.name, agentResult.toolName, agentResult.toolInput, logActivity);
+      const result = await tools.execute(db, user.id, user.teamId, user.name, agentResult.toolName, agentResult.toolInput, logActivity);
       await sendMessage(chatId, result);
       appendHistory(db, chatId, 'assistant', stripHtml(result));
     } catch (e: any) {
@@ -448,7 +448,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
   if (permission === 'auto') {
     // No confirmation step — execute immediately, send the brief summary as a heads-up.
     try {
-      const result = await tools.execute(db, user.id, user.name, agentResult.toolName, agentResult.toolInput, logActivity);
+      const result = await tools.execute(db, user.id, user.teamId, user.name, agentResult.toolName, agentResult.toolInput, logActivity);
       const reply = `⚡ Автоматически (${moduleName}):\n${agentResult.summary}\n\n${result}`;
       await sendMessage(chatId, reply);
       appendHistory(db, chatId, 'assistant', stripHtml(reply));

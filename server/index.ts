@@ -93,6 +93,23 @@ CREATE TABLE IF NOT EXISTS telegram_links (
 );
 CREATE INDEX IF NOT EXISTS idx_telegram_chat ON telegram_links(chat_id);
 CREATE INDEX IF NOT EXISTS idx_telegram_code ON telegram_links(link_code);
+
+-- Block C.2 — team invitations. One row per pending invite. Used codes stay
+-- around for audit; pruning is left to a future maintenance pass.
+CREATE TABLE IF NOT EXISTS invitations (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  code TEXT UNIQUE NOT NULL,
+  role TEXT NOT NULL DEFAULT 'employee',
+  email TEXT,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  used_by TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_invitations_team ON invitations(team_id);
+CREATE INDEX IF NOT EXISTS idx_invitations_code ON invitations(code);
 `);
 
 // Idempotent migration: add columns if missing. Returns true when column was just added.
@@ -119,6 +136,32 @@ migrateColumn('users', 'ai_settings', 'TEXT');
 if (verifiedJustAdded) {
   db.exec(`UPDATE users SET email_verified = 1`);
   console.log('[migration] back-filled email_verified=1 for existing users');
+}
+
+// ─── Block C.2 / P4 — Multi-tenancy via team_id ───────────────────────────
+// Every existing user becomes the owner of their own one-person team
+// (team_id = user.id, team_role = 'admin'). New users invited via /api/invitations
+// inherit the inviter's team_id and the role specified on the invite.
+const teamIdJustAdded = migrateColumn('users', 'team_id', 'TEXT');
+migrateColumn('users', 'team_role', "TEXT DEFAULT 'admin'");
+migrateColumn('users', 'invited_by', 'TEXT');
+if (teamIdJustAdded) {
+  db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
+  db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
+  console.log('[migration] back-filled team_id=id and team_role=admin for existing users');
+}
+
+// Each shared data table gets a team_id column. Pre-existing rows belong to the
+// creator's personal team (team_id = user_id), so single-user installs see no
+// change.
+const SHARED_TABLES = ['deals', 'employees', 'tasks', 'products', 'transactions', 'activity_logs'] as const;
+for (const t of SHARED_TABLES) {
+  const justAdded = migrateColumn(t, 'team_id', 'TEXT');
+  if (justAdded) {
+    db.exec(`UPDATE ${t} SET team_id = user_id WHERE team_id IS NULL`);
+    try { db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_team ON ${t}(team_id)`); } catch {}
+    console.log(`[migration] back-filled team_id for ${t}`);
+  }
 }
 
 const DEFAULT_INTEGRATIONS = [
@@ -152,6 +195,8 @@ app.use(express.json({ limit: '10mb' }));
 
 interface AuthedRequest extends Request {
   userId?: string;
+  teamId?: string;
+  teamRole?: 'admin' | 'manager' | 'employee';
 }
 
 function authMiddleware(req: AuthedRequest, res: Response, next: NextFunction) {
@@ -163,6 +208,11 @@ function authMiddleware(req: AuthedRequest, res: Response, next: NextFunction) {
     const token = header.slice(7);
     const payload = jwt.verify(token, JWT_SECRET) as { sub: string };
     req.userId = payload.sub;
+    // Resolve the team this user belongs to. Single extra SELECT per request —
+    // fine for SQLite. Falls back to user_id so legacy tokens always work.
+    const row = db.prepare('SELECT team_id, team_role FROM users WHERE id = ?').get(payload.sub) as any;
+    req.teamId = row?.team_id || payload.sub;
+    req.teamRole = (row?.team_role as 'admin' | 'manager' | 'employee') || 'admin';
     next();
   } catch {
     res.status(401).json({ error: 'invalid token' });
@@ -179,7 +229,10 @@ function logActivity(userId: string, entry: Record<string, any>) {
   const id = newId('a_');
   const data = { id, timestamp: new Date().toISOString(), actor: 'human', ...entry };
   try {
-    db.prepare('INSERT INTO activity_logs (id, user_id, data) VALUES (?, ?, ?)').run(id, userId, JSON.stringify(data));
+    // Look up team to scope the entry; falls back to userId for legacy / orphaned rows.
+    const row = db.prepare('SELECT team_id FROM users WHERE id = ?').get(userId) as any;
+    const teamId = row?.team_id || userId;
+    db.prepare('INSERT INTO activity_logs (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, userId, teamId, JSON.stringify(data));
   } catch (e) { console.warn('[logActivity] failed', e); }
 }
 
@@ -197,33 +250,76 @@ function genVerificationCode(): string {
 }
 
 app.post('/api/auth/signup', async (req, res) => {
-  const { email, password, name, company, termsAccepted } = req.body || {};
+  const { email, password, name, company, termsAccepted, inviteCode } = req.body || {};
   if (!email || !EMAIL_RE.test(String(email))) return res.status(400).json({ error: 'invalid email' });
   if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
-  if (!company || !String(company).trim()) return res.status(400).json({ error: 'company required' });
   if (!termsAccepted) return res.status(400).json({ error: 'terms must be accepted' });
   const pwdCheck = passwordOk(password);
   if (!pwdCheck.ok) return res.status(400).json({ error: pwdCheck.reason });
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   if (existing) return res.status(409).json({ error: 'email already registered' });
 
+  // If an inviteCode is provided we'll join that team; otherwise the user starts
+  // their own team-of-one. `company` is required only for new-team signups
+  // (invited members inherit the inviter's company from the team).
+  let joinTeamId: string | null = null;
+  let joinRole: 'admin' | 'manager' | 'employee' = 'admin';
+  let invitationRow: any = null;
+  let inviterCompany = '';
+  if (inviteCode) {
+    invitationRow = db.prepare(
+      `SELECT i.id, i.team_id, i.role, i.expires_at, i.used_at, u.company
+       FROM invitations i JOIN users u ON u.id = i.created_by
+       WHERE i.code = ?`
+    ).get(String(inviteCode).toUpperCase().trim()) as any;
+    if (!invitationRow) return res.status(400).json({ error: 'invalid invite code' });
+    if (invitationRow.used_at) return res.status(400).json({ error: 'invite already used' });
+    if (new Date(invitationRow.expires_at).getTime() < Date.now()) return res.status(400).json({ error: 'invite expired' });
+    joinTeamId = invitationRow.team_id;
+    joinRole = invitationRow.role as 'admin' | 'manager' | 'employee';
+    inviterCompany = invitationRow.company || '';
+  } else {
+    if (!company || !String(company).trim()) return res.status(400).json({ error: 'company required' });
+  }
+
   const hash = await bcrypt.hash(password, 10);
   const id = newId('u_');
-  const code = genVerificationCode();
+  const verifyCode = genVerificationCode();
+  const finalCompany = joinTeamId ? (inviterCompany || String(company || '').trim()) : String(company).trim();
+  const finalTeamId = joinTeamId || id; // own-team starter uses their own id as team_id
+
   db.prepare(
-    'INSERT INTO users (id, email, password_hash, name, company, verification_code, email_verified, terms_accepted_at) VALUES (?, ?, ?, ?, ?, ?, 0, datetime(\'now\'))'
-  ).run(id, String(email).toLowerCase(), hash, String(name).trim(), String(company).trim(), code);
+    `INSERT INTO users
+       (id, email, password_hash, name, company, verification_code, email_verified, terms_accepted_at, team_id, team_role, invited_by)
+     VALUES (?, ?, ?, ?, ?, ?, 0, datetime('now'), ?, ?, ?)`
+  ).run(
+    id, String(email).toLowerCase(), hash, String(name).trim(), finalCompany,
+    verifyCode, finalTeamId, joinRole, invitationRow?.id || null,
+  );
+
+  if (invitationRow) {
+    db.prepare('UPDATE invitations SET used_at = datetime(\'now\'), used_by = ? WHERE id = ?').run(id, invitationRow.id);
+  }
+
   seedIntegrations(id);
-  logActivity(id, { user: String(name).trim(), action: 'Зарегистрировался в системе', target: String(email).toLowerCase(), type: 'login', page: 'auth' });
+  logActivity(id, {
+    user: String(name).trim(),
+    action: invitationRow ? `Присоединился к команде (роль: ${joinRole})` : 'Зарегистрировался в системе',
+    target: String(email).toLowerCase(), type: invitationRow ? 'invite' : 'login', page: 'auth',
+  });
   const token = jwt.sign({ sub: id }, JWT_SECRET, { expiresIn: '30d' });
   // verificationCode is returned in dev mode (no real email sending). Frontend displays it on the OTP screen.
-  res.json({ token, user: { id, email, name, company, emailVerified: false }, verificationCode: code });
+  res.json({
+    token,
+    user: { id, email, name, company: finalCompany, emailVerified: false, teamRole: joinRole },
+    verificationCode: verifyCode,
+  });
 });
 
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
-  const user = db.prepare('SELECT id, email, name, company, password_hash, email_verified, verification_code FROM users WHERE email = ?').get(String(email).toLowerCase()) as any;
+  const user = db.prepare('SELECT id, email, name, company, password_hash, email_verified, verification_code, team_role FROM users WHERE email = ?').get(String(email).toLowerCase()) as any;
   if (!user) return res.status(401).json({ error: 'invalid credentials' });
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return res.status(401).json({ error: 'invalid credentials' });
@@ -233,7 +329,7 @@ app.post('/api/auth/login', async (req, res) => {
   logActivity(user.id, { user: user.name, action: 'Вошёл в систему', target: user.email, type: 'login', page: 'auth' });
   res.json({
     token,
-    user: { id: user.id, email: user.email, name: user.name, company: user.company || '', emailVerified: verified },
+    user: { id: user.id, email: user.email, name: user.name, company: user.company || '', emailVerified: verified, teamRole: user.team_role || 'admin' },
     // If not verified, also return the pending code so the OTP screen can pre-fill / display it.
     verificationCode: verified ? undefined : user.verification_code,
   });
@@ -263,9 +359,9 @@ app.post('/api/auth/resend-code', authMiddleware, (req: AuthedRequest, res) => {
 });
 
 app.get('/api/auth/me', authMiddleware, (req: AuthedRequest, res) => {
-  const user = db.prepare('SELECT id, email, name, company, email_verified FROM users WHERE id = ?').get(req.userId!) as any;
+  const user = db.prepare('SELECT id, email, name, company, email_verified, team_role FROM users WHERE id = ?').get(req.userId!) as any;
   if (!user) return res.status(404).json({ error: 'not found' });
-  res.json({ user: { id: user.id, email: user.email, name: user.name, company: user.company || '', emailVerified: !!user.email_verified } });
+  res.json({ user: { id: user.id, email: user.email, name: user.name, company: user.company || '', emailVerified: !!user.email_verified, teamRole: user.team_role || 'admin' } });
 });
 
 app.post('/api/auth/logout', authMiddleware, (req: AuthedRequest, res) => {
@@ -275,12 +371,15 @@ app.post('/api/auth/logout', authMiddleware, (req: AuthedRequest, res) => {
 });
 
 // ─── GENERIC CRUD ROUTER FACTORY ───────────────────────
+// Filters by team_id, not user_id — every team member sees the same data.
+// user_id is still recorded on INSERT as audit (who created the row), but
+// access checks all go through team_id.
 function makeCrud(table: string, idPrefix: string) {
   const r = express.Router();
   r.use(authMiddleware);
 
   r.get('/', (req: AuthedRequest, res) => {
-    const rows = db.prepare(`SELECT id, data FROM ${table} WHERE user_id = ? ORDER BY rowid DESC`).all(req.userId!) as any[];
+    const rows = db.prepare(`SELECT id, data FROM ${table} WHERE team_id = ? ORDER BY rowid DESC`).all(req.teamId!) as any[];
     res.json(rows.map(r => ({ ...JSON.parse(r.data), id: r.id })));
   });
 
@@ -288,20 +387,20 @@ function makeCrud(table: string, idPrefix: string) {
     const body = req.body || {};
     const id = body.id || newId(idPrefix);
     const data = { ...body, id };
-    db.prepare(`INSERT INTO ${table} (id, user_id, data) VALUES (?, ?, ?)`).run(id, req.userId!, JSON.stringify(data));
+    db.prepare(`INSERT INTO ${table} (id, user_id, team_id, data) VALUES (?, ?, ?, ?)`).run(id, req.userId!, req.teamId!, JSON.stringify(data));
     res.json(data);
   });
 
   r.patch('/:id', (req: AuthedRequest, res) => {
-    const row = db.prepare(`SELECT data FROM ${table} WHERE id = ? AND user_id = ?`).get(req.params.id, req.userId!) as any;
+    const row = db.prepare(`SELECT data FROM ${table} WHERE id = ? AND team_id = ?`).get(req.params.id, req.teamId!) as any;
     if (!row) return res.status(404).json({ error: 'not found' });
     const updated = { ...JSON.parse(row.data), ...req.body, id: req.params.id };
-    db.prepare(`UPDATE ${table} SET data = ? WHERE id = ? AND user_id = ?`).run(JSON.stringify(updated), req.params.id, req.userId!);
+    db.prepare(`UPDATE ${table} SET data = ? WHERE id = ? AND team_id = ?`).run(JSON.stringify(updated), req.params.id, req.teamId!);
     res.json(updated);
   });
 
   r.delete('/:id', (req: AuthedRequest, res) => {
-    db.prepare(`DELETE FROM ${table} WHERE id = ? AND user_id = ?`).run(req.params.id, req.userId!);
+    db.prepare(`DELETE FROM ${table} WHERE id = ? AND team_id = ?`).run(req.params.id, req.teamId!);
     res.json({ ok: true });
   });
 
@@ -335,6 +434,102 @@ aiSettingsRouter.put('/', (req: AuthedRequest, res) => {
 
 app.use('/api/ai-settings', aiSettingsRouter);
 
+// ─── INVITATIONS (Block C.2 — team invites) ───────────────────────
+// Flow:
+//   1. Admin POST /api/invitations → returns { code, expiresAt }
+//      Frontend builds a link like /auth?invite=<code> to share.
+//   2. Anyone (no auth) GET /api/invitations/preview/:code → see team name
+//      so the signup form can show "You're joining <Company>".
+//   3. POST /api/auth/signup with { inviteCode } → new user is created
+//      with team_id = invitation.team_id, team_role = invitation.role.
+//      Invite is marked used.
+//   4. Admin DELETE /api/invitations/:id → revoke.
+
+function newInviteCode() {
+  // 8 chars, easy-to-type, ambiguous chars stripped (no 0/O/1/I).
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = ''; for (let i = 0; i < 8; i++) s += A[Math.floor(Math.random() * A.length)];
+  return s;
+}
+
+const ROLE_VALUES = new Set(['admin', 'manager', 'employee']);
+
+const invitationsRouter = express.Router();
+invitationsRouter.use(authMiddleware);
+
+// Only the team admin can manage invites. (Future C.3 may relax this.)
+function requireAdmin(req: AuthedRequest, res: Response, next: NextFunction) {
+  if (req.teamRole !== 'admin') return res.status(403).json({ error: 'admin only' });
+  next();
+}
+
+invitationsRouter.get('/', requireAdmin, (req: AuthedRequest, res) => {
+  const rows = db.prepare(
+    `SELECT id, code, role, email, expires_at, used_at, used_by, created_at
+     FROM invitations WHERE team_id = ? ORDER BY rowid DESC`
+  ).all(req.teamId!) as any[];
+  res.json(rows.map(r => ({
+    id: r.id, code: r.code, role: r.role, email: r.email,
+    expiresAt: r.expires_at, usedAt: r.used_at, usedBy: r.used_by,
+    createdAt: r.created_at,
+  })));
+});
+
+invitationsRouter.post('/', requireAdmin, (req: AuthedRequest, res) => {
+  const { role, email } = req.body || {};
+  const r = (role && ROLE_VALUES.has(role)) ? role : 'employee';
+  // Don't allow inviting a second admin via this endpoint — keeps the model simple.
+  const safeRole = r === 'admin' ? 'manager' : r;
+  const id = newId('iv_');
+  const code = newInviteCode();
+  const expires = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(); // 7 days
+  db.prepare(
+    `INSERT INTO invitations (id, team_id, created_by, code, role, email, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, req.teamId!, req.userId!, code, safeRole, email || null, expires);
+  const inviter = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  logActivity(req.userId!, {
+    user: inviter?.name || '', action: 'Создал приглашение в команду',
+    target: `${safeRole}${email ? ` → ${email}` : ''}`,
+    type: 'invite', page: 'team',
+  });
+  res.json({ id, code, role: safeRole, email: email || null, expiresAt: expires });
+});
+
+invitationsRouter.delete('/:id', requireAdmin, (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT code FROM invitations WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  db.prepare('DELETE FROM invitations WHERE id = ? AND team_id = ?').run(req.params.id, req.teamId!);
+  const inviter = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  logActivity(req.userId!, {
+    user: inviter?.name || '', action: 'Отозвал приглашение',
+    target: row.code, type: 'invite', page: 'team',
+  });
+  res.json({ ok: true });
+});
+
+app.use('/api/invitations', invitationsRouter);
+
+// Public preview — anyone landing on /auth?invite=XYZ can see who invited them
+// before they decide to sign up. Returns minimal info.
+app.get('/api/invitations/preview/:code', (req, res) => {
+  const row = db.prepare(
+    `SELECT i.role, i.email, i.expires_at, i.used_at, u.name AS inviter_name, u.company AS inviter_company
+     FROM invitations i JOIN users u ON u.id = i.created_by
+     WHERE i.code = ?`
+  ).get(String(req.params.code).toUpperCase()) as any;
+  if (!row) return res.status(404).json({ error: 'invalid code' });
+  if (row.used_at) return res.status(410).json({ error: 'already used' });
+  if (new Date(row.expires_at).getTime() < Date.now()) return res.status(410).json({ error: 'expired' });
+  res.json({
+    role: row.role,
+    email: row.email,
+    inviter: row.inviter_name,
+    company: row.inviter_company || '',
+    expiresAt: row.expires_at,
+  });
+});
+
 // ─── INTEGRATIONS (per-user list with stable ids) ──────
 const integrationsRouter = express.Router();
 integrationsRouter.use(authMiddleware);
@@ -361,16 +556,16 @@ activityRouter.use(authMiddleware);
 
 activityRouter.get('/', (req: AuthedRequest, res) => {
   // Full Activity Log page filters client-side; return a generous window (10k most recent).
-  const rows = db.prepare('SELECT data FROM activity_logs WHERE user_id = ? ORDER BY rowid DESC LIMIT 10000').all(req.userId!) as any[];
+  const rows = db.prepare('SELECT data FROM activity_logs WHERE team_id = ? ORDER BY rowid DESC LIMIT 10000').all(req.teamId!) as any[];
   res.json(rows.map(r => JSON.parse(r.data)));
 });
 
 activityRouter.post('/', (req: AuthedRequest, res) => {
   const id = newId('a_');
   const data = { ...req.body, id, timestamp: new Date().toISOString() };
-  db.prepare('INSERT INTO activity_logs (id, user_id, data) VALUES (?, ?, ?)').run(id, req.userId!, JSON.stringify(data));
-  // Trim retention to 10000 rows per workspace.
-  db.prepare(`DELETE FROM activity_logs WHERE user_id = ? AND id NOT IN (SELECT id FROM activity_logs WHERE user_id = ? ORDER BY rowid DESC LIMIT 10000)`).run(req.userId!, req.userId!);
+  db.prepare('INSERT INTO activity_logs (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, req.userId!, req.teamId!, JSON.stringify(data));
+  // Trim retention to 10000 rows per team.
+  db.prepare(`DELETE FROM activity_logs WHERE team_id = ? AND id NOT IN (SELECT id FROM activity_logs WHERE team_id = ? ORDER BY rowid DESC LIMIT 10000)`).run(req.teamId!, req.teamId!);
   res.json(data);
 });
 

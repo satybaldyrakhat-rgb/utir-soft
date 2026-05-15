@@ -3,6 +3,7 @@ import { MessageCircle, Bot, Sparkles, Users, Settings as SettingsIcon, Zap, Act
 import { ModulesSettings } from './ModulesSettings';
 import { ActivityLog } from './ActivityLog';
 import { TelegramPairing } from './TelegramPairing';
+import { TeamInvitePanel } from './TeamInvitePanel';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
 import { useDataStore, ALL_MODULES, ALL_ROLES, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
 import { t } from '../utils/translations';
@@ -331,6 +332,10 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
       {/* ===== EMPLOYEES — invite-only (no manual add until invite flow ships) ===== */}
       {activeTab === 'employees' && (
         <div className="space-y-5">
+          {/* Invitation links (Block C.2 / P4) — visible to admins only.
+              Non-admins get a 403 inside and the panel quietly hides itself. */}
+          <TeamInvitePanel language={language} />
+
           {employees.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
               <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -338,14 +343,11 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
               </div>
               <div className="text-sm text-gray-900 mb-2">{tt('teamEmptyTitle')}</div>
               <div className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed mb-5">{tt('teamEmptyDesc')}</div>
-              <button
-                disabled
-                title={tt('inviteComingSoon')}
-                className="px-4 py-2 bg-gray-100 text-gray-400 rounded-xl text-xs cursor-not-allowed inline-flex items-center gap-1.5"
-              >
-                <UserPlus className="w-3.5 h-3.5" />{tt('inviteEmployee')}
-              </button>
-              <div className="text-[11px] text-gray-400 mt-3">{tt('inviteComingSoon')}</div>
+              <div className="text-[11px] text-gray-400">
+                {l('Используйте панель приглашений выше — сотрудник зарегистрируется по ссылке и появится здесь.',
+                   'Жоғарыдағы шақыру тақтасын пайдаланыңыз — қызметкер сілтеме арқылы тіркеліп, осы жерде шығады.',
+                   'Use the invitations panel above — invited teammates will appear here once they sign up.')}
+              </div>
             </div>
           ) : (
             <>
@@ -362,13 +364,9 @@ export function Settings({ language, onLanguageChange }: SettingsProps) {
                     <option value="employee">{tt('roleEmployee')}</option>
                   </select>
                 </div>
-                <button
-                  disabled
-                  title={tt('inviteComingSoon')}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-400 rounded-xl text-xs cursor-not-allowed"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />{tt('inviteEmployee')}
-                </button>
+                {/* Inviting moved up to TeamInvitePanel; this slot intentionally left blank
+                    so the search/filter row balances visually. */}
+                <span className="w-1" aria-hidden />
               </div>
 
               {/* Stats — only when team exists */}
