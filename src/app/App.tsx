@@ -35,6 +35,48 @@ function AppContent() {
   const [currentUser, setCurrentUser] = useState<{ name: string; email: string } | null>(null);
   const dataStore = useDataStore();
 
+  // If a logged-in user opens an invite link, the invite is meant for someone
+  // else, not them — show a one-time banner explaining what to do with the link.
+  // (When NOT logged in, the Auth screen handles the invite directly.)
+  const [heldInviteCode, setHeldInviteCode] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    try {
+      const code = new URLSearchParams(window.location.search).get('invite');
+      if (code) setHeldInviteCode(code.toUpperCase());
+    } catch { /* ignore */ }
+  }, [isAuthenticated]);
+
+  const dismissHeldInvite = () => {
+    setHeldInviteCode(null);
+    // Strip the `invite` param from the URL so a refresh doesn't re-open the banner.
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('invite');
+      window.history.replaceState({}, '', url.toString());
+    } catch { /* ignore */ }
+  };
+
+  const handleAcceptHeldInvite = async () => {
+    // The current user wants to drop their current session and sign up via this
+    // invite themselves. Wipe the token, refresh state — Auth will pick up the
+    // invite from the URL on the next render.
+    const code = heldInviteCode;
+    setToken(null);
+    window.dispatchEvent(new Event('utir:auth-changed'));
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    setHeldInviteCode(null);
+    // Make sure the invite code stays in the URL for Auth.tsx to read.
+    if (code) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('invite', code);
+        window.history.replaceState({}, '', url.toString());
+      } catch { /* ignore */ }
+    }
+  };
+
   // Sidebar visibility is data-driven from Settings → Модули (Block B.1).
   // Locked modules (dashboard, settings) are always visible regardless of the toggle.
   const isModuleVisible = (id: string) => {
@@ -174,6 +216,54 @@ function AppContent() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
+      {/* Invite link held by a logged-in user — modal explaining what it's for. */}
+      {heldInviteCode && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={dismissHeldInvite}>
+          <div className="bg-white rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="text-lg text-gray-900 mb-2">
+              {language === 'kz' ? 'Командаға шақыру сілтемесі'
+                : language === 'eng' ? 'Team invitation link'
+                : 'Ссылка-приглашение в команду'}
+            </div>
+            <div className="text-sm text-gray-500 mb-4 leading-relaxed">
+              {language === 'kz' ? 'Бұл сілтеме жаңа қызметкерлерді тіркеуге арналған. Сіз қазір тіркелген аккаунттасыз — оны ашылғыңыз келген адамға жіберіңіз немесе incognito режимінде ашыңыз.'
+                : language === 'eng' ? 'This link is for inviting a new teammate to sign up. You are currently logged in — share it with the person you want to invite, or open it in an incognito window.'
+                : 'Эта ссылка нужна, чтобы новый сотрудник зарегистрировался в вашей команде. Вы сейчас в своём аккаунте — отправьте ссылку нужному человеку или откройте её в режиме инкогнито.'}
+            </div>
+            <div className="px-3 py-2 bg-gray-50 rounded-lg text-xs font-mono text-gray-700 break-all mb-4">
+              {typeof window !== 'undefined' ? `${window.location.origin}/?invite=${heldInviteCode}` : `/?invite=${heldInviteCode}`}
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(`${window.location.origin}/?invite=${heldInviteCode}`); } catch { /* ignore */ }
+                  dismissHeldInvite();
+                }}
+                className="w-full py-2.5 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800 transition-colors"
+              >
+                {language === 'kz' ? 'Көшіріп, жабу'
+                  : language === 'eng' ? 'Copy and close'
+                  : 'Скопировать и закрыть'}
+              </button>
+              <button
+                onClick={handleAcceptHeldInvite}
+                className="w-full py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+              >
+                {language === 'kz' ? 'Шығып, осы сілтеме арқылы тіркелу'
+                  : language === 'eng' ? 'Sign out and accept this invite'
+                  : 'Выйти и принять это приглашение'}
+              </button>
+              <button
+                onClick={dismissHeldInvite}
+                className="w-full py-2 text-gray-500 rounded-lg text-xs hover:bg-gray-50 transition-colors"
+              >
+                {language === 'kz' ? 'Жабу' : language === 'eng' ? 'Dismiss' : 'Закрыть'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-40 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
