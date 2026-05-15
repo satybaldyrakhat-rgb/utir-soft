@@ -1,6 +1,5 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { Dashboard } from './components/Dashboard';
-import { ClientAuth, readClientSession, clearClientSession, type ClientSession } from './components/ClientAuth';
 import { SalesKanban } from './components/SalesKanban';
 import { Tasks } from './components/Tasks';
 import { Auth } from './components/Auth';
