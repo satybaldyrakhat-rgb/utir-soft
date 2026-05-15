@@ -32,7 +32,7 @@ function AppContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; teamRole: 'admin' | 'manager' | 'employee' } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; teamRole: string } | null>(null);
   const dataStore = useDataStore();
 
   // If a logged-in user opens an invite link, the invite is meant for someone
@@ -122,7 +122,7 @@ function AppContent() {
   useEffect(() => {
     const token = getToken();
     if (!token) { setAuthChecked(true); return; }
-    api.get<{ user: { id: string; name: string; email: string; teamRole?: 'admin' | 'manager' | 'employee' } }>('/api/auth/me')
+    api.get<{ user: { id: string; name: string; email: string; teamRole?: string } }>('/api/auth/me')
       .then(({ user }) => {
         setCurrentUser({ name: user.name, email: user.email, teamRole: user.teamRole || 'admin' });
         setIsAuthenticated(true);
@@ -146,7 +146,7 @@ function AppContent() {
     return () => window.removeEventListener('utir:auth-changed', onAuth);
   }, []);
 
-  const handleLogin = (user: { name: string; email: string; teamRole?: 'admin' | 'manager' | 'employee' }) => {
+  const handleLogin = (user: { name: string; email: string; teamRole?: string }) => {
     setCurrentUser({ name: user.name, email: user.email, teamRole: user.teamRole || 'admin' });
     setIsAuthenticated(true);
   };

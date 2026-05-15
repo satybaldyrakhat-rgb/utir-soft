@@ -110,11 +110,18 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
   }));
 
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
-  const roleLabel = (r: string) => ({
-    admin: tt('roleAdmin'),
-    manager: tt('roleManager'),
-    employee: tt('roleEmployee'),
-  } as Record<string, string>)[r] || r;
+  // Look up a role's human label first in the team's role list (admin can
+  // rename or add roles), then fall back to the canonical localised labels
+  // for the three built-ins, finally to the raw id.
+  const roleLabel = (r: string) => {
+    const custom = store.roles.find(x => x.id === r);
+    if (custom) return custom.name;
+    return ({
+      admin: tt('roleAdmin'),
+      manager: tt('roleManager'),
+      employee: tt('roleEmployee'),
+    } as Record<string, string>)[r] || r;
+  };
   const roleBg = (r: string) => ({
     admin: 'bg-gray-200 text-gray-700',
     manager: 'bg-blue-50 text-blue-600',
@@ -504,6 +511,32 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
             </>
           )}
 
+          {/* ===== Role list (admin can rename / delete / add custom roles) ===== */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm text-gray-900">{l('Роли в команде', 'Командадағы рөлдер', 'Team roles')}</div>
+              <AddRoleButton language={language} onAdd={(n) => store.addRole(n)} />
+            </div>
+            <div className="text-[11px] text-gray-400 mb-3 max-w-xl">
+              {l('Создайте свои роли (например «Бухгалтер», «Мастер») и настройте их доступ в матрице ниже.',
+                 'Өзіңіздің рөлдеріңізді жасаңыз («Бухгалтер», «Шебер» және т.б.) және төмендегі матрицада олардың рұқсаттарын баптаңыз.',
+                 'Define your own roles (e.g. "Accountant", "Master") and set their access in the matrix below.')}
+            </div>
+            <div className="space-y-1.5">
+              {store.roles.map(r => (
+                <RoleRow
+                  key={r.id}
+                  role={r}
+                  language={language}
+                  onRename={(name) => store.renameRole(r.id, name)}
+                  onDelete={() => store.deleteRole(r.id)}
+                  // Block deleting a role that's currently assigned to anyone in the team.
+                  inUseBy={employees.filter(e => e.role === r.id).length}
+                />
+              ))}
+            </div>
+          </div>
+
           {/* ===== Permissions matrix (merged from the old 'Роли и права' tab) ===== */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <div className="flex items-center gap-2 mb-1">
@@ -522,13 +555,16 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {ALL_ROLES.map(roleK => (
+                  {/* Iterates the team's role list — built-in or custom. */}
+                  {store.roles.map(roleObj => {
+                    const roleK = roleObj.id;
+                    return (
                     <tr key={roleK} className="hover:bg-gray-50/50">
                       <td className="py-3 pr-4">
                         <span className={`px-2 py-0.5 rounded text-[11px] ${roleBg(roleK)}`}>{roleLabel(roleK)}</span>
                       </td>
                       {ALL_MODULES.map(module => {
-                        const current = store.rolePermissions[roleK][module];
+                        const current = store.rolePermissions[roleK]?.[module] || 'none';
                         const isAdminFull = roleK === 'admin';
                         const cycle: PermissionLevel[] = ['full', 'view', 'none'];
                         const nextLevel = cycle[(cycle.indexOf(current) + 1) % cycle.length];
@@ -552,7 +588,8 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
                         );
                       })}
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -923,25 +960,47 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
               </div>
               {/* Role block */}
               <div className="border border-gray-100 rounded-2xl p-4 space-y-3">
-                <div className="text-[11px] text-gray-500">Роль и доступ</div>
+                <div className="text-[11px] text-gray-500">{l('Роль и доступ', 'Рөл және рұқсат', 'Role & access')}</div>
                 <div>
-                  <label className="block text-[11px] text-gray-400 mb-2">Роль</label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {([
-                      ['admin', tt('roleAdmin'), 'bg-gray-200 text-gray-700'],
-                      ['manager', tt('roleManager'), 'bg-blue-50 text-blue-600'],
-                      ['employee', tt('roleEmployee'), 'bg-emerald-50 text-emerald-600'],
-                    ] as [string, string, string][]).map(([id, label, cls]) => (
-                      <button key={id} onClick={() => setEmpRole(id)} className={`px-3 py-2 rounded-xl text-[11px] border transition-all text-left ${empRole === id ? cls + ' border-current' : 'border-gray-100 text-gray-500 hover:border-gray-200'}`}>
-                        {empRole === id && <span className="mr-1">✓</span>}{label}
+                  <label className="block text-[11px] text-gray-400 mb-2">{l('Роль', 'Рөл', 'Role')}</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {/* Iterates the team's role list — built-in and custom. */}
+                    {store.roles.map(r => (
+                      <button
+                        key={r.id}
+                        onClick={() => setEmpRole(r.id)}
+                        className={`px-3 py-2 rounded-xl text-[11px] border transition-all text-left ${
+                          empRole === r.id ? roleBg(r.id) + ' border-current' : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                        }`}
+                      >
+                        {empRole === r.id && <span className="mr-1">✓</span>}{r.name}
                       </button>
                     ))}
                   </div>
                 </div>
-                {/* The old per-employee 'Дополнительные права' checkboxes were
-                    legacy — they didn't save anywhere and overlapped with the
-                    team-wide matrix below. Removed; matrix is the source of
-                    truth for what each role can do. */}
+
+                {/* Read-only preview of what the currently-picked role can access.
+                    Shows the matrix row for empRole as a compact list of bullets. */}
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5">
+                  <div className="text-[10px] text-gray-500 mb-1.5">
+                    {l('Доступы этой роли', 'Осы рөлдің рұқсаттары', "What this role can access")}
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    {ALL_MODULES.map(m => {
+                      const lvl = empRole === 'admin' ? 'full' : (store.rolePermissions[empRole]?.[m] || 'none');
+                      const icon = lvl === 'full' ? <Check className="w-3 h-3 text-green-600" />
+                                 : lvl === 'view' ? <Eye   className="w-3 h-3 text-gray-400" />
+                                 :                  <X     className="w-3 h-3 text-red-400" />;
+                      return (
+                        <div key={m} className="flex items-center gap-1.5 text-[10px] text-gray-700">
+                          {icon}
+                          <span className="truncate">{moduleLabel(m)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="text-[10px] text-gray-400 leading-relaxed">
                   {l(
                     'Подробные права настраиваются в матрице ниже — общие правила для всей роли.',
@@ -966,6 +1025,136 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── AddRoleButton ───────────────────────────────────────────────
+// Small inline form for adding a custom role. Hidden form that toggles open
+// when the admin clicks "Добавить роль".
+function AddRoleButton({ language, onAdd }: { language: 'kz' | 'ru' | 'eng'; onAdd: (name: string) => string }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+
+  const submit = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setName('');
+    setOpen(false);
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-900 text-white rounded-lg text-[11px] hover:bg-gray-800 transition-colors"
+      >
+        <Plus className="w-3 h-3" />
+        {l('Добавить роль', 'Рөл қосу', 'Add role')}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <input
+        type="text"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { setName(''); setOpen(false); } }}
+        autoFocus
+        placeholder={l('Бухгалтер', 'Бухгалтер', 'Accountant')}
+        className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 w-32"
+      />
+      <button onClick={submit} className="px-2 py-1.5 bg-gray-900 text-white rounded-lg text-[11px] hover:bg-gray-800">
+        {l('Готово', 'Дайын', 'Done')}
+      </button>
+      <button onClick={() => { setName(''); setOpen(false); }} className="px-2 py-1.5 text-gray-500 rounded-lg text-[11px] hover:bg-gray-50">
+        ×
+      </button>
+    </div>
+  );
+}
+
+// ─── RoleRow ──────────────────────────────────────────────────────
+// One row in the role list with inline rename + delete. System roles
+// (admin) are read-only and show a small lock label.
+function RoleRow({
+  role, language, onRename, onDelete, inUseBy,
+}: {
+  role: { id: string; name: string; system?: boolean };
+  language: 'kz' | 'ru' | 'eng';
+  onRename: (name: string) => void;
+  onDelete: () => void;
+  inUseBy: number;
+}) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(role.name);
+
+  const commit = () => {
+    if (draft.trim() && draft.trim() !== role.name) onRename(draft.trim());
+    setEditing(false);
+  };
+
+  const askDelete = () => {
+    if (role.system) return;
+    if (inUseBy > 0) {
+      alert(l(
+        `Нельзя удалить роль — она назначена ${inUseBy} сотрудник(ам). Сначала смените их роли.`,
+        `Рөлді жоюға болмайды — ол ${inUseBy} қызметкерге тағайындалған. Алдымен олардың рөлдерін өзгертіңіз.`,
+        `Can't delete this role — it's currently assigned to ${inUseBy} teammate(s). Change their role first.`,
+      ));
+      return;
+    }
+    if (confirm(l(`Удалить роль «${role.name}»?`, `«${role.name}» рөлін жою керек пе?`, `Delete role "${role.name}"?`))) {
+      onDelete();
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl">
+      <span className={`w-2 h-2 rounded-full ${role.system ? 'bg-gray-400' : 'bg-emerald-400'}`} />
+      {editing ? (
+        <input
+          type="text"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(role.name); setEditing(false); } }}
+          onBlur={commit}
+          autoFocus
+          className="flex-1 px-2 py-1 bg-white border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-300"
+        />
+      ) : (
+        <span className="flex-1 text-xs text-gray-900">{role.name}</span>
+      )}
+      {role.system ? (
+        <span className="text-[10px] text-gray-400">{l('Системная', 'Жүйелік', 'System')}</span>
+      ) : (
+        <>
+          {inUseBy > 0 && (
+            <span className="text-[10px] text-gray-400">
+              {l(`${inUseBy} сотр.`, `${inUseBy} қызм.`, `${inUseBy} member${inUseBy === 1 ? '' : 's'}`)}
+            </span>
+          )}
+          <button
+            onClick={() => setEditing(true)}
+            className="p-1 hover:bg-white rounded transition-colors"
+            title={l('Переименовать', 'Қайта атау', 'Rename')}
+          >
+            <Edit2 className="w-3 h-3 text-gray-400" />
+          </button>
+          <button
+            onClick={askDelete}
+            className="p-1 hover:bg-red-50 rounded transition-colors"
+            title={l('Удалить', 'Жою', 'Delete')}
+          >
+            <Trash2 className="w-3 h-3 text-red-400" />
+          </button>
+        </>
       )}
     </div>
   );

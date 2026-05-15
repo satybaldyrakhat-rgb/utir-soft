@@ -155,6 +155,9 @@ migrateColumn('users', 'team_role', "TEXT DEFAULT 'admin'");
 migrateColumn('users', 'invited_by', 'TEXT');
 // Set when an admin removes a teammate from the team — blocks future logins.
 migrateColumn('users', 'disabled_at', 'TEXT');
+// Phase 4 — admin-defined role list (e.g. 'Бухгалтер', 'Мастер'). Stored as a
+// JSON array on the same team_settings row alongside the existing matrix.
+migrateColumn('team_settings', 'team_roles', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -244,7 +247,9 @@ app.use(express.json({ limit: '10mb' }));
 interface AuthedRequest extends Request {
   userId?: string;
   teamId?: string;
-  teamRole?: 'admin' | 'manager' | 'employee';
+  // Free-form so custom team roles ('accountant' etc.) pass through. The
+  // built-in hierarchy in roleAtLeast still works for the three named values.
+  teamRole?: string;
 }
 
 function authMiddleware(req: AuthedRequest, res: Response, next: NextFunction) {
@@ -263,7 +268,7 @@ function authMiddleware(req: AuthedRequest, res: Response, next: NextFunction) {
     // tokens stop working until an admin re-enables them.
     if (row?.disabled_at) return res.status(403).json({ error: 'account disabled' });
     req.teamId = row?.team_id || payload.sub;
-    req.teamRole = (row?.team_role as 'admin' | 'manager' | 'employee') || 'admin';
+    req.teamRole = (row?.team_role as string) || 'admin';
     next();
   } catch {
     res.status(401).json({ error: 'invalid token' });
@@ -330,7 +335,8 @@ app.post('/api/auth/signup', async (req, res) => {
   // their own team-of-one. `company` is required only for new-team signups
   // (invited members inherit the inviter's company from the team).
   let joinTeamId: string | null = null;
-  let joinRole: 'admin' | 'manager' | 'employee' = 'admin';
+  // Free-form role id — admins can create custom roles like 'Бухгалтер'.
+  let joinRole: string = 'admin';
   let invitationRow: any = null;
   let inviterCompany = '';
   if (inviteCode) {
@@ -343,7 +349,7 @@ app.post('/api/auth/signup', async (req, res) => {
     if (invitationRow.used_at) return res.status(400).json({ error: 'invite already used' });
     if (new Date(invitationRow.expires_at).getTime() < Date.now()) return res.status(400).json({ error: 'invite expired' });
     joinTeamId = invitationRow.team_id;
-    joinRole = invitationRow.role as 'admin' | 'manager' | 'employee';
+    joinRole = invitationRow.role as string;
     inviterCompany = invitationRow.company || '';
   } else {
     if (!company || !String(company).trim()) return res.status(400).json({ error: 'company required' });
@@ -611,22 +617,37 @@ app.use('/api/ai-settings', aiSettingsRouter);
 const teamPermsRouter = express.Router();
 teamPermsRouter.use(authMiddleware);
 
+// Returns { permissions, roles } — current shape. Legacy clients that expect
+// the flat matrix still see it as `permissions` at the top level.
 teamPermsRouter.get('/', (req: AuthedRequest, res) => {
-  const row = db.prepare('SELECT role_permissions FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
-  if (!row?.role_permissions) return res.json(null);
-  try { res.json(JSON.parse(row.role_permissions)); }
-  catch { res.json(null); }
+  const row = db.prepare('SELECT role_permissions, team_roles FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+  if (!row) return res.json(null);
+  let permissions: any = null, roles: any = null;
+  try { if (row.role_permissions) permissions = JSON.parse(row.role_permissions); } catch { /* ignore */ }
+  try { if (row.team_roles)       roles       = JSON.parse(row.team_roles); }       catch { /* ignore */ }
+  res.json({ permissions, roles });
 });
 
+// Accepts either the legacy flat matrix or the new { permissions, roles } shape.
+// admin-only — non-admins can read but never write team-wide settings.
 teamPermsRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
-  const blob = JSON.stringify(req.body || {});
+  const body = req.body || {};
+  // Detect new shape vs legacy flat matrix.
+  const hasNewShape = body && (typeof body === 'object') && ('permissions' in body || 'roles' in body);
+  const permissions = hasNewShape ? body.permissions : body;
+  const roles = hasNewShape ? body.roles : undefined;
+
+  const permsJson = permissions ? JSON.stringify(permissions) : null;
+  const rolesJson = roles ? JSON.stringify(roles) : null;
+
   db.prepare(`
-    INSERT INTO team_settings (team_id, role_permissions, updated_at)
-    VALUES (?, ?, datetime('now'))
+    INSERT INTO team_settings (team_id, role_permissions, team_roles, updated_at)
+    VALUES (?, ?, ?, datetime('now'))
     ON CONFLICT(team_id) DO UPDATE SET
-      role_permissions = excluded.role_permissions,
+      role_permissions = COALESCE(excluded.role_permissions, team_settings.role_permissions),
+      team_roles       = COALESCE(excluded.team_roles,       team_settings.team_roles),
       updated_at = excluded.updated_at
-  `).run(req.teamId!, blob);
+  `).run(req.teamId!, permsJson, rolesJson);
   res.json({ ok: true });
 });
 
@@ -654,8 +675,12 @@ function getPermissionLevel(teamId: string, role: string, moduleKey: string): 'f
       if (v === 'full' || v === 'view' || v === 'none') return v;
     }
   } catch { /* fall through */ }
-  // Fallback to defaults table.
-  return DEFAULT_MATRIX[role]?.[moduleKey] ?? 'full';
+  // Built-in role with a baked-in default? Use it.
+  const defLevel = DEFAULT_MATRIX[role]?.[moduleKey];
+  if (defLevel) return defLevel;
+  // Custom role with no matrix row yet → safest is to deny. Admins must
+  // explicitly grant access on Settings → Команда → матрица.
+  return 'none';
 }
 
 // Express middleware factory: blocks the request when the caller's role has
@@ -689,7 +714,10 @@ function newInviteCode() {
   return s;
 }
 
-const ROLE_VALUES = new Set(['admin', 'manager', 'employee']);
+// Built-in roles always recognised by name. Custom team-defined ids
+// (e.g. 'r_xxxxxxx' or 'accountant') are also accepted — validated against
+// the team's stored role list in the invite handler.
+const BUILTIN_ROLE_VALUES = new Set(['admin', 'manager', 'employee']);
 
 const invitationsRouter = express.Router();
 invitationsRouter.use(authMiddleware);
@@ -719,7 +747,20 @@ invitationsRouter.get('/', requireAdmin, (req: AuthedRequest, res) => {
 
 invitationsRouter.post('/', requireAdmin, (req: AuthedRequest, res) => {
   const { role, email } = req.body || {};
-  const r = (role && ROLE_VALUES.has(role)) ? role : 'employee';
+  // Allow any non-admin role id. If the team defined custom roles in
+  // team_settings, accept those too; otherwise fall back to the built-in list.
+  let knownRoles: Set<string> = BUILTIN_ROLE_VALUES;
+  try {
+    const row = db.prepare('SELECT team_roles FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+    if (row?.team_roles) {
+      const parsed = JSON.parse(row.team_roles) as Array<{ id: string }>;
+      if (Array.isArray(parsed)) {
+        knownRoles = new Set([...BUILTIN_ROLE_VALUES, ...parsed.map(r => r.id)]);
+      }
+    }
+  } catch { /* fall back to built-ins */ }
+
+  const r = (role && knownRoles.has(role)) ? role : 'employee';
   // Don't allow inviting a second admin via this endpoint — keeps the model simple.
   const safeRole = r === 'admin' ? 'manager' : r;
   const id = newId('iv_');

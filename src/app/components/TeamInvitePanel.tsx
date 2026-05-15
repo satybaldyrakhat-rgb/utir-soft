@@ -10,11 +10,13 @@
 import { useEffect, useState } from 'react';
 import { Copy, Trash2, Plus, Check, Link as LinkIcon } from 'lucide-react';
 import { api } from '../utils/api';
+import { useDataStore } from '../utils/dataStore';
 
 interface Invitation {
   id: string;
   code: string;
-  role: 'admin' | 'manager' | 'employee';
+  // Free-form so admin-defined custom role ids ('accountant', 'r_xxxx') pass through.
+  role: string;
   email?: string | null;
   expiresAt: string;
   usedAt?: string | null;
@@ -44,12 +46,24 @@ function buildLink(code: string) {
 
 export function TeamInvitePanel({ language }: Props) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const store = useDataStore();
+
+  // Role choices for new invitations — built-ins + any custom roles defined
+  // by the team admin. Admin is excluded — admins are created manually only.
+  const roleOptions = store.roles.filter(r => r.id !== 'admin');
+  const defaultRoleId = roleOptions.find(r => r.id === 'employee')?.id || roleOptions[0]?.id || 'employee';
+  // Look up a human label for a role id (custom first, then built-in).
+  const labelForRole = (id: string): string => {
+    const found = store.roles.find(r => r.id === id);
+    if (found) return found.name;
+    return ROLE_LABEL[id]?.[language] || id;
+  };
 
   const [list, setList] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [role, setRole] = useState<'manager' | 'employee'>('employee');
+  const [role, setRole] = useState<string>(defaultRoleId);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string>('');
 
@@ -74,7 +88,7 @@ export function TeamInvitePanel({ language }: Props) {
     try {
       await api.post<Invitation>('/api/invitations', { role });
       setShowCreate(false);
-      setRole('employee');
+      setRole(defaultRoleId);
       await load();
     } catch (e: any) {
       setError(String(e?.message || 'create failed'));
@@ -130,11 +144,12 @@ export function TeamInvitePanel({ language }: Props) {
           <label className="block text-[11px] text-gray-500 mb-1.5">{l('Роль', 'Рөл', 'Role')}</label>
           <select
             value={role}
-            onChange={e => setRole(e.target.value as 'manager' | 'employee')}
+            onChange={e => setRole(e.target.value)}
             className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 mb-3"
           >
-            <option value="employee">{ROLE_LABEL.employee[language]}</option>
-            <option value="manager">{ROLE_LABEL.manager[language]}</option>
+            {roleOptions.map(r => (
+              <option key={r.id} value={r.id}>{labelForRole(r.id)}</option>
+            ))}
           </select>
           <div className="flex gap-2">
             <button
@@ -175,7 +190,7 @@ export function TeamInvitePanel({ language }: Props) {
               <div className="flex-1 min-w-0">
                 <div className="text-xs text-gray-900 font-mono truncate">{buildLink(inv.code)}</div>
                 <div className="text-[10px] text-gray-500 mt-0.5">
-                  {ROLE_LABEL[inv.role]?.[language] || inv.role}
+                  {labelForRole(inv.role)}
                   {' · '}
                   {l('Истекает', 'Жарамдылық', 'Expires')}{' '}
                   {new Date(inv.expiresAt).toLocaleDateString(language === 'eng' ? 'en-GB' : 'ru-RU')}

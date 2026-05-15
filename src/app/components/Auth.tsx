@@ -4,7 +4,7 @@ import profileLogo from '../../imports/utirsoft.png';
 import { api, setToken } from '../utils/api';
 
 interface AuthProps {
-  onLogin: (user: { name: string; email: string; avatar?: string; teamRole?: 'admin' | 'manager' | 'employee' }) => void;
+  onLogin: (user: { name: string; email: string; avatar?: string; teamRole?: string }) => void;
   language: 'kz' | 'ru' | 'eng';
   onLanguageChange: (lang: 'kz' | 'ru' | 'eng') => void;
 }
@@ -34,7 +34,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
   // user inherits the inviter's company.
   const [inviteCode, setInviteCode] = useState<string>('');
   const [invitePreview, setInvitePreview] = useState<
-    | { company: string; inviter: string; role: 'admin' | 'manager' | 'employee'; email?: string }
+    | { company: string; inviter: string; role: string; email?: string }
     | { error: string }
     | null
   >(null);
@@ -47,7 +47,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
       setInviteCode(code.toUpperCase());
       // Jump straight into the signup flow so the user doesn't see the welcome screen.
       setStep('signup-email');
-      api.get<{ company: string; inviter: string; role: 'admin' | 'manager' | 'employee'; email?: string | null }>(
+      api.get<{ company: string; inviter: string; role: string; email?: string | null }>(
         `/api/invitations/preview/${encodeURIComponent(code)}`,
       ).then(p => {
         setInvitePreview({ company: p.company, inviter: p.inviter, role: p.role, email: p.email || undefined });
@@ -114,7 +114,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     setTimeout(() => { setIsLoading(false); callback(); }, ms);
   };
 
-  const finishAuth = (data: { token: string; user: { id: string; name: string; email: string; teamRole?: 'admin' | 'manager' | 'employee' } }) => {
+  const finishAuth = (data: { token: string; user: { id: string; name: string; email: string; teamRole?: string } }) => {
     setToken(data.token);
     window.dispatchEvent(new Event('utir:auth-changed'));
     onLogin({ name: data.user.name, email: data.user.email, teamRole: data.user.teamRole });

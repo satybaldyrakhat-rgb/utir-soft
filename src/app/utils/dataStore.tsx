@@ -39,7 +39,18 @@ export interface Deal {
   createdAt: string;
 }
 
-export type RoleKey = 'admin' | 'manager' | 'employee';
+// RoleKey is now a free-form string id (e.g. 'admin', 'manager', 'accountant').
+// 'admin' is reserved and treated as a system role — it can't be deleted or
+// renamed and always has 'full' access regardless of the matrix.
+export type RoleKey = string;
+
+// Each team has a list of roles it has defined. The matrix in
+// `RolePermissions` is keyed by these ids.
+export interface TeamRole {
+  id: string;
+  name: string;     // human label, e.g. 'Бухгалтер'
+  system?: boolean; // true for built-ins like 'admin' that can't be removed
+}
 export type PermissionLevel = 'full' | 'view' | 'none';
 export type ModuleKey = 'orders' | 'chats' | 'finance' | 'production' | 'analytics' | 'settings';
 
@@ -69,6 +80,15 @@ const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
 };
 
 export const ALL_MODULES: ModuleKey[] = ['orders', 'chats', 'finance', 'production', 'analytics', 'settings'];
+// Default roles every brand-new team starts with. Admin is system (locked);
+// the other two are convenience pre-fills that the admin can rename or delete.
+export const DEFAULT_ROLES: TeamRole[] = [
+  { id: 'admin',    name: 'Администратор', system: true },
+  { id: 'manager',  name: 'Менеджер' },
+  { id: 'employee', name: 'Сотрудник' },
+];
+// Kept as a fallback list for places that still iterate roles statically.
+// New code should read from store.roles instead.
 export const ALL_ROLES: RoleKey[] = ['admin', 'manager', 'employee'];
 
 export interface Task {
@@ -207,22 +227,45 @@ function loadRolePermissions(): RolePermissions {
     const raw = localStorage.getItem(ROLE_PERMS_STORAGE_KEY);
     if (!raw) return DEFAULT_ROLE_PERMISSIONS;
     const parsed = JSON.parse(raw) as Partial<RolePermissions>;
-    return {
-      admin:    { ...DEFAULT_ROLE_PERMISSIONS.admin,    ...(parsed.admin || {}) },
-      manager:  { ...DEFAULT_ROLE_PERMISSIONS.manager,  ...(parsed.manager || {}) },
-      employee: { ...DEFAULT_ROLE_PERMISSIONS.employee, ...(parsed.employee || {}) },
-    };
+    // Merge with defaults for known role ids; preserve unknown (custom) ones.
+    const merged: RolePermissions = { ...DEFAULT_ROLE_PERMISSIONS };
+    for (const [roleId, perms] of Object.entries(parsed)) {
+      merged[roleId] = { ...(merged[roleId] || EMPTY_PERMS), ...(perms as any || {}) };
+    }
+    return merged;
   } catch { return DEFAULT_ROLE_PERMISSIONS; }
 }
 
-function saveRolePermissions(p: RolePermissions) {
-  try { localStorage.setItem(ROLE_PERMS_STORAGE_KEY, JSON.stringify(p)); } catch {}
-  // Mirror to the backend so the matrix follows the team across devices and
-  // — eventually — server-side enforcement (Phase 2b). Admin-only on the PUT;
-  // non-admins get a 403 here which we silently ignore.
-  api.put('/api/team-permissions', p).catch(err => {
+// Default permission set for a brand-new role: 'none' on every module.
+const EMPTY_PERMS: Record<ModuleKey, PermissionLevel> = {
+  orders: 'none', chats: 'none', finance: 'none',
+  production: 'none', analytics: 'none', settings: 'none',
+};
+
+const ROLES_STORAGE_KEY = 'utir_team_roles';
+
+function loadTeamRoles(): TeamRole[] {
+  try {
+    const raw = localStorage.getItem(ROLES_STORAGE_KEY);
+    if (!raw) return DEFAULT_ROLES;
+    const parsed = JSON.parse(raw) as TeamRole[];
+    if (!Array.isArray(parsed)) return DEFAULT_ROLES;
+    // Make sure the system 'admin' role is always present and locked.
+    const withoutAdmin = parsed.filter(r => r.id !== 'admin');
+    return [{ id: 'admin', name: 'Администратор', system: true }, ...withoutAdmin];
+  } catch { return DEFAULT_ROLES; }
+}
+
+function saveTeamSettings(roles: TeamRole[], perms: RolePermissions) {
+  try {
+    localStorage.setItem(ROLE_PERMS_STORAGE_KEY, JSON.stringify(perms));
+    localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(roles));
+  } catch {}
+  // Mirror to the backend so settings follow the team across devices. Admin-only
+  // on the PUT; non-admins get a 403 here which we silently ignore.
+  api.put('/api/team-permissions', { permissions: perms, roles }).catch(err => {
     if (String(err?.message || '') !== 'requires admin role') {
-      console.error('[saveRolePermissions]', err);
+      console.error('[saveTeamSettings]', err);
     }
   });
 }
@@ -404,6 +447,7 @@ interface DataStore {
   profile: UserProfile;
   catalogs: UserCatalogs;
   rolePermissions: RolePermissions;
+  roles: TeamRole[];
   modules: PlatformModule[];
   customRecords: CustomRecordsByModule;
   aiSettings: AISettings;
@@ -447,6 +491,10 @@ interface DataStore {
   addCatalogItem: (key: CatalogKey, value: string) => void;
   removeCatalogItem: (key: CatalogKey, value: string) => void;
   setRolePermission: (role: RoleKey, module: ModuleKey, level: PermissionLevel) => void;
+  // Manage the role list (admins only — backend rejects non-admins).
+  addRole: (name: string) => string; // returns generated id
+  renameRole: (roleId: string, name: string) => void;
+  deleteRole: (roleId: string) => void;
   updateModule: (id: string, updates: Partial<PlatformModule>) => void;
   reorderModules: (orderedIds: string[]) => void;
   resetModules: () => void;
@@ -490,6 +538,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile>(() => loadProfile());
   const [catalogs, setCatalogs] = useState<UserCatalogs>(() => loadCatalogs());
   const [rolePermissions, setRolePermissions] = useState<RolePermissions>(() => loadRolePermissions());
+  const [roles, setRoles] = useState<TeamRole[]>(() => loadTeamRoles());
   // Default to 'admin' so single-user installs work before App.tsx wires the
   // real value — admins always get 'full' so this is the safest fallback.
   const [currentUserRole, setCurrentUserRole] = useState<RoleKey>('admin');
@@ -524,9 +573,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const setRolePermission = useCallback((role: RoleKey, module: ModuleKey, level: PermissionLevel) => {
     let beforeLevel: PermissionLevel | undefined;
     setRolePermissions(prev => {
-      beforeLevel = prev[role][module];
-      const next: RolePermissions = { ...prev, [role]: { ...prev[role], [module]: level } };
-      saveRolePermissions(next);
+      beforeLevel = prev[role]?.[module];
+      const next: RolePermissions = { ...prev, [role]: { ...(prev[role] || EMPTY_PERMS), [module]: level } };
+      saveTeamSettings(roles, next);
       return next;
     });
     addActivity({
@@ -538,6 +587,52 @@ export function DataProvider({ children }: { children: ReactNode }) {
       before: beforeLevel,
       after: level,
     });
+  }, [addActivity, roles]);
+
+  // ─── Role list management ─────────────────────────────────────
+  const addRole = useCallback((name: string): string => {
+    const trimmed = name.trim();
+    if (!trimmed) return '';
+    const id = 'r_' + Math.random().toString(36).slice(2, 9);
+    const nextRole: TeamRole = { id, name: trimmed };
+    setRoles(prev => {
+      const next = [...prev, nextRole];
+      // Also seed an EMPTY_PERMS row for this role and persist atomically.
+      setRolePermissions(perms => {
+        const nextPerms: RolePermissions = { ...perms, [id]: { ...EMPTY_PERMS } };
+        saveTeamSettings(next, nextPerms);
+        return nextPerms;
+      });
+      return next;
+    });
+    addActivity({ user: 'Вы', actor: 'human', action: 'Создал роль', target: trimmed, type: 'create', page: 'roles' });
+    return id;
+  }, [addActivity]);
+
+  const renameRole = useCallback((roleId: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || roleId === 'admin') return; // admin label is fixed
+    setRoles(prev => {
+      const next = prev.map(r => r.id === roleId ? { ...r, name: trimmed } : r);
+      saveTeamSettings(next, rolePermissions);
+      return next;
+    });
+    addActivity({ user: 'Вы', actor: 'human', action: 'Переименовал роль', target: trimmed, type: 'update', page: 'roles' });
+  }, [addActivity, rolePermissions]);
+
+  const deleteRole = useCallback((roleId: string) => {
+    if (roleId === 'admin') return; // admin can't be deleted
+    setRoles(prev => {
+      const next = prev.filter(r => r.id !== roleId);
+      setRolePermissions(perms => {
+        const nextPerms = { ...perms };
+        delete nextPerms[roleId];
+        saveTeamSettings(next, nextPerms);
+        return nextPerms;
+      });
+      return next;
+    });
+    addActivity({ user: 'Вы', actor: 'human', action: 'Удалил роль', target: roleId, type: 'delete', page: 'roles' });
   }, [addActivity]);
 
   const updateProfile = useCallback((updates: Partial<UserProfile>) => {
@@ -751,20 +846,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
         api.get<Integration[]>('/api/integrations'),
         api.get<ActivityLog[]>('/api/activity').catch(() => [] as ActivityLog[]),
         api.get<AISettings | null>('/api/ai-settings').catch(() => null),
-        api.get<RolePermissions | null>('/api/team-permissions').catch(() => null),
+        api.get<{ permissions?: RolePermissions; roles?: TeamRole[] } | RolePermissions | null>('/api/team-permissions').catch(() => null),
       ]);
       setDeals(d); setEmployees(e); setTasks(t); setProducts(p);
       setTransactions(tx); setIntegrations(ig); setActivityLogs(al);
-      // Role permission matrix is sourced from the backend so all teammates
-      // see the same rules. Merge with defaults to absorb new module keys.
+      // Role settings come from the backend so all teammates see the same rules.
+      // Accepts both the legacy shape (flat matrix) and the new shape ({permissions, roles}).
       if (rp) {
-        const merged: RolePermissions = {
-          admin:    { ...DEFAULT_ROLE_PERMISSIONS.admin,    ...((rp as any).admin || {}) },
-          manager:  { ...DEFAULT_ROLE_PERMISSIONS.manager,  ...((rp as any).manager || {}) },
-          employee: { ...DEFAULT_ROLE_PERMISSIONS.employee, ...((rp as any).employee || {}) },
-        };
-        setRolePermissions(merged);
-        try { localStorage.setItem(ROLE_PERMS_STORAGE_KEY, JSON.stringify(merged)); } catch {}
+        const raw: any = rp;
+        const legacyMatrix = raw && !('permissions' in raw) && !('roles' in raw) ? raw : null;
+        const matrixPart = (raw?.permissions ?? legacyMatrix ?? {}) as Partial<RolePermissions>;
+        const rolesPart: TeamRole[] = Array.isArray(raw?.roles) ? raw.roles : [];
+
+        // Merge matrix with defaults so new module keys land; preserve custom role ids.
+        const mergedMatrix: RolePermissions = { ...DEFAULT_ROLE_PERMISSIONS };
+        for (const [roleId, perms] of Object.entries(matrixPart)) {
+          mergedMatrix[roleId] = { ...(mergedMatrix[roleId] || EMPTY_PERMS), ...(perms as any || {}) };
+        }
+        setRolePermissions(mergedMatrix);
+        try { localStorage.setItem(ROLE_PERMS_STORAGE_KEY, JSON.stringify(mergedMatrix)); } catch {}
+
+        // Roles list — make sure admin is always present and locked.
+        if (rolesPart.length > 0) {
+          const withoutAdmin = rolesPart.filter(r => r.id !== 'admin');
+          const fullRoles = [{ id: 'admin', name: 'Администратор', system: true }, ...withoutAdmin];
+          setRoles(fullRoles);
+          try { localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(fullRoles)); } catch {}
+        }
       }
       // Backend is the source of truth for AI settings — merge with defaults so
       // newly-added fields don't crash older saved blobs.
@@ -796,12 +904,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setProfile(EMPTY_PROFILE);
     setCatalogs(EMPTY_CATALOGS);
     setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
+    setRoles(DEFAULT_ROLES);
     setModules(DEFAULT_MODULES);
     setCustomRecords({});
     setAISettings(DEFAULT_AI_SETTINGS);
     try { localStorage.removeItem(PROFILE_STORAGE_KEY); } catch {}
     try { localStorage.removeItem(CATALOGS_STORAGE_KEY); } catch {}
     try { localStorage.removeItem(ROLE_PERMS_STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(ROLES_STORAGE_KEY); } catch {}
     try { localStorage.removeItem(MODULES_STORAGE_KEY); } catch {}
     try { localStorage.removeItem(CUSTOM_RECORDS_STORAGE_KEY); } catch {}
     try { localStorage.removeItem(AI_SETTINGS_STORAGE_KEY); } catch {}
@@ -955,7 +1065,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const canWriteModule = useCallback((moduleKey: string) => getModuleLevel(moduleKey) === 'full', [getModuleLevel]);
 
   const store: DataStore = {
-    deals, employees, tasks, products, transactions, integrations, activityLogs, profile, catalogs, rolePermissions, modules, customRecords, aiSettings, loaded,
+    deals, employees, tasks, products, transactions, integrations, activityLogs, profile, catalogs, rolePermissions, roles, modules, customRecords, aiSettings, loaded,
     currentUserRole, setCurrentUserRole, getModuleLevel, canWriteModule,
     addDeal, updateDeal, deleteDeal,
     addEmployee, updateEmployee, deleteEmployee,
@@ -967,6 +1077,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateProfile,
     addCatalogItem, removeCatalogItem,
     setRolePermission,
+    addRole, renameRole, deleteRole,
     updateModule, reorderModules, resetModules,
     addCustomModule, deleteCustomModule,
     addCustomRecord, updateCustomRecord, deleteCustomRecord,
