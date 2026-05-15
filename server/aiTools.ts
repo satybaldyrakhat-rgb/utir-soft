@@ -259,18 +259,25 @@ const addTask: ToolDef = {
     required: ['title'],
   },
   summarize: (i) => {
+    // Show the actual date that will be saved, including the today-fallback used by execute().
+    const today = new Date().toISOString().slice(0, 10);
+    const due = i.dueDate || today;
+    const dueLabel = i.dueDate ? i.dueDate : `сегодня (${today})`;
     const lines = [
       `<b>Создаю задачу:</b>`,
       `• Название: <b>${i.title}</b>`,
+      `• Срок: ${dueLabel}`,
     ];
     if (i.description) lines.push(`• Описание: ${i.description}`);
-    if (i.dueDate)     lines.push(`• Срок: ${i.dueDate}`);
     if (i.priority)    lines.push(`• Приоритет: ${i.priority}`);
     if (i.category)    lines.push(`• Категория: ${i.category}`);
+    // Touch `due` so TS treats it as used even if all helpers above end up disabled.
+    void due;
     return lines.join('\n');
   },
   execute: async (ctx, i) => {
     const id = newId('t');
+    const due = i.dueDate || new Date().toISOString().slice(0, 10);
     const data = {
       id,
       title: i.title,
@@ -279,7 +286,7 @@ const addTask: ToolDef = {
       priority: i.priority || 'medium',
       assigneeId: '',
       createdAt: new Date().toISOString(),
-      dueDate: i.dueDate || new Date().toISOString().slice(0, 10),
+      dueDate: due,
       category: i.category || 'Прочее',
       subtasks: [],
     };
@@ -290,7 +297,7 @@ const addTask: ToolDef = {
       target: i.title,
       type: 'create', page: 'tasks',
     });
-    return `Задача «${i.title}» создана${i.dueDate ? ` на ${i.dueDate}` : ''}. Открыть → Задачи.`;
+    return `Задача «${i.title}» создана на ${due}. Открыть → Задачи.`;
   },
 };
 

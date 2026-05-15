@@ -39,15 +39,13 @@ interface Employee {
   tasksDone: number;
 }
 
-// Placeholder team slots — real names + telegramConnected flip to true once Block C.2 invitations
-// and Block F Telegram-bot pairing are wired. Kept non-empty so legacy hardcoded tasks below
-// still have valid `assignee` references at render time.
-const employees: Employee[] = [
-  { id: 'e1', name: '—', role: '—', avatar: '?', telegramUsername: '', telegramConnected: false, tasksToday: 0, tasksDone: 0 },
-  { id: 'e2', name: '—', role: '—', avatar: '?', telegramUsername: '', telegramConnected: false, tasksToday: 0, tasksDone: 0 },
-  { id: 'e3', name: '—', role: '—', avatar: '?', telegramUsername: '', telegramConnected: false, tasksToday: 0, tasksDone: 0 },
-  { id: 'e4', name: '—', role: '—', avatar: '?', telegramUsername: '', telegramConnected: false, tasksToday: 0, tasksDone: 0 },
-];
+// Single sentinel for tasks without an assignee (e.g. AI-generated tasks where
+// Claude omitted assigneeId). Replaces the old hardcoded 4-slot placeholder team.
+// Real team members come from store.employees (Block C.2 invitations populate this).
+const UNASSIGNED: Employee = {
+  id: '', name: 'Не назначен', role: '—', avatar: '?',
+  telegramUsername: '', telegramConnected: false, tasksToday: 0, tasksDone: 0,
+};
 
 const columns = [
   { id: 'new' as const, title: 'Новые', icon: Circle, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-200' },
@@ -84,12 +82,22 @@ export function Tasks({ language }: TasksProps) {
   // Poll backend every 15s so tasks created via Telegram bot show up without manual reload.
   useAutoRefresh(store.reloadAll, 15000);
 
+  // Real team members from the store, projected into this component's `Employee` shape
+  // for use in dropdowns and the "Сотрудники" view. Empty array means no team yet.
+  const teamEmployees: Employee[] = store.employees.map(e => ({
+    id: e.id, name: e.name, role: e.department, avatar: e.avatar,
+    telegramUsername: '@' + e.name.split(' ')[0].toLowerCase(),
+    telegramConnected: e.status === 'active',
+    tasksToday: store.tasks.filter(t => t.assigneeId === e.id).length,
+    tasksDone: store.tasks.filter(t => t.assigneeId === e.id && t.status === 'done').length,
+  }));
+
   // Map store tasks to local Task format
   const mapStoreTask = (st: StoreTask): Task => {
     const emp = store.getEmployeeById(st.assigneeId);
     return {
       id: st.id, title: st.title, description: st.description, status: st.status, priority: st.priority,
-      assignee: emp ? { id: emp.id, name: emp.name, role: emp.department, avatar: emp.avatar, telegramUsername: '@' + emp.name.split(' ')[0].toLowerCase(), telegramConnected: emp.status === 'active', tasksToday: store.tasks.filter(t => t.assigneeId === emp.id).length, tasksDone: store.tasks.filter(t => t.assigneeId === emp.id && t.status === 'done').length } : employees[0],
+      assignee: emp ? { id: emp.id, name: emp.name, role: emp.department, avatar: emp.avatar, telegramUsername: '@' + emp.name.split(' ')[0].toLowerCase(), telegramConnected: emp.status === 'active', tasksToday: store.tasks.filter(t => t.assigneeId === emp.id).length, tasksDone: store.tasks.filter(t => t.assigneeId === emp.id && t.status === 'done').length } : UNASSIGNED,
       createdAt: st.createdAt, dueDate: st.dueDate, completedAt: st.completedAt,
       source: 'telegram', telegramConfirmed: true, completionNote: st.completionNote,
       category: st.category, subtasks: st.subtasks, linkedDealId: st.linkedDealId,
@@ -284,7 +292,7 @@ export function Tasks({ language }: TasksProps) {
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
           >
             <option value="all">Все сотрудники</option>
-            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            {teamEmployees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
 
           <select
@@ -410,7 +418,13 @@ export function Tasks({ language }: TasksProps) {
       {/* EMPLOYEES VIEW */}
       {viewMode === 'employees' && (
         <div className="space-y-4">
-          {employees.filter(e => e.telegramConnected).map(emp => {
+          {teamEmployees.length === 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+              <div className="text-sm text-gray-500 mb-1">Пока никого в команде</div>
+              <div className="text-xs text-gray-400">Добавьте сотрудников в Настройках → Команда — они появятся здесь со своими задачами.</div>
+            </div>
+          )}
+          {teamEmployees.map(emp => {
             const empTasks = filteredTasks.filter(t => t.assignee.id === emp.id);
             const empDone = empTasks.filter(t => t.status === 'done').length;
             const isExpanded = expandedEmployee === emp.id;
@@ -512,7 +526,7 @@ export function Tasks({ language }: TasksProps) {
       {/* NEW TASK MODAL */}
       {showNewTaskModal && (
         <NewTaskModal
-          employees={employees}
+          employees={teamEmployees}
           onClose={() => setShowNewTaskModal(false)}
           onAdd={(task) => {
             store.addTask({
@@ -585,13 +599,14 @@ function TaskCard({ task, onClick, onMove }: { task: Task; onClick: () => void; 
 function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; onClose: () => void; onAdd: (task: Task) => void }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [assigneeId, setAssigneeId] = useState(employees[0].id);
+  // If no team yet, default assigneeId to '' (unassigned).
+  const [assigneeId, setAssigneeId] = useState(employees[0]?.id ?? '');
   const [priority, setPriority] = useState<Task['priority']>('medium');
   const [category, setCategory] = useState('Замер');
 
   const handleSubmit = () => {
     if (!title.trim()) return;
-    const assignee = employees.find(e => e.id === assigneeId) || employees[0];
+    const assignee = employees.find(e => e.id === assigneeId) || UNASSIGNED;
     const task: Task = {
       id: `t${Date.now()}`,
       title: title.trim(),
@@ -640,6 +655,7 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Исполнитель</label>
               <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200">
+                <option value="">Не назначен</option>
                 {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </div>
