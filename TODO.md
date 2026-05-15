@@ -2,114 +2,112 @@
 
 _Обновлено: 2026-05-16_
 
-Короткое резюме перед /compact, чтобы не потерять контекст между сессиями.
-
 ---
 
-## 1. Сделано в текущей сессии (после прошлого TODO.md)
+## 1. Что сделано в текущей сессии (после предыдущего TODO.md)
 
-### Авто-обновление страниц
-- `src/app/utils/useAutoRefresh.ts` — хук: polling каждые 15с + пауза при скрытой вкладке + refresh при возврате.
-- Подключён в `Tasks.tsx`, `SalesKanban.tsx`, `ActivityLog.tsx`.
+### Block P4 — Multi-tenancy и роли (большой блок)
+- **БД**: `users.team_id`, `team_role`, `invited_by`, `disabled_at`. `team_settings` (role_permissions + team_roles JSON). На всех шарных таблицах `team_id`. Идемпотентные миграции + бэкфилл.
+- **Auth middleware** прокидывает `teamId` и `teamRole`. Все CRUD фильтруют по `team_id`. JWT не менялся.
+- **Эндпоинты приглашений**: `POST/GET/DELETE /api/invitations`, публичный `GET /api/invitations/preview/:code`.
+- **Signup** принимает `inviteCode` → новый юзер наследует team_id и роль.
+- **Auto-create `employees`-row** при signup + startup-backfill для существующих юзеров.
+- **TeamInvitePanel** в Настройки → Команда: генерация ссылки, копирование, отзыв, история (с именем кто использовал).
+- **Auth.tsx** читает `?invite=XXX`, preview, баннер «Приглашение от X».
+- **Modal в App.tsx** когда залогиненный открыл свою же invite-ссылку (3 кнопки: скопировать/выйти-и-принять/закрыть).
+- **vercel.json** catch-all rewrite для deep-links.
 
-### Карточка задачи редактируется
-- Раньше read-only с только статус-кнопками. Теперь редактируемая модалка: название, описание, исполнитель, приоритет, категория, срок, статус.
-- Кнопки Сохранить / Отмена / Удалить (с подтверждением).
+### Phase 1-2-3 — роли и матрица
+- **Phase 1**: `requireRole` middleware (admin > manager > employee), сайдбар прячет Финансы / Настройки по роли.
+- **Phase 2a**: `team_settings.role_permissions` через `GET/PUT /api/team-permissions`; матрица персистится в БД.
+- **Phase 2b**: `requirePermission(module)` на роутах deals/products/transactions — backend 403 по матрице.
+- **Phase 2c**: на фронте кнопки Create/Edit/Delete скрываются для роли с `view`.
+- **Phase 3**: `PATCH /api/employees/:id/role` — admin может менять роли сотрудников; защита «нельзя оставить команду без админа» / «нельзя сменить свою роль».
+- **Phase 4 — кастомные роли**: `RoleKey: string`, `TeamRole` interface, store CRUD ролей. UI: «Роли в команде» блок с rename/delete/add, матрица иттерирует store.roles. Invite + edit-employee dropdown'ы динамические. Превью матрицы в edit-модалке.
+- **Объединил Команда + Роли** в одну вкладку «Команда и права».
+- **Hard admin-only**: Команда и права + Журнал — даже если settings=full для другой роли.
+- **Расширил матрицу**: Главная, AI Дизайн, Задачи, Платежи, Реклама + подразделы Настроек (settings-catalogs, settings-modules, settings-integrations, settings-ai). Группировка в шапке: «Рабочие модули» / «Настройки».
+- **Кнопка «Сохранить»** на матрице (вместо автосейва на каждый клик) — `bulkSetRolePermissions`.
 
-### Блок F.4 — per-module permissions для AI-бота
-- Бот теперь читает `users.ai_settings` (новая колонка, JSON-blob, синхронизируется через `GET/PUT /api/ai-settings`).
-- На каждый tool-call смотрит `assistant.modulePermissions[модуль]`:
-  - `auto` → выполняет без подтверждения, отвечает «⚡ Автоматически…»
-  - `confirm` → как было: сводка + «Да/Нет»
-  - `none` → отказывает с подсказкой «зайди в Настройки…»
-- В `aiTools.ts` у каждого инструмента поле `module`: sales / finance / tasks / readonly.
+### Удаление/восстановление сотрудника
+- Soft-delete: `users.disabled_at` + `employees.data.removed_at`. Не удаляет ряд.
+- `POST /api/employees/:id/restore` + UI «Удалённые сотрудники» (свёрнутая секция с кнопкой «Восстановить»).
+- Backend startup-sync: `users.team_role` приводится к `employees.data.role` (фикс старых данных).
 
-### Блок F.5 — Hand-off notifications
-- Когда бот не смог/не захотел — пишет в Журнал действий (`type: 'ai'`, `actor: 'ai'`).
-- 7 reason-веток: Claude API failed, tool execute failed (confirm/auto), read-only failed, rejected by admin, module disabled, unknown tool.
+### Командный Telegram-бот (F.6)
+- **Уведомления исполнителю**: POST + PATCH `/api/tasks` шлют в личку Telegram «📝 Новая задача / На вас назначена задача».
+- **`GET /api/team/pairings`** → список пар (email, chat_id, username).
+- **✈️ бейдж** в списке команды для подключённых.
+
+### Email через Resend
+- `server/email.ts` (без новых npm-deps). Шаблоны: OTP + invite.
+- `sendEmail()` подключён в `signup`, `resend-code`, `invitations POST` (если admin указал email).
+- Env-gated: при `RESEND_API_KEY` отсутствует — dev-fallback (код на экране).
+- **TeamInvitePanel** теперь принимает email в форме создания инвайта.
+
+### Code-splitting
+- `vite.config.ts` → `manualChunks` для вендоров: `vendor-react`, `vendor-charts`, `vendor-radix`, `vendor-lucide`, `vendor`.
+- `React.lazy` + `Suspense` для тяжёлых страниц: Settings, Analytics, Chats, Warehouse, AIDesign, Finance, Booking, ClientCabinet, ClientTrack, CustomModulePage.
+- **Первая загрузка**: с 1127 KB до 370 KB (gzip с 313 до 95 KB).
 
 ### Полировка
-- AI-генерируемые задачи: убрал placeholder-сотрудников из дропдаунов, теперь только реальная команда; пустая команда → «Не назначен».
-- Сводка `add_task` всегда показывает дату (если Claude не указал — «сегодня (YYYY-MM-DD)»).
-
-### Блок P4 — Multi-tenancy через инвайты (БОЛЬШОЙ)
-- БД: колонки `team_id`, `team_role`, `invited_by`, `disabled_at` на users; колонка `team_id` на всех шарных таблицах; новая таблица `invitations`. Идемпотентные миграции + бэкфилл существующих рядов.
-- Auth middleware прокидывает `teamId` + `teamRole`. Все CRUD фильтруют по `team_id` (user_id остался audit-полем).
-- Эндпоинты (только админ): POST/GET/DELETE `/api/invitations`. Публичный GET `/api/invitations/preview/:code` (зарегистрирован **перед** auth-роутером!).
-- Signup принимает `inviteCode` → новый юзер наследует team_id и роль инвайта.
-- Авто-создание `employees`-записи при любом signup'е + startup-backfill для существующих юзеров.
-- Frontend: `TeamInvitePanel.tsx` в Настройки → Команда (генерация ссылки, копирование, отзыв, история с именем того кто использовал).
-- Auth.tsx читает `?invite=XXX` из URL → preview → баннер «Приглашение от X · команда · роль».
-- Модалка «invite held» в App.tsx когда залогиненный юзер открывает свою же ссылку: 3 кнопки (скопировать / выйти-и-принять / закрыть).
-- vercel.json catch-all rewrite чтобы deep-links не давали 404.
-
-### Удаление из команды
-- DELETE `/api/employees/:id` теперь soft-disable: ставит `users.disabled_at` + сбрасывает team_id.
-- Backend: 403 «account disabled» в login + authMiddleware. Защита «нельзя удалить себя».
-- Frontend: кнопка 🗑 скрыта на своей же строке; кикнутый юзер автоматически выкидывается на Auth screen (api.ts ловит 403, чистит токен, App.tsx подписан на event).
-
-### Фиксы по ходу
-- `e7a1cb6` — invite link `/auth?invite=...` 404-ил на Vercel → перешли на `/?invite=...` + `vercel.json`.
-- `7cf3447` — preview-эндпоинт возвращал 401 (был ЗА auth-роутером) → перенёс выше mount.
-- `2c5632c` — fallback в баннере когда у инвайтера пустое company.
-- `da24729` — в истории инвайтов теперь видно имя того, кто использовал код.
+- 3-точечный фикс: TG-уведомление на PATCH, закрытие модалки задачи после Save, кнопка Save на матрице.
+- Edit-модалка сотрудника: name/phone теперь сохраняются (раньше defaultValue без onChange). Email read-only.
+- Убрал legacy «Дополнительные права» чекбоксы (теперь матрица — единственный источник истины).
+- Placeholder при добавлении роли — нейтральный.
 
 ---
 
-## 2. На каком моменте остановились
+## 2. Где остановились
 
-Только что закрыли «удаление из команды» (commit `726c0f8`). Жду от тебя следующего направления.
+Только что закончили #4 code-splitting (commit `baed330`).
 
 ---
 
-## 3. Очередь (что осталось)
+## 3. Очередь работ
 
-### P1 — UX мелочи в роли-доступе
-- Сейчас manager / employee видят те же модули и могут править всё, что админ. Нужно ограничить:
-  - `requireRole('admin')` на роуты настроек / инвайтов / удаления (часть уже есть).
-  - На фронте — спрятать табы и кнопки по роли (Финансы только админу/manager; Журнал только админу — уже есть; и т.д.).
-  - Чёткая матрица «кто что может» в коде.
+### Технический долг
+- **Подключить Resend** в prod: добавить `RESEND_API_KEY` в Railway → реальные письма. (Пока пауза по запросу.)
+- **Большая PNG**: `src/imports/utirsoft.png` = 1.0 MB. Заменить на оптимизированный логотип (PNG/SVG ~50KB).
+- **`store.profile.email`** иногда пустое после signup — низкий приоритет, баг косметический.
 
-### P2 — Восстановление выгнанного сотрудника
-- Пока чтобы вернуть — надо вручную в БД сбросить `disabled_at`. Сделать UI «История уволенных» с кнопкой «Восстановить».
-
-### P3 — Telegram-бот для команды
-- Сейчас каждый юзер пейрит свой собственный бот-чат. Хорошо бы:
-  - У команды один общий бот, который понимает кто пишет (по `chat_id` → user → team_id).
-  - Уведомления о новых задачах падают в личку исполнителю (если он спарился).
-
-### P4 — Реальная отправка email
-- Сейчас OTP/инвайты только on-screen (dev-mode). Подключить SMTP/Resend/SendGrid чтобы инвайт-ссылка реально уходила на email.
-
-### Мелочи
-- Очистить дублирующиеся placeholder-структуры в других компонентах (Chats, Dashboard…).
-- Code-splitting в Vite (chunk > 500kB warning).
-- Реакция на TypeScript-сообщения «store.profile.email пустое после signup».
+### Возможные направления (когда захочется)
+- Дашборд: метрики по командам (сколько задач/сделок по каждому сотруднику).
+- Push-уведомления через Telegram-бот на изменения статуса сделки.
+- Bot-команды для команды: `/мои-задачи`, `/моя-выручка`, `/назначь-задачу @user текст`.
+- Импорт/экспорт справочников (CSV / Excel).
+- Версионирование сделок (история изменений с откатом).
+- Public API для интеграций (webhook на создание сделки и т.п.).
 
 ---
 
 ## 4. Текущее состояние деплоя
 
-- **Frontend (Vercel)**: `utir-soft.vercel.app` — Active, `vercel.json` есть, SPA-rewrite работает.
-- **Backend (Railway)**: `utir-soft-production.up.railway.app` — Active, последний коммит `726c0f8`.
-- **Telegram bot**: `@utirsoftbot` — pairing/память/per-module permissions/hand-off лог работают.
-- **БД**: SQLite WAL на Railway volume. Все P4-миграции идемпотентные, при следующем рестарте автоматически добьются.
-- **Секреты**: ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, JWT_SECRET — только в Railway env.
+- **Frontend (Vercel)**: `utir-soft.vercel.app` — Active. `vercel.json` rewrite работает.
+- **Backend (Railway)**: `utir-soft-production.up.railway.app` — Active, последний commit `baed330`.
+- **Telegram bot**: `@utirsoftbot` — pairing/память/per-module permissions/hand-off лог/уведомления о задачах работают.
+- **БД**: SQLite WAL на Railway volume. Все миграции идемпотентные, бэкфилл team_role + employees-row при каждом старте.
+- **Секреты**: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET` в Railway env.
+- **Не подключено**: `RESEND_API_KEY` (готово, нужно только добавить ключ в Railway), `EMAIL_FROM` (опционально для своего домена).
 
 ---
 
 ## Свежие коммиты
 
-- `726c0f8` — Remove employee from team = revoke their account access
+- `baed330` — Code-splitting: vendor chunks + lazy-load
+- `af63e98` — Real email via Resend (OTP + team invitations)
+- `d3d7bea` — 3 UX fixes: TG notify on task PATCH, modal close, matrix Save btn
+- `ca55a9d` — Hard admin gate on Команда, granular sub-tabs in matrix
+- `900d833` — Matrix: add Платежи + Реклама modules
+- `f46ae12` — Sync stale team_role, expand matrix modules
+- `f323510` — Phase 4: custom team roles
+- `1cf7cc8` — Phase 3: promote/demote teammates
+- `fdc3d4c` — Phase 2a: role × module matrix persists to backend
+- `8962523` — Phase 2b: backend enforces matrix
+- `9bf4940` — Phase 2c: hide write buttons when role is 'view'
+- `75dceea` — Phase 1: role-based access foundation
+- `726c0f8` — Remove employee = revoke their account access
+- `7978ce7` — Restore kicked teammate via UI
+- `31d3d28` — Team Telegram bot: notifications + paired-member badges
 - `e3cf2f6` — Auto-create employees row on signup
-- `da24729` — Invite history shows WHO accepted
-- `2c5632c` — Invite banner: graceful fallback for empty company
-- `7cf3447` — Fix: invitation preview 401 — register public route before auth router
-- `14ea000` — Debug invite preview: server log + clearer client error bucket
-- `424ba95` — Invite UX: handle invite link opened by an already-logged-in user
-- `e7a1cb6` — Fix: invite link 404 on Vercel — root path + SPA rewrite
 - `81e9de5` — Block P4: Multi-tenancy via team invitations
-- `0ec2a2a` — Polish: real team employees + show date in add_task summary
-- `35faff4` — Make task detail modal editable
-- `213c688` — Auto-refresh on Tasks / Sales / ActivityLog
-- `93609ed` — Block F.3: multi-turn memory (из прошлой сессии)
