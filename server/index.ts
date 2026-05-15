@@ -215,6 +215,26 @@ try {
   }
 } catch (e) { console.warn('[migration] employees backfill failed', e); }
 
+// Sync users.team_role with employees.data.role for any rows that diverged
+// (most often: users created before users.team_role column existed got the
+// default 'admin' even though their employees row says 'manager'/'employee').
+// Source of truth is the employees row because that's what the admin edits
+// in the UI; the UPDATE in role-PATCH already keeps both in sync going forward.
+try {
+  const rows = db.prepare(`SELECT u.id as user_id, u.team_role, e.data FROM users u JOIN employees e ON e.user_id = u.id`).all() as any[];
+  let synced = 0;
+  for (const r of rows) {
+    try {
+      const empRole = JSON.parse(r.data)?.role;
+      if (empRole && empRole !== r.team_role) {
+        db.prepare('UPDATE users SET team_role = ? WHERE id = ?').run(empRole, r.user_id);
+        synced++;
+      }
+    } catch { /* skip rows with bad JSON */ }
+  }
+  if (synced > 0) console.log(`[migration] synced team_role for ${synced} user(s) from their employees row`);
+} catch (e) { console.warn('[migration] team_role sync failed', e); }
+
 const DEFAULT_INTEGRATIONS = [
   { id: 'whatsapp', name: 'WhatsApp Business', desc: 'Сообщения WhatsApp', connected: false, cat: 'msg' },
   { id: 'telegram', name: 'Telegram Bot', desc: 'Боты и уведомления', connected: false, cat: 'msg' },

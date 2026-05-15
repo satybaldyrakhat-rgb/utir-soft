@@ -128,12 +128,15 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
     employee: 'bg-emerald-50 text-emerald-600',
   } as Record<string, string>)[r] || 'bg-gray-50 text-gray-600';
   const moduleLabel = (m: ModuleKey) => ({
-    orders: tt('modOrders'),
-    chats: tt('modChats'),
-    finance: tt('modFinance'),
-    production: tt('modProduction'),
-    analytics: tt('modAnalytics'),
-    settings: tt('modSettings'),
+    dashboard:    l('Главная',     'Басты бет',    'Home'),
+    'ai-design':  l('AI Дизайн',   'AI Дизайн',    'AI Design'),
+    orders:       tt('modOrders'),
+    production:   tt('modProduction'),
+    finance:      tt('modFinance'),
+    chats:        tt('modChats'),
+    tasks:        l('Задачи',      'Тапсырмалар', 'Tasks'),
+    analytics:    tt('modAnalytics'),
+    settings:     tt('modSettings'),
   })[m];
   const statusDot = (s: string) => s === 'active' ? 'bg-green-500' : s === 'vacation' ? 'bg-blue-500' : 'bg-gray-300';
 
@@ -518,9 +521,9 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
               <AddRoleButton language={language} onAdd={(n) => store.addRole(n)} />
             </div>
             <div className="text-[11px] text-gray-400 mb-3 max-w-xl">
-              {l('Создайте свои роли (например «Бухгалтер», «Мастер») и настройте их доступ в матрице ниже.',
-                 'Өзіңіздің рөлдеріңізді жасаңыз («Бухгалтер», «Шебер» және т.б.) және төмендегі матрицада олардың рұқсаттарын баптаңыз.',
-                 'Define your own roles (e.g. "Accountant", "Master") and set their access in the matrix below.')}
+              {l('Добавьте роли под структуру своей команды и настройте их доступ в матрице ниже.',
+                 'Команда құрылымына сай рөлдер қосып, төмендегі матрицада олардың рұқсаттарын баптаңыз.',
+                 'Add roles that match your team structure and set their access in the matrix below.')}
             </div>
             <div className="space-y-1.5">
               {store.roles.map(r => (
@@ -1066,7 +1069,7 @@ function AddRoleButton({ language, onAdd }: { language: 'kz' | 'ru' | 'eng'; onA
         onChange={e => setName(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { setName(''); setOpen(false); } }}
         autoFocus
-        placeholder={l('Бухгалтер', 'Бухгалтер', 'Accountant')}
+        placeholder={l('Название роли', 'Рөл атауы', 'Role name')}
         className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 w-32"
       />
       <button onClick={submit} className="px-2 py-1.5 bg-gray-900 text-white rounded-lg text-[11px] hover:bg-gray-800">
