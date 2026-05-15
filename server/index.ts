@@ -587,11 +587,23 @@ app.delete('/api/employees/:id', authMiddleware, requireRole('admin'), (req: Aut
     if (user) {
       // Safety: an admin cannot remove themselves this way — would orphan the team.
       if (user.id === req.userId) return res.status(400).json({ error: 'cannot remove yourself' });
-      db.prepare(`UPDATE users SET team_id = id, disabled_at = datetime('now') WHERE id = ?`).run(user.id);
+      // Soft-remove: block login (disabled_at) but keep team_id so admin can
+      // see and restore the user from the "Removed" list. Previously we also
+      // reset team_id, which made restoration impossible without manual SQL.
+      db.prepare(`UPDATE users SET disabled_at = datetime('now') WHERE id = ?`).run(user.id);
       kickedUser = { id: user.id, name: user.name };
     }
   }
-  db.prepare('DELETE FROM employees WHERE id = ? AND team_id = ?').run(req.params.id, req.teamId!);
+  // Mark the employees row as removed (rather than DELETE) so the data — name,
+  // phone, role, history — survives for restoration.
+  try {
+    const data = JSON.parse(row.data);
+    data.removed_at = new Date().toISOString();
+    db.prepare('UPDATE employees SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(data), req.params.id, req.teamId!);
+  } catch {
+    // If JSON parse fails (shouldn't happen), fall back to actual delete to keep prior behaviour.
+    db.prepare('DELETE FROM employees WHERE id = ? AND team_id = ?').run(req.params.id, req.teamId!);
+  }
   if (kickedUser) {
     logActivity(req.userId!, {
       user: '', action: 'Удалил сотрудника из команды',
@@ -599,6 +611,36 @@ app.delete('/api/employees/:id', authMiddleware, requireRole('admin'), (req: Aut
     });
   }
   res.json({ ok: true, kicked: !!kickedUser });
+});
+
+// Restore a previously-kicked teammate. Inverse of the DELETE above:
+// clears removed_at on the employees row and disabled_at on the user row.
+app.post('/api/employees/:id/restore', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT data FROM employees WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  let email = '';
+  let data: any = {};
+  try { data = JSON.parse(row.data); email = data.email || ''; } catch { /* ignore */ }
+  if (!data.removed_at) return res.status(400).json({ error: 'not removed' });
+
+  delete data.removed_at;
+  db.prepare('UPDATE employees SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(data), req.params.id, req.teamId!);
+
+  let restoredUser: { id: string; name: string } | null = null;
+  if (email) {
+    const user = db.prepare('SELECT id, name FROM users WHERE email = ? AND team_id = ?').get(email.toLowerCase(), req.teamId!) as any;
+    if (user) {
+      db.prepare('UPDATE users SET disabled_at = NULL WHERE id = ?').run(user.id);
+      restoredUser = { id: user.id, name: user.name };
+    }
+  }
+  if (restoredUser) {
+    logActivity(req.userId!, {
+      user: '', action: 'Восстановил сотрудника в команде',
+      target: restoredUser.name, type: 'invite', page: 'team',
+    });
+  }
+  res.json({ ok: true, restored: !!restoredUser });
 });
 
 app.use('/api/employees', makeCrud('employees', 'e'));

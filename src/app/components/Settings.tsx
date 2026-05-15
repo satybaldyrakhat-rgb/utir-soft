@@ -83,12 +83,18 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
   const initials = (profile.name || '').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   // Use store employees mapped to local format
-  const employees = store.employees.map(e => ({
+  // Map store employees to local view-model. We split into active (visible in
+  // the main team list) and removed (shown in the 'Удалённые сотрудники' block)
+  // by looking at the optional `removed_at` field added by the kick handler.
+  const allEmployees = store.employees.map(e => ({
     id: e.id, name: e.name, email: e.email, phone: e.phone, role: e.role,
     department: e.department, status: e.status, salary: e.salary, joinDate: e.joinDate,
     lastActive: e.lastActive, permissions: e.permissions, schedule: {} as Record<string, string>,
     performance: e.performance,
+    removedAt: (e as any).removed_at as string | undefined,
   }));
+  const employees = allEmployees.filter(e => !e.removedAt);
+  const removedEmployees = allEmployees.filter(e => e.removedAt);
   const setEmployees = (updater: any) => {
     // Handle updates through store
   };
@@ -223,6 +229,25 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
       `Remove ${emp.name} from the team? They will lose access to all data and won't be able to sign in.`,
     );
     if (confirm(msg)) store.deleteEmployee(id);
+  };
+
+  // Inverse: restore a previously-kicked teammate. Calls the POST /restore
+  // endpoint which clears removed_at on the employees row and disabled_at on
+  // the user row; then we refresh the store.
+  const restoreEmployee = async (id: string) => {
+    const emp = removedEmployees.find(e => e.id === id);
+    if (!emp) return;
+    if (!confirm(l(
+      `Восстановить ${emp.name} в команде? Сотрудник снова сможет войти со своими прежними правами.`,
+      `${emp.name} командаға қайта қосылсын ба? Қызметкер бұрынғы рұқсаттарымен қайта кіре алады.`,
+      `Restore ${emp.name} to the team? They will be able to sign in again with their previous role.`,
+    ))) return;
+    try {
+      await api.post(`/api/employees/${id}/restore`, {});
+      await store.reloadAll();
+    } catch (e: any) {
+      alert(String(e?.message || 'restore failed'));
+    }
   };
 
   const Toggle = ({ value, onChange }: { value: boolean; onChange: () => void }) => (
@@ -514,6 +539,43 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
                 )}
               </div>
             </>
+          )}
+
+          {/* ===== Removed teammates (admin can restore access) ===== */}
+          {removedEmployees.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+              <details>
+                <summary className="text-sm text-gray-900 cursor-pointer flex items-center justify-between select-none">
+                  <span>{l('Удалённые сотрудники', 'Жойылған қызметкерлер', 'Removed teammates')}</span>
+                  <span className="text-[11px] text-gray-400">{removedEmployees.length}</span>
+                </summary>
+                <div className="mt-3 space-y-1.5">
+                  {removedEmployees.map(emp => (
+                    <div key={emp.id} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-xl">
+                      <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center text-xs text-gray-500">
+                        {emp.name.charAt(0) || '?'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-gray-900 truncate">{emp.name}</div>
+                        <div className="text-[10px] text-gray-400 truncate">
+                          {emp.email}
+                          {emp.removedAt && (
+                            <> · {l('удалён', 'жойылды', 'removed')} {new Date(emp.removedAt).toLocaleDateString(language === 'eng' ? 'en-GB' : 'ru-RU')}</>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${roleBg(emp.role)}`}>{roleLabel(emp.role)}</span>
+                      <button
+                        onClick={() => restoreEmployee(emp.id)}
+                        className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] hover:bg-emerald-700 transition-colors"
+                      >
+                        {l('Восстановить', 'Қалпына келтіру', 'Restore')}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </div>
           )}
 
           {/* ===== Role list (admin can rename / delete / add custom roles) ===== */}
