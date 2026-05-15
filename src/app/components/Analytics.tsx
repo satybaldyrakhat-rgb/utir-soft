@@ -131,7 +131,10 @@ export function Analytics({ language }: AnalyticsProps) {
           </h1>
         </div>
         <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
-          {(Object.keys(tabs) as Array<keyof typeof tabs>).map(tab => (
+          {(Object.keys(tabs) as Array<keyof typeof tabs>).map(tab => {
+            // Hide the Реклама tab when matrix says 'none' for the marketing module.
+            if (tab === 'ads' && store.getModuleLevel('marketing') === 'none') return null;
+            return (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -141,11 +144,12 @@ export function Analytics({ language }: AnalyticsProps) {
             >
               {tabs[tab][language]}
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      {activeTab === 'ads' ? (
+      {activeTab === 'ads' && store.getModuleLevel('marketing') !== 'none' ? (
         <AdAnalytics language={language} />
       ) : (
         <>

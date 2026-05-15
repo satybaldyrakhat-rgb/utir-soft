@@ -128,14 +128,16 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
     employee: 'bg-emerald-50 text-emerald-600',
   } as Record<string, string>)[r] || 'bg-gray-50 text-gray-600';
   const moduleLabel = (m: ModuleKey) => ({
-    dashboard:    l('Главная',     'Басты бет',    'Home'),
-    'ai-design':  l('AI Дизайн',   'AI Дизайн',    'AI Design'),
+    dashboard:    l('Главная',         'Басты бет',    'Home'),
+    'ai-design':  l('AI Дизайн',       'AI Дизайн',    'AI Design'),
     orders:       tt('modOrders'),
     production:   tt('modProduction'),
-    finance:      tt('modFinance'),
+    finance:      l('Финансы',         'Қаржы',        'Finance'),
+    payments:     l('Платежи',         'Төлемдер',     'Payments'),
     chats:        tt('modChats'),
-    tasks:        l('Задачи',      'Тапсырмалар', 'Tasks'),
+    tasks:        l('Задачи',          'Тапсырмалар',  'Tasks'),
     analytics:    tt('modAnalytics'),
+    marketing:    l('Реклама',         'Жарнама',      'Marketing'),
     settings:     tt('modSettings'),
   })[m];
   const statusDot = (s: string) => s === 'active' ? 'bg-green-500' : s === 'vacation' ? 'bg-blue-500' : 'bg-gray-300';

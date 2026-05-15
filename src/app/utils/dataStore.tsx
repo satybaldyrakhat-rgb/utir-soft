@@ -60,10 +60,12 @@ export type ModuleKey =
   | 'ai-design'  // AI Дизайн
   | 'orders'     // Заказы (sales)
   | 'production' // Производство (warehouse)
-  | 'finance'    // Финансы
+  | 'finance'    // Финансы компании
+  | 'payments'   // Платежи — tab inside Заказы
   | 'chats'      // Чаты
   | 'tasks'      // Задачи
   | 'analytics'  // Аналитика
+  | 'marketing'  // Реклама — tab inside Аналитика
   | 'settings';  // Настройки
 
 export interface Employee {
@@ -86,12 +88,12 @@ export interface Employee {
 export type RolePermissions = Record<RoleKey, Record<ModuleKey, PermissionLevel>>;
 
 const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
-  admin:    { dashboard: 'full', 'ai-design': 'full', orders: 'full', production: 'full', finance: 'full', chats: 'full', tasks: 'full', analytics: 'full', settings: 'full' },
-  manager:  { dashboard: 'full', 'ai-design': 'full', orders: 'full', production: 'view', finance: 'view', chats: 'full', tasks: 'full', analytics: 'view', settings: 'none' },
-  employee: { dashboard: 'full', 'ai-design': 'view', orders: 'view', production: 'view', finance: 'none', chats: 'view', tasks: 'full', analytics: 'none', settings: 'none' },
+  admin:    { dashboard: 'full', 'ai-design': 'full', orders: 'full', production: 'full', finance: 'full', payments: 'full', chats: 'full', tasks: 'full', analytics: 'full', marketing: 'full', settings: 'full' },
+  manager:  { dashboard: 'full', 'ai-design': 'full', orders: 'full', production: 'view', finance: 'view', payments: 'full', chats: 'full', tasks: 'full', analytics: 'view', marketing: 'view', settings: 'none' },
+  employee: { dashboard: 'full', 'ai-design': 'view', orders: 'view', production: 'view', finance: 'none', payments: 'none', chats: 'view', tasks: 'full', analytics: 'none', marketing: 'none', settings: 'none' },
 };
 
-export const ALL_MODULES: ModuleKey[] = ['dashboard', 'ai-design', 'orders', 'production', 'finance', 'chats', 'tasks', 'analytics', 'settings'];
+export const ALL_MODULES: ModuleKey[] = ['dashboard', 'ai-design', 'orders', 'production', 'finance', 'payments', 'chats', 'tasks', 'analytics', 'marketing', 'settings'];
 // Default roles every brand-new team starts with. Admin is system (locked);
 // the other two are convenience pre-fills that the admin can rename or delete.
 export const DEFAULT_ROLES: TeamRole[] = [
@@ -251,7 +253,8 @@ function loadRolePermissions(): RolePermissions {
 // Default permission set for a brand-new role: 'none' on every module.
 const EMPTY_PERMS: Record<ModuleKey, PermissionLevel> = {
   dashboard: 'none', 'ai-design': 'none', orders: 'none', production: 'none',
-  finance: 'none', chats: 'none', tasks: 'none', analytics: 'none', settings: 'none',
+  finance: 'none', payments: 'none', chats: 'none', tasks: 'none',
+  analytics: 'none', marketing: 'none', settings: 'none',
 };
 
 const ROLES_STORAGE_KEY = 'utir_team_roles';

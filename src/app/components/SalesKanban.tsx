@@ -128,7 +128,10 @@ export function SalesKanban({ language }: SalesKanbanProps) {
             <div className="flex items-center gap-2">
               <div className="flex gap-1 bg-gray-50 p-0.5 rounded-xl">
                 <button onClick={() => setActiveTab('funnel')} className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${activeTab === 'funnel' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}>{l('Воронка', 'Воронка', 'Funnel')}</button>
-                <button onClick={() => setActiveTab('payments')} className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${activeTab === 'payments' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}>{l('Оплаты', 'Төлемдер', 'Payments')}</button>
+                {/* Платежи прячутся, если матрица роли = 'none' для модуля payments */}
+                {store.getModuleLevel('payments') !== 'none' && (
+                  <button onClick={() => setActiveTab('payments')} className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${activeTab === 'payments' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}>{l('Оплаты', 'Төлемдер', 'Payments')}</button>
+                )}
               </div>
               {/* Archive button */}
               <button
@@ -160,7 +163,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
           </div>
         </div>
 
-        {activeTab === 'payments' && <PaymentsHub language={language} />}
+        {activeTab === 'payments' && store.getModuleLevel('payments') !== 'none' && <PaymentsHub language={language} />}
 
         {/* Kanban Board */}
         {activeTab === 'funnel' && (
