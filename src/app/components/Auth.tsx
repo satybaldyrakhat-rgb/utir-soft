@@ -431,8 +431,15 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                   {l('Приглашение от', 'Шақыру', 'Invitation from')} <b>{invitePreview.inviter}</b>
                 </div>
                 <div className="text-sm text-emerald-900">
-                  {l('Вы присоединяетесь к команде', 'Командаға қосыласыз', 'You are joining team')}{' '}
-                  <b>{invitePreview.company}</b>
+                  {invitePreview.company ? (
+                    <>
+                      {l('Вы присоединяетесь к команде', 'Командаға қосыласыз', 'You are joining team')}{' '}
+                      <b>{invitePreview.company}</b>
+                    </>
+                  ) : (
+                    // Inviter never filled in a company name — fall back to "their team".
+                    <>{l('Вы присоединяетесь к команде', 'Командаға қосыласыз', 'You are joining the team')}</>
+                  )}
                   {' · '}
                   <span className="text-xs">{l('Роль', 'Рөл', 'Role')}: {invitePreview.role}</span>
                 </div>
@@ -516,7 +523,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                     {l('Команда', 'Команда', 'Team')}
                   </label>
                   <div className="w-full px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-900">
-                    {invitePreview.company}
+                    {invitePreview.company || l('Команда пользователя', 'Пайдаланушы командасы', "Inviter's team")}
                     <span className="text-xs text-emerald-600 ml-2">· {invitePreview.role}</span>
                   </div>
                 </div>
