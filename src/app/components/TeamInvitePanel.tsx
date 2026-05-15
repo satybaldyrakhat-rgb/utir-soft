@@ -34,8 +34,10 @@ const ROLE_LABEL: Record<string, { ru: string; kz: string; eng: string }> = {
 
 function buildLink(code: string) {
   // Use the current origin so the link is shareable across local / Vercel / Railway envs.
-  if (typeof window === 'undefined') return `/auth?invite=${code}`;
-  return `${window.location.origin}/auth?invite=${code}`;
+  // We point at "/" rather than "/auth" because this app is a single-page Vite bundle
+  // — there is no real /auth route on the server, only a query-param read on the root.
+  if (typeof window === 'undefined') return `/?invite=${code}`;
+  return `${window.location.origin}/?invite=${code}`;
 }
 
 export function TeamInvitePanel({ language }: Props) {
