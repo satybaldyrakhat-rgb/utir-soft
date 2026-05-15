@@ -164,6 +164,44 @@ for (const t of SHARED_TABLES) {
   }
 }
 
+// Ensure every user has a matching row in the employees table (so the team list
+// in Settings → Команда reflects everyone who has actually joined the team).
+// Idempotent: skips users who already have a corresponding employees row.
+try {
+  const orphans = db.prepare(
+    `SELECT u.id, u.name, u.email, u.team_id, u.team_role, u.created_at
+     FROM users u
+     WHERE NOT EXISTS (SELECT 1 FROM employees e WHERE e.user_id = u.id)`
+  ).all() as any[];
+  if (orphans.length > 0) {
+    const insert = db.prepare('INSERT INTO employees (id, user_id, team_id, data) VALUES (?, ?, ?, ?)');
+    const tx = db.transaction(() => {
+      for (const u of orphans) {
+        const empId = 'e' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+        const initial = (String(u.name || '?').charAt(0) || '?').toUpperCase();
+        const data = {
+          id: empId,
+          name: u.name || '',
+          email: u.email || '',
+          phone: '',
+          role: (u.team_role as string) || 'admin',
+          department: '',
+          status: 'active',
+          salary: 0,
+          joinDate: (u.created_at || new Date().toISOString()).slice(0, 10),
+          lastActive: new Date().toISOString(),
+          avatar: initial,
+          permissions: { sales: true, finance: u.team_role === 'admin', warehouse: false, chats: true, analytics: u.team_role === 'admin', settings: u.team_role === 'admin' },
+          performance: { ordersCompleted: 0, rating: 0, efficiency: 0 },
+        };
+        insert.run(empId, u.id, u.team_id || u.id, JSON.stringify(data));
+      }
+    });
+    tx();
+    console.log(`[migration] created ${orphans.length} employees row(s) for users without one`);
+  }
+} catch (e) { console.warn('[migration] employees backfill failed', e); }
+
 const DEFAULT_INTEGRATIONS = [
   { id: 'whatsapp', name: 'WhatsApp Business', desc: 'Сообщения WhatsApp', connected: false, cat: 'msg' },
   { id: 'telegram', name: 'Telegram Bot', desc: 'Боты и уведомления', connected: false, cat: 'msg' },
@@ -299,6 +337,35 @@ app.post('/api/auth/signup', async (req, res) => {
 
   if (invitationRow) {
     db.prepare('UPDATE invitations SET used_at = datetime(\'now\'), used_by = ? WHERE id = ?').run(id, invitationRow.id);
+  }
+
+  // Materialise a row in the employees table so this user immediately shows up
+  // under Settings → Команда. Done for both invite and self-signup paths.
+  {
+    const empId = newId('e');
+    const initial = (String(name).trim().charAt(0) || '?').toUpperCase();
+    const isAdmin = joinRole === 'admin';
+    const employeeData = {
+      id: empId,
+      name: String(name).trim(),
+      email: String(email).toLowerCase(),
+      phone: '',
+      role: joinRole,
+      department: '',
+      status: 'active',
+      salary: 0,
+      joinDate: new Date().toISOString().slice(0, 10),
+      lastActive: new Date().toISOString(),
+      avatar: initial,
+      permissions: {
+        sales: true, finance: isAdmin, warehouse: false, chats: true,
+        analytics: isAdmin, settings: isAdmin,
+      },
+      performance: { ordersCompleted: 0, rating: 0, efficiency: 0 },
+    };
+    db.prepare('INSERT INTO employees (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(
+      empId, id, finalTeamId, JSON.stringify(employeeData),
+    );
   }
 
   seedIntegrations(id);
