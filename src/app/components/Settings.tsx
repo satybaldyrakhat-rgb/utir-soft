@@ -37,7 +37,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
   const catalogs = store.catalogs;
   const aiClient = store.aiSettings.client;
   const aiAssistant = store.aiSettings.assistant;
-  const [activeTab, setActiveTab] = useState<'general' | 'employees' | 'ai-client' | 'ai-assistant' | 'modules' | 'integrations' | 'roles' | 'catalogs' | 'activity'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'employees' | 'ai-client' | 'ai-assistant' | 'modules' | 'integrations' | 'catalogs' | 'activity'>('general');
   const tt = (key: Parameters<typeof t>[0]) => t(key, language);
   const [savedFlash, setSavedFlash] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
@@ -212,15 +212,17 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
     </div>
   );
 
+  // 'roles' tab was merged into 'employees' — the permission matrix now lives
+  // at the bottom of the Команда tab so admin can manage who is in the team
+  // and what each role can do in one place.
   const tabs = [
     { id: 'general' as const, icon: SettingsIcon, label: l('Основные', 'Негізгі', 'General') },
-    { id: 'employees' as const, icon: Users, label: l('Команда', 'Команда', 'Team') },
+    { id: 'employees' as const, icon: Users, label: l('Команда и права', 'Команда және рұқсаттар', 'Team & permissions') },
     { id: 'catalogs' as const, icon: BookOpen, label: tt('catalogs') },
     { id: 'ai-client' as const, icon: MessageCircle, label: tt('aiClientTab') },
     { id: 'ai-assistant' as const, icon: Bot, label: tt('aiAssistantTab') },
     { id: 'modules' as const, icon: LayoutGrid, label: l('Модули', 'Модульдер', 'Modules') },
     { id: 'integrations' as const, icon: Zap, label: l('Интеграции', 'Интеграциялар', 'Integrations') },
-    { id: 'roles' as const, icon: Shield, label: l('Роли и права', 'Рөлдер', 'Roles') },
     // Admin-only: hidden from tab list for non-admins.
     ...(IS_CURRENT_USER_ADMIN ? [{ id: 'activity' as const, icon: Activity, label: tt('activityLog') }] : []),
   ];
@@ -474,6 +476,65 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
               </div>
             </>
           )}
+
+          {/* ===== Permissions matrix (merged from the old 'Роли и права' tab) ===== */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Shield className="w-4 h-4 text-gray-400" />
+              <div className="text-sm text-gray-900">{tt('permissionsMatrixTitle')}</div>
+            </div>
+            <div className="text-[11px] text-gray-400 mb-4 max-w-xl">{tt('permissionsMatrixHint')}</div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left text-[11px] text-gray-400 pb-3 pr-4">{l('Роль', 'Рөл', 'Role')}</th>
+                    {ALL_MODULES.map(m => (
+                      <th key={m} className="text-center text-[11px] text-gray-400 pb-3 px-2 whitespace-nowrap">{moduleLabel(m)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {ALL_ROLES.map(roleK => (
+                    <tr key={roleK} className="hover:bg-gray-50/50">
+                      <td className="py-3 pr-4">
+                        <span className={`px-2 py-0.5 rounded text-[11px] ${roleBg(roleK)}`}>{roleLabel(roleK)}</span>
+                      </td>
+                      {ALL_MODULES.map(module => {
+                        const current = store.rolePermissions[roleK][module];
+                        const isAdminFull = roleK === 'admin';
+                        const cycle: PermissionLevel[] = ['full', 'view', 'none'];
+                        const nextLevel = cycle[(cycle.indexOf(current) + 1) % cycle.length];
+                        return (
+                          <td key={module} className="py-3 px-2 text-center">
+                            <button
+                              onClick={() => !isAdminFull && store.setRolePermission(roleK, module, nextLevel)}
+                              disabled={isAdminFull}
+                              title={isAdminFull ? tt('roleAdmin') : ''}
+                              className={`inline-flex items-center justify-center w-7 h-7 rounded-full transition ${
+                                current === 'full' ? 'bg-green-50 hover:bg-green-100' :
+                                current === 'view' ? 'bg-gray-50 hover:bg-gray-100' :
+                                                     'bg-red-50 hover:bg-red-100'
+                              } ${isAdminFull ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                            >
+                              {current === 'full' && <Check className="w-3.5 h-3.5 text-green-600" />}
+                              {current === 'view' && <Eye className="w-3.5 h-3.5 text-gray-400" />}
+                              {current === 'none' && <X className="w-3.5 h-3.5 text-red-400" />}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 flex items-center gap-4 text-[11px] text-gray-400 flex-wrap">
+              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-50"><Check className="w-3 h-3 text-green-600" /></span>{tt('permLevelFull')}</span>
+              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-50"><Eye className="w-3 h-3 text-gray-400" /></span>{tt('permLevelView')}</span>
+              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-50"><X className="w-3 h-3 text-red-400" /></span>{tt('permLevelNone')}</span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -782,64 +843,6 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
       )}
 
       {/* ===== ROLES & PERMISSIONS — editable matrix ===== */}
-      {activeTab === 'roles' && (
-        <div className="space-y-5">
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="mb-1 text-sm text-gray-900">{tt('permissionsMatrixTitle')}</div>
-            <div className="text-[11px] text-gray-400 mb-4 max-w-xl">{tt('permissionsMatrixHint')}</div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr>
-                    <th className="text-left text-[11px] text-gray-400 pb-3 pr-4">{tt('roleAdmin').replace(/Админ$/, 'Роль')}</th>
-                    {ALL_MODULES.map(m => (
-                      <th key={m} className="text-center text-[11px] text-gray-400 pb-3 px-2 whitespace-nowrap">{moduleLabel(m)}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {ALL_ROLES.map(role => (
-                    <tr key={role} className="hover:bg-gray-50/50">
-                      <td className="py-3 pr-4">
-                        <span className={`px-2 py-0.5 rounded text-[11px] ${roleBg(role)}`}>{roleLabel(role)}</span>
-                      </td>
-                      {ALL_MODULES.map(module => {
-                        const current = store.rolePermissions[role][module];
-                        const isAdminFull = role === 'admin';
-                        const cycle: PermissionLevel[] = ['full', 'view', 'none'];
-                        const nextLevel = cycle[(cycle.indexOf(current) + 1) % cycle.length];
-                        return (
-                          <td key={module} className="py-3 px-2 text-center">
-                            <button
-                              onClick={() => !isAdminFull && store.setRolePermission(role, module, nextLevel)}
-                              disabled={isAdminFull}
-                              title={isAdminFull ? tt('roleAdmin') : ''}
-                              className={`inline-flex items-center justify-center w-7 h-7 rounded-full transition ${
-                                current === 'full' ? 'bg-green-50 hover:bg-green-100' :
-                                current === 'view' ? 'bg-gray-50 hover:bg-gray-100' :
-                                                     'bg-red-50 hover:bg-red-100'
-                              } ${isAdminFull ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                            >
-                              {current === 'full' && <Check className="w-3.5 h-3.5 text-green-600" />}
-                              {current === 'view' && <Eye className="w-3.5 h-3.5 text-gray-400" />}
-                              {current === 'none' && <X className="w-3.5 h-3.5 text-red-400" />}
-                            </button>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-4 flex items-center gap-4 text-[11px] text-gray-400">
-              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-50"><Check className="w-3 h-3 text-green-600" /></span>{tt('permLevelFull')}</span>
-              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-50"><Eye className="w-3 h-3 text-gray-400" /></span>{tt('permLevelView')}</span>
-              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-50"><X className="w-3 h-3 text-red-400" /></span>{tt('permLevelNone')}</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ===== ACTIVITY LOG — admin-only ===== */}
       {activeTab === 'activity' && IS_CURRENT_USER_ADMIN && (
