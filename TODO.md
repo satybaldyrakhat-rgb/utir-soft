@@ -1,73 +1,115 @@
 # Utir Soft — TODO / состояние работы
 
-_Обновлено: 2026-05-15_
+_Обновлено: 2026-05-16_
 
 Короткое резюме перед /compact, чтобы не потерять контекст между сессиями.
 
 ---
 
-## 1. Что уже сделали в этой сессии
+## 1. Сделано в текущей сессии (после прошлого TODO.md)
 
-- **Блок A — Auth**: signup с обязательными полями (email, password, name, company), верификация email через on-screen код, страницы Terms / Privacy, чекбокс согласия.
-- **Блок B.1 — Modules**: исправили toggle / save / feedback.
-- **Блок B.2 — Custom module constructor**: конструктор модулей (name / icon / fields / permissions). В `ModulesSettings.tsx` добавлены Edit/Trash для кастомных модулей и кнопка открытия ModuleBuilder.
-- **Блок C.1 — Roles**: упростили до `admin / manager / employee`.
-- **Блок D — Activity Log**: админ-only, фильтры, CSV-экспорт. Перенесён ВНУТРЬ Settings как вкладка.
-- **Блок E — Split AI**: Client messenger AI ↔ Platform AI assistant. Попап на платформе возвращён по запросу.
-- **Блок F.1 — Telegram bot + Claude foundation**: webhook, pairing через 6-символьные коды, free-form text → tool → подтверждение → запись в CRM. Бот @utirsoftbot настроен.
-- **Блок F.2 — Доп. AI-инструменты**: `add_deal`, `log_payment`, `update_deal_status`, `add_task`, `find_client` (read-only). Read-only пропускают подтверждение.
-- **Блок F.3 — Multi-turn memory**: rolling window 20 сообщений, persist в `telegram_links.chat_history`. Commit `93609ed`.
-- **Фиксы по ходу**:
-  - Pending state перевели с in-memory `Map` на колонку `pending_action` в SQLite (Railway рестартует процесс).
-  - `YES_RE` / `NO_RE` починили под кириллицу (JS `\b` ASCII-only) — заменили `\b` на `(?:[\s.,!?]|$)`.
-  - Убрали слишком агрессивный auto-clear pending (теперь только TTL или `/cancel`).
-  - Откатили бренды (MAGNAT/Rakhmat/Magnat) — карточка снова под мебель, универсальной не делаем.
+### Авто-обновление страниц
+- `src/app/utils/useAutoRefresh.ts` — хук: polling каждые 15с + пауза при скрытой вкладке + refresh при возврате.
+- Подключён в `Tasks.tsx`, `SalesKanban.tsx`, `ActivityLog.tsx`.
+
+### Карточка задачи редактируется
+- Раньше read-only с только статус-кнопками. Теперь редактируемая модалка: название, описание, исполнитель, приоритет, категория, срок, статус.
+- Кнопки Сохранить / Отмена / Удалить (с подтверждением).
+
+### Блок F.4 — per-module permissions для AI-бота
+- Бот теперь читает `users.ai_settings` (новая колонка, JSON-blob, синхронизируется через `GET/PUT /api/ai-settings`).
+- На каждый tool-call смотрит `assistant.modulePermissions[модуль]`:
+  - `auto` → выполняет без подтверждения, отвечает «⚡ Автоматически…»
+  - `confirm` → как было: сводка + «Да/Нет»
+  - `none` → отказывает с подсказкой «зайди в Настройки…»
+- В `aiTools.ts` у каждого инструмента поле `module`: sales / finance / tasks / readonly.
+
+### Блок F.5 — Hand-off notifications
+- Когда бот не смог/не захотел — пишет в Журнал действий (`type: 'ai'`, `actor: 'ai'`).
+- 7 reason-веток: Claude API failed, tool execute failed (confirm/auto), read-only failed, rejected by admin, module disabled, unknown tool.
+
+### Полировка
+- AI-генерируемые задачи: убрал placeholder-сотрудников из дропдаунов, теперь только реальная команда; пустая команда → «Не назначен».
+- Сводка `add_task` всегда показывает дату (если Claude не указал — «сегодня (YYYY-MM-DD)»).
+
+### Блок P4 — Multi-tenancy через инвайты (БОЛЬШОЙ)
+- БД: колонки `team_id`, `team_role`, `invited_by`, `disabled_at` на users; колонка `team_id` на всех шарных таблицах; новая таблица `invitations`. Идемпотентные миграции + бэкфилл существующих рядов.
+- Auth middleware прокидывает `teamId` + `teamRole`. Все CRUD фильтруют по `team_id` (user_id остался audit-полем).
+- Эндпоинты (только админ): POST/GET/DELETE `/api/invitations`. Публичный GET `/api/invitations/preview/:code` (зарегистрирован **перед** auth-роутером!).
+- Signup принимает `inviteCode` → новый юзер наследует team_id и роль инвайта.
+- Авто-создание `employees`-записи при любом signup'е + startup-backfill для существующих юзеров.
+- Frontend: `TeamInvitePanel.tsx` в Настройки → Команда (генерация ссылки, копирование, отзыв, история с именем того кто использовал).
+- Auth.tsx читает `?invite=XXX` из URL → preview → баннер «Приглашение от X · команда · роль».
+- Модалка «invite held» в App.tsx когда залогиненный юзер открывает свою же ссылку: 3 кнопки (скопировать / выйти-и-принять / закрыть).
+- vercel.json catch-all rewrite чтобы deep-links не давали 404.
+
+### Удаление из команды
+- DELETE `/api/employees/:id` теперь soft-disable: ставит `users.disabled_at` + сбрасывает team_id.
+- Backend: 403 «account disabled» в login + authMiddleware. Защита «нельзя удалить себя».
+- Frontend: кнопка 🗑 скрыта на своей же строке; кикнутый юзер автоматически выкидывается на Auth screen (api.ts ловит 403, чистит токен, App.tsx подписан на event).
+
+### Фиксы по ходу
+- `e7a1cb6` — invite link `/auth?invite=...` 404-ил на Vercel → перешли на `/?invite=...` + `vercel.json`.
+- `7cf3447` — preview-эндпоинт возвращал 401 (был ЗА auth-роутером) → перенёс выше mount.
+- `2c5632c` — fallback в баннере когда у инвайтера пустое company.
+- `da24729` — в истории инвайтов теперь видно имя того, кто использовал код.
 
 ---
 
-## 2. На каком моменте остановились (ждём подтверждение от тебя)
+## 2. На каком моменте остановились
 
-Ты подтвердил **«да, добавь авто-обновление»** — но я ещё НЕ начал реализацию.
-
-Проблема, которую нужно решить: фронт кэширует данные через `dataStore.reloadAll()`, вызываемый один раз на mount. Когда Telegram-бот создаёт задачу / сделку на сервере — на странице Tasks / SalesKanban / ActivityLog она не появляется без ручного Cmd+Shift+R.
-
-Жду от тебя: **«давай»** (или корректировки по интервалу 15 сек / списку страниц), чтобы начать реализацию авто-рефреша.
+Только что закрыли «удаление из команды» (commit `726c0f8`). Жду от тебя следующего направления.
 
 ---
 
-## 3. Очередь работ (приоритеты)
+## 3. Очередь (что осталось)
 
-1. **[P1] Авто-обновление** на Tasks.tsx, SalesKanban.tsx, ActivityLog.tsx
-   - `useEffect` + `setInterval` каждые 15 сек → `store.reloadAll()`
-   - Триггер на `visibilitychange` (возврат вкладки из Telegram)
-   - Пауза polling когда вкладка не видна
-   - Возможно вынести в кастомный хук `useAutoRefresh(intervalMs)`
-   - Проверить tsc + build + push → Railway redeploy
+### P1 — UX мелочи в роли-доступе
+- Сейчас manager / employee видят те же модули и могут править всё, что админ. Нужно ограничить:
+  - `requireRole('admin')` на роуты настроек / инвайтов / удаления (часть уже есть).
+  - На фронте — спрятать табы и кнопки по роли (Финансы только админу/manager; Журнал только админу — уже есть; и т.д.).
+  - Чёткая матрица «кто что может» в коде.
 
-2. **[P2] Per-module permissions для AI** — `auto / confirm / none` из настроек (отложено с F.2).
+### P2 — Восстановление выгнанного сотрудника
+- Пока чтобы вернуть — надо вручную в БД сбросить `disabled_at`. Сделать UI «История уволенных» с кнопкой «Восстановить».
 
-3. **[P3] Hand-off notifications** когда AI не уверен (отложено с F.2).
+### P3 — Telegram-бот для команды
+- Сейчас каждый юзер пейрит свой собственный бот-чат. Хорошо бы:
+  - У команды один общий бот, который понимает кто пишет (по `chat_id` → user → team_id).
+  - Уведомления о новых задачах падают в личку исполнителю (если он спарился).
 
-4. **[P4] C.2 Invitation flow** — multi-tenancy, приглашение сотрудников по ссылке.
+### P4 — Реальная отправка email
+- Сейчас OTP/инвайты только on-screen (dev-mode). Подключить SMTP/Resend/SendGrid чтобы инвайт-ссылка реально уходила на email.
 
-Дополнительно — обновить файлы памяти в `~/.claude/projects/.../memory/` после завершения F.3 / авто-рефреша.
+### Мелочи
+- Очистить дублирующиеся placeholder-структуры в других компонентах (Chats, Dashboard…).
+- Code-splitting в Vite (chunk > 500kB warning).
+- Реакция на TypeScript-сообщения «store.profile.email пустое после signup».
 
 ---
 
 ## 4. Текущее состояние деплоя
 
-- **Frontend (Vercel)**: `utir-soft.vercel.app` — Active, последний пуш из main.
-- **Backend (Railway)**: `utir-soft-production.up.railway.app` — Active, последний коммит `93609ed` (Block F.3 multi-turn memory).
-- **Telegram bot**: `@utirsoftbot` — webhook привязан к Railway, pairing работает, бот отвечает, память между сообщениями работает.
-- **БД**: SQLite на Railway volume, WAL mode. Миграции идемпотентные на boot (`pending_action`, `chat_history`, `company`, `verification_code`, `email_verified`, `terms_accepted_at`).
-- **Секреты**: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET` — в Railway env. (Ранее токен бота утёк дважды в чате — был отозван через @BotFather, новый только в Railway.)
+- **Frontend (Vercel)**: `utir-soft.vercel.app` — Active, `vercel.json` есть, SPA-rewrite работает.
+- **Backend (Railway)**: `utir-soft-production.up.railway.app` — Active, последний коммит `726c0f8`.
+- **Telegram bot**: `@utirsoftbot` — pairing/память/per-module permissions/hand-off лог работают.
+- **БД**: SQLite WAL на Railway volume. Все P4-миграции идемпотентные, при следующем рестарте автоматически добьются.
+- **Секреты**: ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, JWT_SECRET — только в Railway env.
 
 ---
 
-## Свежие коммиты (для ориентира)
+## Свежие коммиты
 
-- `93609ed` — Block F.3: multi-turn memory
-- `b0eaa3c` — fix: stop clearing pending on fall-through
-- `2db4c47` — fix: YES/NO regex для кириллицы
-- `7ea7713` — fix: pending state в SQLite вместо in-memory
-- `b3fefca` — Block F.1: Telegram + Claude foundation
+- `726c0f8` — Remove employee from team = revoke their account access
+- `e3cf2f6` — Auto-create employees row on signup
+- `da24729` — Invite history shows WHO accepted
+- `2c5632c` — Invite banner: graceful fallback for empty company
+- `7cf3447` — Fix: invitation preview 401 — register public route before auth router
+- `14ea000` — Debug invite preview: server log + clearer client error bucket
+- `424ba95` — Invite UX: handle invite link opened by an already-logged-in user
+- `e7a1cb6` — Fix: invite link 404 on Vercel — root path + SPA rewrite
+- `81e9de5` — Block P4: Multi-tenancy via team invitations
+- `0ec2a2a` — Polish: real team employees + show date in add_task summary
+- `35faff4` — Make task detail modal editable
+- `213c688` — Auto-refresh on Tasks / Sales / ActivityLog
+- `93609ed` — Block F.3: multi-turn memory (из прошлой сессии)
