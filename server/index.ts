@@ -182,6 +182,8 @@ function migrateColumn(table: string, column: string, ddl: string): boolean {
 // after we observed Railway restarting the process between requests and dropping the Map.
 migrateColumn('telegram_links', 'pending_action', 'TEXT');
 migrateColumn('telegram_links', 'chat_history', 'TEXT');
+// Multi-turn /design wizard state — JSON with current step + answers so far.
+migrateColumn('telegram_links', 'design_state', 'TEXT');
 migrateColumn('users', 'company', "TEXT DEFAULT ''");
 migrateColumn('users', 'verification_code', 'TEXT');
 const verifiedJustAdded = migrateColumn('users', 'email_verified', 'INTEGER DEFAULT 0');

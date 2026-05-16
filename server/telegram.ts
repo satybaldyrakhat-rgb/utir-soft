@@ -149,6 +149,142 @@ function clearPending(db: Database.Database, chatId: number) {
   db.prepare('UPDATE telegram_links SET pending_action = NULL WHERE chat_id = ?').run(chatId);
 }
 
+// ─── /design wizard state (multi-turn AI-design conversation) ────────────
+// Stored on telegram_links.design_state as JSON. Lets a user type plain
+// answers (or tap reply keyboard buttons) instead of crafting a full prompt.
+type DesignStep = 'room' | 'style' | 'mood' | 'confirm';
+interface DesignState {
+  step: DesignStep;
+  room?: string;
+  style?: string;
+  extra?: string; // user's free-text mood/details
+  expiresAt: number;
+}
+const DESIGN_TTL_MS = 15 * 60 * 1000;
+
+function getDesignState(db: Database.Database, chatId: number): DesignState | null {
+  const row = db.prepare('SELECT design_state FROM telegram_links WHERE chat_id = ?').get(chatId) as any;
+  if (!row?.design_state) return null;
+  try {
+    const s = JSON.parse(row.design_state) as DesignState;
+    if (!s || s.expiresAt < Date.now()) { clearDesignState(db, chatId); return null; }
+    return s;
+  } catch { clearDesignState(db, chatId); return null; }
+}
+function setDesignState(db: Database.Database, chatId: number, s: Omit<DesignState, 'expiresAt'>) {
+  db.prepare('UPDATE telegram_links SET design_state = ? WHERE chat_id = ?').run(
+    JSON.stringify({ ...s, expiresAt: Date.now() + DESIGN_TTL_MS }), chatId,
+  );
+}
+function clearDesignState(db: Database.Database, chatId: number) {
+  db.prepare('UPDATE telegram_links SET design_state = NULL WHERE chat_id = ?').run(chatId);
+}
+
+// Reply-keyboard rows for the wizard. Telegram renders them under the
+// input area; tapping a button sends the label as a regular text message.
+const KB_ROOMS = [
+  ['🍳 Кухня', '🛏 Спальня', '🛋 Гостиная'],
+  ['🛁 Ванная', '🧸 Детская', '🚪 Прихожая'],
+  ['/skip'],
+];
+const KB_STYLES = [
+  ['🌲 Скандинавский', '◻️ Минимализм'],
+  ['🧱 Лофт', '🏛 Классика'],
+  ['✨ Модерн', '🌿 Эко'],
+  ['/skip'],
+];
+const KB_MOOD = [
+  ['☀️ Утренний свет', '🛋 Уютно'],
+  ['💎 Премиум', '📐 Просторно'],
+  ['🌱 С растениями', '🌙 Вечерние лампы'],
+  ['/skip готово'],
+];
+
+// Strip emoji/leading symbols from a button label so the answer matches our
+// wizard's room/style keys.
+function cleanLabel(s: string): string {
+  return s.replace(/^[^a-zа-яё]+/i, '').trim().toLowerCase();
+}
+
+// Map a user's text answer (button label or freeform) to a Russian phrase
+// that goes into the final assembled prompt.
+const ROOM_MAP: Record<string, string> = {
+  'кухня': 'просторная кухня',
+  'спальня': 'уютная спальня',
+  'гостиная': 'светлая гостиная',
+  'ванная': 'современная ванная комната',
+  'детская': 'детская комната',
+  'прихожая': 'прихожая',
+};
+const STYLE_MAP: Record<string, string> = {
+  'скандинавский': 'в скандинавском стиле, белые матовые фасады, дерево, мягкое естественное освещение',
+  'сканди': 'в скандинавском стиле, белые матовые фасады, дерево, мягкое естественное освещение',
+  'минимализм': 'в стиле минимализм, чистые линии, монохромная палитра',
+  'лофт': 'в стиле лофт, кирпичная кладка, открытые балки, металл',
+  'классика': 'в классическом стиле, лепнина, благородные материалы, тёплый свет',
+  'классический': 'в классическом стиле, лепнина, благородные материалы, тёплый свет',
+  'модерн': 'в стиле современный модерн, акцентные геометрии, тёмный дуб, латунь',
+  'современный': 'в стиле современный модерн, акцентные геометрии, тёмный дуб, латунь',
+  'эко': 'в эко-стиле, натуральные материалы, лён, ротанг, много зелени',
+};
+
+// Build a prompt from wizard answers.
+function assemblePromptFromWizard(s: DesignState): string {
+  const parts: string[] = [];
+  if (s.room && ROOM_MAP[s.room]) parts.push(ROOM_MAP[s.room]);
+  if (s.style && STYLE_MAP[s.style]) parts.push(STYLE_MAP[s.style]);
+  if (s.extra) parts.push(s.extra);
+  return parts.join(', ');
+}
+
+// Shared image generation routine — pulled out so /design with-args AND
+// the wizard's final confirm step can share the same code path.
+async function runDesignGeneration(
+  db: Database.Database, chatId: number,
+  user: { id: string; teamId: string; name: string },
+  providerId: 'chatgpt' | 'gemini' | 'claude' | 'utir-mix',
+  prompt: string,
+  logActivity: (userId: string, entry: any) => void,
+) {
+  await sendMessage(chatId, `🎨 Генерирую (${providerId}), это может занять 10-30 секунд…`);
+  const { generate } = await import('./aiImage.js');
+  let results;
+  try { results = await generate(providerId, prompt); }
+  catch (e: any) { await sendMessage(chatId, `❌ Ошибка генерации: ${String(e?.message || e)}`); return; }
+  const ok = results.filter((r: any) => r.ok);
+  if (ok.length === 0) {
+    await sendMessage(chatId, `❌ Не получилось: ${results[0]?.error || 'неизвестная причина'}`);
+    return;
+  }
+  const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(user.id) as any;
+  for (const r of ok) {
+    const id = 'aig_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+    try {
+      db.prepare(
+        'INSERT INTO ai_generations (id, team_id, user_id, user_name, provider, prompt, image_url, image_data, enhanced_prompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ).run(id, user.teamId, user.id, actor?.name || '', r.provider, prompt, r.imageUrl || null, r.imageDataUrl || null, r.enhancedPrompt || null);
+    } catch (e) { console.warn('[design save]', e); }
+  }
+  for (const r of ok) {
+    try {
+      if (r.imageUrl) {
+        await tg('sendPhoto', { chat_id: chatId, photo: r.imageUrl, caption: `<b>${r.provider}</b>${r.enhancedPrompt ? `\n<i>Prompt:</i> ${r.enhancedPrompt.slice(0, 200)}` : ''}`, parse_mode: 'HTML' });
+      } else {
+        await sendMessage(chatId, `<b>${r.provider}</b> ✅ — открыть на платформе → AI Дизайн.`);
+      }
+    } catch (e) {
+      console.warn('[design send photo]', e);
+      await sendMessage(chatId, `<b>${r.provider}</b>: открыть на платформе → AI Дизайн.`);
+    }
+  }
+  logActivity(user.id, {
+    user: user.name, actor: 'human',
+    action: 'Сгенерировал AI-дизайн через Telegram',
+    target: prompt.slice(0, 100),
+    type: 'create', page: 'ai-design',
+  });
+}
+
 // ─── Per-module AI permissions (Block F.4) ────────────────────────────────
 // Each user can configure per-module behaviour in Settings → AI-assistant:
 //   - 'auto'    → bot executes the tool immediately, no confirmation
@@ -260,6 +396,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
 
     if (cmd === '/start') {
       clearHistory(db, chatId);
+      clearDesignState(db, chatId);
       const paired = findUserByChat(db, chatId);
       if (paired) {
         await sendMessage(chatId,
@@ -294,8 +431,9 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
         `<code>/assign Имя текст задачи</code> — поставить задачу сотруднику\n` +
         `<code>/assign @username текст задачи</code> — по Telegram-нику\n\n` +
         `<b>AI Дизайн:</b>\n` +
-        `<code>/design описание интерьера</code> — UTIR-mix (все провайдеры)\n` +
-        `<code>/design @chatgpt|@gemini|@claude ...</code> — выбрать конкретный\n\n` +
+        `<code>/design</code> — wizard, отвечаете кнопками шаг за шагом\n` +
+        `<code>/design описание интерьера</code> — мгновенно (UTIR-mix)\n` +
+        `<code>/design @chatgpt|@gemini|@claude …</code> — выбрать провайдер\n\n` +
         `<b>Прочее:</b> /start /link /cancel /help`,
       );
       return;
@@ -332,9 +470,15 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
 
     if (cmd === '/cancel') {
       const had = getPending(db, chatId);
+      const hadDesign = !!getDesignState(db, chatId);
       clearPending(db, chatId);
       clearHistory(db, chatId);
-      await sendMessage(chatId, had ? 'Действие отменено. История диалога очищена.' : 'История диалога очищена.');
+      clearDesignState(db, chatId);
+      await tg('sendMessage', {
+        chat_id: chatId,
+        text: had || hadDesign ? 'Действие отменено. История диалога очищена.' : 'История диалога очищена.',
+        reply_markup: { remove_keyboard: true },
+      });
       return;
     }
 
@@ -422,18 +566,23 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     // Defaults to UTIR-mix (runs every configured provider in parallel).
     //   /design <описание интерьера>
     //   /design @gemini <описание>   ← опционально выбрать провайдер
+    // /design — start the wizard when called bare, or instant-generate when
+    // the user supplies a description in one go.
+    //   /design                                   → wizard (рекомендуем)
+    //   /design <описание интерьера>              → мгновенно через UTIR-mix
+    //   /design @gemini|@chatgpt|@claude <описание>  → выбрать провайдер
     if (cmd === '/design' || cmd === '/дизайн') {
       const user = findUserByChat(db, chatId);
       if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт: <code>/link КОД</code>'); return; }
       if (args.length === 0) {
-        await sendMessage(chatId,
-          `<b>Использование:</b>\n` +
-          `<code>/design описание интерьера</code> — всё доступное (UTIR-mix)\n` +
-          `<code>/design @chatgpt описание</code> — только ChatGPT\n` +
-          `<code>/design @gemini описание</code>  — только Gemini\n` +
-          `<code>/design @claude описание</code>  — Claude улучшает prompt и роутит\n\n` +
-          `Пример: <code>/design кухня в стиле сканди, белые фасады, дубовая столешница, окно</code>`,
-        );
+        // Start wizard: clear any old state, set step=room, send keyboard.
+        setDesignState(db, chatId, { step: 'room' });
+        await tg('sendMessage', {
+          chat_id: chatId,
+          parse_mode: 'HTML',
+          text: '🎨 <b>Соберём AI-дизайн вместе.</b>\n\n<b>Шаг 1/3 — какая комната?</b>',
+          reply_markup: { keyboard: KB_ROOMS, resize_keyboard: true, one_time_keyboard: true },
+        });
         return;
       }
       // Pick provider via leading @flag, default utir-mix.
@@ -447,57 +596,8 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
         }
       }
       const prompt = promptArgs.join(' ');
-      if (!prompt.trim()) {
-        await sendMessage(chatId, 'Пустой запрос — добавьте описание после команды.');
-        return;
-      }
-      await sendMessage(chatId, `🎨 Генерирую (${providerId}), это может занять 10-30 секунд…`);
-      // Import lazily so the telegram module doesn't carry aiImage at module load.
-      const { generate } = await import('./aiImage.js');
-      let results;
-      try { results = await generate(providerId as any, prompt); }
-      catch (e: any) {
-        await sendMessage(chatId, `❌ Ошибка генерации: ${String(e?.message || e)}`);
-        return;
-      }
-      const ok = results.filter(r => r.ok);
-      if (ok.length === 0) {
-        const reason = results[0]?.error || 'неизвестная причина';
-        await sendMessage(chatId, `❌ Не получилось: ${reason}`);
-        return;
-      }
-      // Persist into ai_generations so the platform shows the generation.
-      const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(user.id) as any;
-      for (const r of ok) {
-        const id = newId('aig_');
-        try {
-          db.prepare(
-            'INSERT INTO ai_generations (id, team_id, user_id, user_name, provider, prompt, image_url, image_data, enhanced_prompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          ).run(id, user.teamId, user.id, actor?.name || '', r.provider, prompt, r.imageUrl || null, r.imageDataUrl || null, r.enhancedPrompt || null);
-        } catch (e) { console.warn('[/design save]', e); }
-      }
-      // Send each image back as a photo. URL → sendPhoto; base64 → sendPhoto via URL of the
-      // platform... actually Telegram sendPhoto accepts URL strings only (no base64). For
-      // base64 results we fall back to a message with the data URL is too long — use
-      // platform link instead. (We do save the image; user can open the platform.)
-      for (const r of ok) {
-        try {
-          if (r.imageUrl) {
-            await tg('sendPhoto', { chat_id: chatId, photo: r.imageUrl, caption: `<b>${r.provider}</b>${r.enhancedPrompt ? `\n<i>Prompt:</i> ${r.enhancedPrompt.slice(0, 200)}` : ''}`, parse_mode: 'HTML' });
-          } else {
-            await sendMessage(chatId, `<b>${r.provider}</b> ✅ — открыть на платформе → AI Дизайн (base64-генерация, длинная для пересылки в Telegram).`);
-          }
-        } catch (e) {
-          console.warn('[/design send photo]', e);
-          await sendMessage(chatId, `<b>${r.provider}</b>: открыть на платформе → AI Дизайн.`);
-        }
-      }
-      logActivity(user.id, {
-        user: user.name, actor: 'human',
-        action: 'Сгенерировал AI-дизайн через Telegram',
-        target: prompt.slice(0, 100),
-        type: 'create', page: 'ai-design',
-      });
+      if (!prompt.trim()) { await sendMessage(chatId, 'Пустой запрос. Используйте /design без аргументов для wizard.'); return; }
+      await runDesignGeneration(db, chatId, user, providerId, prompt, logActivity);
       return;
     }
 
@@ -569,6 +669,91 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
 
     await sendMessage(chatId, `Не знаю такой команды. Доступны: /start /help /link /today /tasks /revenue /assign /design /cancel`);
     return;
+  }
+
+  // --- /design wizard active? Step through it. ---------------------
+  // Plain text (or reply-keyboard taps) routed here instead of Claude so the
+  // user can answer "кухня" → "сканди" → ... without typing /design again.
+  const designState = getDesignState(db, chatId);
+  if (designState) {
+    const user = findUserByChat(db, chatId);
+    if (!user) { clearDesignState(db, chatId); await sendMessage(chatId, 'Аккаунт не привязан. /link КОД'); return; }
+    const answer = cleanLabel(text);
+    if (answer === 'cancel' || answer === '/cancel' || text === '/cancel') {
+      clearDesignState(db, chatId);
+      await tg('sendMessage', { chat_id: chatId, text: 'Отменил.', reply_markup: { remove_keyboard: true } });
+      return;
+    }
+    // STEP 1 → room
+    if (designState.step === 'room') {
+      let room: string | undefined;
+      for (const key of Object.keys(ROOM_MAP)) {
+        if (answer.includes(key)) { room = key; break; }
+      }
+      if (!room && answer !== 'skip' && answer !== '/skip') {
+        await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML',
+          text: 'Не понял. Выберите кнопкой:',
+          reply_markup: { keyboard: KB_ROOMS, resize_keyboard: true, one_time_keyboard: true },
+        });
+        return;
+      }
+      setDesignState(db, chatId, { ...designState, step: 'style', room });
+      await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML',
+        text: '<b>Шаг 2/3 — какой стиль?</b>',
+        reply_markup: { keyboard: KB_STYLES, resize_keyboard: true, one_time_keyboard: true },
+      });
+      return;
+    }
+    // STEP 2 → style
+    if (designState.step === 'style') {
+      let style: string | undefined;
+      for (const key of Object.keys(STYLE_MAP)) {
+        if (answer.includes(key)) { style = key; break; }
+      }
+      if (!style && answer !== 'skip' && answer !== '/skip') {
+        await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML',
+          text: 'Не понял. Выберите кнопкой:',
+          reply_markup: { keyboard: KB_STYLES, resize_keyboard: true, one_time_keyboard: true },
+        });
+        return;
+      }
+      setDesignState(db, chatId, { ...designState, step: 'mood', style });
+      await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML',
+        text: '<b>Шаг 3/3 — атмосфера / детали (по желанию).</b>\nТекстом любое: «бежевые шторы, мраморный пол, окно во всю стену». Или нажмите кнопку:',
+        reply_markup: { keyboard: KB_MOOD, resize_keyboard: true, one_time_keyboard: true },
+      });
+      return;
+    }
+    // STEP 3 → mood / details → generate
+    if (designState.step === 'mood') {
+      let extra = '';
+      if (answer && answer !== 'skip готово' && answer !== '/skip готово' && answer !== '/skip' && answer !== 'skip') {
+        // Map labels to phrases; if user typed free text, use it raw.
+        const moodPhrase: Record<string, string> = {
+          'утренний свет': 'мягкий утренний свет из окна',
+          'уютно':         'тёплая уютная атмосфера',
+          'премиум':       'премиальные материалы, латунь и натуральный камень',
+          'просторно':     'высокие потолки, ощущение простора',
+          'с растениями':  'много комнатных растений',
+          'вечерние лампы':'вечернее тёплое освещение от ламп',
+        };
+        const matched = Object.keys(moodPhrase).find(k => answer.includes(k));
+        extra = matched ? moodPhrase[matched] : text.trim();
+      }
+      const finalState: DesignState = { ...designState, step: 'confirm', extra: extra || undefined, expiresAt: 0 };
+      const prompt = assemblePromptFromWizard(finalState);
+      clearDesignState(db, chatId);
+      if (!prompt.trim()) {
+        await tg('sendMessage', { chat_id: chatId, text: 'Слишком мало деталей — попробуйте /design ещё раз.', reply_markup: { remove_keyboard: true } });
+        return;
+      }
+      await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML',
+        text: `<b>Готовлю prompt:</b>\n<i>${prompt}</i>`,
+        reply_markup: { remove_keyboard: true },
+      });
+      await runDesignGeneration(db, chatId, user, 'utir-mix', prompt, logActivity);
+      return;
+    }
   }
 
   // --- Confirmation of pending tool? -------------------------------
