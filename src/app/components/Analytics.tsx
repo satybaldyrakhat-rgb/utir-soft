@@ -587,8 +587,8 @@ function TeamMetrics({ language }: { language: 'kz' | 'ru' | 'eng' }) {
     const tasksInProgress = empTasks.filter(t => t.status === 'in_progress' || t.status === 'review').length;
     const tasksNew = empTasks.filter(t => t.status === 'new').length;
 
-    // Deal attribution by free-text role fields. Matching is case-insensitive
-    // and accepts the full name or just the first name.
+    // Deal attribution: prefer the explicit ownerId on the deal; fall back to
+    // free-text role fields for legacy rows without an ownerId set.
     const empNameLow = (emp.name || '').toLowerCase().trim();
     const firstNameLow = empNameLow.split(/\s+/)[0] || '';
     const matchesEmp = (val: string | undefined): boolean => {
@@ -596,9 +596,10 @@ function TeamMetrics({ language }: { language: 'kz' | 'ru' | 'eng' }) {
       const v = val.toLowerCase();
       return v.includes(empNameLow) || (firstNameLow.length > 2 && v.includes(firstNameLow));
     };
-    const empDeals = store.deals.filter(d =>
-      matchesEmp(d.measurer) || matchesEmp(d.designer) || matchesEmp((d as any).foreman) || matchesEmp((d as any).architect),
-    );
+    const empDeals = store.deals.filter(d => {
+      if (d.ownerId) return d.ownerId === emp.id;
+      return matchesEmp(d.measurer) || matchesEmp(d.designer) || matchesEmp((d as any).foreman) || matchesEmp((d as any).architect);
+    });
     const dealsClosed = empDeals.filter(d => d.status === 'completed').length;
     const dealsRejected = empDeals.filter(d => d.status === 'rejected').length;
     const dealsActive = empDeals.length - dealsRejected;
@@ -715,13 +716,12 @@ function TeamMetrics({ language }: { language: 'kz' | 'ru' | 'eng' }) {
         })}
       </div>
 
-      {/* Attribution note — explains how we link deals to teammates so the
-          admin understands why a deal might not show up under someone. */}
+      {/* Attribution note. */}
       <div className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-[11px] text-gray-500 leading-relaxed">
         {l(
-          'Задачи привязаны к сотруднику по полю «Исполнитель». Сделки — по полям «Замерщик», «Дизайнер», «Прораб» или «Архитектор» (совпадение по имени). Если сотрудник не виден по сделке — проверьте что его имя указано в одном из этих полей.',
-          'Тапсырмалар «Орындаушы» өрісі бойынша байланысады. Мәмілелер «Өлшеуші», «Дизайнер», «Прораб» немесе «Сәулетші» өрістері бойынша. Аты сол өрістердің бірінде көрсетілгенін тексеріңіз.',
-          'Tasks are linked by Assignee. Deals are linked by Measurer / Designer / Foreman / Architect (name match). If a deal does not show up under someone, make sure their name is in one of those fields.',
+          'Задачи привязываются к сотруднику по полю «Исполнитель». Сделки — по полю «Ответственный»; если оно пустое, используется имя в полях «Замерщик / Дизайнер / Прораб / Архитектор». Чтобы метрика была точнее, открывайте сделку и ставьте «Ответственный».',
+          'Тапсырмалар «Орындаушы» өрісі бойынша байланысады. Мәмілелер «Жауапты» өрісі арқылы; ол бос болса, «Өлшеуші / Дизайнер / Прораб / Сәулетші» өрістерінде көрсетілген аты қолданылады. Дәлірек болуы үшін мәмілеге «Жауапты» қойыңыз.',
+          'Tasks are linked by Assignee. Deals are linked by Owner; if empty, the name in Measurer / Designer / Foreman / Architect is used. Set Owner on each deal for precise metrics.',
         )}
       </div>
     </div>

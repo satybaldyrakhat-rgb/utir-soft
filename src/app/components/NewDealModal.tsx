@@ -15,6 +15,8 @@ export function NewDealModal({ language, onClose }: Props) {
   const [product, setProduct] = useState({ type: '', template: '', l: 3, w: 0.6, h: 0.9, material: '', color: '', hardware: '', addons: [] as string[] });
   const [term, setTerm] = useState({ measureDate: '', measurer: '', readyDate: '', installDate: '', amount: 0, payMethod: 'kaspi', prepay: 50 });
   const [docs, setDocs] = useState({ notes: '' });
+  // Owner — feeds the team-metrics dashboard precisely. Empty = unassigned.
+  const [ownerId, setOwnerId] = useState('');
 
 
   const TABS = [l('Клиент', 'Клиент', 'Client'), l('Изделие', 'Бұйым', 'Product'), l('Срок и оплата', 'Мерзім', 'Term & Pay'), l('Документы', 'Құжаттар', 'Documents')];
@@ -57,6 +59,7 @@ export function NewDealModal({ language, onClose }: Props) {
         installment: term.payMethod === 'installment',
       },
       notes: docs.notes,
+      ownerId: ownerId || undefined,
     });
     onClose();
   };
@@ -157,6 +160,20 @@ export function NewDealModal({ language, onClose }: Props) {
             </div>
           </>)}
           {tab === 2 && (<>
+            {/* Owner picker — explicit assignee for team-metrics attribution. */}
+            <div>
+              <label className="block text-[11px] text-gray-400 mb-1">{l('Ответственный', 'Жауапты', 'Owner')}</label>
+              <select
+                value={ownerId}
+                onChange={e => setOwnerId(e.target.value)}
+                className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+              >
+                <option value="">{l('Не назначен', 'Тағайындалмаған', 'Unassigned')}</option>
+                {store.employees
+                  .filter((e: any) => !e.removed_at)
+                  .map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><label className="block text-[11px] text-gray-400 mb-1">{l('Дата замера', 'Өлшеу күні', 'Measure date')}</label><input type="date" value={term.measureDate} onChange={e => setTerm({ ...term, measureDate: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" /></div>
               <div><label className="block text-[11px] text-gray-400 mb-1">{l('Замерщик', 'Өлшеуші', 'Measurer')}</label>

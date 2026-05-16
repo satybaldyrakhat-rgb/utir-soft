@@ -39,6 +39,8 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   const [source, setSource] = useState(deal.source || 'Instagram');
   const [measurer, setMeasurer] = useState(deal.measurer || '');
   const [designer, setDesigner] = useState(deal.designer || '');
+  // Owner — employee responsible for the deal (used by team-metrics tab).
+  const [ownerId, setOwnerId] = useState(deal.ownerId || '');
   const [furnitureType, setFurnitureType] = useState(deal.furnitureType || '');
   const [materials, setMaterials] = useState(deal.materials || '');
   const [measurementDate, setMeasurementDate] = useState(deal.measurementDate || '');
@@ -88,6 +90,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       furnitureType, materials,
       measurementDate, completionDate, installationDate,
       notes, paidAmount, paymentMethods,
+      ownerId: ownerId || undefined,
     });
     onClose();
   };
@@ -212,7 +215,20 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
               {/* ── Section: Team ── */}
               <section>
                 <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Команда', 'Команда', 'Team')}</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Owner — explicit employee link. Falls back to first-name match
+                    on measurer/designer/foreman fields when missing; this makes
+                    revenue / conversion in the Team-metrics tab accurate. */}
+                <FieldSelect
+                  label={l('Ответственный', 'Жауапты', 'Owner')}
+                  value={ownerId}
+                  onChange={setOwnerId}
+                >
+                  <option value="">{l('Не назначен', 'Тағайындалмаған', 'Unassigned')}</option>
+                  {store.employees
+                    .filter((e: any) => !e.removed_at)
+                    .map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </FieldSelect>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                   <FieldInput label={tt('measurer')} value={measurer} onChange={setMeasurer} placeholder={tt('notSelected')} />
                   <FieldInput label={tt('designer')} value={designer} onChange={setDesigner} placeholder={tt('notSelected')} />
                 </div>

@@ -37,6 +37,11 @@ export interface Deal {
   paymentMethods: Record<string, boolean>;
   notes: string;
   createdAt: string;
+  // Owner — the employee responsible for the deal. Used by the team-metrics
+  // dashboard for precise attribution. Falls back to the free-text role fields
+  // (measurer/designer/foreman/architect) when missing. Optional so legacy
+  // rows without it keep working.
+  ownerId?: string;
 }
 
 // RoleKey is now a free-form string id (e.g. 'admin', 'manager', 'accountant').
