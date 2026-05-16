@@ -198,6 +198,9 @@ export function AIDesign({ language }: AIDesignProps) {
   const [error, setError] = useState('');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
+  // Quota status — null limit means unlimited.
+  const [usage, setUsage] = useState<{ used: number; limit: number | null; role: string } | null>(null);
+
   // Auto-assembled prompt from wizard selections. Concatenates room +
   // style + optional moods + extra free-text comma-separated, in Russian.
   const assembledPrompt = useMemo(() => {
@@ -219,12 +222,14 @@ export function AIDesign({ language }: AIDesignProps) {
 
   const reloadAll = async () => {
     try {
-      const [p, h] = await Promise.all([
+      const [p, h, q] = await Promise.all([
         api.get<ProviderStatus[]>('/api/ai-design/providers'),
         api.get<HistoryEntry[]>('/api/ai-design/history').catch(() => [] as HistoryEntry[]),
+        api.get<{ you: { used: number; limit: number | null; role: string } }>('/api/ai-design/quotas').catch(() => null),
       ]);
       setProviders(p);
       setHistory(h);
+      if (q) setUsage(q.you);
       const stillEnabled = p.find(x => x.id === selectedProvider)?.enabled;
       if (!stillEnabled) setSelectedProvider(p.find(x => x.enabled)?.id || 'utir-mix');
     } catch (e: any) {
@@ -250,7 +255,12 @@ export function AIDesign({ language }: AIDesignProps) {
       setResults(res.results || []);
       void reloadAll();
     } catch (e: any) {
-      setError(String(e?.message || 'generation failed'));
+      const msg = String(e?.message || 'generation failed');
+      setError(msg === 'quota exceeded'
+        ? l('Лимит генераций в этом месяце исчерпан. Попросите админа увеличить квоту в Настройки → AI-настройки.',
+            'Осы айдағы лимит таусылды. Әкімшіден квотаны ұлғайтуды сұраңыз.',
+            'Monthly quota exhausted. Ask admin to raise the limit in Settings → AI settings.')
+        : msg);
     } finally {
       setGenerating(false);
     }
@@ -519,7 +529,24 @@ export function AIDesign({ language }: AIDesignProps) {
           </div>
         </div>
         <div className="flex items-center justify-between">
-          <div className="text-[11px] text-gray-400">{l('Обычно 10–60 секунд', '10–60 секунд алады', 'Usually 10–60s')}</div>
+          <div className="text-[11px] text-gray-400 flex items-center gap-2">
+            <span>{l('Обычно 10–60 секунд', '10–60 секунд алады', 'Usually 10–60s')}</span>
+            {usage && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                usage.limit === null
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : usage.used >= usage.limit
+                    ? 'bg-red-50 text-red-700'
+                    : usage.used >= usage.limit * 0.8
+                      ? 'bg-amber-50 text-amber-700'
+                      : 'bg-gray-100 text-gray-600'
+              }`}>
+                {usage.limit === null
+                  ? l('Без лимита', 'Шектеусіз', 'Unlimited')
+                  : `${usage.used} / ${usage.limit} ${l('в этом месяце', 'осы айда', 'this month')}`}
+              </span>
+            )}
+          </div>
           <button
             onClick={generate}
             disabled={!canGenerate}

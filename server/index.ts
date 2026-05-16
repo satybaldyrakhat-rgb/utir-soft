@@ -210,6 +210,8 @@ migrateColumn('users', 'disabled_at', 'TEXT');
 // Phase 4 — admin-defined role list (e.g. 'Бухгалтер', 'Мастер'). Stored as a
 // JSON array on the same team_settings row alongside the existing matrix.
 migrateColumn('team_settings', 'team_roles', 'TEXT');
+// AI generation quotas — JSON map { roleId: monthlyLimit|null }. null = unlimited.
+migrateColumn('team_settings', 'ai_quotas', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -1146,6 +1148,67 @@ app.use('/api/webhooks', webhooksRouter);
 const aiDesignRouter = express.Router();
 aiDesignRouter.use(authMiddleware);
 
+// ── Quota helpers (per-role monthly cap on /generate) ───────────────────
+// Stored as { admin: null, manager: 100, employee: 30 } JSON on
+// team_settings.ai_quotas. null/undefined = unlimited for that role.
+// Admin is ALWAYS unlimited regardless of the configured value (matches the
+// 'admin can't lock themselves out' rule from the matrix module).
+const DEFAULT_AI_QUOTAS: Record<string, number | null> = { admin: null, manager: 100, employee: 30 };
+
+function readQuotas(teamId: string): Record<string, number | null> {
+  try {
+    const row = db.prepare('SELECT ai_quotas FROM team_settings WHERE team_id = ?').get(teamId) as any;
+    if (row?.ai_quotas) {
+      const parsed = JSON.parse(row.ai_quotas);
+      if (parsed && typeof parsed === 'object') return { ...DEFAULT_AI_QUOTAS, ...parsed };
+    }
+  } catch { /* fallthrough */ }
+  return DEFAULT_AI_QUOTAS;
+}
+
+function quotaForRole(teamId: string, role: string): number | null {
+  if (role === 'admin') return null; // safety net — admin never gets blocked
+  const q = readQuotas(teamId);
+  if (Object.prototype.hasOwnProperty.call(q, role)) return q[role];
+  return DEFAULT_AI_QUOTAS[role] ?? null;
+}
+
+function countGenerationsThisMonth(teamId: string, userId: string): number {
+  const firstOfMonth = new Date(); firstOfMonth.setDate(1); firstOfMonth.setHours(0, 0, 0, 0);
+  const since = firstOfMonth.toISOString().slice(0, 19).replace('T', ' ');
+  const row = db.prepare(
+    'SELECT COUNT(*) AS c FROM ai_generations WHERE team_id = ? AND user_id = ? AND created_at >= ?',
+  ).get(teamId, userId, since) as any;
+  return Number(row?.c || 0);
+}
+
+aiDesignRouter.get('/quotas', (req: AuthedRequest, res) => {
+  // Everyone can see the team's quota config + their own usage.
+  const quotas = readQuotas(req.teamId!);
+  const used = countGenerationsThisMonth(req.teamId!, req.userId!);
+  const limit = quotaForRole(req.teamId!, req.teamRole || 'employee');
+  res.json({ quotas, you: { used, limit, role: req.teamRole || 'employee' } });
+});
+
+aiDesignRouter.put('/quotas', requireRole('admin'), (req: AuthedRequest, res) => {
+  const body = req.body || {};
+  // Sanitise: only numbers or null allowed as values.
+  const clean: Record<string, number | null> = {};
+  for (const [role, val] of Object.entries(body)) {
+    if (val === null || val === undefined) { clean[role] = null; continue; }
+    const n = Number(val);
+    if (Number.isFinite(n) && n >= 0) clean[role] = Math.floor(n);
+  }
+  db.prepare(`
+    INSERT INTO team_settings (team_id, ai_quotas, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET
+      ai_quotas = excluded.ai_quotas,
+      updated_at = excluded.updated_at
+  `).run(req.teamId!, JSON.stringify(clean));
+  res.json({ ok: true, quotas: clean });
+});
+
 aiDesignRouter.get('/providers', (_req: AuthedRequest, res) => {
   res.json(aiImageProviders());
 });
@@ -1167,6 +1230,20 @@ aiDesignRouter.get('/history', (req: AuthedRequest, res) => {
 });
 
 aiDesignRouter.post('/generate', requirePermission('ai-design'), async (req: AuthedRequest, res) => {
+  // Quota check — block early so we don't burn provider credits when the
+  // user is over budget. Admin bypasses (limit always null for admin).
+  const limit = quotaForRole(req.teamId!, req.teamRole || 'employee');
+  if (limit !== null) {
+    const used = countGenerationsThisMonth(req.teamId!, req.userId!);
+    if (used >= limit) {
+      return res.status(429).json({
+        error: 'quota exceeded',
+        used, limit,
+        message: `Лимит ${limit} генераций в этом месяце исчерпан (использовано ${used}). Лимит сбросится 1-го числа.`,
+      });
+    }
+  }
+
   const provider = String(req.body?.provider || 'utir-mix') as ProviderId;
   const prompt = String(req.body?.prompt || '').trim();
   // Optional input images for img2img. Accept data-URLs only (the frontend

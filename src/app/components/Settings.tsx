@@ -957,6 +957,9 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
       {/* ===== AI assistant for platform (Block E2) — independent product ===== */}
       {activeTab === 'ai-assistant' && (
         <div className="space-y-5">
+          {/* AI-design quota matrix — admin sets monthly cap per role. */}
+          <AiQuotasCard language={language} />
+
           {/* Product header — violet theme so it never visually mixes with the client AI */}
           <div className="bg-gradient-to-br from-violet-50 to-white rounded-2xl border border-violet-100 p-5">
             <div className="flex items-start gap-3 mb-3">
@@ -1365,6 +1368,111 @@ function RoleRow({
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+// ─── AiQuotasCard ─────────────────────────────────────────────────
+// Admin-only card to set the monthly AI-design generation cap per role.
+// Empty = unlimited. Admin role is always unlimited regardless of value
+// (matches the matrix's 'admin can't lock themselves out' rule).
+function AiQuotasCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const store = useDataStore();
+  const [quotas, setQuotas] = useState<Record<string, number | null>>({});
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [savedToast, setSavedToast] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get<{ quotas: Record<string, number | null> }>('/api/ai-design/quotas')
+      .then(r => {
+        setQuotas(r.quotas || {});
+        const d: Record<string, string> = {};
+        for (const role of store.roles) {
+          const v = r.quotas?.[role.id];
+          d[role.id] = v === null || v === undefined ? '' : String(v);
+        }
+        setDraft(d);
+      })
+      .catch(e => {
+        if (!String(e?.message || '').includes('admin')) setError(String(e?.message || 'load failed'));
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const save = async () => {
+    setSaving(true); setError('');
+    try {
+      const payload: Record<string, number | null> = {};
+      for (const [role, str] of Object.entries(draft)) {
+        const s = (str || '').trim();
+        if (s === '') payload[role] = null;
+        else { const n = Number(s); if (Number.isFinite(n) && n >= 0) payload[role] = Math.floor(n); }
+      }
+      const r = await api.put<{ quotas: Record<string, number | null> }>('/api/ai-design/quotas', payload);
+      setQuotas(r.quotas);
+      setSavedToast(l('Сохранено', 'Сақталды', 'Saved'));
+      setTimeout(() => setSavedToast(''), 1800);
+    } catch (e: any) {
+      setError(String(e?.message || 'save failed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const dirty = store.roles.some(r => {
+    const original = quotas[r.id];
+    const current = (draft[r.id] || '').trim();
+    const origStr = original === null || original === undefined ? '' : String(original);
+    return current !== origStr;
+  });
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5">
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-sm text-gray-900">{l('Лимиты AI-генерации', 'AI-генерация лимиттері', 'AI generation limits')}</div>
+        {dirty && (
+          <div className="flex items-center gap-1.5">
+            <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs hover:bg-gray-800 disabled:opacity-50">
+              {saving ? l('Сохраняю…', 'Сақталуда…', 'Saving…') : l('Сохранить', 'Сақтау', 'Save')}
+            </button>
+          </div>
+        )}
+        {savedToast && <span className="text-[11px] text-emerald-700">✓ {savedToast}</span>}
+      </div>
+      <div className="text-[11px] text-gray-400 mb-4 max-w-xl leading-relaxed">
+        {l('Сколько генераций в месяц на каждого сотрудника. Пусто = без лимита. Счётчик сбрасывается 1-го числа.',
+           'Әр қызметкерге айына қанша генерация. Бос = шектеусіз. Санауыш 1-ші күні нөлденеді.',
+           'How many generations per teammate per month. Empty = unlimited. Counter resets on the 1st.')}
+      </div>
+      {error && <div className="mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-lg text-xs text-red-700">{error}</div>}
+      <div className="space-y-2">
+        {store.roles.map(role => {
+          const isAdmin = role.id === 'admin';
+          return (
+            <div key={role.id} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-xl">
+              <span className="text-xs text-gray-700 flex-1 truncate">{role.name}</span>
+              {isAdmin ? (
+                <span className="text-[11px] text-gray-400">{l('Без лимита', 'Шектеусіз', 'Unlimited')}</span>
+              ) : (
+                <>
+                  <input
+                    type="number"
+                    min={0}
+                    value={draft[role.id] ?? ''}
+                    onChange={e => setDraft(prev => ({ ...prev, [role.id]: e.target.value }))}
+                    placeholder={l('без лимита', 'шектеусіз', 'unlimited')}
+                    className="w-24 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-right focus:outline-none focus:ring-1 focus:ring-gray-300"
+                  />
+                  <span className="text-[10px] text-gray-400">{l('в месяц', 'айда', '/ month')}</span>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
