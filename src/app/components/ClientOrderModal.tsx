@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
-import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History } from 'lucide-react';
 import { t } from '../utils/translations';
 import { useDataStore, type Deal } from '../utils/dataStore';
+import { api } from '../utils/api';
 
 type Lang = 'kz' | 'ru' | 'eng';
 
@@ -30,7 +31,12 @@ const formatKZT = (n: number) => `${Math.round(n).toLocaleString('ru-RU').replac
 export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: ClientOrderModalProps) {
   const store = useDataStore();
   const catalogs = store.catalogs;
-  const [activeTab, setActiveTab] = useState<'main' | 'progress' | 'chat'>('main');
+  const [activeTab, setActiveTab] = useState<'main' | 'progress' | 'chat' | 'history'>('main');
+
+  // History state — populated by the useEffect below once 'l' is defined.
+  interface HistoryEntry { id: string; userId: string; userName: string; changes: Record<string, { before: any; after: any }>; createdAt: string }
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // All editable fields initialized from the current deal (no fake hardcodes).
   const [phone, setPhone] = useState(deal.phone || '');
@@ -62,6 +68,56 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const tt = (key: Parameters<typeof t>[0]) => t(key, language);
+
+  // Lazy-load history when the tab opens; cancelled-on-unmount guard prevents
+  // state updates after the modal is closed.
+  useEffect(() => {
+    if (activeTab !== 'history') return;
+    let cancelled = false;
+    setHistoryLoading(true);
+    api.get<HistoryEntry[]>(`/api/deals/${deal.id}/history`)
+      .then(rows => { if (!cancelled) setHistory(rows); })
+      .catch(err => { console.warn('[deal history] fetch failed', err); if (!cancelled) setHistory([]); })
+      .finally(() => { if (!cancelled) setHistoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, deal.id]);
+
+  // Friendly labels for the audit trail. Anything not in this map shows the
+  // raw key, which is still readable (status, paidAmount, etc.).
+  const FIELD_LABEL: Record<string, string> = {
+    customerName: l('Клиент', 'Клиент', 'Customer'),
+    phone: l('Телефон', 'Телефон', 'Phone'),
+    address: l('Адрес', 'Мекенжай', 'Address'),
+    siteAddress: l('Адрес объекта', 'Нысан мекенжайы', 'Site address'),
+    product: l('Продукт', 'Өнім', 'Product'),
+    furnitureType: l('Тип мебели', 'Жиһаз түрі', 'Furniture type'),
+    amount: l('Сумма', 'Сома', 'Amount'),
+    paidAmount: l('Оплачено', 'Төленген', 'Paid'),
+    status: l('Статус', 'Күй', 'Status'),
+    source: l('Источник', 'Көзі', 'Source'),
+    measurer: l('Замерщик', 'Өлшеуші', 'Measurer'),
+    designer: l('Дизайнер', 'Дизайнер', 'Designer'),
+    foreman: l('Прораб', 'Прораб', 'Foreman'),
+    architect: l('Архитектор', 'Сәулетші', 'Architect'),
+    ownerId: l('Ответственный', 'Жауапты', 'Owner'),
+    materials: l('Материалы', 'Материалдар', 'Materials'),
+    measurementDate: l('Дата замера', 'Өлшеу күні', 'Measure date'),
+    completionDate: l('Готовность', 'Дайын болу', 'Ready'),
+    installationDate: l('Установка', 'Орнату', 'Install'),
+    notes: l('Заметки', 'Жазбалар', 'Notes'),
+    paymentMethods: l('Способы оплаты', 'Төлем тәсілдері', 'Payment methods'),
+  };
+  const formatHistoryValue = (key: string, val: any): string => {
+    if (val === null || val === undefined || val === '') return '—';
+    if (typeof val === 'number') return val.toLocaleString('ru-RU').replace(/,/g, ' ');
+    if (typeof val === 'boolean') return val ? 'да' : 'нет';
+    if (key === 'ownerId') return store.getEmployeeById(val)?.name || val;
+    if (typeof val === 'object') {
+      const enabled = Object.entries(val).filter(([, v]) => v).map(([k]) => k);
+      return enabled.length > 0 ? enabled.join(', ') : '—';
+    }
+    return String(val);
+  };
 
   const remaining = Math.max(0, (deal.amount || 0) - (paidAmount || 0));
   const paidPercent = deal.amount > 0 ? Math.min(100, Math.round((paidAmount / deal.amount) * 100)) : 0;
@@ -117,9 +173,10 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   );
 
   const tabs = [
-    { id: 'main' as const, label: l('Информация', 'Ақпарат', 'Info') },
-    { id: 'progress' as const, label: l('Прогресс', 'Прогресс', 'Progress') },
-    { id: 'chat' as const, label: l('Чат', 'Чат', 'Chat') },
+    { id: 'main'     as const, label: l('Информация', 'Ақпарат',  'Info') },
+    { id: 'progress' as const, label: l('Прогресс',   'Прогресс', 'Progress') },
+    { id: 'chat'     as const, label: l('Чат',        'Чат',      'Chat') },
+    { id: 'history'  as const, label: l('История',    'Тарих',    'History') },
   ];
 
   return (
@@ -368,6 +425,50 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
               >
                 {tt('connectWorkNumber')}
               </button>
+            </div>
+          )}
+
+          {/* HISTORY TAB — audit trail of edits, newest first */}
+          {activeTab === 'history' && (
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <History className="w-4 h-4 text-gray-400" />
+                <div className="text-sm text-gray-900">{l('История изменений', 'Өзгерістер тарихы', 'Change history')}</div>
+              </div>
+              {historyLoading && history.length === 0 && (
+                <div className="text-xs text-gray-400 py-6 text-center">{l('Загрузка…', 'Жүктелуде…', 'Loading…')}</div>
+              )}
+              {!historyLoading && history.length === 0 && (
+                <div className="text-xs text-gray-400 py-10 text-center">
+                  {l('Пока изменений нет — карточка ни разу не редактировалась.',
+                     'Әзірге өзгерістер жоқ — карточка әлі редакцияланбаған.',
+                     'No edits yet — the deal has not been changed.')}
+                </div>
+              )}
+              <div className="space-y-3">
+                {history.map(entry => (
+                  <div key={entry.id} className="bg-gray-50 rounded-xl border border-gray-100 p-3">
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
+                      <span>
+                        <b className="text-gray-700">{entry.userName || l('Неизвестно', 'Белгісіз', 'Unknown')}</b>
+                      </span>
+                      <span>{new Date(entry.createdAt).toLocaleString(language === 'eng' ? 'en-GB' : 'ru-RU', {
+                        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                      })}</span>
+                    </div>
+                    <div className="space-y-1">
+                      {Object.entries(entry.changes).map(([key, diff]) => (
+                        <div key={key} className="text-[11px] flex flex-wrap items-baseline gap-1.5">
+                          <span className="text-gray-500">{FIELD_LABEL[key] || key}:</span>
+                          <span className="text-gray-400 line-through truncate max-w-[40%]">{formatHistoryValue(key, diff.before)}</span>
+                          <span className="text-gray-300">→</span>
+                          <span className="text-gray-900 truncate max-w-[40%]">{formatHistoryValue(key, diff.after)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

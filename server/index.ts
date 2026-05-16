@@ -119,6 +119,20 @@ CREATE TABLE IF NOT EXISTS team_settings (
   role_permissions TEXT,
   updated_at TEXT
 );
+
+-- Per-deal audit trail. One row per PATCH that actually changes something.
+-- 'changes' is JSON: { fieldName: { before: …, after: … }, … }.
+CREATE TABLE IF NOT EXISTS deal_history (
+  id TEXT PRIMARY KEY,
+  deal_id TEXT NOT NULL,
+  team_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  user_name TEXT,
+  changes TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_deal_history_deal ON deal_history(deal_id);
+CREATE INDEX IF NOT EXISTS idx_deal_history_team ON deal_history(team_id);
 `);
 
 // Idempotent migration: add columns if missing. Returns true when column was just added.
@@ -559,6 +573,29 @@ app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (
   const updated = { ...before, ...req.body, id: req.params.id };
   db.prepare('UPDATE deals SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(updated), req.params.id, req.teamId!);
 
+  // ─── Audit trail ─────────────────────────────────────────────────
+  // Compute a per-field diff and store it so the deal modal can show
+  // 'who changed what when'. Skip noisy fields like progress (auto-derived).
+  const SKIP = new Set(['id', 'progress']);
+  const changes: Record<string, { before: any; after: any }> = {};
+  for (const key of Object.keys(req.body || {})) {
+    if (SKIP.has(key)) continue;
+    const a = before[key];
+    const b = updated[key];
+    // Deep compare via JSON.stringify so nested paymentMethods / arrays work.
+    if (JSON.stringify(a) !== JSON.stringify(b)) {
+      changes[key] = { before: a ?? null, after: b ?? null };
+    }
+  }
+  if (Object.keys(changes).length > 0) {
+    try {
+      const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+      db.prepare('INSERT INTO deal_history (id, deal_id, team_id, user_id, user_name, changes) VALUES (?, ?, ?, ?, ?, ?)').run(
+        newId('dh_'), req.params.id, req.teamId!, req.userId!, actor?.name || '', JSON.stringify(changes),
+      );
+    } catch (e) { console.warn('[deals history] insert failed', e); }
+  }
+
   const statusChanged = updated.status && updated.status !== before.status;
   if (statusChanged && isTelegramReady()) {
     try {
@@ -620,6 +657,24 @@ app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (
   }
 
   res.json(updated);
+});
+
+// Audit-trail readback. Returns the deal_history rows newest-first.
+// Same module-permission as deals read (orders), so view-only roles see it too.
+app.get('/api/deals/:id/history', authMiddleware, requirePermission('orders'), (req: AuthedRequest, res) => {
+  // Cross-check the deal exists in this team before returning history.
+  const own = db.prepare('SELECT 1 FROM deals WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!);
+  if (!own) return res.status(404).json({ error: 'not found' });
+  const rows = db.prepare(
+    'SELECT id, user_id, user_name, changes, created_at FROM deal_history WHERE deal_id = ? AND team_id = ? ORDER BY rowid DESC LIMIT 500',
+  ).all(req.params.id, req.teamId!) as any[];
+  res.json(rows.map(r => ({
+    id: r.id,
+    userId: r.user_id,
+    userName: r.user_name,
+    changes: (() => { try { return JSON.parse(r.changes); } catch { return {}; } })(),
+    createdAt: r.created_at,
+  })));
 });
 
 app.use('/api/deals', authMiddleware, requirePermission('orders'), makeCrud('deals', 'D'));
