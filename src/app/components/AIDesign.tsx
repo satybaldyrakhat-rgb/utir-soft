@@ -201,6 +201,11 @@ export function AIDesign({ language }: AIDesignProps) {
   // Quota status — null limit means unlimited.
   const [usage, setUsage] = useState<{ used: number; limit: number | null; role: string } | null>(null);
 
+  // Team brand kit — auto-applied to every prompt. Shown as a small chip
+  // next to the prompt preview so the user knows their request will be
+  // augmented before hitting the AI.
+  const [brandKit, setBrandKit] = useState<{ photorealism: boolean; styleHint: string } | null>(null);
+
   // Auto-assembled prompt from wizard selections. Concatenates room +
   // style + optional moods + extra free-text comma-separated, in Russian.
   const assembledPrompt = useMemo(() => {
@@ -222,14 +227,16 @@ export function AIDesign({ language }: AIDesignProps) {
 
   const reloadAll = async () => {
     try {
-      const [p, h, q] = await Promise.all([
+      const [p, h, q, bk] = await Promise.all([
         api.get<ProviderStatus[]>('/api/ai-design/providers'),
         api.get<HistoryEntry[]>('/api/ai-design/history').catch(() => [] as HistoryEntry[]),
         api.get<{ you: { used: number; limit: number | null; role: string } }>('/api/ai-design/quotas').catch(() => null),
+        api.get<{ photorealism: boolean; styleHint: string }>('/api/ai-design/brand-kit').catch(() => null),
       ]);
       setProviders(p);
       setHistory(h);
       if (q) setUsage(q.you);
+      setBrandKit(bk);
       const stillEnabled = p.find(x => x.id === selectedProvider)?.enabled;
       if (!stillEnabled) setSelectedProvider(p.find(x => x.enabled)?.id || 'utir-mix');
     } catch (e: any) {
@@ -518,7 +525,18 @@ export function AIDesign({ language }: AIDesignProps) {
         <div className="flex items-start gap-3 mb-3">
           <Wand2 className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{l('Что отправим в AI', 'AI-ге не жібереміз', 'AI prompt')}</div>
+            <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-2">
+              <span>{l('Что отправим в AI', 'AI-ге не жібереміз', 'AI prompt')}</span>
+              {/* Brand-kit applied indicator — non-empty hint OR photoreal flag */}
+              {brandKit && (brandKit.styleHint.trim() || brandKit.photorealism) && (
+                <span
+                  className="px-1.5 py-0.5 bg-violet-50 text-violet-700 rounded text-[9px] normal-case tracking-normal"
+                  title={`${brandKit.photorealism ? '📷 фотореализм' : ''}${brandKit.styleHint ? ' · ' + brandKit.styleHint.slice(0, 80) + (brandKit.styleHint.length > 80 ? '…' : '') : ''}`}
+                >
+                  ✨ {l('Бренд-стиль применён', 'Бренд-стиль қосылды', 'Brand kit applied')}
+                </span>
+              )}
+            </div>
             <div className="text-sm text-gray-700 leading-relaxed">
               {finalPrompt
                 ? finalPrompt

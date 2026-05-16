@@ -957,6 +957,9 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
       {/* ===== AI assistant for platform (Block E2) — independent product ===== */}
       {activeTab === 'ai-assistant' && (
         <div className="space-y-5">
+          {/* Team-wide brand kit — auto-applied to every AI Дизайн prompt. */}
+          <BrandKitCard language={language} />
+
           {/* AI-design quota matrix — admin sets monthly cap per role. */}
           <AiQuotasCard language={language} />
 
@@ -1472,6 +1475,105 @@ function AiQuotasCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ─── BrandKitCard ─────────────────────────────────────────────────
+// Team-wide style preferences auto-injected into every AI-design prompt.
+// Two knobs:
+//   - photorealism (default ON): adds a photoreal architectural phrase to
+//     every prompt so the team gets consistent magazine-style renders.
+//   - styleHint (free text): any team standard ('always brass hardware,
+//     scandinavian palette, oak countertops'). Appended to every prompt.
+function BrandKitCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [kit, setKit] = useState<{ photorealism: boolean; styleHint: string }>({ photorealism: true, styleHint: '' });
+  const [draftHint, setDraftHint] = useState('');
+  const [draftPhoto, setDraftPhoto] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get<{ photorealism: boolean; styleHint: string }>('/api/ai-design/brand-kit')
+      .then(k => { setKit(k); setDraftHint(k.styleHint); setDraftPhoto(k.photorealism); })
+      .catch(e => { if (!String(e?.message || '').includes('admin')) setError(String(e?.message || 'load failed')); });
+  }, []);
+
+  const dirty = draftHint !== kit.styleHint || draftPhoto !== kit.photorealism;
+
+  const save = async () => {
+    setSaving(true); setError('');
+    try {
+      const r = await api.put<{ kit: typeof kit }>('/api/ai-design/brand-kit', {
+        photorealism: draftPhoto, styleHint: draftHint,
+      });
+      setKit(r.kit);
+      setSaved(l('Сохранено', 'Сақталды', 'Saved'));
+      setTimeout(() => setSaved(''), 1800);
+    } catch (e: any) {
+      setError(String(e?.message || 'save failed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5">
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-sm text-gray-900">{l('Бренд-стиль команды', 'Команда бренд-стилі', 'Team brand kit')}</div>
+        {dirty && (
+          <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs hover:bg-gray-800 disabled:opacity-50">
+            {saving ? l('Сохраняю…', 'Сақталуда…', 'Saving…') : l('Сохранить', 'Сақтау', 'Save')}
+          </button>
+        )}
+        {saved && <span className="text-[11px] text-emerald-700">✓ {saved}</span>}
+      </div>
+      <div className="text-[11px] text-gray-400 mb-4 max-w-xl leading-relaxed">
+        {l('Эти настройки автоматически добавляются к каждому AI-запросу команды — чтобы все генерации были в едином стиле.',
+           'Бұл баптаулар команданың әр AI-сұранысына автоматты түрде қосылады — барлық генерациялар бірыңғай стильде болуы үшін.',
+           'These settings are auto-added to every team AI prompt so all generations stay on-brand.')}
+      </div>
+
+      {error && <div className="mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-lg text-xs text-red-700">{error}</div>}
+
+      <label className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 rounded-xl cursor-pointer mb-3">
+        <input
+          type="checkbox"
+          checked={draftPhoto}
+          onChange={e => setDraftPhoto(e.target.checked)}
+          className="w-4 h-4 rounded accent-gray-900"
+        />
+        <div className="flex-1">
+          <div className="text-xs text-gray-900">{l('Фотореализм', 'Фотореализм', 'Photorealism')}</div>
+          <div className="text-[10px] text-gray-400 mt-0.5">
+            {l('Добавляет «photorealistic, soft light, fine material detail, 4k»',
+               '«photorealistic, soft light, fine material detail, 4k» қосады',
+               'Adds "photorealistic, soft light, fine material detail, 4k"')}
+          </div>
+        </div>
+      </label>
+
+      <div>
+        <label className="block text-[11px] text-gray-500 mb-1.5">{l('Дополнительный стилевой суффикс', 'Қосымша стиль суффиксі', 'Style hint suffix')}</label>
+        <textarea
+          value={draftHint}
+          onChange={e => setDraftHint(e.target.value)}
+          rows={3}
+          placeholder={l(
+            'Например: всегда латунная фурнитура, дубовые столешницы, скандинавская палитра, окно во всю стену',
+            'Мысалы: әрқашан жез фурнитура, емен үстелдері, сканди палитра',
+            'e.g. always brass hardware, oak countertops, scandinavian palette, floor-to-ceiling windows',
+          )}
+          className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-200 resize-none"
+        />
+        <div className="text-[10px] text-gray-400 mt-1">
+          {l('Этот текст добавляется к каждому prompt после запроса пользователя.',
+             'Бұл мәтін әр пайдаланушы prompt-тен кейін қосылады.',
+             'This text is appended to every user prompt.')}
+        </div>
       </div>
     </div>
   );

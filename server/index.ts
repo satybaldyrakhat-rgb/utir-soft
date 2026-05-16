@@ -212,6 +212,9 @@ migrateColumn('users', 'disabled_at', 'TEXT');
 migrateColumn('team_settings', 'team_roles', 'TEXT');
 // AI generation quotas — JSON map { roleId: monthlyLimit|null }. null = unlimited.
 migrateColumn('team_settings', 'ai_quotas', 'TEXT');
+// Brand kit — JSON { photorealism: bool, styleHint: string } injected into
+// every AI Дизайн prompt so the whole team's generations look consistent.
+migrateColumn('team_settings', 'brand_kit', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -1182,6 +1185,57 @@ function countGenerationsThisMonth(teamId: string, userId: string): number {
   return Number(row?.c || 0);
 }
 
+// ── Brand kit (team-wide style prefs injected into every prompt) ───────
+interface BrandKit { photorealism: boolean; styleHint: string }
+const DEFAULT_BRAND_KIT: BrandKit = { photorealism: true, styleHint: '' };
+
+function readBrandKit(teamId: string): BrandKit {
+  try {
+    const row = db.prepare('SELECT brand_kit FROM team_settings WHERE team_id = ?').get(teamId) as any;
+    if (row?.brand_kit) {
+      const parsed = JSON.parse(row.brand_kit);
+      return {
+        photorealism: typeof parsed.photorealism === 'boolean' ? parsed.photorealism : DEFAULT_BRAND_KIT.photorealism,
+        styleHint: typeof parsed.styleHint === 'string' ? parsed.styleHint : DEFAULT_BRAND_KIT.styleHint,
+      };
+    }
+  } catch { /* fall through */ }
+  return DEFAULT_BRAND_KIT;
+}
+
+// Build the final prompt by appending brand-kit additions (style hint +
+// photorealism phrase) to the user's prompt. Kept separate so the team can
+// see the diff in the saved 'prompt' field if we ever decide to log it.
+function applyBrandKit(userPrompt: string, kit: BrandKit): string {
+  const bits = [userPrompt.trim()];
+  if (kit.styleHint.trim()) bits.push(kit.styleHint.trim());
+  if (kit.photorealism) {
+    bits.push('photorealistic interior architectural photography, ' +
+              'soft realistic lighting, fine material detail, ' +
+              'wide-angle perspective, 4k quality');
+  }
+  return bits.filter(Boolean).join('. ');
+}
+
+aiDesignRouter.get('/brand-kit', (req: AuthedRequest, res) => {
+  res.json(readBrandKit(req.teamId!));
+});
+
+aiDesignRouter.put('/brand-kit', requireRole('admin'), (req: AuthedRequest, res) => {
+  const kit: BrandKit = {
+    photorealism: !!req.body?.photorealism,
+    styleHint: String(req.body?.styleHint || '').slice(0, 500),
+  };
+  db.prepare(`
+    INSERT INTO team_settings (team_id, brand_kit, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET
+      brand_kit = excluded.brand_kit,
+      updated_at = excluded.updated_at
+  `).run(req.teamId!, JSON.stringify(kit));
+  res.json({ ok: true, kit });
+});
+
 aiDesignRouter.get('/quotas', (req: AuthedRequest, res) => {
   // Everyone can see the team's quota config + their own usage.
   const quotas = readQuotas(req.teamId!);
@@ -1245,7 +1299,7 @@ aiDesignRouter.post('/generate', requirePermission('ai-design'), async (req: Aut
   }
 
   const provider = String(req.body?.provider || 'utir-mix') as ProviderId;
-  const prompt = String(req.body?.prompt || '').trim();
+  const userPrompt = String(req.body?.prompt || '').trim();
   // Optional input images for img2img. Accept data-URLs only (the frontend
   // converts files via FileReader.readAsDataURL). Cap the refs at 3 so we
   // don't blow request size limits.
@@ -1253,7 +1307,13 @@ aiDesignRouter.post('/generate', requirePermission('ai-design'), async (req: Aut
   const referenceImages: string[] = Array.isArray(req.body?.referenceImages)
     ? req.body.referenceImages.filter((s: any) => typeof s === 'string' && s.startsWith('data:')).slice(0, 3)
     : [];
-  if (!prompt) return res.status(400).json({ error: 'prompt required' });
+  if (!userPrompt) return res.status(400).json({ error: 'prompt required' });
+
+  // Inject the team brand kit (style hint + photorealism). Always applied so
+  // every member's generation stays on-brand. Per-call opt-out via
+  // skipBrandKit boolean on the body for advanced users.
+  const kit = readBrandKit(req.teamId!);
+  const prompt = req.body?.skipBrandKit ? userPrompt : applyBrandKit(userPrompt, kit);
 
   const results = await aiImageGenerate(provider, { prompt, roomPhoto, referenceImages });
 
@@ -1266,7 +1326,9 @@ aiDesignRouter.post('/generate', requirePermission('ai-design'), async (req: Aut
       'INSERT INTO ai_generations (id, team_id, user_id, user_name, provider, prompt, image_url, image_data, enhanced_prompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(
       id, req.teamId!, req.userId!, actor?.name || '',
-      r.provider, prompt,
+      // Save the user's ORIGINAL prompt for clean history. The brand-kit
+      // additions are deterministic + readable in the team settings.
+      r.provider, userPrompt,
       r.imageUrl || null,
       r.imageDataUrl || null,
       r.enhancedPrompt || null,
