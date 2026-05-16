@@ -18,7 +18,7 @@ interface AnalyticsProps {
 
 export function Analytics({ language }: AnalyticsProps) {
   const store = useDataStore();
-  const [activeTab, setActiveTab] = useState<'overview' | 'ads'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'ads' | 'team'>('overview');
   const [selectedMaster, setSelectedMaster] = useState<string | null>(null);
 
   // Sales by month from completed income transactions + deal counts
@@ -116,8 +116,9 @@ export function Analytics({ language }: AnalyticsProps) {
     language === 'kz' ? kz : language === 'eng' ? eng : ru;
 
   const tabs = {
-    overview: { kz: 'Шолу', ru: 'Обзор', eng: 'Overview' },
-    ads: { kz: 'Жарнама', ru: 'Реклама', eng: 'Ads' },
+    overview: { kz: 'Шолу',     ru: 'Обзор',   eng: 'Overview' },
+    team:     { kz: 'Команда',  ru: 'Команда', eng: 'Team' },
+    ads:      { kz: 'Жарнама',  ru: 'Реклама', eng: 'Ads' },
   };
 
   return (
@@ -151,6 +152,8 @@ export function Analytics({ language }: AnalyticsProps) {
 
       {activeTab === 'ads' && store.getModuleLevel('marketing') !== 'none' ? (
         <AdAnalytics language={language} />
+      ) : activeTab === 'team' ? (
+        <TeamMetrics language={language} />
       ) : (
         <>
           {/* Metric Cards */}
@@ -539,6 +542,188 @@ export function Analytics({ language }: AnalyticsProps) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// ─── Team metrics (per-employee performance) ─────────────────────
+// Renders one card per teammate with:
+//   - Tasks: total / done with progress bar
+//   - Deals: total / completed
+//   - Revenue: sum of paidAmount on deals attributed to them
+//   - Conversion: completed / non-rejected deals × 100%
+// Attribution: tasks via assigneeId; deals via measurer/designer/foreman/
+// architect text match (current schema doesn't store ownerId on deals).
+function TeamMetrics({ language }: { language: 'kz' | 'ru' | 'eng' }) {
+  const store = useDataStore();
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+
+  // Skip removed teammates from the board.
+  const team = store.employees.filter((e: any) => !e.removed_at);
+
+  if (team.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+        <Users className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+        <div className="text-sm text-gray-700 mb-1">
+          {l('В команде пока никого', 'Командада әзірге ешкім жоқ', 'Team is empty')}
+        </div>
+        <div className="text-xs text-gray-400">
+          {l('Пригласите сотрудников в Настройках → Команда — метрики появятся автоматически.',
+             'Қызметкерлерді Баптаулар → Команда арқылы шақырыңыз — метрикалар автоматты түрде шығады.',
+             'Invite teammates from Settings → Team — metrics will appear automatically.')}
+        </div>
+      </div>
+    );
+  }
+
+  const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
+
+  // Pre-compute per-employee stats.
+  type Row = ReturnType<typeof statsFor>;
+  function statsFor(emp: typeof team[number]) {
+    const empTasks = store.tasks.filter(t => t.assigneeId === emp.id);
+    const tasksDone = empTasks.filter(t => t.status === 'done').length;
+    const tasksInProgress = empTasks.filter(t => t.status === 'in_progress' || t.status === 'review').length;
+    const tasksNew = empTasks.filter(t => t.status === 'new').length;
+
+    // Deal attribution by free-text role fields. Matching is case-insensitive
+    // and accepts the full name or just the first name.
+    const empNameLow = (emp.name || '').toLowerCase().trim();
+    const firstNameLow = empNameLow.split(/\s+/)[0] || '';
+    const matchesEmp = (val: string | undefined): boolean => {
+      if (!val || !empNameLow) return false;
+      const v = val.toLowerCase();
+      return v.includes(empNameLow) || (firstNameLow.length > 2 && v.includes(firstNameLow));
+    };
+    const empDeals = store.deals.filter(d =>
+      matchesEmp(d.measurer) || matchesEmp(d.designer) || matchesEmp((d as any).foreman) || matchesEmp((d as any).architect),
+    );
+    const dealsClosed = empDeals.filter(d => d.status === 'completed').length;
+    const dealsRejected = empDeals.filter(d => d.status === 'rejected').length;
+    const dealsActive = empDeals.length - dealsRejected;
+    const revenue = empDeals
+      .filter(d => d.status === 'completed')
+      .reduce((sum, d) => sum + (d.paidAmount || 0), 0);
+    const conversion = dealsActive > 0 ? Math.round((dealsClosed / dealsActive) * 100) : 0;
+
+    return {
+      emp,
+      tasksTotal: empTasks.length, tasksDone, tasksInProgress, tasksNew,
+      dealsTotal: empDeals.length, dealsClosed, revenue, conversion,
+    };
+  }
+
+  const rows: Row[] = team.map(statsFor).sort((a, b) => b.revenue - a.revenue);
+
+  // Team-wide totals for the summary row at the top.
+  const totals = rows.reduce(
+    (acc, r) => ({
+      tasksDone:   acc.tasksDone   + r.tasksDone,
+      tasksTotal:  acc.tasksTotal  + r.tasksTotal,
+      dealsClosed: acc.dealsClosed + r.dealsClosed,
+      dealsTotal:  acc.dealsTotal  + r.dealsTotal,
+      revenue:     acc.revenue     + r.revenue,
+    }),
+    { tasksDone: 0, tasksTotal: 0, dealsClosed: 0, dealsTotal: 0, revenue: 0 },
+  );
+  const teamConversion = (totals.dealsTotal > 0)
+    ? Math.round((totals.dealsClosed / totals.dealsTotal) * 100)
+    : 0;
+
+  return (
+    <div className="space-y-5">
+      {/* Team summary */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: l('Задачи выполнено', 'Тапсырмалар орындалды', 'Tasks done'),
+            value: `${totals.tasksDone} / ${totals.tasksTotal}`, icon: Target },
+          { label: l('Сделок закрыто', 'Мәмілелер жабылды',       'Deals closed'),
+            value: `${totals.dealsClosed} / ${totals.dealsTotal}`, icon: ShoppingBag },
+          { label: l('Выручка команды',  'Команда табысы',         'Team revenue'),
+            value: fmt(totals.revenue), icon: DollarSign },
+          { label: l('Средняя конверсия','Орташа конверсия',       'Avg. conversion'),
+            value: `${teamConversion}%`, icon: Percent },
+        ].map((m, i) => (
+          <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] text-gray-400">{m.label}</span>
+              <m.icon className="w-4 h-4 text-gray-300" />
+            </div>
+            <div className="text-xl text-gray-900">{m.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Per-employee cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {rows.map(r => {
+          const tasksPercent = r.tasksTotal > 0 ? (r.tasksDone / r.tasksTotal) * 100 : 0;
+          return (
+            <div key={r.emp.id} className="bg-white rounded-2xl border border-gray-100 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-sm text-gray-600">
+                  {r.emp.name?.charAt(0) || '?'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-gray-900 truncate">{r.emp.name}</div>
+                  <div className="text-[11px] text-gray-400 truncate">{r.emp.role} · {r.emp.email}</div>
+                </div>
+              </div>
+
+              {/* Stats grid */}
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                <div className="text-center">
+                  <div className="text-[10px] text-gray-400">{l('Задачи', 'Тапсырма', 'Tasks')}</div>
+                  <div className="text-sm text-gray-900 mt-0.5">{r.tasksDone}<span className="text-gray-300">/{r.tasksTotal}</span></div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[10px] text-gray-400">{l('Сделки', 'Мәміле', 'Deals')}</div>
+                  <div className="text-sm text-gray-900 mt-0.5">{r.dealsClosed}<span className="text-gray-300">/{r.dealsTotal}</span></div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[10px] text-gray-400">{l('Выручка', 'Табыс', 'Revenue')}</div>
+                  <div className="text-sm text-gray-900 mt-0.5 whitespace-nowrap">{r.revenue > 0 ? fmt(r.revenue) : '—'}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[10px] text-gray-400">{l('Конверсия', 'Конверсия', 'Conv.')}</div>
+                  <div className="text-sm text-gray-900 mt-0.5">{r.conversion}%</div>
+                </div>
+              </div>
+
+              {/* Tasks progress bar */}
+              <div>
+                <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1">
+                  <span>{l('Выполнено задач', 'Орындалған', 'Tasks completion')}</span>
+                  <span>{Math.round(tasksPercent)}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all"
+                    style={{ width: `${tasksPercent}%` }}
+                  />
+                </div>
+                {r.tasksInProgress > 0 || r.tasksNew > 0 ? (
+                  <div className="flex gap-3 text-[10px] text-gray-400 mt-1.5">
+                    {r.tasksInProgress > 0 && <span>{l('В работе', 'Жұмыста', 'In progress')}: {r.tasksInProgress}</span>}
+                    {r.tasksNew > 0        && <span>{l('Новых', 'Жаңа',       'New')}: {r.tasksNew}</span>}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Attribution note — explains how we link deals to teammates so the
+          admin understands why a deal might not show up under someone. */}
+      <div className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-[11px] text-gray-500 leading-relaxed">
+        {l(
+          'Задачи привязаны к сотруднику по полю «Исполнитель». Сделки — по полям «Замерщик», «Дизайнер», «Прораб» или «Архитектор» (совпадение по имени). Если сотрудник не виден по сделке — проверьте что его имя указано в одном из этих полей.',
+          'Тапсырмалар «Орындаушы» өрісі бойынша байланысады. Мәмілелер «Өлшеуші», «Дизайнер», «Прораб» немесе «Сәулетші» өрістері бойынша. Аты сол өрістердің бірінде көрсетілгенін тексеріңіз.',
+          'Tasks are linked by Assignee. Deals are linked by Measurer / Designer / Foreman / Architect (name match). If a deal does not show up under someone, make sure their name is in one of those fields.',
+        )}
+      </div>
     </div>
   );
 }
