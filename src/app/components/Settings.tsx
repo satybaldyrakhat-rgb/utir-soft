@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle, Bot, Sparkles, Users, Settings as SettingsIcon, Zap, Activity, Plus, Search, Edit2, Trash2, UserPlus, Star, CheckCircle, X, Shield, Check, Eye, ChevronDown, LayoutGrid, Camera, BookOpen, Send } from 'lucide-react';
+import { MessageCircle, Bot, Sparkles, Users, Settings as SettingsIcon, Zap, Activity, Plus, Search, Edit2, Trash2, UserPlus, Star, CheckCircle, X, Shield, Check, Eye, ChevronDown, LayoutGrid, Camera, BookOpen, Send, Download } from 'lucide-react';
 import { ModulesSettings } from './ModulesSettings';
 import { ActivityLog } from './ActivityLog';
 import { TelegramPairing } from './TelegramPairing';
@@ -7,6 +7,7 @@ import { TeamInvitePanel } from './TeamInvitePanel';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
 import { useDataStore, ALL_MODULES, ALL_ROLES, MODULE_GROUPS, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
 import { api } from '../utils/api';
+import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { t } from '../utils/translations';
 
 // Until C.2 (invitations) ships, the workspace owner is always the admin.
@@ -566,9 +567,29 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
                     <option value="employee">{tt('roleEmployee')}</option>
                   </select>
                 </div>
-                {/* Inviting moved up to TeamInvitePanel; this slot intentionally left blank
-                    so the search/filter row balances visually. */}
-                <span className="w-1" aria-hidden />
+                {/* Export team to CSV — admin-only operation. */}
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      const cols: CsvColumn<typeof employees[number]>[] = [
+                        { header: 'ID',         value: 'id' },
+                        { header: 'Имя',        value: 'name' },
+                        { header: 'Email',      value: 'email' },
+                        { header: 'Телефон',    value: 'phone' },
+                        { header: 'Роль',       value: 'role' },
+                        { header: 'Отдел',      value: 'department' },
+                        { header: 'Статус',     value: 'status' },
+                        { header: 'В команде с',value: 'joinDate' },
+                      ];
+                      downloadCsv(todayStampedName('team'), rowsToCsv(employees, cols));
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 border border-gray-100 rounded-xl text-xs text-gray-500 hover:bg-gray-50"
+                    title={l('Скачать команду в CSV', 'Командаға CSV-ге жүктеу', 'Export team to CSV')}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {l('Экспорт', 'Экспорт', 'Export')}
+                  </button>
+                )}
               </div>
 
               {/* Stats — only when team exists */}

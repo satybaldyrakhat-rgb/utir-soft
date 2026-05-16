@@ -3,10 +3,11 @@ import {
   CheckCircle2, Circle, Clock, AlertCircle, Plus, Search, Filter,
   ChevronDown, ChevronRight, MoreHorizontal, Calendar, User, Send,
   MessageCircle, X, GripVertical, ArrowRight, Bot, Smartphone,
-  Check, RefreshCw, Eye, Trash2, Edit3, Flag
+  Check, RefreshCw, Eye, Trash2, Edit3, Flag, Download,
 } from 'lucide-react';
 import { useDataStore, Task as StoreTask } from '../utils/dataStore';
 import { useAutoRefresh } from '../utils/useAutoRefresh';
+import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { TelegramBotPanel } from './TelegramBotPanel';
 
 // ─── TYPES ───────────────────────────────────────────────────
@@ -160,6 +161,28 @@ export function Tasks({ language }: TasksProps) {
           >
             <Send className="w-4 h-4" />
             Telegram-бот
+          </button>
+          <button
+            onClick={() => {
+              const cols: CsvColumn<StoreTask>[] = [
+                { header: 'ID',           value: 'id' },
+                { header: 'Название',     value: 'title' },
+                { header: 'Описание',     value: 'description' },
+                { header: 'Категория',    value: 'category' },
+                { header: 'Статус',       value: 'status' },
+                { header: 'Приоритет',    value: 'priority' },
+                { header: 'Исполнитель',  value: (t) => store.getEmployeeById(t.assigneeId)?.name || '' },
+                { header: 'Срок',         value: 'dueDate' },
+                { header: 'Создано',      value: 'createdAt' },
+                { header: 'Выполнено',    value: 'completedAt' },
+              ];
+              downloadCsv(todayStampedName('tasks'), rowsToCsv(store.tasks, cols));
+            }}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            title="Скачать задачи в CSV"
+          >
+            <Download className="w-4 h-4" />
+            Экспорт
           </button>
           <button
             onClick={() => setShowNewTaskModal(true)}

@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Instagram, Phone, X, Users, MessageCircle, Mail, Calendar, TrendingUp, AlertCircle, CheckCircle, Package, Hammer, FileCheck, XCircle, Plus, Search, Filter, Archive } from 'lucide-react';
+import { Instagram, Phone, X, Users, MessageCircle, Mail, Calendar, TrendingUp, AlertCircle, CheckCircle, Package, Hammer, FileCheck, XCircle, Plus, Search, Filter, Archive, Download } from 'lucide-react';
 import { ClientOrderModal } from './ClientOrderModal';
 import { NewDealModal } from './NewDealModal';
 import { useDataStore, type Deal } from '../utils/dataStore';
+import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { useAutoRefresh } from '../utils/useAutoRefresh';
 import { t } from '../utils/translations';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo } from './PlatformLogos';
@@ -141,6 +142,39 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                 <Archive className="w-3.5 h-3.5" />
                 {l('Архив отказов', 'Бас тарту мұрағаты', 'Rejected Archive')}
                 {rejectedDeals.length > 0 && <span className="ml-0.5 bg-red-100 text-red-600 text-[10px] px-1.5 py-0.5 rounded-full">{rejectedDeals.length}</span>}
+              </button>
+              {/* CSV export — UTF-8 BOM so Excel reads Cyrillic without manual import. */}
+              <button
+                onClick={() => {
+                  const ownerName = (id: string | undefined) => id ? (store.getEmployeeById(id)?.name || '') : '';
+                  const cols: CsvColumn<Deal>[] = [
+                    { header: 'ID',           value: 'id' },
+                    { header: 'Клиент',       value: 'customerName' },
+                    { header: 'Телефон',      value: 'phone' },
+                    { header: 'Адрес',        value: 'address' },
+                    { header: 'Продукт',      value: 'product' },
+                    { header: 'Тип мебели',   value: 'furnitureType' },
+                    { header: 'Сумма',        value: 'amount' },
+                    { header: 'Оплачено',     value: 'paidAmount' },
+                    { header: 'Статус',       value: 'status' },
+                    { header: 'Источник',     value: 'source' },
+                    { header: 'Замерщик',     value: 'measurer' },
+                    { header: 'Дизайнер',     value: 'designer' },
+                    { header: 'Ответственный',value: (d) => ownerName(d.ownerId) },
+                    { header: 'Дата замера',  value: 'measurementDate' },
+                    { header: 'Готовность',   value: 'completionDate' },
+                    { header: 'Установка',    value: 'installationDate' },
+                    { header: 'Создано',      value: 'createdAt' },
+                    { header: 'Заметки',      value: 'notes' },
+                  ];
+                  const csv = rowsToCsv(store.deals, cols);
+                  downloadCsv(todayStampedName('deals'), csv);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 border border-gray-100 rounded-xl text-xs text-gray-500 hover:bg-gray-50"
+                title={l('Скачать сделки в CSV (Excel)', 'CSV-ге жүктеп алу', 'Export deals to CSV')}
+              >
+                <Download className="w-3.5 h-3.5" />
+                {l('Экспорт', 'Экспорт', 'Export')}
               </button>
               {store.canWriteModule('orders') && (
                 <button onClick={() => setShowNewDealModal(true)} className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">
