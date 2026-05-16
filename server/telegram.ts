@@ -8,6 +8,7 @@
 
 import Database from 'better-sqlite3';
 import { runAgent, type AgentTurnContext } from './claudeAgent.js';
+import { canRunTool } from './permissions.js';
 
 const TG_API = 'https://api.telegram.org';
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -121,13 +122,13 @@ export function unlink(db: Database.Database, userId: string) {
   db.prepare('DELETE FROM telegram_links WHERE user_id = ?').run(userId);
 }
 
-function findUserByChat(db: Database.Database, chatId: number): { id: string; teamId: string; name: string } | undefined {
+function findUserByChat(db: Database.Database, chatId: number): { id: string; teamId: string; name: string; teamRole: string } | undefined {
   const row = db.prepare(`
-    SELECT u.id, u.team_id, u.name FROM telegram_links tl
+    SELECT u.id, u.team_id, u.name, u.team_role FROM telegram_links tl
     JOIN users u ON u.id = tl.user_id
     WHERE tl.chat_id = ?
   `).get(chatId) as any;
-  return row ? { id: row.id, teamId: row.team_id || row.id, name: row.name } : undefined;
+  return row ? { id: row.id, teamId: row.team_id || row.id, name: row.name, teamRole: row.team_role || 'admin' } : undefined;
 }
 
 // Find the employees row that belongs to this auth user (matching by email,
@@ -936,6 +937,20 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       appendHistory(db, chatId, 'user', text);
       try {
         const { default: tools } = await import('./aiTools.js');
+        // Re-check the role gate in case the admin downgraded the user
+        // between the proposal and this confirmation (defence in depth).
+        const m = tools.getToolModule(pendingAction.toolName) || '';
+        const isW = !tools.isReadOnly(pendingAction.toolName);
+        const g = canRunTool(db, user.teamId, user.teamRole, m, isW);
+        if (!g.ok) {
+          const refusal = `🚫 Действие отменено: у вашей роли (<b>${user.teamRole}</b>) нет прав на модуль <b>${g.matrixKey}</b>.`;
+          await sendMessage(chatId, refusal);
+          appendHistory(db, chatId, 'assistant', stripHtml(refusal));
+          clearPending(db, chatId);
+          logHandoff(logActivity, user.id, user.name, 'role gate denied on confirm',
+            `${g.matrixKey}/${pendingAction.toolName} (role=${user.teamRole}, level=${g.level})`);
+          return;
+        }
         const result = await tools.execute(db, user.id, user.teamId, user.name, pendingAction.toolName, pendingAction.toolInput, logActivity);
         const reply = `✅ Готово.\n\n${result}`;
         await sendMessage(chatId, reply);
@@ -1004,8 +1019,32 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     return;
   }
 
-  // Read-only tools (find_client and similar) run immediately and reply with the result.
+  // ─── ROLE GATE (team matrix) — applies BEFORE per-user auto/confirm setting.
+  // Admin always passes; manager/employee/custom limited by Settings → Команда.
+  // Wrong role → polite refusal + handoff log so admin sees what employee tried.
   const { default: tools } = await import('./aiTools.js');
+  const toolModule = tools.getToolModule(agentResult.toolName);
+  if (!toolModule) {
+    const errReply = `Неизвестное действие: <code>${agentResult.toolName}</code>`;
+    await sendMessage(chatId, errReply);
+    appendHistory(db, chatId, 'assistant', stripHtml(errReply));
+    logHandoff(logActivity, user.id, user.name, 'unknown tool', agentResult.toolName);
+    return;
+  }
+  const isWriteTool = !tools.isReadOnly(agentResult.toolName);
+  const roleGate = canRunTool(db, user.teamId, user.teamRole, toolModule, isWriteTool);
+  if (!roleGate.ok) {
+    const reply = roleGate.level === 'none'
+      ? `🚫 У вашей роли (<b>${user.teamRole}</b>) нет доступа к модулю <b>${roleGate.matrixKey}</b>.\nПопросите администратора открыть права в Платформа → Настройки → Команда.`
+      : `🔒 Модуль <b>${roleGate.matrixKey}</b> доступен вам только для чтения (роль: <b>${user.teamRole}</b>).\nИзменения доступны менеджеру или администратору.`;
+    await sendMessage(chatId, reply);
+    appendHistory(db, chatId, 'assistant', stripHtml(reply));
+    logHandoff(logActivity, user.id, user.name, 'role gate denied',
+      `${roleGate.matrixKey}/${agentResult.toolName} (role=${user.teamRole}, level=${roleGate.level}): "${text.slice(0, 120)}"`);
+    return;
+  }
+
+  // Read-only tools (find_client and similar) run immediately and reply with the result.
   if (tools.isReadOnly(agentResult.toolName)) {
     try {
       const result = await tools.execute(db, user.id, user.teamId, user.name, agentResult.toolName, agentResult.toolInput, logActivity);
@@ -1021,15 +1060,8 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     return;
   }
 
-  // Write tools — gate by the user's per-module permission setting.
-  const toolModule = tools.getToolModule(agentResult.toolName);
-  if (!toolModule) {
-    const errReply = `Неизвестное действие: <code>${agentResult.toolName}</code>`;
-    await sendMessage(chatId, errReply);
-    appendHistory(db, chatId, 'assistant', stripHtml(errReply));
-    logHandoff(logActivity, user.id, user.name, 'unknown tool', agentResult.toolName);
-    return;
-  }
+  // Write tools — apply the per-user auto/confirm/none preference (kept as a
+  // *finer* control on top of the role gate above).
   const permission = getModulePermission(db, user.id, toolModule);
   const moduleName = HUMAN_MODULE_NAMES[toolModule] || toolModule;
 

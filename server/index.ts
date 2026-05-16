@@ -11,6 +11,7 @@ import { sendEmail, isEmailReady, otpTemplate, inviteTemplate } from './email.js
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
 import { chat as aiChat, chatProviderStatuses, type ChatProviderId, type ChatMessage } from './aiChat.js';
 import aiTools from './aiTools.js';
+import { getPermissionLevel as getPermLevel, canRunTool } from './permissions.js';
 import { createHmac, randomBytes } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1459,6 +1460,21 @@ aiChatRouter.post('/message', async (req: AuthedRequest, res) => {
         return res.json({ kind: 'reply', provider, ok: true, text: agentResult.text });
       }
 
+      // Role gate (matches the team matrix). Tools belong to modules; the
+      // user's role must have at least 'view' for read-only tools or 'full'
+      // for write tools, otherwise we refuse and offer guidance.
+      const toolModule = aiTools.getToolModule(agentResult.toolName) || '';
+      const isWrite = !aiTools.isReadOnly(agentResult.toolName);
+      const gate = canRunTool(db, req.teamId!, req.teamRole || 'admin', toolModule, isWrite);
+      if (!gate.ok) {
+        const denyText = gate.level === 'none'
+          ? `У вашей роли (${req.teamRole}) нет доступа к модулю «${gate.matrixKey}». Действие отменено. Попросите администратора открыть права.`
+          : `Модуль «${gate.matrixKey}» доступен только для чтения для вашей роли (${req.teamRole}). Действие отменено.`;
+        const newHistory: ChatMessage[] = [...messages, { role: 'assistant', content: denyText }];
+        saveChatHistory(req.teamId!, req.userId!, provider, newHistory);
+        return res.json({ kind: 'reply', provider, ok: true, text: denyText });
+      }
+
       // Tool proposal — read-only tools (find_client) execute immediately.
       if (aiTools.isReadOnly(agentResult.toolName)) {
         try {
@@ -1511,10 +1527,19 @@ aiChatRouter.post('/execute', async (req: AuthedRequest, res) => {
   const toolInput = req.body?.toolInput || {};
   if (!toolName) return res.status(400).json({ error: 'toolName required' });
 
-  // Per-module permission check (matches the team matrix). We allow execution
-  // when the user's role grants the module — same gate the Telegram bot uses.
+  // Per-module permission check (same role matrix used by REST guards). Admin
+  // always passes; manager/employee/custom roles need the module marked 'full'
+  // (since every aiTool is a write — read-only tools bypass /execute entirely).
   const toolModule = aiTools.getToolModule(toolName);
   if (!toolModule) return res.status(400).json({ error: 'unknown tool' });
+  const isWrite = !aiTools.isReadOnly(toolName);
+  const gate = canRunTool(db, req.teamId!, req.teamRole || 'admin', toolModule, isWrite);
+  if (!gate.ok) {
+    const msg = gate.level === 'none'
+      ? `Нет доступа к модулю «${gate.matrixKey}». Попросите администратора открыть его в Настройки → Команда → права.`
+      : `Модуль «${gate.matrixKey}» доступен только для чтения для вашей роли (${req.teamRole}). Действие отменено.`;
+    return res.status(403).json({ ok: false, text: msg });
+  }
 
   const userRow = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
   const userName = userRow?.name || 'Пользователь';
@@ -1562,42 +1587,11 @@ app.get('/api/team/pairings', authMiddleware, (req: AuthedRequest, res) => {
   })));
 });
 
-// ─── Permission check helper (used by route guards) ────────────────
-// Looks up the current request's role × module permission and returns the
-// level ('full' | 'view' | 'none'). Defaults to 'full' for admins regardless
-// of matrix (they can't lock themselves out) and to the hardcoded defaults
-// otherwise so a missing matrix doesn't accidentally open everything up.
-const DEFAULT_MATRIX: Record<string, Record<string, 'full' | 'view' | 'none'>> = {
-  admin:    { orders: 'full', sales: 'full', chats: 'full', finance: 'full', production: 'full', warehouse: 'full', analytics: 'full', settings: 'full', tasks: 'full' },
-  manager:  { orders: 'full', sales: 'full', chats: 'full', finance: 'view', production: 'view', warehouse: 'view', analytics: 'view', settings: 'none', tasks: 'full' },
-  employee: { orders: 'view', sales: 'view', chats: 'view', finance: 'none', production: 'view', warehouse: 'view', analytics: 'none', settings: 'none', tasks: 'view' },
-};
-
-function getPermissionLevel(teamId: string, role: string, moduleKey: string): 'full' | 'view' | 'none' {
-  // Admin always 'full' — protects against accidentally locking out the admin.
-  if (role === 'admin') return 'full';
-  try {
-    const row = db.prepare('SELECT role_permissions FROM team_settings WHERE team_id = ?').get(teamId) as any;
-    if (row?.role_permissions) {
-      const matrix = JSON.parse(row.role_permissions);
-      const v = matrix?.[role]?.[moduleKey];
-      if (v === 'full' || v === 'view' || v === 'none') return v;
-    }
-  } catch { /* fall through */ }
-  // Built-in role with a baked-in default? Use it.
-  const defLevel = DEFAULT_MATRIX[role]?.[moduleKey];
-  if (defLevel) return defLevel;
-  // Custom role with no matrix row yet → safest is to deny. Admins must
-  // explicitly grant access on Settings → Команда → матрица.
-  return 'none';
-}
-
-// Express middleware factory: blocks the request when the caller's role has
-// no access to `moduleKey` (level === 'none'), or when the call is a write
-// (POST/PATCH/PUT/DELETE) and the level is read-only ('view').
+// Permission check helper now lives in ./permissions.ts — see canRunTool /
+// getPermissionLevel exports there. requirePermission is the Express adapter.
 function requirePermission(moduleKey: string) {
   return (req: AuthedRequest, res: Response, next: NextFunction) => {
-    const level = getPermissionLevel(req.teamId!, req.teamRole || 'admin', moduleKey);
+    const level = getPermLevel(db, req.teamId!, req.teamRole || 'admin', moduleKey);
     if (level === 'none') return res.status(403).json({ error: `no access to ${moduleKey}` });
     const isWrite = req.method !== 'GET' && req.method !== 'HEAD';
     if (isWrite && level !== 'full') return res.status(403).json({ error: `${moduleKey} is read-only for your role` });
