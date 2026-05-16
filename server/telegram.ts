@@ -33,6 +33,55 @@ export async function sendMessage(chatId: number, text: string, options: { parse
   return tg('sendMessage', { chat_id: chatId, text, parse_mode: options.parse_mode || 'HTML', disable_web_page_preview: true });
 }
 
+// Download a Telegram photo by file_id and return a data URL. Used by the
+// /design wizard to feed user-supplied room photos & references into the
+// aiImage providers (which already accept data URLs).
+//
+// Telegram's /getFile returns { file_path }; the actual binary lives at
+// https://api.telegram.org/file/bot<TOKEN>/<file_path>.
+async function downloadTgFileAsDataUrl(fileId: string): Promise<string | null> {
+  if (!TOKEN) return null;
+  try {
+    const info = await tg<{ file_path: string; file_size?: number }>('getFile', { file_id: fileId });
+    if (!info?.file_path) return null;
+    // Hard cap at ~20 MB so we don't blow our /generate body limit (25MB) on a single image.
+    if (info.file_size && info.file_size > 20 * 1024 * 1024) return null;
+    const res = await fetch(`${TG_API}/file/bot${TOKEN}/${info.file_path}`);
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    // Telegram converts the file path's extension to give us a reasonable hint.
+    const ext = info.file_path.toLowerCase().split('.').pop() || 'jpg';
+    const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  } catch (e) {
+    console.warn('[downloadTgFile]', e);
+    return null;
+  }
+}
+
+// Register the /-command list shown in Telegram's blue menu button.
+// Called once at server start; safe to re-run (Telegram just overwrites).
+export async function registerBotCommands(): Promise<void> {
+  if (!TOKEN) return;
+  try {
+    await tg('setMyCommands', {
+      commands: [
+        { command: 'start',   description: '🚀 Начать / приветствие' },
+        { command: 'design',  description: '🎨 AI Дизайн интерьера (мастер)' },
+        { command: 'today',   description: '📊 Что было сегодня' },
+        { command: 'tasks',   description: '✅ Мои задачи' },
+        { command: 'revenue', description: '💰 Моя выручка' },
+        { command: 'assign',  description: '👥 Назначить задачу сотруднику' },
+        { command: 'link',    description: '🔗 Привязать аккаунт по коду' },
+        { command: 'cancel',  description: '✕ Отменить текущее действие' },
+        { command: 'help',    description: '❓ Помощь' },
+      ],
+    });
+  } catch (e) {
+    console.warn('[registerBotCommands]', e);
+  }
+}
+
 // ─── Pairing state in DB ──────────────────────────────────────────
 function newLinkCode() {
   // 6 chars, easy to type, unambiguous (no 0/O/1/I).
@@ -152,12 +201,15 @@ function clearPending(db: Database.Database, chatId: number) {
 // ─── /design wizard state (multi-turn AI-design conversation) ────────────
 // Stored on telegram_links.design_state as JSON. Lets a user type plain
 // answers (or tap reply keyboard buttons) instead of crafting a full prompt.
-type DesignStep = 'room' | 'style' | 'mood' | 'confirm';
+type DesignStep = 'room' | 'style' | 'mood' | 'room_photo' | 'references' | 'confirm';
 interface DesignState {
   step: DesignStep;
   room?: string;
   style?: string;
   extra?: string; // user's free-text mood/details
+  // Optional input images for img2img. Both data URLs (base64).
+  roomPhoto?: string;
+  referenceImages?: string[]; // capped at 3
   expiresAt: number;
 }
 const DESIGN_TTL_MS = 15 * 60 * 1000;
@@ -198,6 +250,14 @@ const KB_MOOD = [
   ['💎 Премиум', '📐 Просторно'],
   ['🌱 С растениями', '🌙 Вечерние лампы'],
   ['/skip готово'],
+];
+// Photo-step keyboards — only /skip, since the photo itself is a Telegram
+// attachment, not a button. Tap the paperclip → photo / camera to upload.
+const KB_SKIP_PHOTO = [
+  ['/skip пропустить'],
+];
+const KB_REFS = [
+  ['✅ Готово', '/skip пропустить'],
 ];
 
 // Strip emoji/leading symbols from a button label so the answer matches our
@@ -245,11 +305,16 @@ async function runDesignGeneration(
   providerId: 'chatgpt' | 'gemini' | 'claude' | 'utir-mix',
   prompt: string,
   logActivity: (userId: string, entry: any) => void,
+  inputImages?: { roomPhoto?: string; referenceImages?: string[] },
 ) {
-  await sendMessage(chatId, `🎨 Генерирую (${providerId}), это может занять 10-30 секунд…`);
+  const extras: string[] = [];
+  if (inputImages?.roomPhoto) extras.push('фото комнаты');
+  if (inputImages?.referenceImages?.length) extras.push(`${inputImages.referenceImages.length} реф.`);
+  const extraNote = extras.length ? ` (с ${extras.join(' + ')})` : '';
+  await sendMessage(chatId, `🎨 Генерирую (${providerId})${extraNote}, это может занять 10-30 секунд…`);
   const { generate } = await import('./aiImage.js');
   let results;
-  try { results = await generate(providerId, { prompt }); }
+  try { results = await generate(providerId, { prompt, roomPhoto: inputImages?.roomPhoto, referenceImages: inputImages?.referenceImages }); }
   catch (e: any) { await sendMessage(chatId, `❌ Ошибка генерации: ${String(e?.message || e)}`); return; }
   const ok = results.filter((r: any) => r.ok);
   if (ok.length === 0) {
@@ -283,6 +348,34 @@ async function runDesignGeneration(
     target: prompt.slice(0, 100),
     type: 'create', page: 'ai-design',
   });
+}
+
+// End-of-wizard: read state, build prompt, run generation with collected
+// photos. Shared by the «✅ Готово» / /skip path and the auto-finish at 3 refs.
+async function finalizeDesignWizard(
+  db: Database.Database, chatId: number,
+  user: { id: string; teamId: string; name: string },
+  logActivity: (userId: string, entry: any) => void,
+) {
+  const state = getDesignState(db, chatId);
+  if (!state) return;
+  const prompt = assemblePromptFromWizard(state);
+  const inputs = { roomPhoto: state.roomPhoto, referenceImages: state.referenceImages };
+  clearDesignState(db, chatId);
+  if (!prompt.trim() && !inputs.roomPhoto && !(inputs.referenceImages?.length)) {
+    await tg('sendMessage', { chat_id: chatId, text: 'Слишком мало деталей — попробуйте /design ещё раз.', reply_markup: { remove_keyboard: true } });
+    return;
+  }
+  await tg('sendMessage', {
+    chat_id: chatId, parse_mode: 'HTML',
+    text: `<b>Готовлю prompt:</b>\n<i>${prompt || '(только по фото)'}</i>`,
+    reply_markup: { remove_keyboard: true },
+  });
+  // When the user uploaded a room photo, prefer Gemini (nano-banana-pro) —
+  // it's the most reliable img2img provider for interiors. Otherwise stay
+  // on UTIR-mix so the team sees multiple variants.
+  const provider: 'chatgpt' | 'gemini' | 'claude' | 'utir-mix' = inputs.roomPhoto ? 'gemini' : 'utir-mix';
+  await runDesignGeneration(db, chatId, user, provider, prompt || 'photoreal interior render', logActivity, inputs);
 }
 
 // ─── Per-module AI permissions (Block F.4) ────────────────────────────────
@@ -379,15 +472,64 @@ export interface IncomingUpdate {
     chat: { id: number };
     from?: { id: number; username?: string; first_name?: string };
     text?: string;
+    // Photo updates carry an array of size variants — last one is the largest.
+    photo?: Array<{ file_id: string; file_unique_id: string; width: number; height: number; file_size?: number }>;
+    caption?: string;
   };
 }
 
 export async function handleUpdate(db: Database.Database, update: IncomingUpdate, logActivity: (userId: string, entry: any) => void) {
   const msg = update.message;
-  if (!msg || !msg.text) return;
+  if (!msg) return;
   const chatId = msg.chat.id;
-  const text = msg.text.trim();
   const username = msg.from?.username;
+
+  // ── Photo message? Only meaningful inside the /design wizard. Route to the
+  //    wizard handler below so it can stash the data URL and advance the step.
+  if (msg.photo && msg.photo.length > 0 && !msg.text) {
+    const designState = getDesignState(db, chatId);
+    if (!designState || (designState.step !== 'room_photo' && designState.step !== 'references')) {
+      await sendMessage(chatId, 'Получил фото, но я не в режиме сбора картинок. Начните /design.');
+      return;
+    }
+    const user = findUserByChat(db, chatId);
+    if (!user) { clearDesignState(db, chatId); await sendMessage(chatId, 'Аккаунт не привязан. /link КОД'); return; }
+    const largest = msg.photo[msg.photo.length - 1];
+    await sendMessage(chatId, '📥 Загружаю фото…');
+    const dataUrl = await downloadTgFileAsDataUrl(largest.file_id);
+    if (!dataUrl) {
+      await sendMessage(chatId, '⚠️ Не удалось скачать фото. Попробуйте ещё раз или /skip.');
+      return;
+    }
+    if (designState.step === 'room_photo') {
+      setDesignState(db, chatId, { ...designState, step: 'references', roomPhoto: dataUrl, referenceImages: [] });
+      await tg('sendMessage', {
+        chat_id: chatId, parse_mode: 'HTML',
+        text: '✅ Принял фото комнаты.\n\n<b>Шаг 5/5 — фото-референсы (необязательно).</b>\nПришлите до 3 фото-вдохновений по одному. Когда закончите — нажмите «✅ Готово». Можно пропустить кнопкой /skip.',
+        reply_markup: { keyboard: KB_REFS, resize_keyboard: true, one_time_keyboard: false },
+      });
+      return;
+    }
+    // step === 'references'
+    const refs = [...(designState.referenceImages || []), dataUrl].slice(0, 3);
+    setDesignState(db, chatId, { ...designState, referenceImages: refs });
+    if (refs.length >= 3) {
+      // Auto-finish — we hit the cap, no need to wait for «Готово».
+      await tg('sendMessage', { chat_id: chatId, text: `✅ Принял ${refs.length} референс(а). Запускаю генерацию…`, reply_markup: { remove_keyboard: true } });
+      await finalizeDesignWizard(db, chatId, user, logActivity);
+      return;
+    }
+    await tg('sendMessage', {
+      chat_id: chatId, parse_mode: 'HTML',
+      text: `✅ Принял ${refs.length}/3 референс(ов). Пришлите ещё или нажмите «✅ Готово».`,
+      reply_markup: { keyboard: KB_REFS, resize_keyboard: true, one_time_keyboard: false },
+    });
+    return;
+  }
+
+  // ── Text message? Continue with the regular handler.
+  if (!msg.text) return;
+  const text = msg.text.trim();
 
   // --- Slash commands ------------------------------------------------
   if (text.startsWith('/')) {
@@ -580,7 +722,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
         await tg('sendMessage', {
           chat_id: chatId,
           parse_mode: 'HTML',
-          text: '🎨 <b>Соберём AI-дизайн вместе.</b>\n\n<b>Шаг 1/3 — какая комната?</b>',
+          text: '🎨 <b>Соберём AI-дизайн вместе.</b>\n\n<b>Шаг 1/5 — какая комната?</b>\nНа любом шаге можно нажать <code>/skip</code> чтобы пропустить, или <code>/cancel</code> чтобы прервать.',
           reply_markup: { keyboard: KB_ROOMS, resize_keyboard: true, one_time_keyboard: true },
         });
         return;
@@ -699,7 +841,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       }
       setDesignState(db, chatId, { ...designState, step: 'style', room });
       await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML',
-        text: '<b>Шаг 2/3 — какой стиль?</b>',
+        text: '<b>Шаг 2/5 — какой стиль?</b>',
         reply_markup: { keyboard: KB_STYLES, resize_keyboard: true, one_time_keyboard: true },
       });
       return;
@@ -719,12 +861,12 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       }
       setDesignState(db, chatId, { ...designState, step: 'mood', style });
       await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML',
-        text: '<b>Шаг 3/3 — атмосфера / детали (по желанию).</b>\nТекстом любое: «бежевые шторы, мраморный пол, окно во всю стену». Или нажмите кнопку:',
+        text: '<b>Шаг 3/5 — атмосфера / детали (по желанию).</b>\nТекстом любое: «бежевые шторы, мраморный пол, окно во всю стену». Или нажмите кнопку, либо <code>/skip</code>:',
         reply_markup: { keyboard: KB_MOOD, resize_keyboard: true, one_time_keyboard: true },
       });
       return;
     }
-    // STEP 3 → mood / details → generate
+    // STEP 3 → mood / details → ask for room photo (optional)
     if (designState.step === 'mood') {
       let extra = '';
       if (answer && answer !== 'skip готово' && answer !== '/skip готово' && answer !== '/skip' && answer !== 'skip') {
@@ -740,18 +882,47 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
         const matched = Object.keys(moodPhrase).find(k => answer.includes(k));
         extra = matched ? moodPhrase[matched] : text.trim();
       }
-      const finalState: DesignState = { ...designState, step: 'confirm', extra: extra || undefined, expiresAt: 0 };
-      const prompt = assemblePromptFromWizard(finalState);
-      clearDesignState(db, chatId);
-      if (!prompt.trim()) {
-        await tg('sendMessage', { chat_id: chatId, text: 'Слишком мало деталей — попробуйте /design ещё раз.', reply_markup: { remove_keyboard: true } });
+      // Advance to optional room-photo step. Don't generate yet.
+      setDesignState(db, chatId, { ...designState, step: 'room_photo', extra: extra || undefined });
+      await tg('sendMessage', {
+        chat_id: chatId, parse_mode: 'HTML',
+        text: '<b>Шаг 4/5 — фото комнаты (необязательно).</b>\nПришлите фото текущего помещения, чтобы AI перерисовал именно его. Если фото нет — нажмите <code>/skip</code>.',
+        reply_markup: { keyboard: KB_SKIP_PHOTO, resize_keyboard: true, one_time_keyboard: false },
+      });
+      return;
+    }
+    // STEP 4 → room photo (skip-only via text; photo comes through the
+    // photo-message branch at the top of handleUpdate).
+    if (designState.step === 'room_photo') {
+      if (answer === 'skip' || answer === '/skip' || answer.startsWith('skip')) {
+        setDesignState(db, chatId, { ...designState, step: 'references', referenceImages: [] });
+        await tg('sendMessage', {
+          chat_id: chatId, parse_mode: 'HTML',
+          text: '<b>Шаг 5/5 — фото-референсы (необязательно).</b>\nПришлите до 3 фото для вдохновения. Когда закончите — нажмите «✅ Готово». Или /skip чтобы пропустить.',
+          reply_markup: { keyboard: KB_REFS, resize_keyboard: true, one_time_keyboard: false },
+        });
         return;
       }
-      await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML',
-        text: `<b>Готовлю prompt:</b>\n<i>${prompt}</i>`,
-        reply_markup: { remove_keyboard: true },
+      // Any other text — gently remind that we need a photo or /skip.
+      await tg('sendMessage', {
+        chat_id: chatId, parse_mode: 'HTML',
+        text: '📷 Пришлите фото комнаты (через 📎 → Фото) или нажмите <code>/skip</code>.',
+        reply_markup: { keyboard: KB_SKIP_PHOTO, resize_keyboard: true, one_time_keyboard: false },
       });
-      await runDesignGeneration(db, chatId, user, 'utir-mix', prompt, logActivity);
+      return;
+    }
+    // STEP 5 → references — accept «Готово» / /skip, otherwise wait for photos.
+    if (designState.step === 'references') {
+      if (answer === 'skip' || answer === '/skip' || answer.startsWith('skip') ||
+          answer === 'готово' || answer.includes('готово')) {
+        await finalizeDesignWizard(db, chatId, user, logActivity);
+        return;
+      }
+      await tg('sendMessage', {
+        chat_id: chatId, parse_mode: 'HTML',
+        text: `📷 Пришлите ещё фото-референс (есть ${(designState.referenceImages || []).length}/3) или нажмите «✅ Готово» / <code>/skip</code>.`,
+        reply_markup: { keyboard: KB_REFS, resize_keyboard: true, one_time_keyboard: false },
+      });
       return;
     }
   }

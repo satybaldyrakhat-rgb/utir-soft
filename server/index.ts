@@ -5,10 +5,12 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage } from './telegram.js';
-import { isClaudeReady } from './claudeAgent.js';
+import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands } from './telegram.js';
+import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate } from './email.js';
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
+import { chat as aiChat, chatProviderStatuses, type ChatProviderId, type ChatMessage } from './aiChat.js';
+import aiTools from './aiTools.js';
 import { createHmac, randomBytes } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -168,6 +170,17 @@ CREATE TABLE IF NOT EXISTS ai_generations (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ai_generations_team ON ai_generations(team_id);
+
+CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  -- JSON array: [{ role: 'user'|'assistant', content: string, ts: string }]
+  messages TEXT NOT NULL DEFAULT '[]',
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ai_chat_sessions_user ON ai_chat_sessions(user_id);
 `);
 
 // Idempotent migration: add columns if missing. Returns true when column was just added.
@@ -1358,6 +1371,177 @@ aiDesignRouter.delete('/:id', requireRole('admin'), (req: AuthedRequest, res) =>
 
 app.use('/api/ai-design', aiDesignRouter);
 
+// ─── AI Chat (in-app assistant popup) ──────────────────────────────────
+// Five providers; UTIR AI is routed through claudeRunAgent so it can call
+// platform tools (create deal, log payment, change status, add task,
+// find client). Other providers do pure text chat without tool execution.
+//
+// Flow:
+//   POST /message  { provider, messages } → returns text reply OR a
+//     pending tool proposal { kind: 'tool', toolName, toolInput, summary }
+//   POST /execute  { toolName, toolInput } → user-confirmed tool run,
+//     writes to DB, returns short result string.
+const aiChatRouter = express.Router();
+aiChatRouter.use(authMiddleware);
+
+aiChatRouter.get('/providers', (_req: AuthedRequest, res) => {
+  res.json(chatProviderStatuses());
+});
+
+// Persisted history (per user × provider). Lets the popup reopen and
+// continue from where the user left off, on any device.
+aiChatRouter.get('/history', (req: AuthedRequest, res) => {
+  const provider = String(req.query?.provider || '');
+  if (!provider) return res.json({ messages: [] });
+  const row = db.prepare(
+    'SELECT messages FROM ai_chat_sessions WHERE user_id = ? AND provider = ?',
+  ).get(req.userId!, provider) as any;
+  let messages: any[] = [];
+  try { messages = row?.messages ? JSON.parse(row.messages) : []; } catch { messages = []; }
+  res.json({ messages });
+});
+
+aiChatRouter.delete('/history', (req: AuthedRequest, res) => {
+  const provider = String(req.query?.provider || '');
+  if (provider) {
+    db.prepare('DELETE FROM ai_chat_sessions WHERE user_id = ? AND provider = ?').run(req.userId!, provider);
+  } else {
+    db.prepare('DELETE FROM ai_chat_sessions WHERE user_id = ?').run(req.userId!);
+  }
+  res.json({ ok: true });
+});
+
+function saveChatHistory(teamId: string, userId: string, provider: string, messages: ChatMessage[]) {
+  // Cap history at last 40 turns to keep storage small and prompts cheap.
+  const trimmed = messages.slice(-40).map(m => ({ role: m.role, content: m.content, ts: new Date().toISOString() }));
+  const id = `chat_${userId}_${provider}`;
+  db.prepare(`
+    INSERT INTO ai_chat_sessions (id, team_id, user_id, provider, messages, updated_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(id) DO UPDATE SET
+      messages = excluded.messages,
+      updated_at = excluded.updated_at
+  `).run(id, teamId, userId, provider, JSON.stringify(trimmed));
+}
+
+aiChatRouter.post('/message', async (req: AuthedRequest, res) => {
+  const provider = String(req.body?.provider || 'utir-ai') as ChatProviderId;
+  const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+  const messages: ChatMessage[] = rawMessages
+    .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+    .map((m: any) => ({ role: m.role, content: String(m.content) }))
+    .slice(-40);
+  if (messages.length === 0) return res.status(400).json({ error: 'messages required' });
+  if (messages[messages.length - 1].role !== 'user') return res.status(400).json({ error: 'last message must be user' });
+
+  const userRow = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  const userName = userRow?.name || 'Пользователь';
+
+  // ─── UTIR AI → tool-capable platform agent ─────────────────────────
+  if (provider === 'utir-ai') {
+    if (!isClaudeReady()) {
+      return res.json({ kind: 'error', provider, ok: false, error: 'ANTHROPIC_API_KEY не задан — UTIR AI пока недоступен.' });
+    }
+    try {
+      const last = messages[messages.length - 1].content;
+      const history = messages.slice(0, -1); // everything BEFORE last user turn
+      const agentResult = await claudeRunAgent({
+        db,
+        userId: req.userId!,
+        userName,
+        userText: last,
+        history,
+      });
+
+      if (agentResult.kind === 'reply') {
+        const newHistory: ChatMessage[] = [...messages, { role: 'assistant', content: agentResult.text }];
+        saveChatHistory(req.teamId!, req.userId!, provider, newHistory);
+        return res.json({ kind: 'reply', provider, ok: true, text: agentResult.text });
+      }
+
+      // Tool proposal — read-only tools (find_client) execute immediately.
+      if (aiTools.isReadOnly(agentResult.toolName)) {
+        try {
+          const result = await aiTools.execute(
+            db, req.userId!, req.teamId!, userName,
+            agentResult.toolName, agentResult.toolInput, logActivity,
+          );
+          const newHistory: ChatMessage[] = [...messages, { role: 'assistant', content: result }];
+          saveChatHistory(req.teamId!, req.userId!, provider, newHistory);
+          return res.json({ kind: 'reply', provider, ok: true, text: result });
+        } catch (e: any) {
+          const errText = `Не удалось выполнить: ${String(e?.message || e)}`;
+          return res.json({ kind: 'reply', provider, ok: true, text: errText });
+        }
+      }
+
+      // Write tool — return proposal, UI shows confirm/cancel buttons.
+      // Persist the proposal as an assistant turn so the conversation flows.
+      const proposalText = `${agentResult.summary}\n\n<i>Подтвердите выполнение действия кнопками ниже.</i>`;
+      const newHistory: ChatMessage[] = [...messages, { role: 'assistant', content: proposalText }];
+      saveChatHistory(req.teamId!, req.userId!, provider, newHistory);
+      return res.json({
+        kind: 'tool',
+        provider,
+        ok: true,
+        toolName: agentResult.toolName,
+        toolInput: agentResult.toolInput,
+        summary: agentResult.summary,
+      });
+    } catch (e: any) {
+      return res.json({ kind: 'error', provider, ok: false, error: String(e?.message || e) });
+    }
+  }
+
+  // ─── Pure-chat providers (claude / gemini / chatgpt / deepseek) ────
+  const result = await aiChat(provider, messages);
+  if (result.kind === 'reply') {
+    const newHistory: ChatMessage[] = [...messages, { role: 'assistant', content: result.text }];
+    saveChatHistory(req.teamId!, req.userId!, provider, newHistory);
+  }
+  return res.json(result);
+});
+
+// User-confirmed tool execution. Body: { provider, toolName, toolInput }.
+// Returns { ok, text } where text is the short success/error sentence the
+// popup can render as an assistant message.
+aiChatRouter.post('/execute', async (req: AuthedRequest, res) => {
+  const provider = String(req.body?.provider || 'utir-ai');
+  const toolName = String(req.body?.toolName || '');
+  const toolInput = req.body?.toolInput || {};
+  if (!toolName) return res.status(400).json({ error: 'toolName required' });
+
+  // Per-module permission check (matches the team matrix). We allow execution
+  // when the user's role grants the module — same gate the Telegram bot uses.
+  const toolModule = aiTools.getToolModule(toolName);
+  if (!toolModule) return res.status(400).json({ error: 'unknown tool' });
+
+  const userRow = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  const userName = userRow?.name || 'Пользователь';
+
+  try {
+    const text = await aiTools.execute(
+      db, req.userId!, req.teamId!, userName,
+      toolName, toolInput, logActivity,
+    );
+    // Append the result to the saved chat history so reopening the popup
+    // shows the confirmation outcome inline.
+    try {
+      const row = db.prepare(
+        'SELECT messages FROM ai_chat_sessions WHERE user_id = ? AND provider = ?',
+      ).get(req.userId!, provider) as any;
+      const prior: any[] = row?.messages ? JSON.parse(row.messages) : [];
+      prior.push({ role: 'assistant', content: `✅ ${text}`, ts: new Date().toISOString() });
+      saveChatHistory(req.teamId!, req.userId!, provider, prior);
+    } catch { /* non-fatal */ }
+    res.json({ ok: true, text });
+  } catch (e: any) {
+    res.json({ ok: false, text: `Не удалось выполнить: ${String(e?.message || e)}` });
+  }
+});
+
+app.use('/api/ai-chat', aiChatRouter);
+
 // Map of team-wide Telegram pairings (Block F.6). Used by the team panel to
 // show which teammates have linked their account to the bot — admin sees who
 // can receive notifications and whose chat will route through the AI tools.
@@ -1655,4 +1839,10 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, telegram: isTelegramR
 
 app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
+  // Push the /-command menu to Telegram (idempotent — safe on every boot).
+  // Adds /design to the blue menu button so users discover the wizard.
+  if (isTelegramReady()) {
+    registerBotCommands().then(() => console.log('[server] telegram /design menu registered'))
+      .catch(e => console.warn('[server] registerBotCommands failed', e));
+  }
 });
