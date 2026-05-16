@@ -17,6 +17,33 @@ import {
   CookingPot, BedDouble, Sofa, Bath, Baby, DoorOpen,
 } from 'lucide-react';
 import { api } from '../utils/api';
+import utirLogo from '../../imports/utirsoft.png';
+
+// ─── Brand-icon SVGs (real provider logos, inline so no extra requests) ──
+// OpenAI knot / spiral
+function OpenAiIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.792a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z" />
+    </svg>
+  );
+}
+// Gemini — 4-point star (Google's mark for the model)
+function GeminiIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M12 0c.844 6.844 5.156 11.156 12 12-6.844.844-11.156 5.156-12 12-.844-6.844-5.156-11.156-12-12C6.844 11.156 11.156 6.844 12 0z" />
+    </svg>
+  );
+}
+// Claude / Anthropic — stylised radial mark, recognisable orange
+function ClaudeIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M4.6 19.4 9.7 7.2h2.4l5.1 12.2h-2.4l-1.3-3.3H8.4l-1.3 3.3H4.6zm4.6-5.2h4l-2-5.1-2 5.1z" />
+    </svg>
+  );
+}
 
 interface AIDesignProps {
   language: 'kz' | 'ru' | 'eng';
@@ -59,11 +86,34 @@ const MOODS: { id: string; label: { ru: string; kz: string; eng: string }; promp
   { id: 'evening',  label: { ru: 'Вечер, лампы',   kz: 'Кеш, шамдар',      eng: 'Evening lamps' },promptRu: 'вечернее тёплое освещение от ламп и торшеров' },
 ];
 
-const PROVIDER_VISUAL: Record<ProviderId, { gradient: string; icon: string; sub: string }> = {
-  chatgpt:    { gradient: 'from-emerald-400 to-teal-600',   icon: '🤖', sub: 'ChatGPT · OpenAI' },
-  gemini:     { gradient: 'from-blue-400 to-indigo-600',    icon: '✨', sub: 'Gemini · Google' },
-  claude:     { gradient: 'from-orange-400 to-pink-600',    icon: '🍌', sub: 'Claude prompt → nano-banana' },
-  'utir-mix': { gradient: 'from-purple-500 to-fuchsia-600', icon: '🪄', sub: 'UTIR AI — все провайдеры' },
+// Each provider's visual identity. `icon` is a render function so we can swap
+// real brand SVGs in instead of emoji. `bg` is a tailwind class for the
+// rounded square the icon sits in (uses brand-ish neutral backgrounds).
+const PROVIDER_VISUAL: Record<ProviderId, {
+  bg: string;
+  icon: (className: string) => React.ReactNode;
+  sub: string;
+}> = {
+  chatgpt: {
+    bg: 'bg-[#0F1715]',
+    icon: (cls) => <OpenAiIcon className={cls + ' text-white'} />,
+    sub: 'ChatGPT · OpenAI',
+  },
+  gemini: {
+    bg: 'bg-gradient-to-br from-[#4285F4] via-[#9168F0] to-[#D96570]',
+    icon: (cls) => <GeminiIcon className={cls + ' text-white'} />,
+    sub: 'Gemini · Google',
+  },
+  claude: {
+    bg: 'bg-[#D4A27F]',
+    icon: (cls) => <ClaudeIcon className={cls + ' text-[#1C1814]'} />,
+    sub: 'Claude prompt → nano-banana',
+  },
+  'utir-mix': {
+    bg: 'bg-white border border-gray-200',
+    icon: (cls) => <img src={utirLogo} alt="UTIR" className={cls + ' object-cover'} />,
+    sub: 'UTIR AI — все провайдеры',
+  },
 };
 
 export function AIDesign({ language }: AIDesignProps) {
@@ -303,7 +353,11 @@ export function AIDesign({ language }: AIDesignProps) {
                   active && p.enabled ? 'border-gray-900 shadow-sm' : 'border-gray-100 hover:border-gray-300'
                 } ${!p.enabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${vis.gradient} flex items-center justify-center text-base mb-2`}>{vis.icon}</div>
+                {/* Brand logo square — real SVG for ChatGPT / Gemini / Claude,
+                    the platform logo for UTIR-mix. */}
+                <div className={`w-10 h-10 rounded-xl ${vis.bg} flex items-center justify-center overflow-hidden mb-2`}>
+                  {vis.icon('w-6 h-6')}
+                </div>
                 <div className="text-xs text-gray-900">{p.name}</div>
                 <div className="text-[10px] text-gray-400 mt-0.5">{vis.sub}</div>
                 {!p.enabled && p.envVar && (
@@ -367,7 +421,9 @@ export function AIDesign({ language }: AIDesignProps) {
                     <div className="p-3">
                       <div className="flex items-center justify-between mb-1">
                         <div className="text-xs text-gray-900 flex items-center gap-1.5">
-                          <span>{PROVIDER_VISUAL[r.provider].icon}</span>
+                          <span className={`w-4 h-4 rounded ${PROVIDER_VISUAL[r.provider].bg} flex items-center justify-center overflow-hidden`}>
+                            {PROVIDER_VISUAL[r.provider].icon('w-2.5 h-2.5')}
+                          </span>
                           <span>{r.provider}</span>
                         </div>
                         <a
@@ -421,7 +477,12 @@ export function AIDesign({ language }: AIDesignProps) {
                 </div>
                 <div className="p-2.5">
                   <div className="text-[10px] text-gray-500 flex items-center justify-between mb-1">
-                    <span className="flex items-center gap-1"><span>{PROVIDER_VISUAL[h.provider]?.icon || '🤖'}</span> {h.provider}</span>
+                    <span className="flex items-center gap-1">
+                      <span className={`w-3.5 h-3.5 rounded ${PROVIDER_VISUAL[h.provider]?.bg || 'bg-gray-100'} flex items-center justify-center overflow-hidden`}>
+                        {PROVIDER_VISUAL[h.provider]?.icon('w-2 h-2') || <Bot className="w-2 h-2 text-gray-400" />}
+                      </span>
+                      {h.provider}
+                    </span>
                     <span>{new Date(h.createdAt).toLocaleDateString(language === 'eng' ? 'en-GB' : 'ru-RU', { day: '2-digit', month: '2-digit' })}</span>
                   </div>
                   <div className="text-[11px] text-gray-700 line-clamp-2 leading-snug" title={h.prompt}>{h.prompt}</div>
