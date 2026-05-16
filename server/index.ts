@@ -549,6 +549,79 @@ function makeCrud(table: string, idPrefix: string) {
 //   - view  → 403 on POST/PATCH/PUT/DELETE; GET allowed
 //   - full  → all methods allowed
 // Tasks intentionally stay open to every team member — no matrix key for it.
+// Deal-status notifications. Intercept PATCH /api/deals/:id before the
+// generic CRUD: if `status` changed and the deal has an ownerId (or a
+// matched paired teammate), DM them on Telegram with the new stage.
+app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT data FROM deals WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  const before = JSON.parse(row.data);
+  const updated = { ...before, ...req.body, id: req.params.id };
+  db.prepare('UPDATE deals SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(updated), req.params.id, req.teamId!);
+
+  const statusChanged = updated.status && updated.status !== before.status;
+  if (statusChanged && isTelegramReady()) {
+    try {
+      // Resolve the deal's owner. Prefer ownerId; fall back to a name match
+      // on the role fields, same rules as the team-metrics tab.
+      let ownerEmpRow: any = null;
+      if (updated.ownerId) {
+        ownerEmpRow = db.prepare('SELECT data FROM employees WHERE id = ? AND team_id = ?').get(updated.ownerId, req.teamId!) as any;
+      } else {
+        const candidates = [updated.measurer, updated.designer, updated.foreman, updated.architect].filter(Boolean);
+        if (candidates.length > 0) {
+          const allEmps = db.prepare('SELECT id, data FROM employees WHERE team_id = ?').all(req.teamId!) as any[];
+          for (const r of allEmps) {
+            try {
+              const d = JSON.parse(r.data);
+              const nameLow = (d.name || '').toLowerCase();
+              if (!nameLow) continue;
+              const firstLow = nameLow.split(/\s+/)[0] || '';
+              const hit = candidates.some((v: string) => {
+                const vLow = (v || '').toLowerCase();
+                return vLow.includes(nameLow) || (firstLow.length > 2 && vLow.includes(firstLow));
+              });
+              if (hit) { ownerEmpRow = r; break; }
+            } catch { /* skip */ }
+          }
+        }
+      }
+      if (ownerEmpRow) {
+        const ownerData = JSON.parse(ownerEmpRow.data);
+        const email = (ownerData.email || '').toLowerCase();
+        if (email) {
+          const user = db.prepare('SELECT id FROM users WHERE email = ? AND team_id = ?').get(email, req.teamId!) as any;
+          if (user) {
+            const link = db.prepare('SELECT chat_id FROM telegram_links WHERE user_id = ? AND chat_id IS NOT NULL').get(user.id) as any;
+            if (link?.chat_id) {
+              const STAGE_LABEL: Record<string, string> = {
+                new: '🆕 Новая заявка',
+                measured: '📐 Замер',
+                'project-agreed': '✍️ Проект и договор',
+                production: '🏭 Производство',
+                installation: '🚚 Установка',
+                completed: '✅ Завершено',
+                rejected: '❌ Отказ',
+              };
+              const fromL = STAGE_LABEL[before.status] || before.status || '—';
+              const toL = STAGE_LABEL[updated.status] || updated.status;
+              const amount = updated.amount ? `${Math.round(updated.amount).toLocaleString('ru-RU').replace(/,/g, ' ')} ₸` : '';
+              const msg =
+                `<b>Статус сделки изменён</b>\n` +
+                `${updated.customerName || 'Сделка'}${amount ? ` · ${amount}` : ''}\n\n` +
+                `<i>${fromL}</i>  →  <b>${toL}</b>\n\n` +
+                `Открыть на платформе → Заказы`;
+              await tgSendMessage(link.chat_id, msg);
+            }
+          }
+        }
+      }
+    } catch (e) { console.warn('[deals] tg notify on status change failed', e); }
+  }
+
+  res.json(updated);
+});
+
 app.use('/api/deals', authMiddleware, requirePermission('orders'), makeCrud('deals', 'D'));
 
 // Custom DELETE on /api/employees/:id — must register BEFORE the generic
