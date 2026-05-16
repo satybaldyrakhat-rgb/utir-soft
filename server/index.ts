@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage } from './telegram.js';
 import { isClaudeReady } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate } from './email.js';
+import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
 import { createHmac, randomBytes } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -150,6 +151,23 @@ CREATE TABLE IF NOT EXISTS webhooks (
   last_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_webhooks_team ON webhooks(team_id);
+
+-- AI Дизайн — каждый generate сохраняется тут чтобы команда видела историю.
+-- image_url пустой если провайдер вернул base64; в таком случае image_data
+-- хранит data:image/...;base64,... строку.
+CREATE TABLE IF NOT EXISTS ai_generations (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  user_name TEXT,
+  provider TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  image_url TEXT,
+  image_data TEXT,
+  enhanced_prompt TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ai_generations_team ON ai_generations(team_id);
 `);
 
 // Idempotent migration: add columns if missing. Returns true when column was just added.
@@ -1117,6 +1135,78 @@ webhooksRouter.post('/:id/test', requireRole('admin'), (req: AuthedRequest, res)
 });
 
 app.use('/api/webhooks', webhooksRouter);
+
+// ─── AI Дизайн (image generation) ──────────────────────────────────
+// Status + history are open to any team member; generate respects the
+// matrix on 'ai-design' (so admin can lock it off per role if needed).
+const aiDesignRouter = express.Router();
+aiDesignRouter.use(authMiddleware);
+
+aiDesignRouter.get('/providers', (_req: AuthedRequest, res) => {
+  res.json(aiImageProviders());
+});
+
+aiDesignRouter.get('/history', (req: AuthedRequest, res) => {
+  const rows = db.prepare(
+    'SELECT id, user_id, user_name, provider, prompt, image_url, image_data, enhanced_prompt, created_at FROM ai_generations WHERE team_id = ? ORDER BY rowid DESC LIMIT 100',
+  ).all(req.teamId!) as any[];
+  res.json(rows.map(r => ({
+    id: r.id,
+    userId: r.user_id,
+    userName: r.user_name,
+    provider: r.provider,
+    prompt: r.prompt,
+    imageUrl: r.image_url || r.image_data || null,
+    enhancedPrompt: r.enhanced_prompt || null,
+    createdAt: r.created_at,
+  })));
+});
+
+aiDesignRouter.post('/generate', requirePermission('ai-design'), async (req: AuthedRequest, res) => {
+  const provider = String(req.body?.provider || 'utir-mix') as ProviderId;
+  const prompt = String(req.body?.prompt || '').trim();
+  if (!prompt) return res.status(400).json({ error: 'prompt required' });
+
+  const results = await aiImageGenerate(provider, prompt);
+
+  // Persist every successful image so the team can browse them later.
+  const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  const saved = results.map(r => {
+    if (!r.ok) return { ...r };
+    const id = newId('aig_');
+    db.prepare(
+      'INSERT INTO ai_generations (id, team_id, user_id, user_name, provider, prompt, image_url, image_data, enhanced_prompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(
+      id, req.teamId!, req.userId!, actor?.name || '',
+      r.provider, prompt,
+      r.imageUrl || null,
+      r.imageDataUrl || null,
+      r.enhancedPrompt || null,
+    );
+    return { ...r, id };
+  });
+
+  // Telegram notify: when a teammate generates a design, ping them so they
+  // see the result even if they're chatting in the bot.
+  try {
+    if (isTelegramReady()) {
+      const link = db.prepare('SELECT chat_id FROM telegram_links WHERE user_id = ? AND chat_id IS NOT NULL').get(req.userId!) as any;
+      if (link?.chat_id) {
+        const okCount = saved.filter(s => s.ok).length;
+        await tgSendMessage(link.chat_id, `🎨 <b>AI Дизайн готов</b>\nПровайдер: ${provider}\n${okCount > 0 ? `Получено ${okCount} изображ.` : 'К сожалению, не удалось сгенерировать.'}\n\nОткрыть → AI Дизайн`);
+      }
+    }
+  } catch (e) { console.warn('[ai-design tg notify]', e); }
+
+  res.json({ provider, prompt, results: saved });
+});
+
+aiDesignRouter.delete('/:id', requireRole('admin'), (req: AuthedRequest, res) => {
+  db.prepare('DELETE FROM ai_generations WHERE id = ? AND team_id = ?').run(req.params.id, req.teamId!);
+  res.json({ ok: true });
+});
+
+app.use('/api/ai-design', aiDesignRouter);
 
 // Map of team-wide Telegram pairings (Block F.6). Used by the team panel to
 // show which teammates have linked their account to the bot — admin sees who

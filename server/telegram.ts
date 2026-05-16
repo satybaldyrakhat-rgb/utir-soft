@@ -293,6 +293,9 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
         `<b>Управление:</b>\n` +
         `<code>/assign Имя текст задачи</code> — поставить задачу сотруднику\n` +
         `<code>/assign @username текст задачи</code> — по Telegram-нику\n\n` +
+        `<b>AI Дизайн:</b>\n` +
+        `<code>/design описание интерьера</code> — UTIR-mix (все провайдеры)\n` +
+        `<code>/design @chatgpt|@gemini|@claude ...</code> — выбрать конкретный\n\n` +
         `<b>Прочее:</b> /start /link /cancel /help`,
       );
       return;
@@ -415,6 +418,89 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     // /assign — create a task for a teammate.
     //   /assign Имя текст задачи
     //   /assign @username текст задачи  (matches paired Telegram username)
+    // /design — generate an interior design image via the AI providers.
+    // Defaults to UTIR-mix (runs every configured provider in parallel).
+    //   /design <описание интерьера>
+    //   /design @gemini <описание>   ← опционально выбрать провайдер
+    if (cmd === '/design' || cmd === '/дизайн') {
+      const user = findUserByChat(db, chatId);
+      if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт: <code>/link КОД</code>'); return; }
+      if (args.length === 0) {
+        await sendMessage(chatId,
+          `<b>Использование:</b>\n` +
+          `<code>/design описание интерьера</code> — всё доступное (UTIR-mix)\n` +
+          `<code>/design @chatgpt описание</code> — только ChatGPT\n` +
+          `<code>/design @gemini описание</code>  — только Gemini\n` +
+          `<code>/design @claude описание</code>  — Claude улучшает prompt и роутит\n\n` +
+          `Пример: <code>/design кухня в стиле сканди, белые фасады, дубовая столешница, окно</code>`,
+        );
+        return;
+      }
+      // Pick provider via leading @flag, default utir-mix.
+      let providerId: 'chatgpt' | 'gemini' | 'claude' | 'utir-mix' = 'utir-mix';
+      let promptArgs = args;
+      if (args[0].startsWith('@')) {
+        const tag = args[0].slice(1).toLowerCase();
+        if (tag === 'chatgpt' || tag === 'gemini' || tag === 'claude' || tag === 'utir' || tag === 'utir-mix') {
+          providerId = (tag === 'utir' ? 'utir-mix' : tag) as typeof providerId;
+          promptArgs = args.slice(1);
+        }
+      }
+      const prompt = promptArgs.join(' ');
+      if (!prompt.trim()) {
+        await sendMessage(chatId, 'Пустой запрос — добавьте описание после команды.');
+        return;
+      }
+      await sendMessage(chatId, `🎨 Генерирую (${providerId}), это может занять 10-30 секунд…`);
+      // Import lazily so the telegram module doesn't carry aiImage at module load.
+      const { generate } = await import('./aiImage.js');
+      let results;
+      try { results = await generate(providerId as any, prompt); }
+      catch (e: any) {
+        await sendMessage(chatId, `❌ Ошибка генерации: ${String(e?.message || e)}`);
+        return;
+      }
+      const ok = results.filter(r => r.ok);
+      if (ok.length === 0) {
+        const reason = results[0]?.error || 'неизвестная причина';
+        await sendMessage(chatId, `❌ Не получилось: ${reason}`);
+        return;
+      }
+      // Persist into ai_generations so the platform shows the generation.
+      const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(user.id) as any;
+      for (const r of ok) {
+        const id = newId('aig_');
+        try {
+          db.prepare(
+            'INSERT INTO ai_generations (id, team_id, user_id, user_name, provider, prompt, image_url, image_data, enhanced_prompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          ).run(id, user.teamId, user.id, actor?.name || '', r.provider, prompt, r.imageUrl || null, r.imageDataUrl || null, r.enhancedPrompt || null);
+        } catch (e) { console.warn('[/design save]', e); }
+      }
+      // Send each image back as a photo. URL → sendPhoto; base64 → sendPhoto via URL of the
+      // platform... actually Telegram sendPhoto accepts URL strings only (no base64). For
+      // base64 results we fall back to a message with the data URL is too long — use
+      // platform link instead. (We do save the image; user can open the platform.)
+      for (const r of ok) {
+        try {
+          if (r.imageUrl) {
+            await tg('sendPhoto', { chat_id: chatId, photo: r.imageUrl, caption: `<b>${r.provider}</b>${r.enhancedPrompt ? `\n<i>Prompt:</i> ${r.enhancedPrompt.slice(0, 200)}` : ''}`, parse_mode: 'HTML' });
+          } else {
+            await sendMessage(chatId, `<b>${r.provider}</b> ✅ — открыть на платформе → AI Дизайн (base64-генерация, длинная для пересылки в Telegram).`);
+          }
+        } catch (e) {
+          console.warn('[/design send photo]', e);
+          await sendMessage(chatId, `<b>${r.provider}</b>: открыть на платформе → AI Дизайн.`);
+        }
+      }
+      logActivity(user.id, {
+        user: user.name, actor: 'human',
+        action: 'Сгенерировал AI-дизайн через Telegram',
+        target: prompt.slice(0, 100),
+        type: 'create', page: 'ai-design',
+      });
+      return;
+    }
+
     if (cmd === '/assign' || cmd === '/назначь' || cmd === '/назначить') {
       const user = findUserByChat(db, chatId);
       if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт: <code>/link КОД</code>'); return; }
@@ -481,7 +567,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       return;
     }
 
-    await sendMessage(chatId, `Не знаю такой команды. Доступны: /start /help /link /today /tasks /revenue /assign /cancel`);
+    await sendMessage(chatId, `Не знаю такой команды. Доступны: /start /help /link /today /tasks /revenue /assign /design /cancel`);
     return;
   }
 
