@@ -72,29 +72,6 @@ export function unlink(db: Database.Database, userId: string) {
   db.prepare('DELETE FROM telegram_links WHERE user_id = ?').run(userId);
 }
 
-// Notify every admin in this team about something a teammate did from Telegram.
-// Skips the actor themselves (no point notifying admin about their own action).
-// Best-effort: if a chat is offline / chat_id stale, just skip and continue.
-export async function notifyAdmins(
-  db: Database.Database,
-  teamId: string,
-  excludeUserId: string,
-  message: string,
-): Promise<void> {
-  try {
-    const rows = db.prepare(`
-      SELECT u.id, tl.chat_id
-      FROM users u
-      JOIN telegram_links tl ON tl.user_id = u.id
-      WHERE u.team_id = ? AND u.team_role = 'admin' AND tl.chat_id IS NOT NULL AND u.id != ? AND (u.disabled_at IS NULL)
-    `).all(teamId, excludeUserId) as any[];
-    for (const r of rows) {
-      try { await sendMessage(r.chat_id, message); }
-      catch (e) { console.warn('[notifyAdmins] send failed', e); }
-    }
-  } catch (e) { console.warn('[notifyAdmins] lookup failed', e); }
-}
-
 function findUserByChat(db: Database.Database, chatId: number): { id: string; teamId: string; name: string } | undefined {
   const row = db.prepare(`
     SELECT u.id, u.team_id, u.name FROM telegram_links tl
@@ -306,11 +283,6 @@ async function runDesignGeneration(
     target: prompt.slice(0, 100),
     type: 'create', page: 'ai-design',
   });
-  // Ping every team admin (except the actor) so they see who's burning the
-  // AI-design budget right now.
-  await notifyAdmins(db, user.teamId, user.id,
-    `🎨 <b>${user.name}</b> сгенерировал AI-дизайн через Telegram\n<i>${prompt.slice(0, 140)}${prompt.length > 140 ? '…' : ''}</i>`,
-  );
 }
 
 // ─── Per-module AI permissions (Block F.4) ────────────────────────────────
@@ -692,10 +664,6 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
         }
       } catch (e) { console.warn('[/assign tg notify]', e); }
       await sendMessage(chatId, `✅ Задача поставлена сотруднику <b>${JSON.parse(assigneeRow.data).name}</b>:\n${taskTitle}`);
-      // Admin sees who did this from where.
-      await notifyAdmins(db, user.teamId, user.id,
-        `📝 <b>${user.name}</b> назначил задачу через Telegram\n→ <i>${JSON.parse(assigneeRow.data).name}</i>: ${taskTitle.slice(0, 140)}`,
-      );
       return;
     }
 
@@ -801,10 +769,6 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
         const reply = `✅ Готово.\n\n${result}`;
         await sendMessage(chatId, reply);
         appendHistory(db, chatId, 'assistant', stripHtml(reply));
-        // Surface the action to admins so they see realtime team activity.
-        await notifyAdmins(db, user.teamId, user.id,
-          `🤖 <b>${user.name}</b> через бот: <i>${pendingAction.toolName}</i>\n${stripHtml(pendingAction.summary).slice(0, 200)}`,
-        );
       } catch (e: any) {
         const errReply = `❌ Не удалось сохранить: ${e.message || e}`;
         await sendMessage(chatId, errReply);
@@ -915,9 +879,6 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       const reply = `⚡ Автоматически (${moduleName}):\n${agentResult.summary}\n\n${result}`;
       await sendMessage(chatId, reply);
       appendHistory(db, chatId, 'assistant', stripHtml(reply));
-      await notifyAdmins(db, user.teamId, user.id,
-        `⚡ <b>${user.name}</b> через бот (auto, ${moduleName}): <i>${agentResult.toolName}</i>\n${stripHtml(agentResult.summary).slice(0, 200)}`,
-      );
     } catch (e: any) {
       const errReply = `❌ Ошибка: ${e.message || e}`;
       await sendMessage(chatId, errReply);
