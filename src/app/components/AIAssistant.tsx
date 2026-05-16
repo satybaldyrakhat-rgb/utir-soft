@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sparkles, X, Send, ChevronRight, Paperclip, Mic, Image as ImageIcon, File, Film, Camera, StopCircle, ChevronDown, Check } from 'lucide-react';
+import { useDataStore } from '../utils/dataStore';
 
 interface AIMessage {
   id: string;
@@ -53,6 +54,14 @@ export const AI_MODELS = [
 
 export function AIAssistant({ context, language }: AIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
+
+  // Live Telegram-activity feed — shows admin what the team is doing through
+  // the bot. Filters the global activity log to source === 'telegram' and
+  // takes the last 5. Refreshes on auto-refresh tick.
+  const store = useDataStore();
+  const telegramFeed = (store.activityLogs || [])
+    .filter(a => (a as any).source === 'telegram')
+    .slice(0, 5);
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -298,6 +307,29 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
               </div>
             )}
           </div>
+
+          {/* Live Telegram-activity feed — only renders when something
+              actually happened via the bot recently. Lets admin see who is
+              doing what in real time without switching to the Журнал tab. */}
+          {telegramFeed.length > 0 && (
+            <div className="px-4 pt-3 pb-2 border-b border-gray-100 bg-blue-50/30">
+              <div className="flex items-center justify-between text-[10px] text-[#2AABEE] mb-1.5">
+                <span className="flex items-center gap-1">✈️ <b>Из Telegram-бота</b></span>
+                <span className="text-gray-400">{telegramFeed.length}</span>
+              </div>
+              <div className="space-y-1">
+                {telegramFeed.map(a => (
+                  <div key={a.id} className="text-[11px] text-gray-700 flex items-baseline gap-1.5">
+                    <span className="text-[9px] text-gray-400 font-mono flex-shrink-0">
+                      {new Date(a.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <span className="text-gray-900">{a.user}</span>
+                    <span className="text-gray-500 truncate">{a.action}{a.target ? ' · ' + a.target : ''}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">

@@ -213,6 +213,7 @@ export interface ActivityLog {
   id: string;
   user: string;             // display name of the actor (or 'AI-ассистент')
   actor?: ActivityActor;    // 'human' (default) or 'ai'
+  source?: 'platform' | 'telegram'; // where the action originated
   action: string;           // short verb-phrase, e.g. 'Создал сделку'
   target: string;           // what was acted upon
   timestamp: string;
