@@ -19,12 +19,14 @@ interface AIModelDef {
   desc: string;
 }
 
+// Display names must match what server/aiChat.ts actually requests from each
+// provider's API — keep these in sync when bumping model versions.
 export const AI_MODELS: AIModelDef[] = [
   { id: 'utir-ai',  name: 'UTIR AI',           short: 'UTIR AI',   desc: 'Управляет платформой — создаёт сделки, оплаты, задачи' },
-  { id: 'gemini',   name: 'Gemini 3.1 Pro',    short: 'Gemini 3.1', desc: 'Google · мультимодальный, 2M контекст' },
-  { id: 'claude',   name: 'Claude Opus 4.7',   short: 'Opus 4.7',   desc: 'Anthropic · самая точная для бизнес-логики' },
-  { id: 'chatgpt',  name: 'ChatGPT (latest)',  short: 'ChatGPT',    desc: 'OpenAI · быстрые ответы и кодинг' },
-  { id: 'deepseek', name: 'DeepSeek (latest)', short: 'DeepSeek',   desc: 'Open-source, лучший баланс цена/качество' },
+  { id: 'gemini',   name: 'Gemini 2.5 Pro',    short: 'Gemini 2.5', desc: 'Google · gemini-2.5-pro, мультимодальный' },
+  { id: 'claude',   name: 'Claude Opus 4.5',   short: 'Opus 4.5',   desc: 'Anthropic · claude-opus-4-5, самая точная для бизнес-логики' },
+  { id: 'chatgpt',  name: 'GPT-4o',            short: 'GPT-4o',     desc: 'OpenAI · gpt-4o, быстрые ответы и кодинг' },
+  { id: 'deepseek', name: 'DeepSeek V3',       short: 'DeepSeek V3', desc: 'DeepSeek · deepseek-chat, лучший баланс цена/качество' },
 ];
 
 interface ProviderStatus {

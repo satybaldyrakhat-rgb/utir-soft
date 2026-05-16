@@ -61,11 +61,11 @@ export type ChatResult = ChatTextResult | ChatToolResult | ChatErrorResult;
 
 export function chatProviderStatuses(): ChatProviderStatus[] {
   return [
-    { id: 'utir-ai',  name: 'UTIR AI',           short: 'управление платформой', enabled: !!ANTHROPIC_KEY, envVar: 'ANTHROPIC_API_KEY', canControl: true },
-    { id: 'gemini',   name: 'Gemini 3.1 Pro',    short: 'Google',                enabled: !!GEMINI_KEY,    envVar: 'GEMINI_API_KEY' },
-    { id: 'claude',   name: 'Claude Opus 4.7',   short: 'Anthropic',             enabled: !!ANTHROPIC_KEY, envVar: 'ANTHROPIC_API_KEY' },
-    { id: 'chatgpt',  name: 'ChatGPT (latest)',  short: 'OpenAI',                enabled: !!OPENAI_KEY,    envVar: 'OPENAI_API_KEY' },
-    { id: 'deepseek', name: 'DeepSeek (latest)', short: 'DeepSeek',              enabled: !!DEEPSEEK_KEY,  envVar: 'DEEPSEEK_API_KEY' },
+    { id: 'utir-ai',  name: 'UTIR AI',         short: 'управление платформой', enabled: !!ANTHROPIC_KEY, envVar: 'ANTHROPIC_API_KEY', canControl: true },
+    { id: 'gemini',   name: 'Gemini 2.5 Pro',  short: 'gemini-2.5-pro',        enabled: !!GEMINI_KEY,    envVar: 'GEMINI_API_KEY' },
+    { id: 'claude',   name: 'Claude Opus 4.5', short: 'claude-opus-4-5',       enabled: !!ANTHROPIC_KEY, envVar: 'ANTHROPIC_API_KEY' },
+    { id: 'chatgpt',  name: 'GPT-4o',          short: 'gpt-4o',                enabled: !!OPENAI_KEY,    envVar: 'OPENAI_API_KEY' },
+    { id: 'deepseek', name: 'DeepSeek V3',     short: 'deepseek-chat',         enabled: !!DEEPSEEK_KEY,  envVar: 'DEEPSEEK_API_KEY' },
   ];
 }
 
