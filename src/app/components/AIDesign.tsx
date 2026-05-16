@@ -14,9 +14,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Sparkles, Loader2, Download, Check, X, Bot, History, Wand2,
-  CookingPot, BedDouble, Sofa, Bath, Baby, DoorOpen,
+  CookingPot, BedDouble, Sofa, Bath, Baby, DoorOpen, Link as LinkIcon, Search,
 } from 'lucide-react';
 import { api } from '../utils/api';
+import { useDataStore } from '../utils/dataStore';
 import utirLogo from '../../imports/utirsoft.png';
 
 // ─── Brand-icon SVGs (real provider logos, inline so no extra requests) ──
@@ -156,6 +157,36 @@ export function AIDesign({ language }: AIDesignProps) {
     setReferenceImages(prev => [...prev, ...dataUrls.filter((x): x is string => !!x)]);
     // Reset input so the same file can be re-picked later.
     e.target.value = '';
+  };
+
+  // Attach-to-deal picker — opens a modal listing the team's active deals
+  // and writes the generation id into deal.designIds via updateDeal.
+  const store = useDataStore();
+  const [attachingId, setAttachingId] = useState<string | null>(null);
+  const [attachQuery, setAttachQuery] = useState('');
+  const [attachToast, setAttachToast] = useState('');
+  const dealsForAttach = useMemo(() => {
+    const q = attachQuery.toLowerCase().trim();
+    return store.deals
+      .filter(d => d.status !== 'rejected')
+      .filter(d => !q || d.customerName.toLowerCase().includes(q) || (d.phone || '').includes(q))
+      .slice(0, 30);
+  }, [store.deals, attachQuery]);
+
+  const attachToDeal = (dealId: string) => {
+    if (!attachingId) return;
+    const deal = store.deals.find(d => d.id === dealId);
+    if (!deal) return;
+    const existing = deal.designIds || [];
+    if (existing.includes(attachingId)) {
+      setAttachToast(l('Уже прикреплено к этой сделке', 'Бұл мәмілеге қосылған', 'Already attached to this deal'));
+    } else {
+      store.updateDeal(dealId, { designIds: [...existing, attachingId] });
+      setAttachToast(l(`Прикреплено к «${deal.customerName}»`, `«${deal.customerName}» қосылды`, `Attached to "${deal.customerName}"`));
+    }
+    setAttachingId(null);
+    setAttachQuery('');
+    setTimeout(() => setAttachToast(''), 2500);
   };
 
   // Free-form mode (advanced users)
@@ -524,13 +555,24 @@ export function AIDesign({ language }: AIDesignProps) {
                           </span>
                           <span>{r.provider}</span>
                         </div>
-                        <a
-                          href={r.imageUrl || r.imageDataUrl}
-                          download={`utir-design-${r.provider}.png`}
-                          className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-700"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </a>
+                        <div className="flex items-center gap-1">
+                          {r.id && (
+                            <button
+                              onClick={() => setAttachingId(r.id!)}
+                              className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-700"
+                              title={l('Прикрепить к сделке', 'Мәмілеге қосу', 'Attach to deal')}
+                            >
+                              <LinkIcon className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <a
+                            href={r.imageUrl || r.imageDataUrl}
+                            download={`utir-design-${r.provider}.png`}
+                            className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-700"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
                       </div>
                       {r.enhancedPrompt && (
                         <details className="text-[10px] text-gray-400 mt-1">
@@ -565,13 +607,20 @@ export function AIDesign({ language }: AIDesignProps) {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {history.map(h => (
-              <div key={h.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <div key={h.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden group">
                 <div className="aspect-square bg-gray-50 relative">
                   {h.imageUrl ? (
                     <img src={h.imageUrl} alt={h.prompt} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-300"><Bot className="w-8 h-8" /></div>
                   )}
+                  <button
+                    onClick={() => setAttachingId(h.id)}
+                    className="absolute top-1.5 right-1.5 w-7 h-7 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/80 transition-opacity"
+                    title={l('Прикрепить к сделке', 'Мәмілеге қосу', 'Attach to deal')}
+                  >
+                    <LinkIcon className="w-3.5 h-3.5" />
+                  </button>
                 </div>
                 <div className="p-2.5">
                   <div className="text-[10px] text-gray-500 flex items-center justify-between mb-1">
@@ -591,6 +640,71 @@ export function AIDesign({ language }: AIDesignProps) {
           </div>
         )}
       </div>
+
+      {/* Attach-to-deal picker — opens when admin clicks the link icon on
+          any result/history card. Lists active team deals with a quick
+          search box; tapping a row attaches the generation id and closes. */}
+      {attachingId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setAttachingId(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-900">{l('Прикрепить к сделке', 'Мәмілеге қосу', 'Attach to deal')}</div>
+                <div className="text-[10px] text-gray-400 mt-0.5">{l('Выберите сделку из списка', 'Тізімнен мәмілені таңдаңыз', 'Pick a deal from the list')}</div>
+              </div>
+              <button onClick={() => setAttachingId(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-3 border-b border-gray-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
+                <input
+                  type="text"
+                  value={attachQuery}
+                  onChange={e => setAttachQuery(e.target.value)}
+                  placeholder={l('Поиск по клиенту или телефону', 'Клиент немесе телефон бойынша іздеу', 'Search by customer or phone')}
+                  autoFocus
+                  className="w-full pl-9 pr-3 py-2 bg-gray-50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {dealsForAttach.length === 0 && (
+                <div className="text-xs text-gray-400 text-center py-8">{l('Сделок не найдено', 'Мәмілелер табылмады', 'No deals found')}</div>
+              )}
+              {dealsForAttach.map(d => {
+                const alreadyHas = (d.designIds || []).includes(attachingId);
+                return (
+                  <button
+                    key={d.id}
+                    onClick={() => attachToDeal(d.id)}
+                    className={`w-full text-left p-3 rounded-xl transition-colors ${alreadyHas ? 'bg-emerald-50 border border-emerald-100' : 'hover:bg-gray-50 border border-transparent'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-gray-900 truncate">{d.customerName}</div>
+                        <div className="text-[10px] text-gray-400 truncate">
+                          {d.phone || '—'} · {d.product || d.furnitureType || ''}
+                          {(d.designIds?.length || 0) > 0 && (
+                            <span className="text-emerald-600 ml-1.5">· {d.designIds!.length} концепт{d.designIds!.length === 1 ? '' : 'ов'}</span>
+                          )}
+                        </div>
+                      </div>
+                      {alreadyHas && <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast that fades after attach. */}
+      {attachToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-gray-900 text-white text-xs rounded-full shadow-lg z-50">
+          ✓ {attachToast}
+        </div>
+      )}
     </div>
   );
 }

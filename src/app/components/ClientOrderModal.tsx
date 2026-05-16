@@ -315,6 +315,9 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                 </div>
               </section>
 
+              {/* ── Section: AI Дизайн концепты ── */}
+              <DesignConcepts deal={deal} language={language} />
+
               {/* ── Section: Notes ── */}
               <section>
                 <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Заметки', 'Жазбалар', 'Notes')}</div>
@@ -530,5 +533,84 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── AI Дизайн concepts gallery (inside the deal modal) ───────────
+// Pulls the team's generation history once and shows only the entries
+// listed in deal.designIds. Admin/owner can detach individual concepts
+// from this deal (doesn't delete the global generation — just unlinks).
+function DesignConcepts({ deal, language }: { deal: Deal; language: 'kz' | 'ru' | 'eng' }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const store = useDataStore();
+  const [history, setHistory] = useState<Array<{ id: string; provider: string; prompt: string; imageUrl: string | null; createdAt: string }>>([]);
+  const designIds = deal.designIds || [];
+
+  useEffect(() => {
+    if (designIds.length === 0) { setHistory([]); return; }
+    let cancelled = false;
+    api.get<typeof history>('/api/ai-design/history')
+      .then(rows => { if (!cancelled) setHistory(rows); })
+      .catch(() => { if (!cancelled) setHistory([]); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [designIds.length]);
+
+  const attached = history.filter(h => designIds.includes(h.id));
+
+  const detach = (id: string) => {
+    const next = designIds.filter(x => x !== id);
+    store.updateDeal(deal.id, { designIds: next });
+  };
+
+  return (
+    <section>
+      <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3 flex items-center justify-between">
+        <span>{l('AI Дизайн концепты', 'AI Дизайн концептері', 'AI Design concepts')}</span>
+        <span className="text-gray-300 normal-case">{designIds.length}</span>
+      </div>
+      {designIds.length === 0 ? (
+        <div className="text-[11px] text-gray-400 leading-relaxed bg-gray-50 rounded-xl p-3">
+          {l(
+            'Нет привязанных концептов. Сгенерируйте дизайн в разделе «AI Дизайн» и нажмите 🔗, чтобы прикрепить сюда.',
+            'Концептер жоқ. AI Дизайн бөлімінде дизайн жасап, осында тіркеу үшін 🔗 басыңыз.',
+            'No concepts attached yet. Generate in AI Design and click 🔗 to attach here.',
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {attached.map(c => (
+            <div key={c.id} className="relative group">
+              {c.imageUrl ? (
+                <a href={c.imageUrl} target="_blank" rel="noreferrer">
+                  <img src={c.imageUrl} alt={c.prompt} className="w-full aspect-square object-cover rounded-xl border border-gray-100" />
+                </a>
+              ) : (
+                <div className="w-full aspect-square bg-gray-100 rounded-xl flex items-center justify-center text-gray-300">—</div>
+              )}
+              <div className="absolute bottom-1 left-1 right-1 px-1.5 py-0.5 bg-black/60 text-white text-[9px] rounded truncate">
+                {c.provider}
+              </div>
+              <button
+                onClick={() => detach(c.id)}
+                className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/80 transition-opacity"
+                title={l('Открепить', 'Ажырату', 'Detach')}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+          {/* Stale ids (concept got deleted) — show placeholder so admin knows. */}
+          {designIds.filter(id => !history.find(h => h.id === id)).map(id => (
+            <div key={id} className="relative">
+              <div className="w-full aspect-square bg-gray-50 border border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-[10px] text-gray-400 p-2 text-center">
+                {l('Удалён', 'Жойылды', 'Deleted')}
+                <button onClick={() => detach(id)} className="mt-1 text-red-400 hover:text-red-600">{l('убрать', 'жою', 'remove')}</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

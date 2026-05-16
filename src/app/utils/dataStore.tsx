@@ -42,6 +42,10 @@ export interface Deal {
   // (measurer/designer/foreman/architect) when missing. Optional so legacy
   // rows without it keep working.
   ownerId?: string;
+  // AI Дизайн concepts attached to this deal — array of ai_generations.id.
+  // Lets the team show the client a gallery of design options in the deal
+  // modal and keeps every render tied to its source CRM record.
+  designIds?: string[];
 }
 
 // RoleKey is now a free-form string id (e.g. 'admin', 'manager', 'accountant').
