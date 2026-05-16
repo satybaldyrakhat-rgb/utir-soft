@@ -13,6 +13,7 @@ import { chat as aiChat, chatProviderStatuses, type ChatProviderId, type ChatMes
 import aiTools from './aiTools.js';
 import { getPermissionLevel as getPermLevel, canRunTool } from './permissions.js';
 import { transcribeAudio, parseAudioDataUrl, isWhisperReady } from './whisper.js';
+import { readClientAI, writeClientAI, runClientAITest, DEFAULT_CLIENT_AI, type ClientAIConfig } from './clientAi.js';
 import { createHmac, randomBytes } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -230,6 +231,9 @@ migrateColumn('team_settings', 'ai_quotas', 'TEXT');
 // Brand kit — JSON { photorealism: bool, styleHint: string } injected into
 // every AI Дизайн prompt so the whole team's generations look consistent.
 migrateColumn('team_settings', 'brand_kit', 'TEXT');
+// Client-facing AI config — JSON used by Instagram / WhatsApp webhooks when
+// auto-replying to customers. See ClientAIConfig below for the shape.
+migrateColumn('team_settings', 'client_ai', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -1584,6 +1588,80 @@ aiChatRouter.post('/transcribe', async (req: AuthedRequest, res) => {
 });
 
 app.use('/api/ai-chat', aiChatRouter);
+
+// ─── Client-facing AI (для общения с покупателями в Instagram / WhatsApp) ──
+// Admin-only configuration + sandbox test. The actual webhook handlers for
+// Instagram and WhatsApp will read this same config and feed it into the
+// system prompt — so admins can dial in the tone today and have it apply
+// automatically the moment the integration is wired up.
+const clientAiRouter = express.Router();
+clientAiRouter.use(authMiddleware);
+
+// Anyone on the team can read the config (so the «Чаты» page can show
+// «отвечает AI» badges in the right tone), but only admins can mutate it.
+clientAiRouter.get('/', (req: AuthedRequest, res) => {
+  res.json(readClientAI(db, req.teamId!));
+});
+
+clientAiRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
+  // Sanitise the incoming body — never store anything we don't expect. We start
+  // from the defaults and overlay only the keys the admin actually sent.
+  const incoming = (req.body || {}) as Partial<ClientAIConfig>;
+  const cfg: ClientAIConfig = {
+    enabled: !!incoming.enabled,
+    channels: {
+      instagram: !!incoming.channels?.instagram,
+      whatsapp:  !!incoming.channels?.whatsapp,
+    },
+    tone: (['polite', 'casual', 'premium', 'strict'] as const).includes(incoming.tone as any)
+      ? (incoming.tone as ClientAIConfig['tone'])
+      : DEFAULT_CLIENT_AI.tone,
+    persona: String(incoming.persona || '').slice(0, 500),
+    writingSamples: Array.isArray(incoming.writingSamples)
+      ? incoming.writingSamples.filter(s => typeof s === 'string').map(s => s.slice(0, 1000)).slice(0, 5)
+      : [],
+    scenarios: {
+      answerFaq:       !!incoming.scenarios?.answerFaq,
+      calculatePrice:  !!incoming.scenarios?.calculatePrice,
+      bookMeasurement: !!incoming.scenarios?.bookMeasurement,
+      sendCatalog:     !!incoming.scenarios?.sendCatalog,
+      askForContacts:  !!incoming.scenarios?.askForContacts,
+    },
+    handoffTriggers: Array.isArray(incoming.handoffTriggers)
+      ? incoming.handoffTriggers.filter(s => typeof s === 'string').map(s => s.slice(0, 80)).slice(0, 30)
+      : [],
+    blacklistTopics: Array.isArray(incoming.blacklistTopics)
+      ? incoming.blacklistTopics.filter(s => typeof s === 'string').map(s => s.slice(0, 80)).slice(0, 30)
+      : [],
+    workingHours: {
+      enabled: !!incoming.workingHours?.enabled,
+      weekdayStart: typeof incoming.workingHours?.weekdayStart === 'string' ? incoming.workingHours.weekdayStart : DEFAULT_CLIENT_AI.workingHours.weekdayStart,
+      weekdayEnd:   typeof incoming.workingHours?.weekdayEnd   === 'string' ? incoming.workingHours.weekdayEnd   : DEFAULT_CLIENT_AI.workingHours.weekdayEnd,
+      saturdayStart: typeof incoming.workingHours?.saturdayStart === 'string' ? incoming.workingHours.saturdayStart : DEFAULT_CLIENT_AI.workingHours.saturdayStart,
+      saturdayEnd:   typeof incoming.workingHours?.saturdayEnd   === 'string' ? incoming.workingHours.saturdayEnd   : DEFAULT_CLIENT_AI.workingHours.saturdayEnd,
+      sundayOff:    incoming.workingHours?.sundayOff !== false, // default true
+    },
+    outOfHoursMessage: String(incoming.outOfHoursMessage || DEFAULT_CLIENT_AI.outOfHoursMessage).slice(0, 500),
+    handoffMessage:    String(incoming.handoffMessage    || DEFAULT_CLIENT_AI.handoffMessage).slice(0, 500),
+  };
+  writeClientAI(db, req.teamId!, cfg);
+  res.json({ ok: true, config: cfg });
+});
+
+// Sandbox — feed a customer message through the current config and return
+// what the AI would actually reply. Used by the «Тест» panel in Settings.
+clientAiRouter.post('/test', requireRole('admin'), async (req: AuthedRequest, res) => {
+  const message = String(req.body?.message || '').trim();
+  if (!message) return res.status(400).json({ ok: false, error: 'message required' });
+  const cfg = readClientAI(db, req.teamId!);
+  // Pull the team's company name (if any) so the prompt can introduce itself
+  // properly. Take it from the admin's row.
+  const meRow = db.prepare('SELECT company FROM users WHERE id = ?').get(req.userId!) as any;
+  const result = await runClientAITest(cfg, message, meRow?.company || undefined);
+  res.json(result);
+});
+
+app.use('/api/team/client-ai', clientAiRouter);
 
 // Map of team-wide Telegram pairings (Block F.6). Used by the team panel to
 // show which teammates have linked their account to the bot — admin sees who

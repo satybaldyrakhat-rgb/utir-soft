@@ -811,6 +811,9 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
       {/* ===== AI for clients (Block E1) — independent product ===== */}
       {activeTab === 'ai-client' && (
         <div className="space-y-5">
+          {/* NEW backend-stored config — will power Instagram/WhatsApp webhooks. */}
+          <ClientAIBackendCard language={language} />
+
           {/* Product header — green theme so it never visually mixes with the assistant */}
           <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-100 p-5">
             <div className="flex items-start gap-3 mb-3">
@@ -1574,6 +1577,368 @@ function BrandKitCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
              'Бұл мәтін әр пайдаланушы prompt-тен кейін қосылады.',
              'This text is appended to every user prompt.')}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ClientAIBackendCard ─────────────────────────────────────────────
+// Backend-stored client AI configuration (separate from the legacy
+// localStorage `aiSettings.client` block below, which we keep for UI
+// continuity but will retire once this is fully wired).
+//
+// What gets stored on team_settings.client_ai:
+//   - tone preset, persona text, 1-3 writing samples (AI mimics our style)
+//   - scenarios (FAQ, price calc, book measurement, send catalog, ask contacts)
+//   - handoff triggers + blacklist topics (free-text lists)
+//   - working hours + out-of-hours / handoff messages
+//   - channels toggle (instagram / whatsapp) — gates which webhooks consume it
+//
+// The actual Instagram & WhatsApp webhook handlers (next phase) read this
+// config and feed it into the system prompt before replying to customers.
+//
+// The «Тест» panel runs the exact same prompt against Claude with a sample
+// customer message so admins can iterate on tone without waiting for messages.
+interface ClientAIConfigUI {
+  enabled: boolean;
+  channels: { instagram: boolean; whatsapp: boolean };
+  tone: 'polite' | 'casual' | 'premium' | 'strict';
+  persona: string;
+  writingSamples: string[];
+  scenarios: {
+    answerFaq: boolean;
+    calculatePrice: boolean;
+    bookMeasurement: boolean;
+    sendCatalog: boolean;
+    askForContacts: boolean;
+  };
+  handoffTriggers: string[];
+  blacklistTopics: string[];
+  workingHours: {
+    enabled: boolean;
+    weekdayStart: string; weekdayEnd: string;
+    saturdayStart?: string; saturdayEnd?: string;
+    sundayOff: boolean;
+  };
+  outOfHoursMessage: string;
+  handoffMessage: string;
+}
+
+const DEFAULT_CLIENT_AI_UI: ClientAIConfigUI = {
+  enabled: false,
+  channels: { instagram: false, whatsapp: false },
+  tone: 'polite',
+  persona: '',
+  writingSamples: [],
+  scenarios: { answerFaq: true, calculatePrice: false, bookMeasurement: true, sendCatalog: true, askForContacts: true },
+  handoffTriggers: ['жалоба', 'юрист', 'возврат денег', 'позови менеджера', 'хочу с человеком'],
+  blacklistTopics: ['политика', 'религия', 'конкуренты'],
+  workingHours: { enabled: false, weekdayStart: '09:00', weekdayEnd: '20:00', saturdayStart: '10:00', saturdayEnd: '18:00', sundayOff: true },
+  outOfHoursMessage: 'Сейчас мы офлайн. Утром менеджер обязательно вам напишет — спасибо за терпение 🙏',
+  handoffMessage: 'Передаю вас живому менеджеру — он подключится к диалогу в ближайшее время.',
+};
+
+export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [cfg, setCfg] = useState<ClientAIConfigUI>(DEFAULT_CLIENT_AI_UI);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  // Test playground state
+  const [testMsg, setTestMsg] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [testReply, setTestReply] = useState<{ text: string; handoff?: boolean; outOfHours?: boolean } | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get<ClientAIConfigUI>('/api/team/client-ai')
+      .then(c => { setCfg({ ...DEFAULT_CLIENT_AI_UI, ...c, channels: { ...DEFAULT_CLIENT_AI_UI.channels, ...(c.channels || {}) }, scenarios: { ...DEFAULT_CLIENT_AI_UI.scenarios, ...(c.scenarios || {}) }, workingHours: { ...DEFAULT_CLIENT_AI_UI.workingHours, ...(c.workingHours || {}) } }); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  async function save() {
+    setSaving(true); setSaveMsg(null);
+    try {
+      await api.put('/api/team/client-ai', cfg);
+      setSaveMsg(l('Сохранено ✓', 'Сақталды ✓', 'Saved ✓'));
+      setTimeout(() => setSaveMsg(null), 2500);
+    } catch (e: any) {
+      setSaveMsg(l('Ошибка: ', 'Қате: ', 'Error: ') + (e?.message || e));
+    } finally { setSaving(false); }
+  }
+
+  async function runTest() {
+    if (!testMsg.trim()) return;
+    setTesting(true); setTestReply(null); setTestError(null);
+    try {
+      const r = await api.post<{ ok: boolean; reply?: string; handoff?: boolean; outOfHours?: boolean; error?: string }>(
+        '/api/team/client-ai/test', { message: testMsg },
+      );
+      if (r.ok && r.reply) setTestReply({ text: r.reply, handoff: r.handoff, outOfHours: r.outOfHours });
+      else setTestError(r.error || l('Не получилось', 'Болмады', 'Failed'));
+    } catch (e: any) {
+      setTestError(String(e?.message || e));
+    } finally { setTesting(false); }
+  }
+
+  const upd = (patch: Partial<ClientAIConfigUI>) => setCfg(c => ({ ...c, ...patch }));
+  const updWH = (patch: Partial<ClientAIConfigUI['workingHours']>) => setCfg(c => ({ ...c, workingHours: { ...c.workingHours, ...patch } }));
+  const updSc = (k: keyof ClientAIConfigUI['scenarios'], v: boolean) => setCfg(c => ({ ...c, scenarios: { ...c.scenarios, [k]: v } }));
+
+  if (!loaded) return null;
+
+  const TONE_OPTIONS: Array<{ id: ClientAIConfigUI['tone']; emoji: string; label: string }> = [
+    { id: 'polite',  emoji: '🙏', label: l('Вежливый',  'Сыпайы',     'Polite') },
+    { id: 'casual',  emoji: '✌️', label: l('Неформальный','Бейресми',  'Casual') },
+    { id: 'premium', emoji: '💎', label: l('Премиум',    'Премиум',    'Premium') },
+    { id: 'strict',  emoji: '📐', label: l('Строгий',    'Қатаң',      'Strict') },
+  ];
+
+  return (
+    <div className="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-emerald-50 to-white p-5 border-b border-emerald-100">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <MessageCircle className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm text-gray-900 mb-1">
+              {l('AI для клиентов через мессенджеры', 'Клиенттерге арналған AI', 'AI for clients in messengers')}
+            </div>
+            <div className="text-[11px] text-gray-500 leading-relaxed">
+              {l('Настройте как AI будет общаться с клиентами в Instagram и WhatsApp. Конфиг применится автоматически когда подключим каналы.',
+                 'Instagram және WhatsApp-та клиенттермен AI қалай сөйлесетінін баптаңыз.',
+                 'Configure how the AI talks to customers in Instagram and WhatsApp.')}
+            </div>
+          </div>
+          <button onClick={() => upd({ enabled: !cfg.enabled })} className={`relative w-10 h-5 rounded-full transition-colors ${cfg.enabled ? 'bg-emerald-600' : 'bg-gray-200'}`}>
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.enabled ? 'translate-x-5' : ''}`} />
+          </button>
+        </div>
+        <div className="mt-3 flex gap-1.5">
+          <button
+            onClick={() => upd({ channels: { ...cfg.channels, instagram: !cfg.channels.instagram } })}
+            className={`px-2.5 py-1 rounded-lg text-[11px] border ${cfg.channels.instagram ? 'bg-pink-50 border-pink-200 text-pink-700' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
+          >📷 Instagram {cfg.channels.instagram ? '✓' : ''}</button>
+          <button
+            onClick={() => upd({ channels: { ...cfg.channels, whatsapp: !cfg.channels.whatsapp } })}
+            className={`px-2.5 py-1 rounded-lg text-[11px] border ${cfg.channels.whatsapp ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
+          >💬 WhatsApp {cfg.channels.whatsapp ? '✓' : ''}</button>
+        </div>
+      </div>
+
+      {/* Tone */}
+      <div className="p-5 border-b border-gray-100">
+        <div className="text-xs text-gray-900 mb-2">{l('Тон общения', 'Сөйлесу мәнері', 'Tone of voice')}</div>
+        <div className="grid grid-cols-4 gap-2">
+          {TONE_OPTIONS.map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => upd({ tone: opt.id })}
+              className={`p-2.5 rounded-xl border text-center transition ${cfg.tone === opt.id ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}
+            >
+              <div className="text-lg mb-0.5">{opt.emoji}</div>
+              <div className="text-[10px] text-gray-600">{opt.label}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Persona */}
+      <div className="p-5 border-b border-gray-100">
+        <div className="text-xs text-gray-900 mb-1">{l('Персона (необязательно)', 'Персона (міндетті емес)', 'Persona (optional)')}</div>
+        <div className="text-[10px] text-gray-400 mb-2">
+          {l('Например: «Представляйся как Айгуль, менеджер фабрики мебели Utir»', 'Мысалы: «Айгүл деп таныс»', 'e.g. "Introduce yourself as Aigul, manager at Utir furniture"')}
+        </div>
+        <input
+          type="text"
+          value={cfg.persona}
+          onChange={e => upd({ persona: e.target.value })}
+          className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-200"
+          maxLength={500}
+        />
+      </div>
+
+      {/* Writing samples */}
+      <div className="p-5 border-b border-gray-100">
+        <div className="text-xs text-gray-900 mb-1">{l('Образцы наших писем', 'Хаттардың үлгілері', 'Writing samples')}</div>
+        <div className="text-[10px] text-gray-400 mb-2">
+          {l('1-3 примера как вы реально общаетесь с клиентами — AI скопирует стиль', 'AI стильді көшіреді', 'AI mimics this style')}
+        </div>
+        {(cfg.writingSamples.length === 0 ? [''] : cfg.writingSamples).map((s, idx) => (
+          <div key={idx} className="mb-2 flex gap-2 items-start">
+            <textarea
+              value={s}
+              onChange={e => {
+                const next = [...cfg.writingSamples];
+                next[idx] = e.target.value;
+                upd({ writingSamples: next.filter((_, i) => i !== idx || e.target.value).concat(idx >= cfg.writingSamples.length ? [] : []) });
+                // simpler: set the full array
+                const arr = (cfg.writingSamples.length === 0 ? [''] : [...cfg.writingSamples]);
+                arr[idx] = e.target.value;
+                upd({ writingSamples: arr.filter(x => x.length > 0 || arr.length === 1) });
+              }}
+              rows={2}
+              maxLength={1000}
+              placeholder={l('Здравствуйте! Спасибо за интерес — отправлю каталог в личку…', '...', 'Hello! Thanks for your interest...')}
+              className="flex-1 px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none"
+            />
+            {cfg.writingSamples.length > 0 && (
+              <button
+                onClick={() => upd({ writingSamples: cfg.writingSamples.filter((_, i) => i !== idx) })}
+                className="px-2 py-1 text-gray-400 hover:text-red-500 text-xs"
+              >✕</button>
+            )}
+          </div>
+        ))}
+        {cfg.writingSamples.length < 3 && (
+          <button
+            onClick={() => upd({ writingSamples: [...cfg.writingSamples, ''] })}
+            className="text-[11px] text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1"
+          >
+            <Plus className="w-3 h-3" /> {l('Добавить пример', 'Үлгі қосу', 'Add sample')}
+          </button>
+        )}
+      </div>
+
+      {/* Scenarios */}
+      <div className="p-5 border-b border-gray-100">
+        <div className="text-xs text-gray-900 mb-2">{l('Что AI делает сам', 'AI өзі не істейді', 'What AI handles autonomously')}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {[
+            { k: 'answerFaq' as const,       label: l('Отвечать на FAQ',         'FAQ-ға жауап беру',         'Answer FAQs') },
+            { k: 'calculatePrice' as const,  label: l('Прикидывать стоимость',   'Бағаны бағалау',            'Estimate price') },
+            { k: 'bookMeasurement' as const, label: l('Записывать на замер',     'Өлшеуге жазу',              'Book measurement') },
+            { k: 'sendCatalog' as const,     label: l('Отправлять каталог',      'Каталог жіберу',            'Send catalog') },
+            { k: 'askForContacts' as const,  label: l('Запрашивать контакты',    'Байланыс сұрау',            'Ask for contact info') },
+          ].map(s => (
+            <label key={s.k} className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer ${cfg.scenarios[s.k] ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}>
+              <input type="checkbox" checked={cfg.scenarios[s.k]} onChange={e => updSc(s.k, e.target.checked)} className="accent-emerald-500" />
+              <span className="text-[12px] text-gray-700">{s.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Handoff triggers + blacklist */}
+      <div className="p-5 border-b border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <div className="text-xs text-gray-900 mb-1">{l('Передавать менеджеру если есть слова', 'Менеджерге беру', 'Hand off to manager on phrases')}</div>
+          <div className="text-[10px] text-gray-400 mb-2">{l('Через запятую', 'Үтір арқылы', 'Comma-separated')}</div>
+          <input
+            type="text"
+            value={cfg.handoffTriggers.join(', ')}
+            onChange={e => upd({ handoffTriggers: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+            className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200"
+          />
+        </div>
+        <div>
+          <div className="text-xs text-gray-900 mb-1">{l('Запрещённые темы', 'Тыйым салынған тақырыптар', 'Blacklisted topics')}</div>
+          <div className="text-[10px] text-gray-400 mb-2">{l('AI не будет это обсуждать', 'AI бұл туралы айтпайды', 'AI will refuse these topics')}</div>
+          <input
+            type="text"
+            value={cfg.blacklistTopics.join(', ')}
+            onChange={e => upd({ blacklistTopics: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+            className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200"
+          />
+        </div>
+      </div>
+
+      {/* Working hours */}
+      <div className="p-5 border-b border-gray-100">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-xs text-gray-900">{l('Часы работы AI', 'AI жұмыс уақыты', 'AI working hours')}</div>
+            <div className="text-[10px] text-gray-400">{l('Asia/Almaty (UTC+5). Вне часов отправляется фраза-заглушка', 'Asia/Almaty', 'Asia/Almaty timezone')}</div>
+          </div>
+          <button onClick={() => updWH({ enabled: !cfg.workingHours.enabled })} className={`relative w-10 h-5 rounded-full transition-colors ${cfg.workingHours.enabled ? 'bg-emerald-600' : 'bg-gray-200'}`}>
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.workingHours.enabled ? 'translate-x-5' : ''}`} />
+          </button>
+        </div>
+        {cfg.workingHours.enabled && (
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-2 items-center">
+              <div className="text-[11px] text-gray-500">{l('Пн–Пт', 'Дс–Жм', 'Mon–Fri')}</div>
+              <input type="time" value={cfg.workingHours.weekdayStart} onChange={e => updWH({ weekdayStart: e.target.value })} className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
+              <input type="time" value={cfg.workingHours.weekdayEnd}   onChange={e => updWH({ weekdayEnd: e.target.value })}   className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
+            </div>
+            <div className="grid grid-cols-3 gap-2 items-center">
+              <div className="text-[11px] text-gray-500">{l('Суббота', 'Сенбі', 'Saturday')}</div>
+              <input type="time" value={cfg.workingHours.saturdayStart || ''} onChange={e => updWH({ saturdayStart: e.target.value })} className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
+              <input type="time" value={cfg.workingHours.saturdayEnd   || ''} onChange={e => updWH({ saturdayEnd: e.target.value })}   className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
+            </div>
+            <label className="flex items-center gap-2 mt-1">
+              <input type="checkbox" checked={cfg.workingHours.sundayOff} onChange={e => updWH({ sundayOff: e.target.checked })} className="accent-emerald-500" />
+              <span className="text-[12px] text-gray-700">{l('Воскресенье — выходной', 'Жексенбі — демалыс', 'Sunday off')}</span>
+            </label>
+            <div>
+              <div className="text-[11px] text-gray-500 mt-2 mb-1">{l('Сообщение вне часов', 'Жұмыс емес сағаттардағы хабарлама', 'Out-of-hours message')}</div>
+              <textarea value={cfg.outOfHoursMessage} onChange={e => upd({ outOfHoursMessage: e.target.value })} rows={2} maxLength={500} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Handoff message */}
+      <div className="p-5 border-b border-gray-100">
+        <div className="text-xs text-gray-900 mb-1">{l('Сообщение при передаче живому менеджеру', 'Менеджерге беру кезіндегі хабар', 'Handoff message')}</div>
+        <textarea value={cfg.handoffMessage} onChange={e => upd({ handoffMessage: e.target.value })} rows={2} maxLength={500} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none" />
+      </div>
+
+      {/* Save bar */}
+      <div className="px-5 py-3 bg-gray-50 flex items-center justify-between">
+        <div className="text-[11px] text-gray-500">{saveMsg || l('Не забудьте сохранить изменения', 'Өзгерістерді сақтаңыз', 'Remember to save changes')}</div>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs disabled:opacity-50"
+        >{saving ? l('Сохраняю…', 'Сақталуда…', 'Saving…') : l('Сохранить', 'Сақтау', 'Save')}</button>
+      </div>
+
+      {/* Test playground */}
+      <div className="p-5 bg-violet-50/40 border-t border-violet-100">
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles className="w-3.5 h-3.5 text-violet-500" />
+          <div className="text-xs text-gray-900">{l('Тест — что напишет AI', 'Тест — AI не жазады', 'Sandbox — what AI would reply')}</div>
+        </div>
+        <div className="text-[10px] text-gray-500 mb-2">
+          {l('Введите сообщение «как от клиента» и посмотрите ответ — конфиг применяется как при настоящем разговоре', '...', 'Try a customer message — config applies as it would in production')}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={testMsg}
+            onChange={e => setTestMsg(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !testing) runTest(); }}
+            placeholder={l('Здравствуйте, сколько стоит кухня 3 метра?', '...', 'Hi, how much for a 3m kitchen?')}
+            className="flex-1 px-3 py-2 bg-white border border-violet-200 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-violet-300"
+          />
+          <button
+            onClick={runTest}
+            disabled={!testMsg.trim() || testing}
+            className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl text-xs inline-flex items-center gap-1"
+          >
+            <Send className="w-3 h-3" /> {testing ? l('Думаю…', 'Ойлап жатырмын…', 'Thinking…') : l('Спросить', 'Сұрау', 'Ask')}
+          </button>
+        </div>
+        {testError && (
+          <div className="mt-3 px-3 py-2 bg-red-50 border border-red-200 text-[11px] text-red-700 rounded-lg flex items-center gap-2">
+            <X className="w-3 h-3" /> {testError}
+          </div>
+        )}
+        {testReply && (
+          <div className="mt-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-[10px] text-gray-400">{l('Ответ AI', 'AI жауабы', 'AI reply')}:</span>
+              {testReply.handoff && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">📞 HANDOFF</span>}
+              {testReply.outOfHours && <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">🌙 вне часов</span>}
+            </div>
+            <div className="px-3 py-2.5 bg-white border border-violet-200 rounded-xl text-[13px] text-gray-800 whitespace-pre-line">
+              {testReply.text}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
