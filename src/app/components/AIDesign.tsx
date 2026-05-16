@@ -36,11 +36,11 @@ function GeminiIcon({ className = '' }: { className?: string }) {
     </svg>
   );
 }
-// Claude / Anthropic — stylised radial mark, recognisable orange
+// Claude / Anthropic — the official multi-pointed star/spiral mark
 function ClaudeIcon({ className = '' }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
-      <path d="M4.6 19.4 9.7 7.2h2.4l5.1 12.2h-2.4l-1.3-3.3H8.4l-1.3 3.3H4.6zm4.6-5.2h4l-2-5.1-2 5.1z" />
+    <svg viewBox="0 0 32 32" fill="currentColor" className={className} aria-hidden>
+      <path d="M16 0c.6 7 8.3 14.7 16 16-7.7 1.3-15.4 9-16 16-.6-7-8.3-14.7-16-16C7.7 14.7 15.4 7 16 0z M16 6.5c-.4 4-4.5 8.1-8.5 8.5 4 .4 8.1 4.5 8.5 8.5.4-4 4.5-8.1 8.5-8.5-4-.4-8.1-4.5-8.5-8.5z" />
     </svg>
   );
 }
@@ -87,12 +87,13 @@ const MOODS: { id: string; label: { ru: string; kz: string; eng: string }; promp
 ];
 
 // Each provider's visual identity. `icon` is a render function so we can swap
-// real brand SVGs in instead of emoji. `bg` is a tailwind class for the
-// rounded square the icon sits in (uses brand-ish neutral backgrounds).
+// real brand SVGs in instead of emoji. `fullBleed` makes the logo fill the
+// whole rounded square (no inner padding) — used for UTIR's platform logo.
 const PROVIDER_VISUAL: Record<ProviderId, {
   bg: string;
   icon: (className: string) => React.ReactNode;
   sub: string;
+  fullBleed?: boolean;
 }> = {
   chatgpt: {
     bg: 'bg-[#0F1715]',
@@ -102,17 +103,20 @@ const PROVIDER_VISUAL: Record<ProviderId, {
   gemini: {
     bg: 'bg-gradient-to-br from-[#4285F4] via-[#9168F0] to-[#D96570]',
     icon: (cls) => <GeminiIcon className={cls + ' text-white'} />,
-    sub: 'Gemini · Google',
+    sub: 'Gemini · nano-banana-pro',
   },
   claude: {
     bg: 'bg-[#D4A27F]',
     icon: (cls) => <ClaudeIcon className={cls + ' text-[#1C1814]'} />,
-    sub: 'Claude prompt → nano-banana',
+    sub: 'Claude Opus → nano-banana-pro',
   },
   'utir-mix': {
-    bg: 'bg-white border border-gray-200',
-    icon: (cls) => <img src={utirLogo} alt="UTIR" className={cls + ' object-cover'} />,
+    bg: 'bg-white',
+    // fullBleed: the platform logo fills the whole rounded square instead of
+    // sitting as a small icon with padding around it.
+    icon: () => <img src={utirLogo} alt="UTIR" className="w-full h-full object-cover" />,
     sub: 'UTIR AI — все провайдеры',
+    fullBleed: true,
   },
 };
 
@@ -127,6 +131,32 @@ export function AIDesign({ language }: AIDesignProps) {
   const [styleId, setStyleId] = useState<string>('');
   const [moodIds, setMoodIds] = useState<string[]>([]);
   const [extraText, setExtraText] = useState('');
+
+  // Optional uploaded photos. Each is a data URL (base64) so we can send
+  // straight to /api/ai-design/generate without an extra upload step.
+  const [roomPhoto, setRoomPhoto] = useState<string | undefined>(undefined);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
+
+  const fileToDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+  const onRoomFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try { setRoomPhoto(await fileToDataUrl(f)); } catch { /* ignore */ }
+  };
+  const onRefsAdd = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const slots = Math.max(0, 3 - referenceImages.length);
+    const picked = files.slice(0, slots);
+    const dataUrls = await Promise.all(picked.map(fileToDataUrl).map(p => p.catch(() => null)));
+    setReferenceImages(prev => [...prev, ...dataUrls.filter((x): x is string => !!x)]);
+    // Reset input so the same file can be re-picked later.
+    e.target.value = '';
+  };
 
   // Free-form mode (advanced users)
   const [freeMode, setFreeMode] = useState(false);
@@ -183,6 +213,8 @@ export function AIDesign({ language }: AIDesignProps) {
       const res = await api.post<{ provider: ProviderId; prompt: string; results: GenResult[] }>('/api/ai-design/generate', {
         provider: selectedProvider,
         prompt: finalPrompt,
+        roomPhoto,
+        referenceImages,
       });
       setResults(res.results || []);
       void reloadAll();
@@ -193,7 +225,10 @@ export function AIDesign({ language }: AIDesignProps) {
     }
   };
 
-  const resetWizard = () => { setRoomId(''); setStyleId(''); setMoodIds([]); setExtraText(''); setResults([]); };
+  const resetWizard = () => {
+    setRoomId(''); setStyleId(''); setMoodIds([]); setExtraText(''); setResults([]);
+    setRoomPhoto(undefined); setReferenceImages([]);
+  };
 
   return (
     <div className="p-4 md:p-8 max-w-[1400px]">
@@ -334,6 +369,69 @@ export function AIDesign({ language }: AIDesignProps) {
         </div>
       )}
 
+      {/* Optional photo uploads (img2img + style references). Both are
+          optional — UI shows compact upload tiles with previews. */}
+      <section className="mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-5 h-5 rounded-full bg-gray-200 text-gray-400 text-[10px] flex items-center justify-center">📷</div>
+          <div className="text-sm text-gray-900">{l('Фото комнаты и референсы', 'Бөлме фотосы мен референстер', 'Room photo & references')}</div>
+          <span className="text-[11px] text-gray-400">— {l('по желанию', 'қалау бойынша', 'optional')}</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Room photo — single image, used as the img2img source */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-3">
+            <div className="text-[11px] text-gray-500 mb-2">{l('Фото вашей комнаты', 'Бөлмеңіздің фотосы', 'Your room photo')}</div>
+            {roomPhoto ? (
+              <div className="relative">
+                <img src={roomPhoto} alt="" className="w-full aspect-video object-cover rounded-xl" />
+                <button onClick={() => setRoomPhoto(undefined)} className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-1 aspect-video border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-gray-300 hover:bg-gray-50/50">
+                <span className="text-2xl">📷</span>
+                <span className="text-[11px] text-gray-500">{l('Загрузить фото', 'Фото жүктеу', 'Upload photo')}</span>
+                <input type="file" accept="image/*" onChange={onRoomFile} className="hidden" />
+              </label>
+            )}
+            <div className="text-[10px] text-gray-400 mt-2">
+              {l('AI «перерисует» вашу комнату в выбранном стиле.',
+                 'AI бөлмеңізді таңдалған стильде «қайта сызады».',
+                 'AI will redesign your room in the chosen style.')}
+            </div>
+          </div>
+
+          {/* References — up to 3 inspiration images */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-3">
+            <div className="text-[11px] text-gray-500 mb-2">
+              {l('Референсы стиля', 'Стиль референстері', 'Style references')} <span className="text-gray-400">({referenceImages.length}/3)</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {referenceImages.map((src, i) => (
+                <div key={i} className="relative">
+                  <img src={src} alt="" className="w-full aspect-square object-cover rounded-lg" />
+                  <button onClick={() => setReferenceImages(prev => prev.filter((_, j) => j !== i))} className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {referenceImages.length < 3 && (
+                <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-gray-300 hover:bg-gray-50/50">
+                  <span className="text-xl text-gray-400">+</span>
+                  <input type="file" accept="image/*" multiple onChange={onRefsAdd} className="hidden" />
+                </label>
+              )}
+            </div>
+            <div className="text-[10px] text-gray-400 mt-2">
+              {l('Несколько вдохновляющих фото — AI подхватит палитру и настроение.',
+                 'Бірнеше шабыттандыратын фото — AI палитра мен көңіл-күйді алады.',
+                 'A few inspiration shots — AI picks up the palette and mood.')}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Provider grid */}
       <section className="mb-6">
         <div className="flex items-center gap-2 mb-3">
@@ -353,10 +451,10 @@ export function AIDesign({ language }: AIDesignProps) {
                   active && p.enabled ? 'border-gray-900 shadow-sm' : 'border-gray-100 hover:border-gray-300'
                 } ${!p.enabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                {/* Brand logo square — real SVG for ChatGPT / Gemini / Claude,
-                    the platform logo for UTIR-mix. */}
-                <div className={`w-10 h-10 rounded-xl ${vis.bg} flex items-center justify-center overflow-hidden mb-2`}>
-                  {vis.icon('w-6 h-6')}
+                {/* Brand logo square — real SVG for ChatGPT / Gemini / Claude.
+                    UTIR-mix uses the platform logo full-bleed (fills the box). */}
+                <div className={`w-10 h-10 rounded-xl ${vis.bg} flex items-center justify-center overflow-hidden mb-2 ${vis.fullBleed ? 'border border-gray-200' : ''}`}>
+                  {vis.fullBleed ? vis.icon('') : vis.icon('w-6 h-6')}
                 </div>
                 <div className="text-xs text-gray-900">{p.name}</div>
                 <div className="text-[10px] text-gray-400 mt-0.5">{vis.sub}</div>

@@ -314,7 +314,9 @@ function seedIntegrations(userId: string) {
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+// Bumped to 25MB because AI-design img2img sends base64 images for the room
+// photo + up to 3 reference shots in one body.
+app.use(express.json({ limit: '25mb' }));
 
 interface AuthedRequest extends Request {
   userId?: string;
@@ -1167,9 +1169,16 @@ aiDesignRouter.get('/history', (req: AuthedRequest, res) => {
 aiDesignRouter.post('/generate', requirePermission('ai-design'), async (req: AuthedRequest, res) => {
   const provider = String(req.body?.provider || 'utir-mix') as ProviderId;
   const prompt = String(req.body?.prompt || '').trim();
+  // Optional input images for img2img. Accept data-URLs only (the frontend
+  // converts files via FileReader.readAsDataURL). Cap the refs at 3 so we
+  // don't blow request size limits.
+  const roomPhoto = typeof req.body?.roomPhoto === 'string' && req.body.roomPhoto.startsWith('data:') ? req.body.roomPhoto : undefined;
+  const referenceImages: string[] = Array.isArray(req.body?.referenceImages)
+    ? req.body.referenceImages.filter((s: any) => typeof s === 'string' && s.startsWith('data:')).slice(0, 3)
+    : [];
   if (!prompt) return res.status(400).json({ error: 'prompt required' });
 
-  const results = await aiImageGenerate(provider, prompt);
+  const results = await aiImageGenerate(provider, { prompt, roomPhoto, referenceImages });
 
   // Persist every successful image so the team can browse them later.
   const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;

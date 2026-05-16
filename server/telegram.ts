@@ -249,7 +249,7 @@ async function runDesignGeneration(
   await sendMessage(chatId, `🎨 Генерирую (${providerId}), это может занять 10-30 секунд…`);
   const { generate } = await import('./aiImage.js');
   let results;
-  try { results = await generate(providerId, prompt); }
+  try { results = await generate(providerId, { prompt }); }
   catch (e: any) { await sendMessage(chatId, `❌ Ошибка генерации: ${String(e?.message || e)}`); return; }
   const ok = results.filter((r: any) => r.ok);
   if (ok.length === 0) {
