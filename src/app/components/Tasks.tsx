@@ -3,11 +3,12 @@ import {
   CheckCircle2, Circle, Clock, AlertCircle, Plus, Search, Filter,
   ChevronDown, ChevronRight, MoreHorizontal, Calendar, User, Send,
   MessageCircle, X, GripVertical, ArrowRight, Bot, Smartphone,
-  Check, RefreshCw, Eye, Trash2, Edit3, Flag, Download,
+  Check, RefreshCw, Eye, Trash2, Edit3, Flag, Download, Upload,
 } from 'lucide-react';
 import { useDataStore, Task as StoreTask } from '../utils/dataStore';
 import { useAutoRefresh } from '../utils/useAutoRefresh';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
+import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
 import { TelegramBotPanel } from './TelegramBotPanel';
 
 // ─── TYPES ───────────────────────────────────────────────────
@@ -114,6 +115,7 @@ export function Tasks({ language }: TasksProps) {
   const [showTelegramPanel, setShowTelegramPanel] = useState(false);
   const [showBotSettings, setShowBotSettings] = useState(false);
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -183,6 +185,14 @@ export function Tasks({ language }: TasksProps) {
           >
             <Download className="w-4 h-4" />
             Экспорт
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            title="Загрузить задачи из CSV"
+          >
+            <Upload className="w-4 h-4" />
+            Импорт
           </button>
           <button
             onClick={() => setShowNewTaskModal(true)}
@@ -552,6 +562,44 @@ export function Tasks({ language }: TasksProps) {
         />
       )}
       {showBotSettings && <TelegramBotPanel language={language} onClose={() => setShowBotSettings(false)} />}
+      {showImport && (
+        <CsvImportModal
+          language={language}
+          title="Задачи"
+          fields={(() => {
+            const f: CsvFieldSpec[] = [
+              { key: 'title',       headers: ['Название', 'Title'], required: true },
+              { key: 'description', headers: ['Описание', 'Description'] },
+              { key: 'category',    headers: ['Категория', 'Category'] },
+              { key: 'priority',    headers: ['Приоритет', 'Priority'] },
+              { key: 'status',      headers: ['Статус', 'Status'] },
+              { key: 'dueDate',     headers: ['Срок', 'Due'] },
+              { key: 'assignee',    headers: ['Исполнитель', 'Assignee'] }, // matched by name
+            ];
+            return f;
+          })()}
+          onImport={async (rec) => {
+            // Resolve assignee name → employees.id (case-insensitive contains).
+            let assigneeId = '';
+            if (rec.assignee) {
+              const lookup = (rec.assignee as string).toLowerCase();
+              const emp = store.employees.find(e => e.name.toLowerCase().includes(lookup));
+              if (emp) assigneeId = emp.id;
+            }
+            store.addTask({
+              title: String(rec.title),
+              description: String(rec.description || ''),
+              status: (rec.status || 'new') as StoreTask['status'],
+              priority: (rec.priority || 'medium') as StoreTask['priority'],
+              assigneeId,
+              dueDate: String(rec.dueDate || new Date().toISOString().slice(0, 10)),
+              category: String(rec.category || 'Прочее'),
+              subtasks: [],
+            });
+          }}
+          onClose={() => { setShowImport(false); store.reloadAll(); }}
+        />
+      )}
     </div>
   );
 }

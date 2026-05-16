@@ -48,3 +48,56 @@ export function downloadCsv(filename: string, csv: string) {
 export function todayStampedName(base: string): string {
   return `utir-${base}-${new Date().toISOString().slice(0, 10)}.csv`;
 }
+
+// ─── CSV parser ────────────────────────────────────────────────────
+// Minimal RFC-4180-ish parser: handles quoted cells with embedded commas
+// and newlines, escaped quotes (""), \r\n / \r / \n line endings, and an
+// optional leading UTF-8 BOM. Used by CSV-import flows.
+
+export function parseCsv(input: string): string[][] {
+  // Strip BOM if present.
+  if (input.charCodeAt(0) === 0xFEFF) input = input.slice(1);
+
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let inQuotes = false;
+  let i = 0;
+  while (i < input.length) {
+    const c = input[i];
+    if (inQuotes) {
+      if (c === '"') {
+        // Double-quote inside a quoted field → literal "
+        if (input[i + 1] === '"') { cell += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      cell += c; i++; continue;
+    }
+    if (c === '"') { inQuotes = true; i++; continue; }
+    if (c === ',') { row.push(cell); cell = ''; i++; continue; }
+    if (c === '\r' || c === '\n') {
+      row.push(cell); cell = ''; rows.push(row); row = [];
+      // Eat \r\n pair as one line break.
+      if (c === '\r' && input[i + 1] === '\n') i += 2; else i++;
+      continue;
+    }
+    cell += c; i++;
+  }
+  // Push the trailing cell / row if the file didn't end with a newline.
+  if (cell.length > 0 || row.length > 0) { row.push(cell); rows.push(row); }
+  // Drop empty trailing rows so a file ending in '\n' doesn't add a phantom row.
+  while (rows.length > 0 && rows[rows.length - 1].every(v => v === '')) rows.pop();
+  return rows;
+}
+
+// Turn a parsed CSV into [{ header: value, ... }] using the first row
+// as headers. Whitespace-trims keys.
+export function csvToObjects(parsed: string[][]): Record<string, string>[] {
+  if (parsed.length === 0) return [];
+  const headers = parsed[0].map(h => h.trim());
+  return parsed.slice(1).map(r => {
+    const obj: Record<string, string> = {};
+    for (let i = 0; i < headers.length; i++) obj[headers[i]] = r[i] ?? '';
+    return obj;
+  });
+}

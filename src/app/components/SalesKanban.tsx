@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Instagram, Phone, X, Users, MessageCircle, Mail, Calendar, TrendingUp, AlertCircle, CheckCircle, Package, Hammer, FileCheck, XCircle, Plus, Search, Filter, Archive, Download } from 'lucide-react';
+import { Instagram, Phone, X, Users, MessageCircle, Mail, Calendar, TrendingUp, AlertCircle, CheckCircle, Package, Hammer, FileCheck, XCircle, Plus, Search, Filter, Archive, Download, Upload } from 'lucide-react';
 import { ClientOrderModal } from './ClientOrderModal';
 import { NewDealModal } from './NewDealModal';
 import { useDataStore, type Deal } from '../utils/dataStore';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
+import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
 import { useAutoRefresh } from '../utils/useAutoRefresh';
 import { t } from '../utils/translations';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo } from './PlatformLogos';
@@ -50,6 +51,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
   const [newDeal, setNewDeal] = useState({ customerName: '', phone: '', product: '', amount: '', furnitureType: 'Кухня', source: 'phone' as Deal['icon'] });
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchive, setShowArchive] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [activeTab, setActiveTab] = useState<'funnel' | 'payments'>('funnel');
 
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
@@ -177,6 +179,16 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                 {l('Экспорт', 'Экспорт', 'Export')}
               </button>
               {store.canWriteModule('orders') && (
+                <button
+                  onClick={() => setShowImport(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 border border-gray-100 rounded-xl text-xs text-gray-500 hover:bg-gray-50"
+                  title={l('Загрузить сделки из CSV', 'CSV-ден жүктеу', 'Import deals from CSV')}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  {l('Импорт', 'Импорт', 'Import')}
+                </button>
+              )}
+              {store.canWriteModule('orders') && (
                 <button onClick={() => setShowNewDealModal(true)} className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">
                   <Plus className="w-3.5 h-3.5" />{l('Новая сделка', 'Жаңа мәміле', 'New Deal')}
                 </button>
@@ -276,6 +288,58 @@ export function SalesKanban({ language }: SalesKanbanProps) {
       </div>
 
       {showNewDealModal && <NewDealModal language={language} onClose={() => setShowNewDealModal(false)} />}
+      {showImport && (
+        <CsvImportModal
+          language={language}
+          title={l('Сделки', 'Мәмілелер', 'Deals')}
+          fields={(() => {
+            const f: CsvFieldSpec[] = [
+              { key: 'customerName', headers: ['Клиент', 'Customer', 'Имя'], required: true },
+              { key: 'phone',        headers: ['Телефон', 'Phone'] },
+              { key: 'address',      headers: ['Адрес', 'Address'] },
+              { key: 'product',      headers: ['Продукт', 'Product'] },
+              { key: 'furnitureType',headers: ['Тип мебели', 'Type'] },
+              { key: 'amount',       headers: ['Сумма', 'Amount'], transform: (v) => Number(String(v).replace(/[^0-9.-]/g, '')) || 0 },
+              { key: 'paidAmount',   headers: ['Оплачено', 'Paid'], transform: (v) => Number(String(v).replace(/[^0-9.-]/g, '')) || 0 },
+              { key: 'status',       headers: ['Статус', 'Status'] },
+              { key: 'source',       headers: ['Источник', 'Source'] },
+              { key: 'measurer',     headers: ['Замерщик', 'Measurer'] },
+              { key: 'designer',     headers: ['Дизайнер', 'Designer'] },
+              { key: 'notes',        headers: ['Заметки', 'Notes'] },
+            ];
+            return f;
+          })()}
+          onImport={async (rec) => {
+            // Defaults for fields the schema doesn't ask about so the row is
+            // valid against the Deal interface that the store expects.
+            store.addDeal({
+              customerName: String(rec.customerName),
+              phone: String(rec.phone || ''),
+              address: String(rec.address || ''),
+              product: String(rec.product || ''),
+              furnitureType: String(rec.furnitureType || ''),
+              amount: Number(rec.amount) || 0,
+              paidAmount: Number(rec.paidAmount) || 0,
+              status: String(rec.status || 'new'),
+              icon: 'phone',
+              priority: 'medium',
+              date: new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
+              progress: 5,
+              source: String(rec.source || 'Импорт'),
+              measurer: String(rec.measurer || ''),
+              designer: String(rec.designer || ''),
+              materials: '',
+              measurementDate: '',
+              completionDate: '',
+              installationDate: '',
+              paymentMethods: { cash: false, kaspi: false, halyk: false, card_transfer: false, bank_transfer: false, installment: false },
+              notes: String(rec.notes || ''),
+              workType: 'furniture',
+            });
+          }}
+          onClose={() => { setShowImport(false); store.reloadAll(); }}
+        />
+      )}
 
       {/* New Deal Modal (legacy) */}
       {false && (
