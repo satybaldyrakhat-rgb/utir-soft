@@ -17,12 +17,25 @@ export interface TranscribeResult {
   error?: string;
 }
 
-// Convert a data URL ('data:audio/webm;base64,XXX') into { mime, buf }.
-// Returns null when the input doesn't look like a base64 data URL.
+// Convert a data URL ('data:audio/webm;base64,XXX' OR
+// 'data:audio/webm;codecs=opus;base64,XXX') into { mime, buf }.
+//
+// We can't use a single-segment regex because browser MediaRecorder
+// produces MIME types with extra parameters (codecs=opus). Split on the
+// literal ';base64,' marker instead — the left side is everything between
+// 'data:' and ';base64,', including any parameters; the right side is the
+// raw base64 payload.
 export function parseAudioDataUrl(dataUrl: string): { mime: string; buf: Buffer } | null {
-  const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
-  if (!m) return null;
-  return { mime: m[1], buf: Buffer.from(m[2], 'base64') };
+  if (!dataUrl.startsWith('data:')) return null;
+  const marker = ';base64,';
+  const idx = dataUrl.indexOf(marker);
+  if (idx === -1) return null;
+  const mime = dataUrl.slice(5, idx); // strip 'data:' prefix
+  const b64  = dataUrl.slice(idx + marker.length);
+  if (!mime || !b64) return null;
+  try {
+    return { mime, buf: Buffer.from(b64, 'base64') };
+  } catch { return null; }
 }
 
 // Map a mime type to the filename extension Whisper expects (it looks at the
