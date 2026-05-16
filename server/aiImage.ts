@@ -44,7 +44,7 @@ export function providerStatuses(): ProviderStatus[] {
   return [
     { id: 'chatgpt',  name: 'ChatGPT (gpt-image-1)',     enabled: !!OPENAI_KEY,    envVar: 'OPENAI_API_KEY' },
     { id: 'gemini',   name: 'Gemini (nano-banana)',      enabled: !!GEMINI_KEY,    envVar: 'GEMINI_API_KEY' },
-    { id: 'claude',   name: 'Claude Opus + auto-route',  enabled: !!ANTHROPIC_KEY && (!!OPENAI_KEY || !!GEMINI_KEY), envVar: 'ANTHROPIC_API_KEY' },
+    { id: 'claude',   name: 'Claude Opus + nano-banana', enabled: !!ANTHROPIC_KEY && (!!OPENAI_KEY || !!GEMINI_KEY), envVar: 'ANTHROPIC_API_KEY' },
     { id: 'utir-mix', name: 'UTIR AI (всё сразу)',       enabled: !!OPENAI_KEY || !!GEMINI_KEY },
   ];
 }
@@ -156,9 +156,10 @@ async function genClaude(prompt: string): Promise<GenResult> {
   if (!enhanced) {
     return { provider: 'claude', ok: false, error: 'Claude не смог улучшить prompt' };
   }
-  // Prefer OpenAI for the actual generation (better photoreal interiors); fall
-  // back to Gemini if only Gemini is configured.
-  const downstream = OPENAI_KEY ? await genChatGPT(enhanced) : await genGemini(enhanced);
+  // 'Banana skill' — Claude prefers Gemini's nano-banana for the actual
+  // image generation (handles photoreal interiors well + free tier).
+  // Falls back to OpenAI gpt-image-1 if Gemini isn't configured.
+  const downstream = GEMINI_KEY ? await genGemini(enhanced) : await genChatGPT(enhanced);
   return { ...downstream, provider: 'claude', enhancedPrompt: enhanced };
 }
 
