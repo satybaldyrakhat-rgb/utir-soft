@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage } from './telegram.js';
 import { isClaudeReady } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate } from './email.js';
+import { createHmac, randomBytes } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || 'utir-soft-dev-secret-change-me';
@@ -133,6 +134,22 @@ CREATE TABLE IF NOT EXISTS deal_history (
 );
 CREATE INDEX IF NOT EXISTS idx_deal_history_deal ON deal_history(deal_id);
 CREATE INDEX IF NOT EXISTS idx_deal_history_team ON deal_history(team_id);
+
+-- Outbound webhook subscriptions. Admin sets these up in Настройки →
+-- Интеграции; emitEvent fans out each event to every active subscription
+-- whose event_types include the matching type.
+CREATE TABLE IF NOT EXISTS webhooks (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  url TEXT NOT NULL,
+  secret TEXT NOT NULL,
+  event_types TEXT NOT NULL,
+  active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  last_status TEXT,
+  last_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_webhooks_team ON webhooks(team_id);
 `);
 
 // Idempotent migration: add columns if missing. Returns true when column was just added.
@@ -341,6 +358,47 @@ function logActivity(userId: string, entry: Record<string, any>) {
     const teamId = row?.team_id || userId;
     db.prepare('INSERT INTO activity_logs (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, userId, teamId, JSON.stringify(data));
   } catch (e) { console.warn('[logActivity] failed', e); }
+}
+
+// ─── Outbound webhooks (public API) ─────────────────────────────────
+// Fire-and-forget POST to every active subscription whose event_types
+// list contains `event`. Each request carries an HMAC signature of the
+// body so the receiver can verify it came from us.
+function emitEvent(teamId: string, event: string, payload: any) {
+  let rows: any[] = [];
+  try {
+    rows = db.prepare('SELECT id, url, secret, event_types FROM webhooks WHERE team_id = ? AND active = 1').all(teamId) as any[];
+  } catch { return; }
+  if (rows.length === 0) return;
+  const body = JSON.stringify({
+    event,
+    teamId,
+    occurredAt: new Date().toISOString(),
+    data: payload,
+  });
+  for (const r of rows) {
+    let types: string[] = [];
+    try { types = JSON.parse(r.event_types || '[]'); } catch { /* skip */ }
+    // '*' subscription matches all events. Otherwise list must include this event.
+    if (!types.includes('*') && !types.includes(event)) continue;
+    const sig = createHmac('sha256', r.secret).update(body).digest('hex');
+    // Don't await — webhook delivery must never block the originating API call.
+    fetch(r.url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-UtirSoft-Event': event,
+        'X-UtirSoft-Signature': `sha256=${sig}`,
+      },
+      body,
+    })
+      .then(res => {
+        db.prepare('UPDATE webhooks SET last_status = ?, last_at = datetime(\'now\') WHERE id = ?').run(`${res.status}`, r.id);
+      })
+      .catch(err => {
+        db.prepare('UPDATE webhooks SET last_status = ?, last_at = datetime(\'now\') WHERE id = ?').run(`err:${String(err).slice(0, 80)}`, r.id);
+      });
+  }
 }
 
 // ─── AUTH ──────────────────────────────────────────────
@@ -654,6 +712,14 @@ app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (
         }
       }
     } catch (e) { console.warn('[deals] tg notify on status change failed', e); }
+    // External webhook fan-out — separate event from the generic update so
+    // consumers can listen specifically for stage transitions.
+    emitEvent(req.teamId!, 'deal.status_changed', { dealId: req.params.id, from: before.status, to: updated.status, deal: updated });
+  }
+  // Always emit a generic 'deal.updated' too (with the same diff that landed
+  // in deal_history) so integrations that want all changes can subscribe once.
+  if (Object.keys(changes).length > 0) {
+    emitEvent(req.teamId!, 'deal.updated', { dealId: req.params.id, changes, deal: updated });
   }
 
   res.json(updated);
@@ -824,6 +890,9 @@ app.post('/api/tasks', authMiddleware, async (req: AuthedRequest, res) => {
     }
   }
 
+  // Webhook fan-out for integrations.
+  emitEvent(req.teamId!, 'task.created', { task: data });
+
   res.json(data);
 });
 
@@ -860,7 +929,13 @@ app.patch('/api/tasks/:id', authMiddleware, async (req: AuthedRequest, res) => {
         }
       }
     } catch (e) { console.warn('[tasks] telegram notify on patch failed', e); }
+    emitEvent(req.teamId!, 'task.assigned', { taskId: req.params.id, assigneeId: updated.assigneeId, task: updated });
   }
+  // Status transitions to 'done' are interesting for billing / KPI dashboards.
+  if (updated.status === 'done' && before.status !== 'done') {
+    emitEvent(req.teamId!, 'task.completed', { taskId: req.params.id, task: updated });
+  }
+  emitEvent(req.teamId!, 'task.updated', { taskId: req.params.id, task: updated });
 
   res.json(updated);
 });
@@ -935,6 +1010,67 @@ teamPermsRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
 });
 
 app.use('/api/team-permissions', teamPermsRouter);
+
+// ─── WEBHOOKS (admin-managed outbound subscriptions) ─────────────
+const webhooksRouter = express.Router();
+webhooksRouter.use(authMiddleware);
+
+webhooksRouter.get('/', requireRole('admin'), (req: AuthedRequest, res) => {
+  const rows = db.prepare(
+    'SELECT id, url, event_types, active, created_at, last_status, last_at FROM webhooks WHERE team_id = ? ORDER BY rowid DESC',
+  ).all(req.teamId!) as any[];
+  res.json(rows.map(r => ({
+    id: r.id,
+    url: r.url,
+    eventTypes: (() => { try { return JSON.parse(r.event_types); } catch { return []; } })(),
+    active: !!r.active,
+    createdAt: r.created_at,
+    lastStatus: r.last_status,
+    lastAt: r.last_at,
+  })));
+});
+
+webhooksRouter.post('/', requireRole('admin'), (req: AuthedRequest, res) => {
+  const url = String(req.body?.url || '').trim();
+  if (!url || !/^https?:\/\//.test(url)) return res.status(400).json({ error: 'invalid url' });
+  const eventTypes: string[] = Array.isArray(req.body?.eventTypes) && req.body.eventTypes.length
+    ? req.body.eventTypes
+    : ['*'];
+  const id = newId('wh_');
+  const secret = randomBytes(24).toString('hex');
+  db.prepare(
+    'INSERT INTO webhooks (id, team_id, url, secret, event_types, active) VALUES (?, ?, ?, ?, ?, 1)',
+  ).run(id, req.teamId!, url, secret, JSON.stringify(eventTypes));
+  // Return secret once on create — admin must copy it now (HMAC verify side).
+  res.json({ id, url, eventTypes, secret });
+});
+
+webhooksRouter.patch('/:id', requireRole('admin'), (req: AuthedRequest, res) => {
+  const fields: string[] = [];
+  const vals: any[] = [];
+  if (typeof req.body?.url === 'string')             { fields.push('url = ?');         vals.push(req.body.url); }
+  if (Array.isArray(req.body?.eventTypes))           { fields.push('event_types = ?'); vals.push(JSON.stringify(req.body.eventTypes)); }
+  if (typeof req.body?.active === 'boolean')         { fields.push('active = ?');      vals.push(req.body.active ? 1 : 0); }
+  if (fields.length === 0) return res.json({ ok: true });
+  vals.push(req.params.id, req.teamId!);
+  db.prepare(`UPDATE webhooks SET ${fields.join(', ')} WHERE id = ? AND team_id = ?`).run(...vals);
+  res.json({ ok: true });
+});
+
+webhooksRouter.delete('/:id', requireRole('admin'), (req: AuthedRequest, res) => {
+  db.prepare('DELETE FROM webhooks WHERE id = ? AND team_id = ?').run(req.params.id, req.teamId!);
+  res.json({ ok: true });
+});
+
+// Test ping — sends a synthetic event so admin can verify the receiver works.
+webhooksRouter.post('/:id/test', requireRole('admin'), (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT 1 FROM webhooks WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  emitEvent(req.teamId!, 'test.ping', { id: req.params.id, message: 'Hello from Utir Soft' });
+  res.json({ ok: true });
+});
+
+app.use('/api/webhooks', webhooksRouter);
 
 // Map of team-wide Telegram pairings (Block F.6). Used by the team panel to
 // show which teammates have linked their account to the bot — admin sees who

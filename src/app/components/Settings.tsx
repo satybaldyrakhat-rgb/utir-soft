@@ -4,6 +4,7 @@ import { ModulesSettings } from './ModulesSettings';
 import { ActivityLog } from './ActivityLog';
 import { TelegramPairing } from './TelegramPairing';
 import { TeamInvitePanel } from './TeamInvitePanel';
+import { WebhooksPanel } from './WebhooksPanel';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
 import { useDataStore, ALL_MODULES, ALL_ROLES, MODULE_GROUPS, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
 import { api } from '../utils/api';
@@ -1083,6 +1084,9 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
       {/* ===== INTEGRATIONS ===== */}
       {activeTab === 'integrations' && (
         <div className="space-y-5">
+          {/* Outbound webhook subscriptions — admin can wire Make / Zapier / n8n / own backend. */}
+          <WebhooksPanel language={language} />
+
           {['msg', 'fin', 'ai', 'other'].map(cat => {
             const items = integrations.filter(i => i.cat === cat);
             const catLabel = { msg: l('Мессенджеры', 'Мессенджерлер', 'Messaging'), fin: l('Финансы', 'Қаржы', 'Finance'), ai: 'AI', other: l('Другое', 'Басқа', 'Other') }[cat];
