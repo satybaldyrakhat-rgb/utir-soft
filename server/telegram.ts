@@ -9,6 +9,7 @@
 import Database from 'better-sqlite3';
 import { runAgent, type AgentTurnContext } from './claudeAgent.js';
 import { canRunTool } from './permissions.js';
+import { transcribeAudio, isWhisperReady } from './whisper.js';
 
 const TG_API = 'https://api.telegram.org';
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -32,6 +33,33 @@ async function tg<T = any>(method: string, body?: Record<string, any>): Promise<
 
 export async function sendMessage(chatId: number, text: string, options: { parse_mode?: 'HTML' | 'MarkdownV2' } = {}) {
   return tg('sendMessage', { chat_id: chatId, text, parse_mode: options.parse_mode || 'HTML', disable_web_page_preview: true });
+}
+
+// Download a Telegram file by file_id and return the raw buffer + the
+// extension-based MIME guess. Used by voice-message transcription where
+// Whisper wants a real binary upload, not a data URL.
+async function downloadTgFileAsBuffer(fileId: string): Promise<{ buf: Buffer; mime: string } | null> {
+  if (!TOKEN) return null;
+  try {
+    const info = await tg<{ file_path: string; file_size?: number }>('getFile', { file_id: fileId });
+    if (!info?.file_path) return null;
+    if (info.file_size && info.file_size > 25 * 1024 * 1024) return null;
+    const res = await fetch(`${TG_API}/file/bot${TOKEN}/${info.file_path}`);
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const ext = info.file_path.toLowerCase().split('.').pop() || '';
+    const mime =
+      ext === 'oga' || ext === 'ogg' ? 'audio/ogg' :
+      ext === 'mp3' ? 'audio/mpeg' :
+      ext === 'm4a' ? 'audio/mp4' :
+      ext === 'wav' ? 'audio/wav' :
+      ext === 'webm' ? 'audio/webm' :
+      'application/octet-stream';
+    return { buf, mime };
+  } catch (e) {
+    console.warn('[downloadTgFileAsBuffer]', e);
+    return null;
+  }
 }
 
 // Download a Telegram photo by file_id and return a data URL. Used by the
@@ -476,6 +504,10 @@ export interface IncomingUpdate {
     // Photo updates carry an array of size variants — last one is the largest.
     photo?: Array<{ file_id: string; file_unique_id: string; width: number; height: number; file_size?: number }>;
     caption?: string;
+    // Voice notes (microphone button in Telegram) — always Opus in OGG.
+    voice?: { file_id: string; file_unique_id: string; duration: number; mime_type?: string; file_size?: number };
+    // Audio attachments (paperclip → audio file) — mp3/m4a/etc.
+    audio?: { file_id: string; file_unique_id: string; duration: number; mime_type?: string; title?: string; file_size?: number };
   };
 }
 
@@ -484,6 +516,40 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
   if (!msg) return;
   const chatId = msg.chat.id;
   const username = msg.from?.username;
+
+  // ── Voice / audio message? Transcribe with Whisper and pretend the user
+  //    typed the resulting text. This means the whole CRM tool flow — create
+  //    deal, log payment, add task, change status — works hands-free.
+  if ((msg.voice || msg.audio) && !msg.text) {
+    if (!isWhisperReady()) {
+      await sendMessage(chatId, '🎤 Распознавание речи отключено — админ не подключил OPENAI_API_KEY.');
+      return;
+    }
+    const fileId = msg.voice?.file_id || msg.audio?.file_id;
+    const duration = msg.voice?.duration || msg.audio?.duration || 0;
+    if (!fileId) return;
+    // Telegram caps voice messages at ~10MB / a few minutes; still hint the user
+    // when it's clearly too long so they don't wait silently for a 504.
+    if (duration > 300) {
+      await sendMessage(chatId, '🎤 Голосовое слишком длинное (>5 мин). Сократите и пришлите ещё раз.');
+      return;
+    }
+    await sendMessage(chatId, '🎤 Распознаю речь…');
+    const file = await downloadTgFileAsBuffer(fileId);
+    if (!file) { await sendMessage(chatId, '⚠️ Не удалось скачать аудио. Попробуйте ещё раз.'); return; }
+    const tr = await transcribeAudio(file.buf, msg.voice?.mime_type || msg.audio?.mime_type || file.mime);
+    if (!tr.ok || !tr.text) {
+      await sendMessage(chatId, `⚠️ Не получилось распознать: ${tr.error || 'неизвестная причина'}`);
+      return;
+    }
+    // Echo what we heard so the user can correct miss-transcriptions easily.
+    await sendMessage(chatId, `📝 <i>Вы сказали:</i> «${tr.text}»`);
+    // Re-enter handleUpdate as if the user had typed this text. We mutate
+    // the local `msg` object so the slash-command / wizard / agent branches
+    // below all see the new text and treat the voice note like a typed message.
+    (msg as any).text = tr.text;
+    // Fall through to text handling below.
+  }
 
   // ── Photo message? Only meaningful inside the /design wizard. Route to the
   //    wizard handler below so it can stash the data URL and advance the step.

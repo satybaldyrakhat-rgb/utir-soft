@@ -12,6 +12,7 @@ import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type
 import { chat as aiChat, chatProviderStatuses, type ChatProviderId, type ChatMessage } from './aiChat.js';
 import aiTools from './aiTools.js';
 import { getPermissionLevel as getPermLevel, canRunTool } from './permissions.js';
+import { transcribeAudio, parseAudioDataUrl, isWhisperReady } from './whisper.js';
 import { createHmac, randomBytes } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1563,6 +1564,23 @@ aiChatRouter.post('/execute', async (req: AuthedRequest, res) => {
   } catch (e: any) {
     res.json({ ok: false, text: `Не удалось выполнить: ${String(e?.message || e)}` });
   }
+});
+
+// Voice → text. Body: { audioDataUrl: 'data:audio/webm;base64,...', language? }.
+// Browser MediaRecorder produces 'audio/webm' by default; we forward straight
+// to Whisper which handles webm, ogg, mp3, m4a, etc. Returns { ok, text }.
+//
+// We accept data URLs (not multipart) so this endpoint can reuse the existing
+// express.json 25MB body limit without pulling in multer just for one route.
+aiChatRouter.post('/transcribe', async (req: AuthedRequest, res) => {
+  if (!isWhisperReady()) return res.status(503).json({ ok: false, error: 'OPENAI_API_KEY не задан' });
+  const dataUrl = String(req.body?.audioDataUrl || '');
+  const language = req.body?.language ? String(req.body.language) : undefined;
+  const parsed = parseAudioDataUrl(dataUrl);
+  if (!parsed) return res.status(400).json({ ok: false, error: 'audioDataUrl required (data:audio/...;base64,...)' });
+  const r = await transcribeAudio(parsed.buf, parsed.mime, language);
+  if (!r.ok) return res.status(502).json({ ok: false, error: r.error });
+  res.json({ ok: true, text: r.text, language: r.language });
 });
 
 app.use('/api/ai-chat', aiChatRouter);

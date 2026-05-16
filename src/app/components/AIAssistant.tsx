@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Sparkles, X, Send, ChevronRight, ChevronDown, Check, AlertCircle, Loader2, Trash2 } from 'lucide-react';
+import { Sparkles, X, Send, ChevronRight, ChevronDown, Check, AlertCircle, Loader2, Trash2, Mic, Square } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { api } from '../utils/api';
 
@@ -113,6 +113,15 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [executingToolId, setExecutingToolId] = useState<string | null>(null);
+  // Voice input — Web MediaRecorder captures mic audio, we POST it as a base64
+  // data URL to /api/ai-chat/transcribe, then drop the transcript into the
+  // input box so the user can review/edit before sending.
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [recordSec, setRecordSec] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordChunksRef = useRef<BlobPart[]>([]);
+  const recordTimerRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const selectedModel = AI_MODELS.find(m => m.id === providerId) || AI_MODELS[0];
@@ -259,6 +268,92 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
       timestamp: now(),
     }]);
   }
+
+  // ─── Voice recording ───────────────────────────────────────────────
+  // Press mic → request mic permission once, start MediaRecorder, count
+  // seconds. Press again (or click ⏹) → stop, collect blob, base64, POST
+  // to /api/ai-chat/transcribe, drop the resulting text into inputValue
+  // so the user can edit before sending.
+  async function startRecording() {
+    if (recording || transcribing) return;
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Prefer audio/webm with Opus — supported by Chromium and Whisper.
+      // Safari falls back to mp4/aac; Whisper handles both.
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+        : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+        : '';
+      const mr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      recordChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) recordChunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        // Always release the mic; otherwise the browser keeps the indicator on.
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(recordChunksRef.current, { type: mr.mimeType || 'audio/webm' });
+        recordChunksRef.current = [];
+        if (blob.size < 800) { setError('Запись слишком короткая.'); return; }
+        await sendForTranscription(blob);
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setRecording(true);
+      setRecordSec(0);
+      recordTimerRef.current = window.setInterval(() => setRecordSec(s => s + 1), 1000);
+    } catch (e: any) {
+      setError(e?.name === 'NotAllowedError'
+        ? 'Браузер не дал доступ к микрофону. Разрешите в настройках сайта.'
+        : `Микрофон недоступен: ${String(e?.message || e)}`);
+    }
+  }
+
+  function stopRecording() {
+    if (!recording) return;
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state !== 'inactive') mr.stop();
+    setRecording(false);
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+  }
+
+  async function sendForTranscription(blob: Blob) {
+    setTranscribing(true);
+    try {
+      // Convert blob → data URL so we can POST as JSON (matches the existing
+      // 25MB express.json limit; no need to add multer just for one route).
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result));
+        fr.onerror = () => reject(new Error('failed to read recording'));
+        fr.readAsDataURL(blob);
+      });
+      const r = await api.post<{ ok: boolean; text?: string; error?: string }>('/api/ai-chat/transcribe', {
+        audioDataUrl: dataUrl,
+        language: language === 'kz' ? 'kk' : language === 'eng' ? 'en' : 'ru',
+      });
+      if (r.ok && r.text) {
+        // Append to whatever the user might have typed already.
+        setInputValue(v => (v ? v.trim() + ' ' : '') + r.text);
+      } else {
+        setError(r.error || 'Не получилось распознать речь.');
+      }
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setTranscribing(false);
+    }
+  }
+
+  // Stop the recorder if the popup is closed mid-recording — otherwise the
+  // mic indicator hangs forever in the browser tab.
+  useEffect(() => {
+    if (!isOpen && recording) stopRecording();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   return (
     <>
@@ -469,28 +564,55 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
 
           {/* Input */}
           <div className="p-3 border-t border-gray-100">
-            <div className="flex items-center gap-1.5">
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isTyping) { e.preventDefault(); sendMessage(inputValue); } }}
-                disabled={isTyping || selectedProvider?.enabled === false}
-                placeholder={
-                  selectedProvider?.enabled === false
-                    ? `Подключите ${selectedProvider?.envVar || 'API key'} в Railway`
-                    : language === 'ru' ? 'Сообщение...' : language === 'kz' ? 'Хабар...' : 'Message...'
-                }
-                className="flex-1 px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 disabled:opacity-50"
-              />
-              <button
-                onClick={() => sendMessage(inputValue)}
-                disabled={!inputValue.trim() || isTyping || selectedProvider?.enabled === false}
-                className="w-8 h-8 bg-gray-900 text-white rounded-xl flex items-center justify-center hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                {isTyping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              </button>
-            </div>
+            {recording ? (
+              // Recording bar — pulses red so the user can see we're listening.
+              // Click ⏹ to finish; the recorder also auto-cuts at 60s.
+              <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <div className="flex-1 text-[12px] text-red-700">
+                  Идёт запись… <span className="font-mono">{Math.floor(recordSec / 60)}:{(recordSec % 60).toString().padStart(2, '0')}</span>
+                </div>
+                <button
+                  onClick={stopRecording}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[11px] flex items-center gap-1"
+                >
+                  <Square className="w-3 h-3 fill-current" /> Стоп
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isTyping) { e.preventDefault(); sendMessage(inputValue); } }}
+                  disabled={isTyping || transcribing || selectedProvider?.enabled === false}
+                  placeholder={
+                    transcribing
+                      ? 'Распознаю речь…'
+                      : selectedProvider?.enabled === false
+                        ? `Подключите ${selectedProvider?.envVar || 'API key'} в Railway`
+                        : language === 'ru' ? 'Сообщение или 🎤 голос…' : language === 'kz' ? 'Хабар немесе 🎤 дауыс…' : 'Message or 🎤 voice…'
+                  }
+                  className="flex-1 px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 disabled:opacity-50"
+                />
+                <button
+                  onClick={startRecording}
+                  disabled={isTyping || transcribing || selectedProvider?.enabled === false}
+                  title={language === 'ru' ? 'Записать голосовое' : language === 'kz' ? 'Дауыс жазу' : 'Record voice'}
+                  className="w-8 h-8 hover:bg-gray-100 rounded-xl flex items-center justify-center transition-colors disabled:opacity-30"
+                >
+                  {transcribing ? <Loader2 className="w-3.5 h-3.5 text-gray-500 animate-spin" /> : <Mic className="w-3.5 h-3.5 text-gray-500" />}
+                </button>
+                <button
+                  onClick={() => sendMessage(inputValue)}
+                  disabled={!inputValue.trim() || isTyping || transcribing || selectedProvider?.enabled === false}
+                  className="w-8 h-8 bg-gray-900 text-white rounded-xl flex items-center justify-center hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  {isTyping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            )}
             {providerId === 'utir-ai' && (
               <p className="text-[10px] text-gray-400 mt-1.5 px-1">
                 💡 UTIR AI может создавать сделки, оплаты, задачи и менять статусы — спросит подтверждение перед записью.
