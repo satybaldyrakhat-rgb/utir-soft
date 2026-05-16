@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History } from 'lucide-react';
+import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History, RotateCcw } from 'lucide-react';
 import { t } from '../utils/translations';
 import { useDataStore, type Deal } from '../utils/dataStore';
 import { api } from '../utils/api';
@@ -117,6 +117,30 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       return enabled.length > 0 ? enabled.join(', ') : '—';
     }
     return String(val);
+  };
+
+  // Rollback handler — POSTs to the dedicated endpoint, refreshes the store
+  // (so the main tab reflects the restored values) and reloads history (so
+  // the rollback row appears at the top of the timeline).
+  const [rollingBackId, setRollingBackId] = useState<string | null>(null);
+  const rollbackEntry = async (entryId: string) => {
+    if (!confirm(l(
+      'Откатить это изменение? Поля вернутся к значениям до этой правки. Операция запишется в историю.',
+      'Бұл өзгерісті қайтару керек пе? Өрістер бұрынғы мәндерге оралады. Әрекет тарихқа жазылады.',
+      'Roll this change back? Fields will be restored to their previous values. The rollback is recorded in the history.',
+    ))) return;
+    setRollingBackId(entryId);
+    try {
+      await api.post(`/api/deals/${deal.id}/history/${entryId}/rollback`, {});
+      await store.reloadAll();
+      // Re-fetch the history list to show the new rollback entry.
+      const rows = await api.get<HistoryEntry[]>(`/api/deals/${deal.id}/history`);
+      setHistory(rows);
+    } catch (e: any) {
+      alert(String(e?.message || 'rollback failed'));
+    } finally {
+      setRollingBackId(null);
+    }
   };
 
   const remaining = Math.max(0, (deal.amount || 0) - (paidAmount || 0));
@@ -446,15 +470,36 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                 </div>
               )}
               <div className="space-y-3">
-                {history.map(entry => (
+                {history.map(entry => {
+                  // Only the latest non-rollback entry gets a Rollback button.
+                  // (Rolling back an old entry mid-timeline is hard to reason
+                  // about — admin can roll back top-most repeatedly instead.)
+                  const isRollback = entry.userName?.includes('(rollback)');
+                  const isTopActionable = !isRollback && entry.id === history.find(h => !h.userName?.includes('(rollback)'))?.id;
+                  return (
                   <div key={entry.id} className="bg-gray-50 rounded-xl border border-gray-100 p-3">
                     <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
                       <span>
-                        <b className="text-gray-700">{entry.userName || l('Неизвестно', 'Белгісіз', 'Unknown')}</b>
+                        <b className={isRollback ? 'text-amber-700' : 'text-gray-700'}>{entry.userName || l('Неизвестно', 'Белгісіз', 'Unknown')}</b>
                       </span>
-                      <span>{new Date(entry.createdAt).toLocaleString(language === 'eng' ? 'en-GB' : 'ru-RU', {
-                        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-                      })}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{new Date(entry.createdAt).toLocaleString(language === 'eng' ? 'en-GB' : 'ru-RU', {
+                          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                        })}</span>
+                        {isTopActionable && (
+                          <button
+                            onClick={() => rollbackEntry(entry.id)}
+                            disabled={rollingBackId === entry.id}
+                            className="flex items-center gap-1 px-2 py-0.5 text-[10px] text-amber-700 hover:bg-amber-50 rounded transition-colors disabled:opacity-50"
+                            title={l('Откатить эту правку', 'Бұл түзетуді қайтару', 'Roll back this change')}
+                          >
+                            <RotateCcw className="w-2.5 h-2.5" />
+                            {rollingBackId === entry.id
+                              ? l('Откатываю…', 'Қайтарылуда…', 'Rolling back…')
+                              : l('Откатить', 'Қайтару', 'Roll back')}
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-1">
                       {Object.entries(entry.changes).map(([key, diff]) => (
@@ -467,7 +512,8 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                       ))}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

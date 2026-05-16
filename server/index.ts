@@ -743,6 +743,52 @@ app.get('/api/deals/:id/history', authMiddleware, requirePermission('orders'), (
   })));
 });
 
+// Rollback a single history entry — applies its 'before' values back to the
+// deal. Writes a new history row so the rollback itself is auditable and
+// can be re-rolled forward via the same UI.
+// Requires write permission on orders (otherwise users with view-only would
+// be able to mutate via this endpoint).
+app.post('/api/deals/:id/history/:entryId/rollback', authMiddleware, requirePermission('orders'), async (req: AuthedRequest, res) => {
+  const dealRow = db.prepare('SELECT data FROM deals WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!dealRow) return res.status(404).json({ error: 'deal not found' });
+  const entryRow = db.prepare('SELECT changes FROM deal_history WHERE id = ? AND deal_id = ? AND team_id = ?').get(req.params.entryId, req.params.id, req.teamId!) as any;
+  if (!entryRow) return res.status(404).json({ error: 'history entry not found' });
+
+  let entryChanges: Record<string, { before: any; after: any }> = {};
+  try { entryChanges = JSON.parse(entryRow.changes); } catch { return res.status(400).json({ error: 'corrupt history entry' }); }
+  const fieldKeys = Object.keys(entryChanges);
+  if (fieldKeys.length === 0) return res.status(400).json({ error: 'nothing to roll back' });
+
+  const before = JSON.parse(dealRow.data);
+  const updated = { ...before };
+  // For each field touched in the entry, restore its 'before' value.
+  const rollbackDiff: Record<string, { before: any; after: any }> = {};
+  for (const key of fieldKeys) {
+    const targetVal = entryChanges[key].before;
+    if (JSON.stringify(before[key]) !== JSON.stringify(targetVal)) {
+      rollbackDiff[key] = { before: before[key] ?? null, after: targetVal ?? null };
+      updated[key] = targetVal;
+    }
+  }
+  if (Object.keys(rollbackDiff).length === 0) {
+    return res.status(400).json({ error: 'fields already match the target state' });
+  }
+
+  db.prepare('UPDATE deals SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(updated), req.params.id, req.teamId!);
+  // Record the rollback as its own history entry — keeps the timeline honest.
+  try {
+    const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+    db.prepare('INSERT INTO deal_history (id, deal_id, team_id, user_id, user_name, changes) VALUES (?, ?, ?, ?, ?, ?)').run(
+      newId('dh_'), req.params.id, req.teamId!, req.userId!,
+      `${actor?.name || ''} (rollback)`,
+      JSON.stringify(rollbackDiff),
+    );
+  } catch (e) { console.warn('[deals rollback] history insert failed', e); }
+  // Webhook fan-out so external systems learn about the rollback too.
+  emitEvent(req.teamId!, 'deal.updated', { dealId: req.params.id, changes: rollbackDiff, deal: updated, rolledBackFrom: req.params.entryId });
+  res.json({ ok: true, changes: rollbackDiff, deal: updated });
+});
+
 app.use('/api/deals', authMiddleware, requirePermission('orders'), makeCrud('deals', 'D'));
 
 // Custom DELETE on /api/employees/:id — must register BEFORE the generic
