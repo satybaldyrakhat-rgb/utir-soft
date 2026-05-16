@@ -81,6 +81,29 @@ function findUserByChat(db: Database.Database, chatId: number): { id: string; te
   return row ? { id: row.id, teamId: row.team_id || row.id, name: row.name } : undefined;
 }
 
+// Find the employees row that belongs to this auth user (matching by email,
+// since signup creates an employees row whose data.email equals user.email).
+// Returns { id, name } or null.
+function findEmployeeForUser(db: Database.Database, userId: string, teamId: string): { id: string; name: string } | null {
+  const u = db.prepare('SELECT email FROM users WHERE id = ?').get(userId) as any;
+  if (!u?.email) return null;
+  const rows = db.prepare('SELECT id, data FROM employees WHERE team_id = ?').all(teamId) as any[];
+  for (const r of rows) {
+    try {
+      const data = JSON.parse(r.data);
+      if ((data.email || '').toLowerCase() === u.email.toLowerCase()) {
+        return { id: r.id, name: data.name || '' };
+      }
+    } catch { /* skip */ }
+  }
+  return null;
+}
+
+// Stable-ish id helper used by /assign when creating a task directly.
+function newId(prefix: string) {
+  return prefix + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
+
 function consumeLinkCode(db: Database.Database, code: string, chatId: number, username?: string): { ok: true; userId: string; userName: string } | { ok: false; reason: string } {
   const row = db.prepare(`
     SELECT tl.user_id, tl.code_expires_at, u.name
@@ -260,11 +283,17 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
         `<b>Что я умею:</b>\n` +
         `• Записать клиента и сделку\n` +
         `• Зафиксировать оплату\n` +
-        `• Создать задачу\n` +
-        `• Показать сводку за день — /today\n\n` +
-        `<b>Как работать:</b> просто пишите свободным текстом, чем подробнее тем лучше. ` +
+        `• Создать задачу\n\n` +
+        `<b>Свободный текст</b> — просто пишите, чем подробнее тем лучше. ` +
         `Перед сохранением я присылаю резюме на подтверждение.\n\n` +
-        `<b>Команды:</b>\n/start /help /link /today /cancel`,
+        `<b>Личные команды:</b>\n` +
+        `/tasks — ваши открытые задачи\n` +
+        `/revenue — ваша выручка\n` +
+        `/today — что происходило в команде сегодня\n\n` +
+        `<b>Управление:</b>\n` +
+        `<code>/assign Имя текст задачи</code> — поставить задачу сотруднику\n` +
+        `<code>/assign @username текст задачи</code> — по Telegram-нику\n\n` +
+        `<b>Прочее:</b> /start /link /cancel /help`,
       );
       return;
     }
@@ -325,7 +354,134 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       return;
     }
 
-    await sendMessage(chatId, `Не знаю такой команды. Доступны: /start /help /link /today /cancel`);
+    // /tasks — show the user's own active tasks (anything not done).
+    if (cmd === '/tasks' || cmd === '/мои_задачи') {
+      const user = findUserByChat(db, chatId);
+      if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт: <code>/link КОД</code>'); return; }
+      const emp = findEmployeeForUser(db, user.id, user.teamId);
+      if (!emp) {
+        await sendMessage(chatId, 'Ваш профиль ещё не привязан к карточке сотрудника. Попросите админа добавить вас в команду.');
+        return;
+      }
+      const rows = db.prepare('SELECT data FROM tasks WHERE team_id = ? ORDER BY rowid DESC LIMIT 200').all(user.teamId) as any[];
+      const mine = rows.map(r => JSON.parse(r.data)).filter(t => t.assigneeId === emp.id && t.status !== 'done');
+      if (mine.length === 0) {
+        await sendMessage(chatId, `<b>${emp.name}, у вас сейчас нет открытых задач 🎉</b>`);
+        return;
+      }
+      const STATUS_LABEL: Record<string, string> = { new: '🆕', in_progress: '⏳', review: '👀' };
+      const lines = mine.slice(0, 20).map(t =>
+        `${STATUS_LABEL[t.status] || '•'} <b>${t.title}</b>${t.dueDate ? ` · 📅 ${t.dueDate}` : ''}${t.category ? ` · <i>${t.category}</i>` : ''}`,
+      );
+      await sendMessage(chatId,
+        `<b>Ваши задачи (${mine.length}):</b>\n\n${lines.join('\n')}${mine.length > 20 ? `\n\n…и ещё ${mine.length - 20}` : ''}`,
+      );
+      return;
+    }
+
+    // /revenue — sum of paidAmount on the user's completed deals.
+    if (cmd === '/revenue' || cmd === '/моя_выручка') {
+      const user = findUserByChat(db, chatId);
+      if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт: <code>/link КОД</code>'); return; }
+      const emp = findEmployeeForUser(db, user.id, user.teamId);
+      if (!emp) { await sendMessage(chatId, 'Ваш профиль не привязан к карточке сотрудника.'); return; }
+      const rows = db.prepare('SELECT data FROM deals WHERE team_id = ?').all(user.teamId) as any[];
+      const deals = rows.map(r => JSON.parse(r.data));
+      const nameLow = (emp.name || '').toLowerCase();
+      const firstLow = nameLow.split(/\s+/)[0] || '';
+      // Same attribution rules as the Аналитика → Команда tab.
+      const mine = deals.filter(d => {
+        if (d.ownerId) return d.ownerId === emp.id;
+        const test = (v: string | undefined) => v && (v.toLowerCase().includes(nameLow) || (firstLow.length > 2 && v.toLowerCase().includes(firstLow)));
+        return test(d.measurer) || test(d.designer) || test(d.foreman) || test(d.architect);
+      });
+      const completed = mine.filter(d => d.status === 'completed');
+      const totalRev = completed.reduce((s, d) => s + (d.paidAmount || 0), 0);
+      // Month-to-date.
+      const firstOfMonth = new Date(); firstOfMonth.setDate(1); firstOfMonth.setHours(0, 0, 0, 0);
+      const monthRev = completed
+        .filter(d => new Date(d.createdAt || d.date).getTime() >= firstOfMonth.getTime())
+        .reduce((s, d) => s + (d.paidAmount || 0), 0);
+      const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
+      await sendMessage(chatId,
+        `<b>Ваша выручка, ${emp.name}:</b>\n\n` +
+        `За всё время: <b>${fmt(totalRev)}</b>  (${completed.length} сделок)\n` +
+        `В этом месяце: <b>${fmt(monthRev)}</b>\n` +
+        `Сейчас в работе: <b>${mine.length - completed.length}</b> сделок`,
+      );
+      return;
+    }
+
+    // /assign — create a task for a teammate.
+    //   /assign Имя текст задачи
+    //   /assign @username текст задачи  (matches paired Telegram username)
+    if (cmd === '/assign' || cmd === '/назначь' || cmd === '/назначить') {
+      const user = findUserByChat(db, chatId);
+      if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт: <code>/link КОД</code>'); return; }
+      if (args.length < 2) {
+        await sendMessage(chatId,
+          `<b>Использование:</b>\n<code>/assign Имя текст задачи</code>\n<code>/assign @username текст задачи</code>\n\n` +
+          `Пример: <code>/assign Асхат позвонить клиенту Айдан</code>`,
+        );
+        return;
+      }
+      const target = args[0];
+      const taskTitle = args.slice(1).join(' ');
+      // Resolve the assignee — either by Telegram @username or by name substring.
+      let assigneeRow: any = null;
+      if (target.startsWith('@')) {
+        const uname = target.slice(1).toLowerCase();
+        const link = db.prepare(`SELECT u.id, u.email FROM telegram_links tl JOIN users u ON u.id = tl.user_id WHERE LOWER(tl.username) = ? AND u.team_id = ?`).get(uname, user.teamId) as any;
+        if (link) {
+          assigneeRow = db.prepare('SELECT id, data FROM employees WHERE team_id = ? AND LOWER(json_extract(data, \'$.email\')) = ?').get(user.teamId, (link.email || '').toLowerCase()) as any;
+        }
+      } else {
+        // Match employees.data.name (case-insensitive substring).
+        const allEmps = db.prepare('SELECT id, data FROM employees WHERE team_id = ?').all(user.teamId) as any[];
+        const tLow = target.toLowerCase();
+        assigneeRow = allEmps.find(r => {
+          try { return (JSON.parse(r.data).name || '').toLowerCase().includes(tLow); } catch { return false; }
+        });
+      }
+      if (!assigneeRow) {
+        await sendMessage(chatId, `Не нашёл сотрудника <b>${target}</b> в команде.`);
+        return;
+      }
+      // Create the task (and notify the assignee — same as the platform POST does).
+      const taskId = newId('t');
+      const due = new Date().toISOString().slice(0, 10);
+      const data = {
+        id: taskId, title: taskTitle, description: '', status: 'new',
+        priority: 'medium', assigneeId: assigneeRow.id,
+        createdAt: new Date().toISOString(),
+        dueDate: due, category: 'Прочее', subtasks: [],
+      };
+      db.prepare('INSERT INTO tasks (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(taskId, user.id, user.teamId, JSON.stringify(data));
+      logActivity(user.id, {
+        user: user.name, actor: 'human',
+        action: 'Назначил задачу через Telegram',
+        target: `${JSON.parse(assigneeRow.data).name}: ${taskTitle}`,
+        type: 'create', page: 'tasks',
+      });
+      // Push to the assignee's Telegram if paired.
+      try {
+        const assigneeData = JSON.parse(assigneeRow.data);
+        const aEmail = (assigneeData.email || '').toLowerCase();
+        if (aEmail) {
+          const aUser = db.prepare('SELECT id FROM users WHERE email = ? AND team_id = ?').get(aEmail, user.teamId) as any;
+          if (aUser) {
+            const aLink = db.prepare('SELECT chat_id FROM telegram_links WHERE user_id = ? AND chat_id IS NOT NULL').get(aUser.id) as any;
+            if (aLink?.chat_id) {
+              await sendMessage(aLink.chat_id, `<b>📝 На вас назначена задача</b>\n${taskTitle}\n📅 Срок: ${due}\nот ${user.name}`);
+            }
+          }
+        }
+      } catch (e) { console.warn('[/assign tg notify]', e); }
+      await sendMessage(chatId, `✅ Задача поставлена сотруднику <b>${JSON.parse(assigneeRow.data).name}</b>:\n${taskTitle}`);
+      return;
+    }
+
+    await sendMessage(chatId, `Не знаю такой команды. Доступны: /start /help /link /today /tasks /revenue /assign /cancel`);
     return;
   }
 
