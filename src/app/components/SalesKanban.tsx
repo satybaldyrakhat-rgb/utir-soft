@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Phone, X, Users, Mail, Calendar, TrendingUp, XCircle, Plus, Search, Archive, Download, Upload, RotateCcw } from 'lucide-react';
+import { Phone, X, Users, Mail, Calendar, TrendingUp, XCircle, Plus, Search, Archive, Download, Upload, RotateCcw, Trash2 } from 'lucide-react';
 import { ClientOrderModal } from './ClientOrderModal';
 import { NewDealModal } from './NewDealModal';
 import { useDataStore, type Deal } from '../utils/dataStore';
@@ -58,6 +58,10 @@ export function SalesKanban({ language }: SalesKanbanProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchive, setShowArchive] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  // Glass confirm dialog state for delete actions. Replaces the native
+  // window.confirm popup so deletion fits the liquid-glass language used
+  // across the rest of the app.
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
   // Only one view remains here ('funnel') since «Платежи» moved to its own
   // top-level menu item. The state is kept for backward-compat with logic
   // that read `activeTab === 'funnel'` below; can be removed later.
@@ -122,7 +126,17 @@ export function SalesKanban({ language }: SalesKanbanProps) {
     }
   };
 
-  const handleDeleteDeal = (id: string) => { if (confirm(l('Удалить?', 'Жою?', 'Delete?'))) store.deleteDeal(id); };
+  // Opens the glass confirm dialog. The actual deleteDeal call fires from
+  // the dialog's «Удалить» button so the user has a chance to back out.
+  const handleDeleteDeal = (id: string) => {
+    const deal = store.deals.find(d => d.id === id);
+    setConfirmDelete({ id, name: deal?.customerName || '' });
+  };
+  const confirmDeleteNow = () => {
+    if (!confirmDelete) return;
+    store.deleteDeal(confirmDelete.id);
+    setConfirmDelete(null);
+  };
   const handleRejectDeal = (id: string) => { store.updateDeal(id, { status: 'rejected', progress: 0 }); };
 
   const iconMap = (icon: Deal['icon']) => {
@@ -538,6 +552,47 @@ export function SalesKanban({ language }: SalesKanbanProps) {
       )}
 
       {selectedDeal && <ClientOrderModal isOpen={!!selectedDeal} onClose={() => setSelectedDeal(null)} deal={selectedDeal} language={language} />}
+
+      {/* ─── Glass delete-confirmation dialog ─────────────────── */}
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-[60] flex items-center justify-center p-4"
+          onClick={() => setConfirmDelete(null)}
+        >
+          <div
+            className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-sm p-6 shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-rose-100/70 text-rose-700 ring-1 ring-white/60 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <div className="text-center text-sm text-slate-900 mb-1">
+              {l('Удалить сделку?', 'Мәмілені жою?', 'Delete deal?')}
+            </div>
+            <div className="text-center text-[11px] text-slate-500 mb-5 leading-relaxed">
+              {confirmDelete.name
+                ? l(`«${confirmDelete.name}» будет удалён без возможности восстановить.`,
+                    `«${confirmDelete.name}» қайтарылмастан жойылады.`,
+                    `"${confirmDelete.name}" will be removed with no way to restore.`)
+                : l('Действие нельзя отменить.', 'Әрекетті болдырмауға болмайды.', "This can't be undone.")}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="px-3 py-2.5 bg-white/70 hover:bg-white ring-1 ring-white/60 text-slate-700 rounded-2xl text-xs transition-colors"
+              >
+                {l('Отмена', 'Бас тарту', 'Cancel')}
+              </button>
+              <button
+                onClick={confirmDeleteNow}
+                className="px-3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs transition-colors shadow-[0_8px_24px_-8px_rgba(225,29,72,0.5)]"
+              >
+                {l('Удалить', 'Жою', 'Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
