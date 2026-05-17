@@ -914,3 +914,149 @@ export async function generateCashFlowForecastPDF(
   drawFooter(doc);
   doc.save(`forecast-${todayStamp()}.pdf`);
 }
+
+// ─── Tax report (summary across taxes for the chosen period) ───────
+// Lists every applicable tax with: код, ставка, база, сумма, срок,
+// статус (оплачен / к оплате). Useful as a hand-off for the accountant
+// or for filing FNO returns.
+export interface TaxReportRow {
+  code: string;        // Cyrillic short label: «ИПН», «КПН»...
+  label: string;       // full description
+  rate: string;        // «10%» / «12%» / «9.5% − ОПВ»
+  base: number;
+  amount: number;
+  due: string;         // ISO date
+  paid: boolean;
+}
+
+export async function generateTaxReportPDF(opts: {
+  periodLabel: string;
+  rows: TaxReportRow[];
+  company?: string;
+}) {
+  const doc = await newDoc();
+  drawHeader(doc, `Налоговый отчёт`, `Период: ${opts.periodLabel} · ${fmtDate()}`, opts.company);
+
+  const total = opts.rows.reduce((s, r) => s + r.amount, 0);
+  const paid  = opts.rows.filter(r => r.paid).reduce((s, r) => s + r.amount, 0);
+  const due   = total - paid;
+  let y = 38;
+  y = drawKpiCards(doc, y, [
+    { label: 'Всего налогов', value: KZT(total),  sub: `${opts.rows.length} позиций` },
+    { label: 'Оплачено',      value: KZT(paid),   accent: [16, 185, 129] },
+    { label: 'К оплате',      value: KZT(due),    accent: [245, 158, 11] },
+    { label: 'Период',        value: opts.periodLabel },
+  ]);
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Код', 'Налог', 'Ставка', 'База', 'Сумма', 'Срок', 'Статус']],
+    body: opts.rows.map(r => [
+      r.code, r.label, r.rate, KZT(r.base), KZT(r.amount), r.due,
+      r.paid ? 'Оплачен' : 'К оплате',
+    ]),
+    styles: { font: 'Roboto', fontSize: 8, cellPadding: 2.5, textColor: [30, 41, 59] },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      3: { halign: 'right' },
+      4: { halign: 'right' },
+      6: { halign: 'center' },
+    },
+    margin: { left: 14, right: 14 },
+    didDrawCell: data => {
+      if (data.section === 'body' && data.column.index === 6) {
+        const txt = String(data.cell.raw);
+        const colour: [number, number, number] = txt === 'Оплачен' ? [16, 185, 129] : [245, 158, 11];
+        doc.setTextColor(...colour);
+        doc.setFontSize(8);
+        doc.text(txt, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center', baseline: 'middle' });
+        (data.cell as any).text = [''];
+      }
+    },
+  });
+
+  drawFooter(doc);
+  doc.save(`nalogi-${todayStamp()}.pdf`);
+}
+
+// ─── ЭСФ / VAT (НДС) report for the quarter ────────────────────────
+// Pairs nicely with KZ requirement to submit ФНО 300.00 quarterly. We
+// list every outgoing (sale → НДС начислен) and every incoming purchase
+// (расход → НДС к зачёту), with totals at the bottom. Backs out НДС
+// from a gross amount: VAT = gross * 12 / 112.
+export interface VATLine {
+  date: string;
+  counterparty: string;
+  amount: number;  // gross (с НДС)
+  vat: number;     // backed-out VAT
+}
+
+export async function generateVATReportPDF(opts: {
+  period: { from: Date; to: Date };
+  periodLabel: string;
+  outgoing: VATLine[];
+  incoming: VATLine[];
+  company?: string;
+}) {
+  const doc = await newDoc();
+  drawHeader(doc, 'Отчёт по НДС / ЭСФ', `${opts.periodLabel} · ${fmtDate()}`, opts.company);
+
+  const outGross = opts.outgoing.reduce((s, x) => s + x.amount, 0);
+  const outVat   = opts.outgoing.reduce((s, x) => s + x.vat,    0);
+  const inGross  = opts.incoming.reduce((s, x) => s + x.amount, 0);
+  const inVat    = opts.incoming.reduce((s, x) => s + x.vat,    0);
+  const toPay    = Math.max(0, outVat - inVat);
+
+  let y = 38;
+  y = drawKpiCards(doc, y, [
+    { label: 'Оборот (исходящие)', value: KZT(outGross), accent: [16, 185, 129], sub: `${opts.outgoing.length} операций` },
+    { label: 'НДС начисленный',    value: KZT(outVat),   accent: [16, 185, 129] },
+    { label: 'НДС к зачёту',       value: KZT(inVat),    accent: [99, 102, 241] },
+    { label: 'НДС к уплате',       value: KZT(toPay),    accent: [245, 158, 11] },
+  ]);
+
+  // Outgoing (sales) section
+  if (opts.outgoing.length > 0) {
+    doc.setFontSize(11); doc.setTextColor(15, 23, 42);
+    doc.text('Исходящие операции (реализация)', 14, y);
+    autoTable(doc, {
+      startY: y + 2,
+      head: [['Дата', 'Контрагент', 'Сумма с НДС', 'в т.ч. НДС']],
+      body: opts.outgoing
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+        .map(x => [x.date, x.counterparty.slice(0, 60), KZT(x.amount), KZT(x.vat)]),
+      styles: { font: 'Roboto', fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
+      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } },
+      foot: [['Итого', '', KZT(outGross), KZT(outVat)]],
+      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], font: 'Roboto', fontStyle: 'normal' },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+  }
+
+  if (opts.incoming.length > 0) {
+    if (y > 220) { doc.addPage(); y = 20; }
+    doc.setFontSize(11); doc.setTextColor(15, 23, 42);
+    doc.text('Входящие операции (закупки)', 14, y);
+    autoTable(doc, {
+      startY: y + 2,
+      head: [['Дата', 'Контрагент', 'Сумма с НДС', 'в т.ч. НДС']],
+      body: opts.incoming
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+        .map(x => [x.date, x.counterparty.slice(0, 60), KZT(x.amount), KZT(x.vat)]),
+      styles: { font: 'Roboto', fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
+      headStyles: { fillColor: [99, 102, 241], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } },
+      foot: [['Итого', '', KZT(inGross), KZT(inVat)]],
+      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], font: 'Roboto', fontStyle: 'normal' },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  drawFooter(doc);
+  doc.save(`nds-esf-${todayStamp()}.pdf`);
+}

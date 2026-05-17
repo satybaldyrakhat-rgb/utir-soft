@@ -174,6 +174,21 @@ CREATE TABLE IF NOT EXISTS ai_generations (
 );
 CREATE INDEX IF NOT EXISTS idx_ai_generations_team ON ai_generations(team_id);
 
+CREATE TABLE IF NOT EXISTS tax_payments (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  -- Period + tax code together, e.g. '2026-05-IPN' (month tax) or
+  -- '2026-Q2-KPN' (quarterly). Unique per team so marking a tax «paid»
+  -- twice just updates the row instead of inserting duplicates.
+  period_key TEXT NOT NULL,
+  amount REAL NOT NULL,
+  paid_at TEXT NOT NULL DEFAULT (datetime('now')),
+  paid_by TEXT,
+  note TEXT,
+  UNIQUE (team_id, period_key)
+);
+CREATE INDEX IF NOT EXISTS idx_tax_payments_team ON tax_payments(team_id);
+
 CREATE TABLE IF NOT EXISTS ai_chat_sessions (
   id TEXT PRIMARY KEY,
   team_id TEXT NOT NULL,
@@ -1718,6 +1733,9 @@ requisitesRouter.use(authMiddleware);
 const DEFAULT_REQ = {
   legalName: '', bin: '', address: '', bankName: '',
   iban: '', bik: '', kbe: '', director: '', phone: '', email: '',
+  // KZ tax flags — affect which taxes Taxes.tsx calculates.
+  vatPayer: false,   // плательщик НДС
+  entityType: 'too', // 'too' = ТОО → КПН 20%; 'ip' = ИП → ИПН 10% от дохода
 };
 requisitesRouter.get('/', (req: AuthedRequest, res) => {
   try {
@@ -1738,6 +1756,8 @@ requisitesRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
     director:  String(b.director  || '').slice(0, 200),
     phone:     String(b.phone     || '').slice(0, 40),
     email:     String(b.email     || '').slice(0, 100),
+    vatPayer:  !!b.vatPayer,
+    entityType: b.entityType === 'ip' ? 'ip' : 'too',
   };
   db.prepare(`
     INSERT INTO team_settings (team_id, company_requisites, updated_at)
@@ -1749,6 +1769,66 @@ requisitesRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
   res.json({ ok: true, requisites: clean });
 });
 app.use('/api/team/requisites', requisitesRouter);
+
+// ─── Tax payments (mark a tax as paid / undo) ─────────────────────
+// Stores one row per (team, period_key). period_key is built client-side
+// from {YYYY-MM or YYYY-Qn}-{TAX_CODE}, e.g. '2026-05-IPN' or '2026-Q2-KPN'.
+// All team members can read (so accountant + admin both see same picture);
+// only manager-or-above can mark/unmark.
+const taxesRouter = express.Router();
+taxesRouter.use(authMiddleware);
+
+taxesRouter.get('/payments', (req: AuthedRequest, res) => {
+  const rows = db.prepare(
+    'SELECT id, period_key, amount, paid_at, paid_by, note FROM tax_payments WHERE team_id = ? ORDER BY paid_at DESC',
+  ).all(req.teamId!) as any[];
+  res.json(rows.map(r => ({
+    id: r.id, periodKey: r.period_key, amount: r.amount,
+    paidAt: r.paid_at, paidBy: r.paid_by, note: r.note,
+  })));
+});
+
+taxesRouter.post('/payments', requireRole('manager'), (req: AuthedRequest, res) => {
+  const periodKey = String(req.body?.periodKey || '').trim();
+  const amount = Number(req.body?.amount) || 0;
+  const note = String(req.body?.note || '').slice(0, 240);
+  if (!periodKey) return res.status(400).json({ error: 'periodKey required' });
+  const id = newId('tp_');
+  const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  // Upsert: if the same (team, period_key) already exists, just update
+  // amount/note (let admin correct mistakes without insert-delete dance).
+  db.prepare(`
+    INSERT INTO tax_payments (id, team_id, period_key, amount, paid_at, paid_by, note)
+    VALUES (?, ?, ?, ?, datetime('now'), ?, ?)
+    ON CONFLICT(team_id, period_key) DO UPDATE SET
+      amount = excluded.amount,
+      paid_at = excluded.paid_at,
+      paid_by = excluded.paid_by,
+      note = excluded.note
+  `).run(id, req.teamId!, periodKey, amount, actor?.name || '', note);
+  logActivity(req.userId!, {
+    user: actor?.name || 'Пользователь', actor: 'human',
+    action: `Отметил уплату налога ${periodKey}`,
+    target: `${amount.toLocaleString('ru-RU')} ₸`,
+    type: 'create', page: 'finance',
+  });
+  res.json({ ok: true, periodKey, amount });
+});
+
+// Undo a payment mark — DELETE by period_key (not row id, simpler from UI).
+taxesRouter.delete('/payments/:periodKey', requireRole('manager'), (req: AuthedRequest, res) => {
+  const periodKey = String(req.params.periodKey);
+  db.prepare('DELETE FROM tax_payments WHERE team_id = ? AND period_key = ?').run(req.teamId!, periodKey);
+  const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  logActivity(req.userId!, {
+    user: actor?.name || 'Пользователь', actor: 'human',
+    action: `Отменил отметку об уплате ${periodKey}`,
+    target: '', type: 'delete', page: 'finance',
+  });
+  res.json({ ok: true });
+});
+
+app.use('/api/taxes', taxesRouter);
 
 // Map of team-wide Telegram pairings (Block F.6). Used by the team panel to
 // show which teammates have linked their account to the bot — admin sees who

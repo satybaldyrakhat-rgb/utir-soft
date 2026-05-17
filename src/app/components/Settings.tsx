@@ -2312,6 +2312,9 @@ interface Requisites {
   legalName?: string; bin?: string; address?: string;
   bankName?: string; iban?: string; bik?: string; kbe?: string;
   director?: string; phone?: string; email?: string;
+  // KZ tax flags — drive which taxes get calculated in Финансы → Налоги.
+  vatPayer?: boolean;
+  entityType?: 'too' | 'ip';
 }
 
 function RequisitesCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
@@ -2387,6 +2390,42 @@ function RequisitesCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
           <input type="email" value={r.email || ''} onChange={e => up('email', e.target.value)} placeholder="info@..." className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
         </div>
       </div>
+
+      {/* ── KZ tax flags ── */}
+      <div className="mt-5 pt-4 border-t border-gray-100">
+        <div className="text-xs text-gray-900 mb-1">{l('Налоговый статус', 'Салық мәртебесі', 'Tax status')}</div>
+        <div className="text-[10px] text-gray-400 mb-3">{l('Используется при расчёте налогов в разделе «Финансы → Налоги»', '...', 'Used by the tax calculator in Finance → Taxes')}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <div className="text-[10px] text-gray-400 mb-1.5">{l('Форма юр.лица', 'Тұлға түрі', 'Entity type')}</div>
+            <div className="flex gap-1 bg-gray-50 rounded-xl p-1">
+              <button
+                onClick={() => setR(prev => ({ ...prev, entityType: 'too' }))}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${(r.entityType || 'too') === 'too' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              >ТОО (КПН 20%)</button>
+              <button
+                onClick={() => setR(prev => ({ ...prev, entityType: 'ip' }))}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${r.entityType === 'ip' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              >ИП (ИПН 10%)</button>
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] text-gray-400 mb-1.5">{l('НДС', 'ҚҚС', 'VAT')}</div>
+            <label className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl cursor-pointer">
+              <input
+                type="checkbox" checked={!!r.vatPayer}
+                onChange={e => setR(prev => ({ ...prev, vatPayer: e.target.checked }))}
+                className="accent-gray-900"
+              />
+              <span className="text-xs text-gray-700">{l('Плательщик НДС (12%)', 'ҚҚС төлеушісі', 'VAT payer')}</span>
+            </label>
+            <div className="text-[10px] text-gray-400 mt-1.5">
+              {l('Включите если оборот > 20 000 МРП (~80 млн ₸) в год или зарегистрированы добровольно', '...', 'Enable if turnover above threshold or registered voluntarily')}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between mt-4">
         <div className="text-[11px] text-gray-500">{msg || l('Заполните чтобы счета формировались с банковскими данными', '...', 'Fill in so invoices include bank details')}</div>
         <button onClick={save} disabled={saving} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 disabled:opacity-50">
