@@ -240,6 +240,89 @@ const updateDealStatus: ToolDef = {
   },
 };
 
+// ─── update_deal ──────────────────────────────────────────────────
+// Fill arbitrary fields on a deal — phone / address / materials / etc.
+// updateDealStatus only flips the «status» column; this tool covers
+// every other detail the user might add later via «обнови карточку,
+// телефон такой-то, адрес такой-то».
+const updateDeal: ToolDef = {
+  module: 'sales',
+  description:
+    'Обновить поля карточки клиента (телефон, адрес, материалы, сумма и т.п.). ' +
+    'ВЫЗЫВАЙ когда админ говорит "добавь телефон / адрес / материалы / сумму к карточке X". ' +
+    'НЕ ВЫЗЫВАЙ для смены статуса — для этого есть update_deal_status. ' +
+    'Если поле не указано — не передавай его (не перезаписывай пустотой).',
+  input_schema: {
+    type: 'object',
+    properties: {
+      customerName:    { type: 'string', description: 'Имя клиента или его часть для поиска сделки.' },
+      phone:           { type: 'string', description: 'Телефон клиента, любой формат. Опционально.' },
+      email:           { type: 'string', description: 'Email клиента. Опционально.' },
+      address:         { type: 'string', description: 'Адрес клиента (для договора). Опционально.' },
+      siteAddress:     { type: 'string', description: 'Адрес объекта/стройки (куда выезжает прораб). Опционально.' },
+      product:         { type: 'string', description: 'Название изделия / описание. Опционально.' },
+      furnitureType:   { type: 'string', description: 'Тип мебели: Кухня, Шкаф-купе, Гардероб, Прихожая и т.п. Опционально.' },
+      materials:       { type: 'string', description: 'Материалы: МДФ, ЛДСП, массив, шпон, пластик, и т.п. Опционально.' },
+      amount:          { type: 'number', description: 'Сумма сделки в тенге. Опционально.' },
+      source:          { type: 'string', description: 'Источник: Instagram, WhatsApp, Telegram, Сайт, Рекомендация и т.п. Опционально.' },
+      measurer:        { type: 'string', description: 'Имя замерщика. Опционально.' },
+      designer:        { type: 'string', description: 'Имя дизайнера. Опционально.' },
+      measurementDate: { type: 'string', description: 'Дата замера в формате YYYY-MM-DD. Опционально.' },
+      completionDate:  { type: 'string', description: 'Дата готовности YYYY-MM-DD. Опционально.' },
+      installationDate:{ type: 'string', description: 'Дата установки YYYY-MM-DD. Опционально.' },
+      notes:           { type: 'string', description: 'Заметки менеджера. Опционально.' },
+    },
+    required: ['customerName'],
+  },
+  summarize: (i) => {
+    const FIELD_LABELS: Record<string, string> = {
+      phone: 'Телефон', email: 'Email', address: 'Адрес клиента', siteAddress: 'Адрес объекта',
+      product: 'Изделие', furnitureType: 'Тип мебели', materials: 'Материалы', amount: 'Сумма',
+      source: 'Источник', measurer: 'Замерщик', designer: 'Дизайнер',
+      measurementDate: 'Дата замера', completionDate: 'Готовность', installationDate: 'Установка',
+      notes: 'Заметки',
+    };
+    const changes = Object.keys(i).filter(k => k !== 'customerName' && i[k] != null && i[k] !== '');
+    if (changes.length === 0) {
+      return `<b>Обновляю карточку:</b> <b>${i.customerName}</b> — но ни одно поле не указано.`;
+    }
+    const lines = [`<b>Обновляю карточку клиента:</b> <b>${i.customerName}</b>`];
+    for (const k of changes) {
+      const v = k === 'amount' ? `${Number(i[k]).toLocaleString('ru-RU')} ₸` : i[k];
+      lines.push(`• ${FIELD_LABELS[k] || k}: ${v}`);
+    }
+    return lines.join('\n');
+  },
+  execute: async (ctx, i) => {
+    const r = findDealByCustomer(ctx.db, ctx.teamId, String(i.customerName));
+    if (!r.single && !r.multiple) throw new Error(`сделка по «${i.customerName}» не найдена`);
+    if (r.multiple) {
+      const names = r.multiple.slice(0, 5).map(d => `«${d.data.customerName}»`).join(', ');
+      throw new Error(`нашёл несколько сделок: ${names}. Уточните вручную.`);
+    }
+    const d = r.single!;
+    // Build the patch from only the non-empty fields the model sent.
+    // Skip customerName (it's the search key, not a field to update).
+    const patch: Record<string, any> = {};
+    const allowed = ['phone','email','address','siteAddress','product','furnitureType','materials','amount','source','measurer','designer','measurementDate','completionDate','installationDate','notes'];
+    for (const k of allowed) {
+      if (i[k] != null && i[k] !== '') patch[k] = i[k];
+    }
+    if (Object.keys(patch).length === 0) {
+      throw new Error('не указано ни одного поля для обновления');
+    }
+    patchDeal(ctx.db, d.id, patch);
+    const changed = Object.keys(patch).join(', ');
+    ctx.logActivity(ctx.userId, {
+      user: 'AI-ассистент', actor: 'ai',
+      action: `Обновил карточку (по запросу ${ctx.userName}): ${changed}`,
+      target: d.data.customerName,
+      type: 'update', page: 'sales',
+    });
+    return `Карточка <b>${d.data.customerName}</b> обновлена. Поля: ${changed}.`;
+  },
+};
+
 // ─── add_task ─────────────────────────────────────────────────────
 const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const;
 
@@ -345,6 +428,7 @@ const TOOLS: Record<string, ToolDef> = {
   add_deal:           addDeal,
   log_payment:        logPayment,
   update_deal_status: updateDealStatus,
+  update_deal:        updateDeal,
   add_task:           addTask,
   find_client:        findClient,
 };
