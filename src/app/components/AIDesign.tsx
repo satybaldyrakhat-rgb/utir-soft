@@ -812,9 +812,9 @@ export function AIDesign({ language }: AIDesignProps) {
                             <span>{r.provider}</span>
                           </div>
                         </div>
-                        {/* Action toolbar — always visible on result cards so
-                            the user knows what they can do without hunting. */}
-                        <div className="flex items-center gap-1 -mx-1">
+                        {/* Action toolbar — fixed 5-column grid so all
+                            buttons are equal width regardless of label. */}
+                        <div className="grid grid-cols-5 gap-1">
                           <ActionBtn
                             icon={RefreshCw}
                             label={l('Переделать', 'Қайта жасау', 'Regenerate')}
@@ -922,8 +922,9 @@ export function AIDesign({ language }: AIDesignProps) {
                     </div>
                     <div className="text-[11px] text-slate-700 line-clamp-2 leading-snug" title={h.prompt}>{h.prompt}</div>
                     <div className="text-[10px] text-slate-400 mt-1 mb-2">{h.userName}</div>
-                    {/* Compact action row — same set as result cards */}
-                    <div className="flex items-center gap-1 -mx-1">
+                    {/* Compact action row — fixed 5-column grid so every
+                        button is the same width regardless of label. */}
+                    <div className="grid grid-cols-5 gap-1">
                       <ActionBtn icon={RefreshCw} label={l('Переделать', 'Қайта', 'Retry')} onClick={() => regenerate({ id: h.id, provider: h.provider, prompt: h.prompt, imageUrl: h.imageUrl, enhancedPrompt: h.enhancedPrompt })} />
                       <ActionBtn icon={Pencil}    label={l('Изменить', 'Өңдеу', 'Edit')}   onClick={() => editInWizard({ id: h.id, provider: h.provider, prompt: h.prompt, imageUrl: h.imageUrl, enhancedPrompt: h.enhancedPrompt })} />
                       {h.imageUrl && <ActionBtn icon={Download} label={l('Скачать', 'Жүктеу', 'Save')} href={h.imageUrl} download={`utir-design-${h.provider}.png`} />}
@@ -1205,15 +1206,18 @@ function ActionBtn({
   download?: string;
   danger?: boolean;
 }) {
-  const cls = `flex-1 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-xl ring-1 transition-all ${
+  // Equal-width cell + fixed inner height so every action row reads as
+  // a uniform grid: icon centred top, label single-line below, 56px
+  // tall, no flex-1 reflow surprises.
+  const cls = `h-14 flex flex-col items-center justify-center gap-1 px-1 rounded-xl ring-1 transition-all ${
     danger
       ? 'bg-rose-50/60 hover:bg-rose-100/80 ring-rose-200/60 text-rose-700'
       : 'bg-white/50 hover:bg-white/90 ring-white/60 text-slate-600 hover:text-slate-900'
   }`;
   const inner = (
     <>
-      <Icon className="w-3.5 h-3.5" />
-      <span className="text-[9px] leading-none whitespace-nowrap">{label}</span>
+      <Icon className="w-4 h-4 flex-shrink-0" />
+      <span className="text-[9px] leading-none whitespace-nowrap truncate max-w-full">{label}</span>
     </>
   );
   if (href) {
