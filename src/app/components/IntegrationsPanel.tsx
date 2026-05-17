@@ -4,7 +4,6 @@ import {
   Copy, ExternalLink, Lock, Settings as SettingsIcon, Power, Search, KeyRound, ShieldCheck, Trash2,
 } from 'lucide-react';
 import { api } from '../utils/api';
-import { KaspiLogo, HalykLogo, OneCLogo } from './PlatformLogos';
 import { BrandLogo, hasBrandLogo } from './BrandLogo';
 
 interface Props { language: 'kz' | 'ru' | 'eng'; canEdit: boolean }
@@ -30,15 +29,11 @@ interface IntegrationStatus {
   config?: Record<string, string>;
 }
 
-// Logo registry — for KZ-local brands (Kaspi, Halyk, 1С) we keep the
-// hand-drawn SVGs from PlatformLogos (Simple Icons doesn't cover them).
-// Everything else goes through the unified <BrandLogo> which inlines
-// pre-processed Simple Icons SVGs with brand-correct colour.
+// All logos go through <BrandLogo>: SVGs from Simple Icons for global
+// brands (auto-coloured) and raster PNG/JPG for KZ-local ones (Kaspi,
+// Halyk, 1С — official files attached by the team admin).
 function logoFor(id: string): JSX.Element {
-  if (id === 'kaspi-qr') return <KaspiLogo className="w-6 h-6" />;
-  if (id === 'halyk-pos') return <HalykLogo className="w-6 h-6" />;
-  if (id === '1c')        return <OneCLogo className="w-6 h-6" />;
-  if (hasBrandLogo(id))   return <BrandLogo id={id} size={24} />;
+  if (hasBrandLogo(id)) return <BrandLogo id={id} size={26} />;
   return <Zap className="w-5 h-5 text-gray-400" />;
 }
 

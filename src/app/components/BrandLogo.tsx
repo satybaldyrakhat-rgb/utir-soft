@@ -13,7 +13,7 @@
 // PlatformLogos.tsx; this component falls back to <PlatformIcon /> when
 // it doesn't know the id, so admins still see something rather than blank.
 
-// Vite glob-imports every svg in /public/logos as a raw string. The
+// Vite glob-imports every svg in /assets/logos as a raw string. The
 // `eager: true` option means everything bundles at build time — no
 // runtime fetch, no flash of missing icon.
 const SVG_MODULES = import.meta.glob('../../assets/logos/*.svg', {
@@ -21,6 +21,14 @@ const SVG_MODULES = import.meta.glob('../../assets/logos/*.svg', {
   import: 'default',
   eager: true,
 }) as Record<string, string>;
+
+// Raster (PNG / JPG) logos — for brands whose official SVG isn't
+// available (KZ-local: Kaspi, Halyk, 1С etc). Returned as hashed
+// URLs so Vite fingerprints them for caching.
+const RASTER_MODULES = {
+  ...import.meta.glob('../../assets/logos/*.png', { query: '?url', import: 'default', eager: true }),
+  ...import.meta.glob('../../assets/logos/*.jpg', { query: '?url', import: 'default', eager: true }),
+} as Record<string, string>;
 
 // Map integration id → svg slug. Most slugs match directly; a few are
 // aliased so the call sites stay readable («openai», not «open-ai»).
@@ -49,6 +57,12 @@ const SLUG_MAP: Record<string, string> = {
   googlecalendar:    'googlecalendar',
   googledrive:       'googledrive',
   googlemeet:        'googlemeet',
+  // KZ-local brands (raster PNG/JPG — Simple Icons doesn't cover them)
+  kaspi:             'kaspi',
+  'kaspi-qr':        'kaspi',
+  halyk:             'halyk',
+  'halyk-pos':       'halyk',
+  '1c':              '1c',
 };
 
 // Brand colours from each company's marketing site / Wikipedia
@@ -91,39 +105,58 @@ interface Props {
   label?: string;
 }
 
+// Look up a raster URL for the slug — tries .png first, then .jpg.
+function rasterUrlFor(slug: string): string | undefined {
+  return RASTER_MODULES[`../../assets/logos/${slug}.png`]
+      || RASTER_MODULES[`../../assets/logos/${slug}.jpg`];
+}
+
 export function BrandLogo({ id, size = 20, color, mono, className = '', label }: Props) {
   const slug = SLUG_MAP[id] || id;
-  // Vite's import.meta.glob keys are absolute paths starting with /public.
+  // Prefer SVG (vector, scalable, recolorable) when available.
   const svg = SVG_MODULES[`../../assets/logos/${slug}.svg`];
-  if (!svg) {
-    // Unknown id — render a neutral placeholder rather than nothing so the
-    // layout doesn't collapse and devs can spot missing logos in dev.
+  if (svg) {
+    const finalColor = mono ? undefined : (color || BRAND_COLOR[slug] || 'currentColor');
     return (
       <span
-        className={`inline-flex items-center justify-center bg-gray-100 text-gray-400 rounded ${className}`}
-        style={{ width: size, height: size, fontSize: Math.max(8, size * 0.35) }}
-        title={label || id}
-      >
-        ?
-      </span>
+        className={`inline-block ${className}`}
+        style={{ width: size, height: size, color: finalColor, lineHeight: 0 }}
+        title={label || slug}
+        // SVGs are CC0 from Simple Icons; we pre-injected fill="currentColor"
+        // on every <path>, so setting `color` above tints the whole glyph.
+        dangerouslySetInnerHTML={{ __html: svg.replace('<svg ', `<svg width="${size}" height="${size}" `) }}
+      />
     );
   }
-  const finalColor = mono ? undefined : (color || BRAND_COLOR[slug] || 'currentColor');
+  // Fall back to raster PNG/JPG (e.g. KZ-local brands not on Simple Icons).
+  // Colours are baked in — `mono`/`color` props are ignored here.
+  const raster = rasterUrlFor(slug);
+  if (raster) {
+    return (
+      <img
+        src={raster}
+        alt={label || slug}
+        width={size}
+        height={size}
+        className={`inline-block object-contain ${className}`}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  // Unknown id — neutral placeholder so the layout doesn't collapse.
   return (
     <span
-      className={`inline-block ${className}`}
-      style={{ width: size, height: size, color: finalColor, lineHeight: 0 }}
-      title={label || slug}
-      // SVGs are CC0 from Simple Icons; we pre-injected fill="currentColor"
-      // on every <path>, so setting `color` above tints the whole glyph.
-      dangerouslySetInnerHTML={{ __html: svg.replace('<svg ', `<svg width="${size}" height="${size}" `) }}
-    />
+      className={`inline-flex items-center justify-center bg-gray-100 text-gray-400 rounded ${className}`}
+      style={{ width: size, height: size, fontSize: Math.max(8, size * 0.35) }}
+      title={label || id}
+    >
+      ?
+    </span>
   );
 }
 
-// True when we have a real SVG for this id (lets callers decide to fall
-// back to PlatformLogos for KZ-local brands like Kaspi / Halyk / 1С).
+// True when we have any logo (svg OR raster) for this id.
 export function hasBrandLogo(id: string): boolean {
   const slug = SLUG_MAP[id] || id;
-  return !!SVG_MODULES[`../../assets/logos/${slug}.svg`];
+  return !!SVG_MODULES[`../../assets/logos/${slug}.svg`] || !!rasterUrlFor(slug);
 }
