@@ -799,8 +799,20 @@ export function AIDesign({ language }: AIDesignProps) {
                       >
                         <img src={r.imageUrl || r.imageDataUrl} alt="" className="w-full h-full object-cover transition-transform group-hover/card:scale-[1.02]" />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none" />
-                        <div className="absolute top-2 right-2 w-8 h-8 bg-slate-900/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
-                          <Maximize2 className="w-3.5 h-3.5" />
+                        {/* Top-right icon stack: Download + Maximize on hover */}
+                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                          <a
+                            href={r.imageUrl || r.imageDataUrl}
+                            download={`utir-design-${r.provider}.png`}
+                            onClick={e => e.stopPropagation()}
+                            className="w-8 h-8 bg-slate-900/60 hover:bg-slate-900/80 backdrop-blur-xl text-white rounded-full flex items-center justify-center ring-1 ring-white/20 transition-colors"
+                            title={l('Скачать', 'Жүктеу', 'Download')}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                          <div className="w-8 h-8 bg-slate-900/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center ring-1 ring-white/20">
+                            <Maximize2 className="w-3.5 h-3.5" />
+                          </div>
                         </div>
                       </button>
                       <div className="p-3">
@@ -812,41 +824,43 @@ export function AIDesign({ language }: AIDesignProps) {
                             <span>{r.provider}</span>
                           </div>
                         </div>
-                        {/* Action toolbar — fixed 5-column grid so all
-                            buttons are equal width regardless of label. */}
-                        <div className="grid grid-cols-5 gap-1">
-                          <ActionBtn
-                            icon={RefreshCw}
-                            label={l('Переделать', 'Қайта жасау', 'Regenerate')}
-                            onClick={() => regenerate({ id: r.id, provider: r.provider, prompt: finalPrompt, imageUrl: r.imageUrl || r.imageDataUrl, enhancedPrompt: r.enhancedPrompt })}
-                          />
-                          <ActionBtn
-                            icon={Pencil}
-                            label={l('Изменить', 'Өңдеу', 'Edit')}
-                            onClick={() => editInWizard({ id: r.id, provider: r.provider, prompt: finalPrompt, imageUrl: r.imageUrl || r.imageDataUrl, enhancedPrompt: r.enhancedPrompt })}
-                          />
-                          <ActionBtn
-                            icon={Download}
-                            label={l('Скачать', 'Жүктеу', 'Download')}
-                            href={r.imageUrl || r.imageDataUrl}
-                            download={`utir-design-${r.provider}.png`}
-                          />
-                          {r.id && (
-                            <ActionBtn
-                              icon={LinkIcon}
-                              label={l('К сделке', 'Мәмілеге', 'Attach')}
-                              onClick={() => setAttachingId(r.id!)}
-                            />
-                          )}
-                          {r.id && isAdmin && (
-                            <ActionBtn
-                              icon={Trash2}
-                              label={l('Удалить', 'Жою', 'Delete')}
-                              danger
-                              onClick={() => setConfirmDeleteId(r.id!)}
-                            />
-                          )}
-                        </div>
+                        {/* Action toolbar — Download moved to the image
+                            overlay (top-right hover) so the bottom row
+                            stays a clean 4-column grid. */}
+                        {(() => {
+                          const showAttach = !!r.id;
+                          const showDelete = !!r.id && isAdmin;
+                          const cols = 2 + (showAttach ? 1 : 0) + (showDelete ? 1 : 0);
+                          return (
+                            <div className={`grid gap-1`} style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+                              <ActionBtn
+                                icon={RefreshCw}
+                                label={l('Переделать', 'Қайта жасау', 'Regenerate')}
+                                onClick={() => regenerate({ id: r.id, provider: r.provider, prompt: finalPrompt, imageUrl: r.imageUrl || r.imageDataUrl, enhancedPrompt: r.enhancedPrompt })}
+                              />
+                              <ActionBtn
+                                icon={Pencil}
+                                label={l('Изменить', 'Өңдеу', 'Edit')}
+                                onClick={() => editInWizard({ id: r.id, provider: r.provider, prompt: finalPrompt, imageUrl: r.imageUrl || r.imageDataUrl, enhancedPrompt: r.enhancedPrompt })}
+                              />
+                              {showAttach && (
+                                <ActionBtn
+                                  icon={LinkIcon}
+                                  label={l('К сделке', 'Мәмілеге', 'Attach')}
+                                  onClick={() => setAttachingId(r.id!)}
+                                />
+                              )}
+                              {showDelete && (
+                                <ActionBtn
+                                  icon={Trash2}
+                                  label={l('Удалить', 'Жою', 'Delete')}
+                                  danger
+                                  onClick={() => setConfirmDeleteId(r.id!)}
+                                />
+                              )}
+                            </div>
+                          );
+                        })()}
                         {r.enhancedPrompt && (
                           <details className="text-[10px] text-slate-500 mt-2">
                             <summary className="cursor-pointer flex items-center gap-1 hover:text-slate-700"><Wand2 className="w-2.5 h-2.5" /> {l('Улучшенный prompt', 'Жақсартылған prompt', 'Enhanced prompt')}</summary>
@@ -902,8 +916,20 @@ export function AIDesign({ language }: AIDesignProps) {
                       <>
                         <img src={h.imageUrl} alt={h.prompt} className="w-full h-full object-cover transition-transform group-hover/card:scale-[1.02]" />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none" />
-                        <div className="absolute top-2 right-2 w-8 h-8 bg-slate-900/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
-                          <Maximize2 className="w-3.5 h-3.5" />
+                        {/* Top-right icon stack: Download + Maximize on hover */}
+                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                          <a
+                            href={h.imageUrl}
+                            download={`utir-design-${h.provider}.png`}
+                            onClick={e => e.stopPropagation()}
+                            className="w-8 h-8 bg-slate-900/60 hover:bg-slate-900/80 backdrop-blur-xl text-white rounded-full flex items-center justify-center ring-1 ring-white/20 transition-colors"
+                            title={l('Скачать', 'Жүктеу', 'Download')}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                          <div className="w-8 h-8 bg-slate-900/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center ring-1 ring-white/20">
+                            <Maximize2 className="w-3.5 h-3.5" />
+                          </div>
                         </div>
                       </>
                     ) : (
@@ -922,12 +948,12 @@ export function AIDesign({ language }: AIDesignProps) {
                     </div>
                     <div className="text-[11px] text-slate-700 line-clamp-2 leading-snug" title={h.prompt}>{h.prompt}</div>
                     <div className="text-[10px] text-slate-400 mt-1 mb-2">{h.userName}</div>
-                    {/* Compact action row — fixed 5-column grid so every
-                        button is the same width regardless of label. */}
-                    <div className="grid grid-cols-5 gap-1">
+                    {/* Compact action row — Download moved to the image
+                        overlay (top-right corner on hover) so the bottom
+                        toolbar stays a clean 4-column grid. */}
+                    <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-1`}>
                       <ActionBtn icon={RefreshCw} label={l('Переделать', 'Қайта', 'Retry')} onClick={() => regenerate({ id: h.id, provider: h.provider, prompt: h.prompt, imageUrl: h.imageUrl, enhancedPrompt: h.enhancedPrompt })} />
                       <ActionBtn icon={Pencil}    label={l('Изменить', 'Өңдеу', 'Edit')}   onClick={() => editInWizard({ id: h.id, provider: h.provider, prompt: h.prompt, imageUrl: h.imageUrl, enhancedPrompt: h.enhancedPrompt })} />
-                      {h.imageUrl && <ActionBtn icon={Download} label={l('Скачать', 'Жүктеу', 'Save')} href={h.imageUrl} download={`utir-design-${h.provider}.png`} />}
                       <ActionBtn icon={LinkIcon}  label={l('К сделке', 'Мәмілеге', 'Attach')} onClick={() => setAttachingId(h.id)} />
                       {isAdmin && <ActionBtn icon={Trash2} label={l('Удалить', 'Жою', 'Delete')} danger onClick={() => setConfirmDeleteId(h.id)} />}
                     </div>

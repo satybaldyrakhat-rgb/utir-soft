@@ -203,11 +203,15 @@ export function AdAnalytics({ language }: AdAnalyticsProps) {
   if (!hasRealAdsData) {
     return (
       <div className="max-w-2xl mx-auto py-16 px-6">
-        <div className="bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-2xl p-8 text-center">
-          <div className="mx-auto mb-5 shadow-[0_4px_12px_-4px_rgba(15,23,42,0.10)] rounded-2xl">
-            <BrandLogo id="meta" size={64} filled />
+        {/* Solid white card — was bg-white/60 translucent, which let the
+            page orb backdrop bleed through asymmetrically (visible green
+            on the right side, plain white on the left). Now the surface
+            is uniform across all corners. */}
+        <div className="bg-white ring-1 ring-slate-200 rounded-3xl p-10 text-center shadow-[0_8px_32px_-12px_rgba(15,23,42,0.08)]">
+          <div className="inline-flex mx-auto mb-6">
+            <BrandLogo id="meta" size={72} filled />
           </div>
-          <div className="text-lg text-slate-900 mb-2">
+          <div className="text-xl text-slate-900 mb-2 tracking-tight">
             {metaConnected ? 'Ждём первую синхронизацию' : 'Реклама ещё не подключена'}
           </div>
           <div className="text-sm text-slate-500 mb-6 max-w-md mx-auto leading-relaxed">
