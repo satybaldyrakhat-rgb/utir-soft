@@ -6,7 +6,7 @@ import {
 import { api } from '../utils/api';
 import {
   WhatsAppLogo, TelegramLogo, InstagramLogo, KaspiLogo, HalykLogo, OneCLogo,
-  ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo,
+  ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo, AnthropicLogo, DeepSeekLogo,
 } from './PlatformLogos';
 
 interface Props { language: 'kz' | 'ru' | 'eng'; canEdit: boolean }
@@ -32,37 +32,24 @@ interface IntegrationStatus {
   config?: Record<string, string>;
 }
 
-// Logo registry — picks the right pre-made svg if we have one, otherwise
-// falls back to a generic Zap icon. Custom Anthropic icon inline below.
+// Logo registry — uses the real SVG marks from PlatformLogos so the cards
+// have authentic-looking brand identity instead of placeholder monograms.
 function logoFor(id: string): JSX.Element {
   switch (id) {
-    case 'anthropic':         return <AnthropicLogo />;
-    case 'openai':            return <ChatGPTLogo className="w-6 h-6" />;
-    case 'google-gemini':     return <GeminiLogo className="w-6 h-6" />;
-    case 'deepseek':          return <DeepSeekLogo />;
-    case 'telegram-bot':      return <TelegramLogo className="w-6 h-6" />;
-    case 'whatsapp-business': return <WhatsAppLogo className="w-6 h-6" />;
-    case 'instagram-direct':  return <InstagramLogo className="w-6 h-6" />;
-    case 'kaspi-qr':          return <KaspiLogo className="w-6 h-6" />;
-    case 'halyk-pos':         return <HalykLogo className="w-6 h-6" />;
-    case '1c':                return <OneCLogo className="w-6 h-6" />;
-    case 'google-workspace':  return <GoogleLogo className="w-6 h-6" />;
+    case 'anthropic':         return <AnthropicLogo  className="w-6 h-6" />;
+    case 'openai':            return <ChatGPTLogo    className="w-6 h-6" />;
+    case 'google-gemini':     return <GeminiLogo     className="w-6 h-6" />;
+    case 'deepseek':          return <DeepSeekLogo   className="w-6 h-6" />;
+    case 'telegram-bot':      return <TelegramLogo   className="w-6 h-6" />;
+    case 'whatsapp-business': return <WhatsAppLogo   className="w-6 h-6" />;
+    case 'instagram-direct':  return <InstagramLogo  className="w-6 h-6" />;
+    case 'kaspi-qr':          return <KaspiLogo      className="w-6 h-6" />;
+    case 'halyk-pos':         return <HalykLogo      className="w-6 h-6" />;
+    case '1c':                return <OneCLogo       className="w-6 h-6" />;
+    case 'google-workspace':  return <GoogleLogo     className="w-6 h-6" />;
     case 'zapier-webhooks':   return <Zap className="w-5 h-5 text-orange-500" />;
     default:                  return <Zap className="w-5 h-5 text-gray-400" />;
   }
-}
-
-// Anthropic doesn't ship in PlatformLogos — small inline mark.
-function AnthropicLogo() {
-  return (
-    <div className="w-6 h-6 rounded-md bg-orange-100 flex items-center justify-center text-orange-700 text-[10px] font-bold">A</div>
-  );
-}
-// DeepSeek — simple monogram.
-function DeepSeekLogo() {
-  return (
-    <div className="w-6 h-6 rounded-md bg-indigo-100 flex items-center justify-center text-indigo-700 text-[10px] font-bold">DS</div>
-  );
 }
 
 const CAT_META: Record<IntegrationCategory, { ru: string; icon: any; cls: string }> = {
@@ -448,6 +435,35 @@ function IntegrationModal({
                 {l('Откройте Railway → Project → Variables → New Variable, вставьте имя выше и значение API-ключа. Сервер автоматически подхватит после редеплоя.',
                    '...', 'Open Railway → Variables → New Variable. Paste the name above and your API key. Auto-applies on redeploy.')}
               </div>
+
+              {/* «Как отключить» — для env-интеграций кнопки «Отключить»
+                  быть НЕ может (env-vars живут в Railway, не в нашей БД).
+                  Вместо обманной кнопки даём чёткую инструкцию. */}
+              {(status?.connected) && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="text-xs text-gray-900 mb-1.5 flex items-center gap-1.5">
+                    <Power className="w-3 h-3 text-gray-500" />
+                    {l('Как отключить эту интеграцию', 'Қалай өшіру керек', 'How to disable')}
+                  </div>
+                  <ol className="text-[11px] text-gray-600 space-y-1 pl-4 list-decimal">
+                    <li>{l('Откройте Railway → этот проект → Variables', '...', 'Open Railway → this project → Variables')}</li>
+                    <li>{l('Найдите переменную', '...', 'Find the variable')} <span className="font-mono text-[10px] bg-gray-50 px-1 rounded">{(def.envVars || [])[0]}</span></li>
+                    <li>{l('Нажмите Delete (корзина) → Confirm', '...', 'Click Delete → Confirm')}</li>
+                    <li>{l('Сервер сам перезапустится за ~30 секунд — интеграция отключится', '...', 'Server auto-redeploys in ~30s — integration goes offline')}</li>
+                  </ol>
+                  <a
+                    href="https://railway.app/dashboard"
+                    target="_blank" rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-[11px] text-violet-600 hover:text-violet-800"
+                  >
+                    {l('Открыть Railway →', 'Railway-ге өту', 'Open Railway')} <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <div className="mt-2 text-[10px] text-gray-400 italic">
+                    {l('Мы не показываем кнопку «Отключить» здесь, потому что браузер не имеет (и не должен иметь) доступ к env-vars Railway по соображениям безопасности.',
+                       '...', 'No «Disconnect» button here — the browser has no (nor should have) access to Railway env vars.')}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

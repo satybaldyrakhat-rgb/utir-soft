@@ -66,17 +66,78 @@ export const OneCLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
   </svg>
 );
 
+// OpenAI / ChatGPT — green tile with the official «hexagonal knot» mark.
+// The path is a stylised approximation of the OpenAI logo (six interlocking
+// curves forming a hex flower) drawn as a single stroke for cleanness.
 export const ChatGPTLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className}>
     <rect width="24" height="24" rx="6" fill="#10A37F"/>
-    <path d="M12 4c-1.66 0-3.14.68-4.22 1.78C6.68 6.86 6 8.34 6 10c0 1.1.3 2.14.82 3.04-.15.62-.23 1.27-.23 1.96 0 2.76 1.54 5 4 5 .82 0 1.6-.2 2.28-.56.44.1.9.15 1.37.15 2.76 0 5-2.24 5-5 0-.47-.07-.93-.19-1.37.36-.68.56-1.46.56-2.28 0-2.46-2.24-4-5-4-.69 0-1.34.08-1.96.23A5.48 5.48 0 0012 4z" fill="none" stroke="#fff" strokeWidth="1.2"/>
+    <path
+      d="M16.2 11.4c.42-1.25.08-2.66-.93-3.6a3.45 3.45 0 00-3.71-.69 3.46 3.46 0 00-2.6-.78A3.45 3.45 0 005.85 8.7a3.45 3.45 0 00-2.31 1.67c-.65 1.13-.5 2.56.38 3.51-.42 1.25-.08 2.66.93 3.6a3.45 3.45 0 003.71.69 3.46 3.46 0 002.6.78 3.45 3.45 0 003.11-2.37 3.45 3.45 0 002.31-1.67 3.45 3.45 0 00-.38-3.51zm-4.84 6.78c-.78 0-1.5-.27-2.07-.72l.1-.06 3.46-2c.18-.1.28-.29.28-.5v-4.88l1.46.85c.02.01.03.02.03.04v4.05c0 1.78-1.45 3.22-3.26 3.22zm-7-2.99a3.22 3.22 0 01-.39-2.17l.1.06 3.46 2c.18.1.39.1.57 0l4.23-2.44v1.68c0 .02-.01.04-.03.05L9.34 16.4c-1.55.89-3.54.36-4.43-1.21zm-.91-7.51c.39-.67 1-1.19 1.71-1.46v4.12c0 .2.1.4.28.5L9.67 13.3l-1.46.84c-.02.01-.04.01-.06 0L4.65 12.1c-1.55-.9-2.08-2.88-1.2-4.43zm12 2.8L11.22 9.78v-1.68c0-.02.01-.04.03-.05l3.46-2c1.55-.89 3.54-.36 4.43 1.21.39.67.52 1.45.37 2.18l-.1-.06zM10.43 12L9 11.17V7.13c0-1.78 1.45-3.22 3.26-3.22.78 0 1.5.27 2.07.72l-.1.06-3.46 2c-.18.1-.28.29-.28.5V12zm.83-1.71l1.91-1.1 1.91 1.1v2.21l-1.91 1.1-1.91-1.1V10.3z"
+      fill="#fff"
+      fillRule="evenodd"
+    />
   </svg>
 );
 
+// Google Gemini — official 4-point spark («Gemini star») with the
+// signature blue→purple→red→yellow gradient.
 export const GeminiLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className}>
-    <rect width="24" height="24" rx="6" fill="#1A73E8"/>
-    <path d="M12 5l2.5 4.33L19 12l-4.5 2.67L12 19l-2.5-4.33L5 12l4.5-2.67z" fill="#fff"/>
+    <defs>
+      <linearGradient id="gemini-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%"   stopColor="#4796E3"/>
+        <stop offset="35%"  stopColor="#9168C0"/>
+        <stop offset="70%"  stopColor="#BB4B82"/>
+        <stop offset="100%" stopColor="#F0BE5A"/>
+      </linearGradient>
+    </defs>
+    <rect width="24" height="24" rx="6" fill="#0F172A"/>
+    {/* Four-point Gemini «sparkle» — two crossed curved-pointed stars */}
+    <path
+      d="M12 3.5c.6 3.7 1.6 5 4.4 5.6-2.8.6-3.8 1.9-4.4 5.6-.6-3.7-1.6-5-4.4-5.6 2.8-.6 3.8-1.9 4.4-5.6z"
+      fill="url(#gemini-grad)"
+    />
+    <path
+      d="M17.5 13.5c.3 1.85.8 2.5 2.2 2.8-1.4.3-1.9.95-2.2 2.8-.3-1.85-.8-2.5-2.2-2.8 1.4-.3 1.9-.95 2.2-2.8z"
+      fill="url(#gemini-grad)"
+      opacity="0.85"
+    />
+  </svg>
+);
+
+// Anthropic Claude — radial sunburst (8 curved blades) in their signature
+// warm orange palette. Close-enough rendering of the brand mark.
+export const AnthropicLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className}>
+    <rect width="24" height="24" rx="6" fill="#F5F1ED"/>
+    {/* Eight curved «petals» radiating from centre — Claude's burst mark */}
+    <g transform="translate(12 12)" fill="#D97706">
+      {[0, 45, 90, 135, 180, 225, 270, 315].map(angle => (
+        <path
+          key={angle}
+          d="M0 -7 C 1.2 -3.5, 1.2 -3.5, 0 0 C -1.2 -3.5, -1.2 -3.5, 0 -7 Z"
+          transform={`rotate(${angle})`}
+        />
+      ))}
+      <circle r="1.4" fill="#D97706"/>
+    </g>
+  </svg>
+);
+
+// DeepSeek — deep-blue tile with a stylised whale silhouette (their mark).
+export const DeepSeekLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className}>
+    <rect width="24" height="24" rx="6" fill="#4D6BFE"/>
+    {/* Stylised whale outline — simplified for icon size */}
+    <path
+      d="M5.5 13c.5-1.8 1.8-3.5 3.5-4.3 1.5-.7 3.2-.8 4.8-.4 2.2.6 4 2.4 4.6 4.6.1.5.2 1 .2 1.6 0 .5-.4.8-.8.8H7.5c-.6 0-1.1-.3-1.5-.7-.3-.4-.5-.9-.5-1.6z"
+      fill="#fff"
+    />
+    {/* Whale eye */}
+    <circle cx="14.5" cy="11.5" r="0.55" fill="#4D6BFE"/>
+    {/* Tail flick */}
+    <path d="M4 12c.4-.6 1-1 1.7-1.2.5-.1.7.4.4.7-.4.4-.9.7-1.4.9-.4.2-.8 0-.7-.4z" fill="#fff"/>
   </svg>
 );
 
