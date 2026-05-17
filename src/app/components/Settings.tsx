@@ -1476,6 +1476,10 @@ interface ClientAIConfigUI {
   channels: { instagram: boolean; whatsapp: boolean };
   aiModel: ClientAIModelId;
   creativity: number;
+  // botName is no longer surfaced in the UI — bot stays anonymous so admins
+  // don't accidentally make it impersonate a real person. The field is kept
+  // in the type to round-trip cleanly with the saved backend payload, but
+  // we always send an empty string.
   botName: string;
   tone: 'polite' | 'casual' | 'premium' | 'strict';
   persona: string;
@@ -1767,17 +1771,6 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
           {/* — BRAIN — */}
           {section === 'brain' && (
             <div className="space-y-5">
-              <div>
-                <div className="text-xs text-gray-900 mb-1">{l('Имя бота', 'Бот атауы', 'Bot name')}</div>
-                <div className="text-[10px] text-gray-400 mb-2">{l('Так клиент будет его звать в переписке', 'Клиент осылай атайды', 'How customers will address it')}</div>
-                <input
-                  type="text" maxLength={60} value={cfg.botName}
-                  onChange={e => upd({ botName: e.target.value })}
-                  placeholder="Аяна / Aiana / Aigerim"
-                  className="w-full md:w-72 px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-200"
-                />
-              </div>
-
               <div className="space-y-4">
                 <div>
                   <div className="text-xs text-gray-900 mb-1">{l('Нейросеть', 'AI моделі', 'AI model')}</div>

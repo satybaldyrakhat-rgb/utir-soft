@@ -65,16 +65,20 @@ const contextRoles: Record<string, Record<string, string>> = {
   settings: { ru: 'AI Настройщик', kz: 'AI Баптаушы', eng: 'AI Configurator' },
 };
 
+// Greetings are intentionally generic — no product/model names baked in.
+// The model id is already visible in the header subline ('claude-opus-4-5'),
+// so the body doesn't need to repeat or self-name. Keeps the bot anonymous
+// and avoids fake-identity vibes when the admin shows the popup to staff.
 const greetings: Record<ProviderId, Record<string, string>> = {
   'utir-ai': {
-    ru: 'Привет! Я UTIR AI — управляю платформой. Напишите свободным текстом: «Закрыл клиента Айдос на 450 000 ₸», «Поставь задачу замерить завтра у Айгуль», «Что по Кенжебеку?» — и я сам создам / обновлю / найду.',
-    kz: 'Сәлем! Мен UTIR AI — платформаны басқарамын. Еркін мәтінмен жазыңыз: «Айдосты 450 000 ₸-ге жаптым», «Айгүлге ертең өлшеу тапсырмасын қой» — мен өзім жасап беремін.',
-    eng: "Hi! I'm UTIR AI — I run the platform. Just write naturally: 'closed customer X for Y', 'remind me to call Z tomorrow' — I'll create / update / look up.",
+    ru: 'Здравствуйте! Помогу управлять платформой. Опишите задачу свободным текстом — создам сделку, запишу оплату, поставлю задачу, найду клиента. Например: «Закрыл клиента X на 450 000 ₸», «Y оплатил 100 000», «Поставь задачу замерить завтра», «Что по Z?»',
+    kz: 'Сәлем! Платформаны басқаруға көмектесемін. Еркін мәтінмен жазыңыз — өзім жасап беремін.',
+    eng: 'Hi! I can run the platform for you. Just describe what happened — I\'ll create deals, log payments, add tasks, look up clients.',
   },
-  gemini:   { ru: 'Это Gemini 3.1 Pro. Спросите что угодно — отвечу как обычный чат.', kz: 'Бұл Gemini 3.1 Pro. Кез келген сұрақ қойыңыз.', eng: "Gemini 3.1 Pro here — chat freely." },
-  claude:   { ru: 'Claude Opus 4.7 на связи. Готов помочь с анализом, текстами, идеями.', kz: 'Claude Opus 4.7 қосылды.', eng: 'Claude Opus 4.7 ready.' },
-  chatgpt:  { ru: 'ChatGPT (последняя версия). Спросите что нужно.', kz: 'ChatGPT (соңғы нұсқа).', eng: 'ChatGPT (latest) ready.' },
-  deepseek: { ru: 'DeepSeek (последняя версия). Готов отвечать.', kz: 'DeepSeek (соңғы нұсқа).', eng: 'DeepSeek (latest) ready.' },
+  gemini:   { ru: 'Здравствуйте! Спрашивайте, чем помочь.', kz: 'Сәлем! Қандай сұрағыңыз бар?', eng: 'Hi! How can I help?' },
+  claude:   { ru: 'Здравствуйте! Готов помочь с анализом, текстами, идеями.', kz: 'Сәлем! Талдау, мәтін, идеялар бойынша көмектесемін.', eng: 'Hi! Happy to help with analysis, drafting, ideas.' },
+  chatgpt:  { ru: 'Здравствуйте! Спрашивайте что нужно.', kz: 'Сәлем! Сұрағыңызды қойыңыз.', eng: 'Hi! Ask anything.' },
+  deepseek: { ru: 'Здравствуйте! Слушаю.', kz: 'Сәлем!', eng: 'Hi! Ready when you are.' },
 };
 
 // Provider-specific helper actions shown on the empty-state. Only UTIR AI
@@ -615,7 +619,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
             )}
             {providerId === 'utir-ai' && (
               <p className="text-[10px] text-gray-400 mt-1.5 px-1">
-                💡 UTIR AI может создавать сделки, оплаты, задачи и менять статусы — спросит подтверждение перед записью.
+                💡 Можно создавать сделки, оплаты, задачи и менять статусы — спросит подтверждение перед записью.
               </p>
             )}
           </div>

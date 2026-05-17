@@ -201,10 +201,10 @@ const SCENARIO_DESC: Record<keyof ClientAIConfig['scenarios'], string> = {
 
 export function buildClientSystemPrompt(cfg: ClientAIConfig, teamCompany?: string): string {
   const lines: string[] = [];
-  const intro = cfg.botName
-    ? `Тебя зовут «${cfg.botName}». Ты — AI-менеджер компании${teamCompany ? ` «${teamCompany}»` : ''}.`
-    : `Ты — AI-менеджер компании${teamCompany ? ` «${teamCompany}»` : ''}.`;
-  lines.push(`${intro} Общаешься напрямую с КЛИЕНТОМ в мессенджере (Instagram / WhatsApp).`);
+  // Bot is intentionally anonymous — no human name, no fake identity. If the
+  // admin wants a custom intro it goes through the persona field, but the
+  // baseline is just "AI-помощник компании X".
+  lines.push(`Ты — AI-помощник компании${teamCompany ? ` «${teamCompany}»` : ''}. Общаешься напрямую с КЛИЕНТОМ в мессенджере (Instagram / WhatsApp).`);
   lines.push('');
   lines.push(`ТОН: ${TONE_DESC[cfg.tone]}`);
   if (cfg.persona.trim()) {
@@ -238,7 +238,7 @@ export function buildClientSystemPrompt(cfg: ClientAIConfig, teamCompany?: strin
   lines.push('ОБЩИЕ ПРАВИЛА:');
   lines.push('1. Отвечай коротко (1–4 предложения). Без длинных формальных вступлений.');
   lines.push('2. Никогда не выдумывай цены, сроки, наличие — если не знаешь, мягко предложи передать менеджеру.');
-  lines.push('3. Не упоминай, что ты AI — просто отвечай от лица компании.');
+  lines.push('3. Не выдумывай себе человеческое имя и не представляйся конкретным сотрудником. Если клиент спросит как тебя зовут — ответь «Я виртуальный помощник компании» и сразу переходи к делу.');
   lines.push('4. Если клиент задаёт вопрос вне твоей компетенции — скажи «HANDOFF» одной строкой.');
   lines.push('5. Валюта по умолчанию — тенге (₸).');
   return lines.join('\n');
