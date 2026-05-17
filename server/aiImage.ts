@@ -177,19 +177,12 @@ async function genGemini(inp: GenInputs): Promise<GenResult> {
     let res: Response | null = null;
     let j: any = null;
     let lastError = '';
+    let lastWasQuota = false;
     for (const model of MODEL_CANDIDATES) {
-      // Nano Banana 2 (gemini-3.1-flash-image-preview) supports 4K output
-      // and aspectRatio config. Older models silently ignore the extras,
-      // so we send the same body to all candidates.
       const generationConfig: any = {
         responseModalities: ['IMAGE'],
-        // Interior shots read best in horizontal 16:9 (mirrors how listings
-        // are shown on Etsy / Pinterest / Houzz). Falls back to 1:1 on
-        // models that don't accept the option.
         imageConfig: {
           aspectRatio: '16:9',
-          // Newer models accept `imageSize: '2K'` or `'4K'`. Default to 2K
-          // for a nice quality bump without burning quota.
           imageSize: '2K',
         },
       };
@@ -205,15 +198,28 @@ async function genGemini(inp: GenInputs): Promise<GenResult> {
         },
       );
       j = await res.json();
-      // 404 = model name retired; try the next candidate. Anything else
-      // (success or a real error like quota / safety) we surface as-is.
       if (res.ok) break;
       const msg = j?.error?.message || `HTTP ${res.status}`;
       lastError = msg;
+      // Roll to the next candidate when:
+      //   - 404 / «not found» — model name retired
+      //   - 429 / quota exceeded — Gemini tracks quotas per-model on the
+      //     free tier, so 3.1 being empty doesn't mean 2.5 is empty.
+      //     Trying the older model can succeed.
       const isNotFound = res.status === 404 || /not found|is not supported for generateContent/i.test(msg);
-      if (!isNotFound) break;
+      const isQuota    = res.status === 429 || /quota|rate limit|resource_exhausted/i.test(msg);
+      lastWasQuota = isQuota;
+      if (!isNotFound && !isQuota) break;
     }
-    if (!res || !res.ok) return { provider: 'gemini', ok: false, error: lastError || 'no model available' };
+    if (!res || !res.ok) {
+      // Pretty-print the most common error so the UI doesn't dump a 200-char
+      // Google JSON paragraph. Quota gets the friendliest message because
+      // it's the most common one users hit on the free tier.
+      const friendly = lastWasQuota
+        ? 'Free-tier лимит Google Gemini исчерпан. Подождите минуту или подключите платный тариф в Google AI Studio.'
+        : lastError || 'Gemini временно недоступен';
+      return { provider: 'gemini', ok: false, error: friendly };
+    }
     const out = j?.candidates?.[0]?.content?.parts || [];
     for (const p of out) {
       const inline = p?.inlineData;
