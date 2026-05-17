@@ -24,11 +24,17 @@ export function ComingSoon({ title, description, onBack, language = 'ru' }: Comi
       className="min-h-full relative flex items-center justify-center p-6"
     >
       <div className="max-w-md w-full bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 text-center relative overflow-hidden">
-        {/* Decorative corner orb */}
-        <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-gradient-to-br from-emerald-200/60 to-teal-100/30 blur-2xl pointer-events-none" />
+        {/* Decorative corner orb — themable */}
+        <div
+          className="absolute -top-12 -right-12 w-40 h-40 rounded-full blur-2xl pointer-events-none"
+          style={{ background: 'radial-gradient(circle, var(--accent-200) 0%, transparent 70%)' }}
+        />
         <div className="relative">
-          <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-emerald-100/80 to-teal-100/60 ring-1 ring-white/60 flex items-center justify-center">
-            <Sparkles className="w-6 h-6 text-indigo-600" />
+          <div
+            className="w-14 h-14 mx-auto mb-5 rounded-2xl ring-1 ring-white/60 flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, var(--accent-100), var(--accent-50))' }}
+          >
+            <Sparkles className="w-6 h-6" style={{ color: 'var(--accent-600)' }} />
           </div>
           <div className="inline-block text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-100/70 text-amber-700 ring-1 ring-white/40 mb-3">
             {badge}

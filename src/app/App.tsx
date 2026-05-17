@@ -635,7 +635,10 @@ function AppContent() {
                   };
                   return (
                     <>
-                      <div className="w-10 h-10 rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-500 ring-1 ring-white/70 flex items-center justify-center text-sm text-white font-medium flex-shrink-0 shadow-[0_4px_12px_-4px_var(--accent-shadow)]">
+                      <div
+                        className="w-10 h-10 rounded-2xl overflow-hidden ring-1 ring-white/70 flex items-center justify-center text-sm text-white font-medium flex-shrink-0 shadow-[0_4px_12px_-4px_var(--accent-shadow)]"
+                        style={{ background: 'linear-gradient(135deg, var(--accent-500), var(--accent-700))' }}
+                      >
                         {profile.avatar
                           ? <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover" />
                           : <span>{initials || '?'}</span>}

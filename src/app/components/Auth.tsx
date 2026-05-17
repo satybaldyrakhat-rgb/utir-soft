@@ -715,7 +715,10 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     >
       {/* Left side - Features (desktop only) — glass panel */}
       <div className="hidden lg:flex lg:w-[45%] xl:w-[50%] bg-white/30 backdrop-blur-2xl border-r border-white/60 flex-col justify-between p-12 relative overflow-hidden">
-        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-gradient-to-br from-emerald-200/60 to-teal-100/30 blur-3xl pointer-events-none" />
+        <div
+          className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl pointer-events-none"
+          style={{ background: 'radial-gradient(circle, var(--accent-200) 0%, transparent 70%)' }}
+        />
         <div className="relative">
           <div className="flex items-center gap-3 mb-16">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden bg-white/80 ring-1 ring-white/60 backdrop-blur-xl">

@@ -26,15 +26,15 @@
   --accent-700: #020617;
   --accent-shadow:    rgba(15,23,42,0.5);
   --accent-shadow-sm: rgba(15,23,42,0.35);
-  /* Four orbs used by the global page backdrop. Default = muted slate
-     so the platform looks clean and neutral until the user picks an
-     accent in Settings → Основные → Цвет темы. */
-  --orb-1: rgba(226,232,240,0.40);
-  --orb-2: rgba(203,213,225,0.25);
-  --orb-3: rgba(241,245,249,0.40);
-  --orb-4: rgba(248,250,252,0.55);
+  /* Four orbs used by the global page backdrop. Black theme uses
+     deeper slate tints so the gradient is actually visible on white
+     — was nearly invisible before. */
+  --orb-1: rgba(148,163,184,0.40);  /* slate-400 — top-left */
+  --orb-2: rgba(100,116,139,0.25);  /* slate-500 — top-right */
+  --orb-3: rgba(148,163,184,0.40);  /* slate-400 — bottom-right */
+  --orb-4: rgba(203,213,225,0.55);  /* slate-300 — bottom-left */
   --orb-base-from: #fafafa;
-  --orb-base-to:   #f1f5f9;
+  --orb-base-to:   #e2e8f0;
 }
 
 /* === EMERALD (brand) — was the default; now an opt-in theme === */
@@ -47,10 +47,10 @@
   --accent-700: #047857;
   --accent-shadow:    rgba(5,150,105,0.45);
   --accent-shadow-sm: rgba(5,150,105,0.3);
-  --orb-1: rgba(167,243,208,0.45);
-  --orb-2: rgba(110,231,183,0.30);
-  --orb-3: rgba(187,247,208,0.40);
-  --orb-4: rgba(209,250,229,0.50);
+  --orb-1: rgba(167,243,208,0.65);
+  --orb-2: rgba(110,231,183,0.5);
+  --orb-3: rgba(187,247,208,0.6);
+  --orb-4: rgba(209,250,229,0.7);
   --orb-base-from: #f9fbfa;
   --orb-base-to:   #f0fdf4;
 }
@@ -79,10 +79,10 @@
   --accent-700: #0f766e;
   --accent-shadow:    rgba(13,148,136,0.45);
   --accent-shadow-sm: rgba(13,148,136,0.3);
-  --orb-1: rgba(153,246,228,0.45);
-  --orb-2: rgba(94,234,212,0.30);
-  --orb-3: rgba(204,251,241,0.45);
-  --orb-4: rgba(240,253,250,0.55);
+  --orb-1: rgba(153,246,228,0.65);
+  --orb-2: rgba(94,234,212,0.5);
+  --orb-3: rgba(204,251,241,0.65);
+  --orb-4: rgba(240,253,250,0.75);
   --orb-base-from: #f7fbfa;
   --orb-base-to:   #ecfdf5;
 }
@@ -111,10 +111,10 @@
   --accent-700: #0e7490;
   --accent-shadow:    rgba(8,145,178,0.45);
   --accent-shadow-sm: rgba(8,145,178,0.3);
-  --orb-1: rgba(165,243,252,0.45);
-  --orb-2: rgba(103,232,249,0.30);
-  --orb-3: rgba(207,250,254,0.45);
-  --orb-4: rgba(236,254,255,0.55);
+  --orb-1: rgba(165,243,252,0.65);
+  --orb-2: rgba(103,232,249,0.5);
+  --orb-3: rgba(207,250,254,0.65);
+  --orb-4: rgba(236,254,255,0.75);
   --orb-base-from: #f6fbfc;
   --orb-base-to:   #ecfeff;
 }
@@ -143,10 +143,10 @@
   --accent-700: #0369a1;
   --accent-shadow:    rgba(2,132,199,0.45);
   --accent-shadow-sm: rgba(2,132,199,0.3);
-  --orb-1: rgba(186,230,253,0.45);
-  --orb-2: rgba(125,211,252,0.30);
-  --orb-3: rgba(224,242,254,0.45);
-  --orb-4: rgba(240,249,255,0.55);
+  --orb-1: rgba(186,230,253,0.65);
+  --orb-2: rgba(125,211,252,0.5);
+  --orb-3: rgba(224,242,254,0.65);
+  --orb-4: rgba(240,249,255,0.75);
   --orb-base-from: #f7fafb;
   --orb-base-to:   #f0f9ff;
 }
@@ -175,10 +175,10 @@
   --accent-700: #1d4ed8;
   --accent-shadow:    rgba(37,99,235,0.45);
   --accent-shadow-sm: rgba(37,99,235,0.3);
-  --orb-1: rgba(191,219,254,0.45);
-  --orb-2: rgba(147,197,253,0.30);
-  --orb-3: rgba(219,234,254,0.45);
-  --orb-4: rgba(239,246,255,0.55);
+  --orb-1: rgba(191,219,254,0.65);
+  --orb-2: rgba(147,197,253,0.5);
+  --orb-3: rgba(219,234,254,0.65);
+  --orb-4: rgba(239,246,255,0.75);
   --orb-base-from: #f8f9fc;
   --orb-base-to:   #eff6ff;
 }
@@ -207,10 +207,10 @@
   --accent-700: #4338ca;
   --accent-shadow:    rgba(79,70,229,0.45);
   --accent-shadow-sm: rgba(79,70,229,0.3);
-  --orb-1: rgba(199,210,254,0.45);
-  --orb-2: rgba(165,180,252,0.30);
-  --orb-3: rgba(224,231,255,0.45);
-  --orb-4: rgba(238,242,255,0.55);
+  --orb-1: rgba(199,210,254,0.65);
+  --orb-2: rgba(165,180,252,0.5);
+  --orb-3: rgba(224,231,255,0.65);
+  --orb-4: rgba(238,242,255,0.75);
   --orb-base-from: #f8f8fc;
   --orb-base-to:   #eef2ff;
 }
@@ -239,10 +239,10 @@
   --accent-700: #6d28d9;
   --accent-shadow:    rgba(124,58,237,0.45);
   --accent-shadow-sm: rgba(124,58,237,0.3);
-  --orb-1: rgba(221,214,254,0.45);
-  --orb-2: rgba(196,181,253,0.30);
-  --orb-3: rgba(237,233,254,0.45);
-  --orb-4: rgba(245,243,255,0.55);
+  --orb-1: rgba(221,214,254,0.65);
+  --orb-2: rgba(196,181,253,0.5);
+  --orb-3: rgba(237,233,254,0.65);
+  --orb-4: rgba(245,243,255,0.75);
   --orb-base-from: #f9f8fc;
   --orb-base-to:   #f5f3ff;
 }
@@ -271,10 +271,10 @@
   --accent-700: #be123c;
   --accent-shadow:    rgba(225,29,72,0.45);
   --accent-shadow-sm: rgba(225,29,72,0.3);
-  --orb-1: rgba(254,205,211,0.45);
-  --orb-2: rgba(253,164,175,0.30);
-  --orb-3: rgba(255,228,230,0.45);
-  --orb-4: rgba(255,241,242,0.55);
+  --orb-1: rgba(254,205,211,0.65);
+  --orb-2: rgba(253,164,175,0.5);
+  --orb-3: rgba(255,228,230,0.65);
+  --orb-4: rgba(255,241,242,0.75);
   --orb-base-from: #fbf9f9;
   --orb-base-to:   #fff1f2;
 }
@@ -303,10 +303,10 @@
   --accent-700: #c2410c;
   --accent-shadow:    rgba(234,88,12,0.45);
   --accent-shadow-sm: rgba(234,88,12,0.3);
-  --orb-1: rgba(254,215,170,0.45);
-  --orb-2: rgba(253,186,116,0.30);
-  --orb-3: rgba(255,237,213,0.45);
-  --orb-4: rgba(255,247,237,0.55);
+  --orb-1: rgba(254,215,170,0.65);
+  --orb-2: rgba(253,186,116,0.5);
+  --orb-3: rgba(255,237,213,0.65);
+  --orb-4: rgba(255,247,237,0.75);
   --orb-base-from: #fbfaf8;
   --orb-base-to:   #fff7ed;
 }
@@ -335,10 +335,10 @@
   --accent-700: #334155;
   --accent-shadow:    rgba(71,85,105,0.45);
   --accent-shadow-sm: rgba(71,85,105,0.3);
-  --orb-1: rgba(226,232,240,0.45);
-  --orb-2: rgba(203,213,225,0.30);
-  --orb-3: rgba(241,245,249,0.45);
-  --orb-4: rgba(248,250,252,0.55);
+  --orb-1: rgba(226,232,240,0.65);
+  --orb-2: rgba(203,213,225,0.5);
+  --orb-3: rgba(241,245,249,0.65);
+  --orb-4: rgba(248,250,252,0.75);
   --orb-base-from: #fafafa;
   --orb-base-to:   #f8fafc;
 }
@@ -367,12 +367,12 @@
   --accent-700: #020617;
   --accent-shadow:    rgba(15,23,42,0.5);
   --accent-shadow-sm: rgba(15,23,42,0.35);
-  --orb-1: rgba(226,232,240,0.40);
-  --orb-2: rgba(203,213,225,0.25);
-  --orb-3: rgba(241,245,249,0.40);
-  --orb-4: rgba(248,250,252,0.55);
+  --orb-1: rgba(148,163,184,0.40);
+  --orb-2: rgba(100,116,139,0.25);
+  --orb-3: rgba(148,163,184,0.40);
+  --orb-4: rgba(203,213,225,0.55);
   --orb-base-from: #fafafa;
-  --orb-base-to:   #f1f5f9;
+  --orb-base-to:   #e2e8f0;
 }
 [data-theme="black"] .bg-emerald-50    { background-color: #f8fafc; }
 [data-theme="black"] .bg-emerald-100   { background-color: #e2e8f0; }

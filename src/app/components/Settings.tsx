@@ -1571,7 +1571,10 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
       {/* ─── HEADER ─────────────────────────────────────────────── */}
       <div className="bg-gradient-to-br from-emerald-50 via-white to-white p-5 border-b border-emerald-100">
         <div className="flex items-start gap-3">
-          <div className="w-11 h-11 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm">
+          <div
+            className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm"
+            style={{ background: 'linear-gradient(135deg, var(--accent-500), var(--accent-700))' }}
+          >
             <Bot className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
