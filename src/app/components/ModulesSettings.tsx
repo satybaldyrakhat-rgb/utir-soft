@@ -285,14 +285,20 @@ export function ModulesSettings({ language }: Props) {
               <Shield className="w-3 h-3" /> {l('Доступ', 'Қатынау', 'Access')}
             </button>
             {!m.locked ? (
+              // Toggle — proper iOS-style. Track 44×24, handle 20×20, 2px
+              // padding both sides → handle moves exactly the track width
+              // minus its own size (44 − 20 − 4 = 20px / translate-x-5).
+              // Emerald-on, gray-off so «active» reads positive at a glance.
               <button onClick={() => toggleEnabled(m)}
-                className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${m.enabled ? 'bg-gray-900' : 'bg-gray-200'}`}
+                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${m.enabled ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-gray-200 hover:bg-gray-300'}`}
                 title={m.enabled ? l('Отключить', 'Өшіру', 'Disable') : l('Включить', 'Қосу', 'Enable')}>
-                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform shadow-sm ${m.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${m.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             ) : (
-              <span className="w-10 h-6 rounded-full bg-gray-50 flex items-center justify-center" title={l('Системный модуль', 'Жүйелік модуль', 'System module')}>
-                <Check className="w-3 h-3 text-gray-400" />
+              // Locked indicator — slim pill with a tiny lock so it's clearly
+              // not a toggle the admin can flip (and not confused with «on»).
+              <span className="w-11 h-6 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center gap-1 px-1.5" title={l('Системный модуль — нельзя отключить', 'Жүйелік модуль', 'System module — cannot disable')}>
+                <Lock className="w-3 h-3 text-gray-400" />
               </span>
             )}
           </div>

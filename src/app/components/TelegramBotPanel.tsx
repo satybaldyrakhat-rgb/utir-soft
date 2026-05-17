@@ -89,8 +89,8 @@ export function TelegramBotPanel({ onClose }: Props) {
                     <textarea value={t.text} onChange={e => setTemplates(ts => ts.map(x => x.id === t.id ? { ...x, text: e.target.value } : x))}
                       rows={2} className="flex-1 text-xs bg-gray-50 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none" />
                     <button onClick={() => setTemplates(ts => ts.map(x => x.id === t.id ? { ...x, enabled: !x.enabled } : x))}
-                      className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${t.enabled ? 'bg-emerald-500' : 'bg-gray-200'}`}>
-                      <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${t.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${t.enabled ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${t.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
                     </button>
                   </div>
                   <div className="text-[10px] text-gray-400">Триггер: {t.trigger}</div>
