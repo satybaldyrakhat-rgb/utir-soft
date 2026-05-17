@@ -565,7 +565,7 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
           <div className="mx-5 mt-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 flex items-start gap-2">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <div>
-              {l('Не заполнены реквизиты компании (название / IBAN). Документ сформируется, но без банковских данных.', '...', 'Company requisites are empty.')}
+              {l('Не заполнены реквизиты компании (название / IBAN). Документ сформируется, но без банковских данных.', 'Компания деректемелері (атауы / IBAN) толтырылмаған. Құжат банктік деректерсіз қалыптасады.', 'Company requisites are empty.')}
               {' '}
               <a href="#" onClick={e => { e.preventDefault(); onClose(); window.dispatchEvent(new CustomEvent('navigate:settings', { detail: { tab: 'general' } })); }} className="underline">{l('Заполнить →', 'Толтыру →', 'Fill in →')}</a>
             </div>
@@ -589,7 +589,7 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
               className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200 mb-1.5"
             />
             <div className="border border-gray-100 rounded-xl max-h-48 overflow-y-auto divide-y divide-gray-50">
-              {candidates.length === 0 && <div className="px-3 py-6 text-center text-[11px] text-slate-400">{l('Нет подходящих сделок', '...', 'No matching deals')}</div>}
+              {candidates.length === 0 && <div className="px-3 py-6 text-center text-[11px] text-slate-400">{l('Нет подходящих сделок', 'Сәйкес мәмілелер жоқ', 'No matching deals')}</div>}
               {candidates.map(d => (
                 <button
                   key={d.id}
@@ -616,7 +616,7 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
                   placeholder={`${String(new Date().getFullYear()).slice(-2)}-${selected.id.replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase()}`}
                   className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200"
                 />
-                <div className="text-[10px] text-slate-400 mt-1">{l('Если оставить пустым — сгенерируется автоматически', '...', 'Leave empty for auto-number')}</div>
+                <div className="text-[10px] text-slate-400 mt-1">{l('Если оставить пустым — сгенерируется автоматически', 'Бос қалдырсаңыз — автоматты түрде нөмірленеді', 'Leave empty for auto-number')}</div>
               </div>
 
               <div className="bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3 text-[11px] space-y-1">

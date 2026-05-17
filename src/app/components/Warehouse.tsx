@@ -215,8 +215,8 @@ export function Warehouse({ language }: WarehouseProps) {
             {prodOrders.length === 0 && (
               <div className="md:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
                 <Wrench className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                <div className="text-sm text-slate-900 mb-1">{l('Нет заказов в производстве', '...', 'No production orders')}</div>
-                <div className="text-xs text-slate-400">{l('Переведите сделку в статус «Производство» / «Сборка» — она появится здесь', '...', 'Move a deal to «Production» status to see it here')}</div>
+                <div className="text-sm text-slate-900 mb-1">{l('Нет заказов в производстве', 'Өндірісте тапсырыс жоқ', 'No production orders')}</div>
+                <div className="text-xs text-slate-400">{l('Переведите сделку в статус «Производство» / «Сборка» — она появится здесь', 'Мәмілені «Өндіріс» / «Жинау» күйіне ауыстырыңыз — осында пайда болады', 'Move a deal to «Production» status to see it here')}</div>
               </div>
             )}
           </div>
@@ -509,10 +509,10 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
       {templates.length === 0 ? (
         <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
           <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-          <div className="text-sm text-slate-900 mb-1">{l('Пока нет шаблонов', '...', 'No templates yet')}</div>
-          <div className="text-xs text-slate-400 mb-4">{l('Создайте первый шаблон чтобы быстро повторять типовые изделия', '...', 'Create a template to reuse common items')}</div>
+          <div className="text-sm text-slate-900 mb-1">{l('Пока нет шаблонов', 'Әзірге шаблондар жоқ', 'No templates yet')}</div>
+          <div className="text-xs text-slate-400 mb-4">{l('Создайте первый шаблон чтобы быстро повторять типовые изделия', 'Типтік бұйымдарды тез қайталау үшін алғашқы шаблон жасаңыз', 'Create a template to reuse common items')}</div>
           <button onClick={() => setEditing(blankTemplate())} className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all inline-flex items-center gap-1.5">
-            <Plus className="w-3 h-3" /> {l('Создать первый', '...', 'Create first')}
+            <Plus className="w-3 h-3" /> {l('Создать первый', 'Біріншісін жасау', 'Create first')}
           </button>
         </div>
       ) : (
@@ -593,7 +593,7 @@ function BomEditorModal({ initial, onClose, onSave, busy, language }: {
         <div className="px-5 py-4 border-b border-white/60 flex items-center justify-between">
           <div>
             <div className="text-sm text-gray-900">{t.id ? l('Редактировать шаблон', 'Шаблонды өңдеу', 'Edit template') : l('Новый шаблон', 'Жаңа шаблон', 'New template')}</div>
-            <div className="text-[11px] text-slate-400">{l('Сохраняется на сервере для всей команды', '...', 'Saved on the server for the whole team')}</div>
+            <div className="text-[11px] text-slate-400">{l('Сохраняется на сервере для всей команды', 'Бүкіл команда үшін серверде сақталады', 'Saved on the server for the whole team')}</div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
         </div>
@@ -758,8 +758,8 @@ function NestingView({ language, prodOrders, deals }: {
     return (
       <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
         <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-        <div className="text-sm text-slate-900 mb-1">{l('Нет активных заказов', '...', 'No active orders')}</div>
-        <div className="text-xs text-slate-400">{l('Раскрой работает на основе сделок в производстве — переведите сделку в нужный статус', '...', 'Nesting works from in-production deals')}</div>
+        <div className="text-sm text-slate-900 mb-1">{l('Нет активных заказов', 'Белсенді тапсырыстар жоқ', 'No active orders')}</div>
+        <div className="text-xs text-slate-400">{l('Раскрой работает на основе сделок в производстве — переведите сделку в нужный статус', 'Тілу өндірістегі мәмілелер негізінде жұмыс істейді — мәмілені тиісті күйге ауыстырыңыз', 'Nesting works from in-production deals')}</div>
       </div>
     );
   }
@@ -782,7 +782,7 @@ function NestingView({ language, prodOrders, deals }: {
         <div className="text-sm text-slate-900 mb-3">{l('Детали', 'Бөліктер', 'Parts')} ({parts.length})</div>
         {parts.length === 0 ? (
           <div className="text-[11px] text-slate-400 italic text-center py-4">
-            {l('Материалы не указаны в сделке. Заполните поле «Материалы» в карточке клиента.', '...', 'Materials not specified in the deal')}
+            {l('Материалы не указаны в сделке. Заполните поле «Материалы» в карточке клиента.', 'Мәміледе материалдар көрсетілмеген. Клиент картасында «Материалдар» өрісін толтырыңыз.', 'Materials not specified in the deal')}
           </div>
         ) : (
           <div className="space-y-2">
@@ -804,8 +804,8 @@ function NestingView({ language, prodOrders, deals }: {
       <div className="lg:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="text-sm text-gray-900">{l('Лист ЛДСП 2750×1830 мм', '...', 'MFC sheet 2750×1830 mm')}</div>
-            <div className="text-[10px] text-slate-400 mt-0.5">{l('Иллюстративная раскладка — для точного нестинга нужен CNC-софт', '...', 'Illustrative — real nesting requires CNC software')}</div>
+            <div className="text-sm text-gray-900">{l('Лист ЛДСП 2750×1830 мм', 'ЛДСП парағы 2750×1830 мм', 'MFC sheet 2750×1830 mm')}</div>
+            <div className="text-[10px] text-slate-400 mt-0.5">{l('Иллюстративная раскладка — для точного нестинга нужен CNC-софт', 'Иллюстрациялық сызба — нақты тілу үшін CNC бағдарламасы керек', 'Illustrative — real nesting requires CNC software')}</div>
           </div>
           <span className="text-[10px] text-slate-400">{l('Лист 1', '1-парақ', 'Sheet 1')} / {sheetsNeeded || 1}</span>
         </div>
@@ -813,7 +813,7 @@ function NestingView({ language, prodOrders, deals }: {
           {/* Render a simple grid of part rectangles — purely visual */}
           {parts.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center text-slate-300 text-xs">
-              {l('Выберите заказ с материалами', '...', 'Select an order with materials')}
+              {l('Выберите заказ с материалами', 'Материалдары бар тапсырысты таңдаңыз', 'Select an order with materials')}
             </div>
           ) : (
             <div className="absolute inset-1 grid grid-cols-6 grid-rows-4 gap-0.5 p-1">
@@ -838,7 +838,8 @@ function NestingView({ language, prodOrders, deals }: {
           </div>
           <div className="mt-3 pt-3 border-t border-white/60 text-[10px] text-slate-400 leading-relaxed">
             {l('Оценка по средней детали 600×400 мм + 12% на отходы. Реальная раскладка зависит от размеров деталей и софта станка.',
-               '...', 'Estimate based on avg 600×400 part + 12% waste.')}
+               'Орташа 600×400 мм бөлшек бойынша бағалау + 12% қалдыққа. Нақты сызба бөлшек өлшеміне және станок бағдарламасына байланысты.',
+               'Estimate based on avg 600×400 part + 12% waste.')}
           </div>
         </div>
 
@@ -875,7 +876,8 @@ function NestingView({ language, prodOrders, deals }: {
             </div>
             <div className="text-[11px] text-amber-800 leading-relaxed mb-2">
               {l('Реальная оптимизация раскладки — это отдельный класс задач (genetic / bottom-left-fill алгоритмы). Для точного нестинга экспортируйте CSV и загрузите в софт вашего станка: Felder Maxisoft, Holzma Cadmatic, Biesse bSolid.',
-                 '...', 'Use Felder/Holzma/Biesse software for real nesting via CSV.')}
+                 'Сызба оптимизациясы — бөлек тапсырмалар класы (genetic / bottom-left-fill алгоритмдері). Нақты нестинг үшін CSV экспорттап, өз станогыңыздың бағдарламасына жүктеңіз: Felder Maxisoft, Holzma Cadmatic, Biesse bSolid.',
+                 'Use Felder/Holzma/Biesse software for real nesting via CSV.')}
             </div>
             <a href="https://www.felder-group.com/" target="_blank" rel="noopener noreferrer" className="text-[11px] text-amber-700 underline">Felder Maxisoft →</a>
           </div>

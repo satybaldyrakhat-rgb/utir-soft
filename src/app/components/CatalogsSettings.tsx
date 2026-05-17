@@ -132,7 +132,7 @@ export function CatalogsSettings({ language }: Props) {
   }
 
   function clearAll(key: CatalogKey, title: string) {
-    if (!confirm(l(`Очистить весь справочник «${title}»? Действие не отменить.`, '...', `Clear all from «${title}»? Cannot be undone.`))) return;
+    if (!confirm(l(`Очистить весь справочник «${title}»? Действие не отменить.`, `«${title}» анықтамалығын толық тазалау керек пе? Әрекетті қайтаруға болмайды.`, `Clear all from «${title}»? Cannot be undone.`))) return;
     store.replaceCatalog(key, []);
     flash(l('Справочник очищен', 'Анықтамалық тазартылды', 'Catalog cleared'));
   }
@@ -141,7 +141,7 @@ export function CatalogsSettings({ language }: Props) {
   // One catalog = one CSV file with a header row + one item per line.
   function exportCSV(key: CatalogKey, title: string) {
     const items = store.catalogs[key];
-    if (items.length === 0) { flash(l('Справочник пустой', '...', 'Catalog is empty')); return; }
+    if (items.length === 0) { flash(l('Справочник пустой', 'Анықтамалық бос', 'Catalog is empty')); return; }
     const csv = `name\n${items.map(x => /[",\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x).join('\n')}`;
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -160,7 +160,7 @@ export function CatalogsSettings({ language }: Props) {
       // Parse — supports both raw lines and CSV with header. We take the
       // first column of each row, skipping the «name» header if present.
       const rows = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-      if (rows.length === 0) { flash(l('Файл пустой', '...', 'Empty file')); return; }
+      if (rows.length === 0) { flash(l('Файл пустой', 'Файл бос', 'Empty file')); return; }
       const start = rows[0].toLowerCase() === 'name' ? 1 : 0;
       const items = rows.slice(start).map(row => {
         // Strip surrounding quotes + handle escaped quotes («""» → «"»).
@@ -172,7 +172,7 @@ export function CatalogsSettings({ language }: Props) {
       // Merge with existing — append-only, dedupe.
       const merged = Array.from(new Set([...store.catalogs[importingKey], ...items]));
       store.replaceCatalog(importingKey, merged);
-      flash(l(`Импортировано: ${items.length} (всего ${merged.length})`, '...', `Imported ${items.length} (total ${merged.length})`));
+      flash(l(`Импортировано: ${items.length} (всего ${merged.length})`, `Импортталды: ${items.length} (барлығы ${merged.length})`, `Imported ${items.length} (total ${merged.length})`));
     } catch (e: any) {
       flash(l('Ошибка импорта: ', 'Қате: ', 'Import error: ') + (e?.message || e));
     } finally {
@@ -277,7 +277,7 @@ export function CatalogsSettings({ language }: Props) {
                 </button>
                 <button
                   onClick={() => { setImportingKey(meta.key); importInputRef.current?.click(); }}
-                  title={l('Импорт CSV (добавит к существующим)', '...', 'Import CSV (append)')}
+                  title={l('Импорт CSV (добавит к существующим)', 'CSV импорттау (барларға қосады)', 'Import CSV (append)')}
                   className="text-[11px] px-2.5 py-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg inline-flex items-center gap-1"
                 >
                   <Upload className="w-3 h-3" /> CSV
@@ -285,7 +285,7 @@ export function CatalogsSettings({ language }: Props) {
                 {all.length > 0 && (
                   <button
                     onClick={() => clearAll(meta.key, title)}
-                    title={l('Очистить весь справочник', '...', 'Clear all')}
+                    title={l('Очистить весь справочник', 'Анықтамалықты толық тазалау', 'Clear all')}
                     className="text-[11px] px-2.5 py-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg inline-flex items-center gap-1"
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -299,7 +299,7 @@ export function CatalogsSettings({ language }: Props) {
               {items.length === 0 ? (
                 <div className="text-center py-4 text-[11px] text-gray-400 italic">
                   {search
-                    ? l(`Ничего не найдено по «${search}»`, '...', `Nothing matches «${search}»`)
+                    ? l(`Ничего не найдено по «${search}»`, `«${search}» бойынша ештеңе табылмады`, `Nothing matches «${search}»`)
                     : l('Пока пусто. Добавьте первую запись ниже или импортируйте CSV.', 'Әзірше бос.', 'Empty. Add your first item below or import a CSV.')}
                 </div>
               ) : (

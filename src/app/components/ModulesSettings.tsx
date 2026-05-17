@@ -342,7 +342,7 @@ export function ModulesSettings({ language }: Props) {
             onClick={() => setAllInGroup(group, true)}
             disabled={count.on === count.total}
             className="text-[10px] text-gray-500 hover:text-emerald-600 inline-flex items-center gap-1 px-2 py-1 hover:bg-gray-50 rounded-md disabled:opacity-30"
-            title={l('Включить все в группе', '...', 'Enable all in group')}
+            title={l('Включить все в группе', 'Топтағы барлығын қосу', 'Enable all in group')}
           >
             <Power className="w-3 h-3" /> {l('Все', 'Барлығы', 'All on')}
           </button>
@@ -350,7 +350,7 @@ export function ModulesSettings({ language }: Props) {
             onClick={() => setAllInGroup(group, false)}
             disabled={count.on === 0}
             className="text-[10px] text-gray-500 hover:text-rose-600 inline-flex items-center gap-1 px-2 py-1 hover:bg-gray-50 rounded-md disabled:opacity-30"
-            title={l('Отключить все в группе (кроме системных)', '...', 'Disable all (except locked)')}
+            title={l('Отключить все в группе (кроме системных)', 'Топтағы барлығын өшіру (жүйелік емес)', 'Disable all (except locked)')}
           >
             <Power className="w-3 h-3" /> {l('Откл', 'Өшір', 'All off')}
           </button>
@@ -375,14 +375,14 @@ export function ModulesSettings({ language }: Props) {
           <button
             onClick={exportConfig}
             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-100 rounded-lg text-[11px] text-gray-700 hover:bg-gray-50"
-            title={l('Скачать конфиг модулей в JSON', '...', 'Download module config as JSON')}
+            title={l('Скачать конфиг модулей в JSON', 'Модуль конфигурациясын JSON-ға жүктеу', 'Download module config as JSON')}
           >
             <Download className="w-3 h-3" /> {l('Экспорт', 'Экспорт', 'Export')}
           </button>
           <button
             onClick={() => importInputRef.current?.click()}
             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-100 rounded-lg text-[11px] text-gray-700 hover:bg-gray-50"
-            title={l('Загрузить JSON-конфиг', '...', 'Upload JSON config')}
+            title={l('Загрузить JSON-конфиг', 'JSON конфигурациясын жүктеу', 'Upload JSON config')}
           >
             <Upload className="w-3 h-3" /> {l('Импорт', 'Импорт', 'Import')}
           </button>
@@ -447,7 +447,7 @@ export function ModulesSettings({ language }: Props) {
         {!collapsed.system && (
           systemMods.length === 0 ? (
             <div className="text-[11px] text-gray-400 italic text-center py-4">
-              {l('Ничего не найдено по запросу', '...', 'Nothing matches')}
+              {l('Ничего не найдено по запросу', 'Сұрау бойынша ештеңе табылмады', 'Nothing matches')}
             </div>
           ) : (
             <div className="space-y-2">
@@ -473,14 +473,15 @@ export function ModulesSettings({ language }: Props) {
               <FilePlus2 className="w-8 h-8 text-gray-200 mx-auto mb-2" />
               <div className="text-sm text-gray-900 mb-1">
                 {search
-                  ? l('Ничего не найдено', '...', 'Nothing matches')
+                  ? l('Ничего не найдено', 'Ештеңе табылмады', 'Nothing matches')
                   : l('Пока нет кастомных модулей', 'Әзірге кастом модуль жоқ', 'No custom modules yet')}
               </div>
               {!search && (
                 <>
                   <div className="text-[11px] text-gray-400 mb-4 max-w-xs mx-auto">
                     {l('Создайте свой раздел с произвольными полями — например, «Поставщики», «Гарантии», «Объекты на стройке».',
-                       '...', 'Create your own section with custom fields — e.g. Suppliers, Warranties, Sites.')}
+                       'Өз бөлімінізді еркін өрістермен жасаңыз — мысалы, «Жеткізушілер», «Кепілдіктер», «Құрылыс нысандары».',
+                       'Create your own section with custom fields — e.g. Suppliers, Warranties, Sites.')}
                   </div>
                   <button onClick={() => setBuilderOpen({})}
                     className="px-3.5 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 inline-flex items-center gap-1.5">
@@ -505,7 +506,7 @@ export function ModulesSettings({ language }: Props) {
           <Plus className="w-3.5 h-3.5" /> {tt('createCustomModule')}
         </button>
         <button onClick={() => {
-            if (!confirm(l('Сбросить порядок модулей и роли к настройкам по умолчанию?', '...', 'Reset module order and roles to defaults?'))) return;
+            if (!confirm(l('Сбросить порядок модулей и роли к настройкам по умолчанию?', 'Модуль ретін және рөлдерді әдепкі баптауларға қайтару керек пе?', 'Reset module order and roles to defaults?'))) return;
             store.resetModules();
             flash(l('Сброшено к настройкам по умолчанию', 'Әдепкі бойынша қалпына келтірілді', 'Reset to defaults'));
           }}
@@ -572,7 +573,8 @@ export function ModulesSettings({ language }: Props) {
               </div>
               <div className="px-5 pb-2 text-[10px] text-gray-400 leading-relaxed">
                 {l('Этот переключатель управляет видимостью модуля в меню для роли. Тонкие права (что можно делать внутри — view / full) настраиваются в «Настройки → Команда → Матрица прав».',
-                   '...', 'This toggles visibility in the menu. Fine-grained permissions live in Settings → Team → Permission matrix.')}
+                   'Бұл ауыстырғыш рөл үшін модульдің мәзірдегі көрінуін басқарады. Нақты рұқсаттар (ішінде не істеуге болады — view / full) «Баптаулар → Команда → Рұқсаттар матрицасы» бөлімінде бапталады.',
+                   'This toggles visibility in the menu. Fine-grained permissions live in Settings → Team → Permission matrix.')}
               </div>
               <div className="px-5 pb-5 pt-2 text-[10px] text-gray-400">
                 {l('Админ всегда имеет доступ ко всем модулям.', 'Әкімші барлық модульдерге әрқашан қол жеткізе алады.', 'Admin always has access to all modules.')}

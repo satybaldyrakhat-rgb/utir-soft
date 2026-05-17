@@ -406,7 +406,7 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
       <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-3 gap-2.5">
         {insights.length === 0 ? (
           <div className="md:col-span-3 text-center text-[11px] text-gray-400 py-2">
-            {l('Пока недостаточно данных для инсайтов — добавьте сделки и платежи', '...', 'Not enough data yet — add deals and payments')}
+            {l('Пока недостаточно данных для инсайтов — добавьте сделки и платежи', 'Талдау үшін деректер жеткіліксіз — мәмілелер мен төлемдер қосыңыз', 'Not enough data yet — add deals and payments')}
           </div>
         ) : insights.map((ins, i) => {
           const Icon = toneIcon(ins.kind);

@@ -98,7 +98,7 @@ export function IntegrationsPanel({ language, canEdit }: Props) {
   }, [catalog, statuses]);
 
   async function disconnect(d: IntegrationDef) {
-    if (!confirm(l(`Отключить «${d.name}»? Сохранённые ключи будут удалены.`, '...', `Disconnect ${d.name}? Stored keys will be removed.`))) return;
+    if (!confirm(l(`Отключить «${d.name}»? Сохранённые ключи будут удалены.`, `«${d.name}» өшіру керек пе? Сақталған кілттер жойылады.`, `Disconnect ${d.name}? Stored keys will be removed.`))) return;
     try {
       await api.delete(`/api/integrations/v2/${d.id}`);
       setToast(l('Интеграция отключена', 'Өшірілді', 'Disconnected'));
@@ -128,7 +128,8 @@ export function IntegrationsPanel({ language, canEdit }: Props) {
         <h2 className="text-gray-900 mb-1">{l('Интеграции', 'Интеграциялар', 'Integrations')}</h2>
         <p className="text-xs text-gray-400 max-w-xl">
           {l('Каждая интеграция показывает реальный статус: ключи из Railway проверяются на лету, конфиги команды (Kaspi, WhatsApp) сохраняются в БД. Все подключения и отключения попадают в журнал.',
-             '...', 'Real status — env keys checked live, team configs persisted in DB. All connect/disconnect actions go to the activity log.')}
+             'Әр интеграция нақты күйін көрсетеді: Railway-дегі кілттер бірден тексеріледі, команда конфигтері (Kaspi, WhatsApp) ДБ-да сақталады. Барлық қосу/өшіру әрекеттері журналға түседі.',
+             'Real status — env keys checked live, team configs persisted in DB. All connect/disconnect actions go to the activity log.')}
         </p>
       </div>
 
@@ -155,7 +156,7 @@ export function IntegrationsPanel({ language, canEdit }: Props) {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder={l('Поиск по интеграциям…', '...', 'Search integrations…')}
+          placeholder={l('Поиск по интеграциям…', 'Интеграциялар бойынша іздеу…', 'Search integrations…')}
           className="flex-1 bg-transparent text-xs focus:outline-none placeholder:text-gray-400"
         />
         {search && (
@@ -176,7 +177,7 @@ export function IntegrationsPanel({ language, canEdit }: Props) {
       {/* ─── Groups ──────────────────────────────────────────────── */}
       {groups.length === 0 ? (
         <div className="text-center text-xs text-gray-400 py-8">
-          {l('Ничего не найдено', '...', 'Nothing matches')}
+          {l('Ничего не найдено', 'Ештеңе табылмады', 'Nothing matches')}
         </div>
       ) : groups.map(g => {
         const meta = CAT_META[g.cat];
@@ -234,7 +235,7 @@ export function IntegrationsPanel({ language, canEdit }: Props) {
                               return (
                                 <button
                                   key={v}
-                                  onClick={() => { navigator.clipboard.writeText(v); setToast(l('Скопировано: ', '...', 'Copied: ') + v); }}
+                                  onClick={() => { navigator.clipboard.writeText(v); setToast(l('Скопировано: ', 'Көшірілді: ', 'Copied: ') + v); }}
                                   className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono ${set ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-500'} hover:opacity-80`}
                                   title={l('Скопировать имя переменной', 'Айнымалы атын көшіру', 'Copy env name')}
                                 >
@@ -362,7 +363,7 @@ function IntegrationModal({
   const isEnv  = def.kind === 'env';
 
   async function save() {
-    if (!canEdit) { setErr(l('Только админ может настраивать', '...', 'Admins only')); return; }
+    if (!canEdit) { setErr(l('Только админ может настраивать', 'Тек әкімші бапта алады', 'Admins only')); return; }
     setBusy(true); setErr(null);
     try {
       await api.put(`/api/integrations/v2/${def.id}/config`, form);
@@ -412,7 +413,7 @@ function IntegrationModal({
                     <button
                       onClick={() => navigator.clipboard.writeText(v)}
                       className="px-2 py-1 text-[10px] text-gray-500 hover:text-gray-900 hover:bg-white rounded inline-flex items-center gap-1"
-                      title={l('Скопировать имя', '...', 'Copy name')}
+                      title={l('Скопировать имя', 'Атын көшіру', 'Copy name')}
                     >
                       <Copy className="w-3 h-3" />
                     </button>
@@ -421,7 +422,8 @@ function IntegrationModal({
               })}
               <div className="text-[10px] text-gray-400 leading-relaxed">
                 {l('Откройте Railway → Project → Variables → New Variable, вставьте имя выше и значение API-ключа. Сервер автоматически подхватит после редеплоя.',
-                   '...', 'Open Railway → Variables → New Variable. Paste the name above and your API key. Auto-applies on redeploy.')}
+                   'Railway → Project → Variables → New Variable ашыңыз, жоғарыдағы атау мен API-кілт мәнін қойыңыз. Сервер редеплойдан кейін автоматты түрде қабылдайды.',
+                   'Open Railway → Variables → New Variable. Paste the name above and your API key. Auto-applies on redeploy.')}
               </div>
 
               {/* «Как отключить» — для env-интеграций кнопки «Отключить»
@@ -434,10 +436,10 @@ function IntegrationModal({
                     {l('Как отключить эту интеграцию', 'Қалай өшіру керек', 'How to disable')}
                   </div>
                   <ol className="text-[11px] text-gray-600 space-y-1 pl-4 list-decimal">
-                    <li>{l('Откройте Railway → этот проект → Variables', '...', 'Open Railway → this project → Variables')}</li>
-                    <li>{l('Найдите переменную', '...', 'Find the variable')} <span className="font-mono text-[10px] bg-gray-50 px-1 rounded">{(def.envVars || [])[0]}</span></li>
-                    <li>{l('Нажмите Delete (корзина) → Confirm', '...', 'Click Delete → Confirm')}</li>
-                    <li>{l('Сервер сам перезапустится за ~30 секунд — интеграция отключится', '...', 'Server auto-redeploys in ~30s — integration goes offline')}</li>
+                    <li>{l('Откройте Railway → этот проект → Variables', 'Railway → осы жоба → Variables ашыңыз', 'Open Railway → this project → Variables')}</li>
+                    <li>{l('Найдите переменную', 'Айнымалыны табыңыз', 'Find the variable')} <span className="font-mono text-[10px] bg-gray-50 px-1 rounded">{(def.envVars || [])[0]}</span></li>
+                    <li>{l('Нажмите Delete (корзина) → Confirm', 'Delete (себет) → Confirm басыңыз', 'Click Delete → Confirm')}</li>
+                    <li>{l('Сервер сам перезапустится за ~30 секунд — интеграция отключится', 'Сервер ~30 секундта қайта жүктеледі — интеграция өшеді', 'Server auto-redeploys in ~30s — integration goes offline')}</li>
                   </ol>
                   <a
                     href="https://railway.app/dashboard"
@@ -448,7 +450,8 @@ function IntegrationModal({
                   </a>
                   <div className="mt-2 text-[10px] text-gray-400 italic">
                     {l('Мы не показываем кнопку «Отключить» здесь, потому что браузер не имеет (и не должен иметь) доступ к env-vars Railway по соображениям безопасности.',
-                       '...', 'No «Disconnect» button here — the browser has no (nor should have) access to Railway env vars.')}
+                       '«Өшіру» түймесі осында көрсетілмейді — қауіпсіздік үшін браузерде Railway env-vars-қа қол жеткізу жоқ (және болмауы керек).',
+                       'No «Disconnect» button here — the browser has no (nor should have) access to Railway env vars.')}
                   </div>
                 </div>
               )}
@@ -480,7 +483,7 @@ function IntegrationModal({
 
           {def.kind === 'config' && (!def.configFields || def.configFields.length === 0) && (
             <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-[11px] text-amber-800">
-              {l('Эта интеграция настраивается в отдельном блоке (см. выше).', '...', 'This integration is configured in a separate panel.')}
+              {l('Эта интеграция настраивается в отдельном блоке (см. выше).', 'Бұл интеграция жоғарыдағы жеке блокта бапталады.', 'This integration is configured in a separate panel.')}
             </div>
           )}
 

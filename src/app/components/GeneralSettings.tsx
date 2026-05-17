@@ -330,7 +330,7 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
 
       {/* ─── Localization ──────────────────────────────────────── */}
       <SectionCard icon={Globe} cls="bg-emerald-50 text-emerald-700" title={l('Язык и часовой пояс', 'Тіл және уақыт белдеуі', 'Language & timezone')}
-        subtitle={l('Применяется ко всему интерфейсу и расчётам времени (например, налоги КЗ)', '...', 'Applies across the UI and time calculations')}>
+        subtitle={l('Применяется ко всему интерфейсу и расчётам времени (например, налоги КЗ)', 'Барлық интерфейске және уақыт есептеуіне қолданылады (мысалы, ҚР салықтары)', 'Applies across the UI and time calculations')}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <div className="text-[10px] text-gray-400 mb-2 uppercase tracking-wide">{l('Язык интерфейса', 'Интерфейс тілі', 'UI Language')}</div>
@@ -429,7 +429,7 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
 
       {/* ─── Account actions ───────────────────────────────────── */}
       <SectionCard icon={Lock} cls="bg-gray-50 text-gray-700" title={l('Аккаунт', 'Аккаунт', 'Account')}
-        subtitle={l('Экспорт данных, смена пароля, выход', '...', 'Data export, password, sign out')}>
+        subtitle={l('Экспорт данных, смена пароля, выход', 'Деректерді экспорттау, құпия сөзді ауыстыру, шығу', 'Data export, password, sign out')}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <button
             onClick={exportData}
@@ -438,7 +438,7 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
             <Download className="w-3.5 h-3.5" /> {l('Экспорт моих данных', 'Деректерді экспорт', 'Export my data')}
           </button>
           <button
-            onClick={() => alert(l('Смена пароля скоро будет доступна. Пока — выйдите и используйте «Восстановить пароль».', '...', 'Password change coming soon. For now sign out and use «Reset password».'))}
+            onClick={() => alert(l('Смена пароля скоро будет доступна. Пока — выйдите и используйте «Восстановить пароль».', 'Құпия сөзді ауыстыру жақын арада қол жетімді болады. Әзірге шығып, «Құпия сөзді қалпына келтіру» қолданыңыз.', 'Password change coming soon. For now sign out and use «Reset password».'))}
             className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs text-gray-700 border border-gray-100"
           >
             <Lock className="w-3.5 h-3.5" /> {l('Сменить пароль', 'Пароль ауыстыру', 'Change password')}

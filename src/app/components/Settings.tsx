@@ -1545,23 +1545,23 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
     {
       family: 'openai', title: 'OpenAI GPT',
       options: [
-        { id: 'gpt-4o',      name: 'GPT-4o',      tone: l('Универсал, мультимодальная', '...', 'Versatile') },
+        { id: 'gpt-4o',      name: 'GPT-4o',      tone: l('Универсал, мультимодальная', 'Әмбебап, мультимодальды', 'Versatile') },
         { id: 'gpt-4o-mini', name: 'GPT-4o mini', tone: l('Быстрый и дешёвый',          'Тез',  'Fast / cheap'), badge: '⚡' },
-        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', tone: l('Стабильная для длинных диалогов', '...', 'Stable, long-ctx') },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', tone: l('Стабильная для длинных диалогов', 'Ұзақ диалогтар үшін тұрақты', 'Stable, long-ctx') },
       ],
     },
     {
       family: 'gemini', title: 'Google Gemini',
       options: [
-        { id: 'gemini-2.5-pro',   name: 'Gemini 2.5 Pro',   tone: l('2M контекст, мультимодальная', '...', 'Multimodal, 2M ctx') },
+        { id: 'gemini-2.5-pro',   name: 'Gemini 2.5 Pro',   tone: l('2M контекст, мультимодальная', '2M контекст, мультимодальды', 'Multimodal, 2M ctx') },
         { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', tone: l('Скоростная, дешёвая',          'Тез',  'Fast / cheap'), badge: '⚡' },
       ],
     },
     {
       family: 'deepseek', title: 'DeepSeek',
       options: [
-        { id: 'deepseek-chat',     name: 'DeepSeek V3',         tone: l('Дешёвая, отлично пишет на русском', '...', 'Cheap, great in RU') },
-        { id: 'deepseek-reasoner', name: 'DeepSeek R1 Reasoner', tone: l('Думает шаг за шагом, аналитика',    '...', 'Step-by-step reasoning'), badge: '🧠' },
+        { id: 'deepseek-chat',     name: 'DeepSeek V3',         tone: l('Дешёвая, отлично пишет на русском', 'Арзан, орысша жақсы жазады', 'Cheap, great in RU') },
+        { id: 'deepseek-reasoner', name: 'DeepSeek R1 Reasoner', tone: l('Думает шаг за шагом, аналитика',    'Қадам-қадам ойлайды, аналитика', 'Step-by-step reasoning'), badge: '🧠' },
       ],
     },
   ];
@@ -1736,7 +1736,8 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                 <div className="text-xs text-gray-900 mb-1">{l('Персона (необязательно)', 'Персона', 'Persona (optional)')}</div>
                 <div className="text-[10px] text-gray-400 mb-2">
                   {l('Например: «Помогаю подобрать мебель под ваш интерьер. Бесплатный замер по городу — обычно отвечаю в течение часа»',
-                     '...', 'e.g. "I help pick furniture for your interior. Free measurement — usually reply within an hour."')}
+                     'Мысалы: «Сізге интерьерге сай мебель таңдауға көмектесемін. Қала бойынша тегін өлшем — әдетте бір сағат ішінде жауап беремін»',
+                     'e.g. "I help pick furniture for your interior. Free measurement — usually reply within an hour."')}
                 </div>
                 <textarea
                   value={cfg.persona}
@@ -1788,11 +1789,11 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                 <div className="text-xs text-gray-900 mb-2">{l('Что AI делает сам', 'AI өзі не істейді', 'What AI handles autonomously')}</div>
                 <div className="grid sm:grid-cols-2 gap-2">
                   {[
-                    { k: 'answerFaq' as const,       label: l('Отвечать на FAQ',          'FAQ-ға жауап',           'Answer FAQs'),         hint: l('Часы, адрес, материалы', '...', 'Hours, address, materials') },
-                    { k: 'calculatePrice' as const,  label: l('Прикидывать стоимость',    'Бағаны бағалау',         'Estimate price'),       hint: l('Ориентировочно, по габаритам', '...', 'Rough, by dimensions') },
-                    { k: 'bookMeasurement' as const, label: l('Записывать на замер',      'Өлшеуге жазу',           'Book measurement'),     hint: l('Спросит имя, телефон, адрес', '...', 'Asks name + phone + addr') },
-                    { k: 'sendCatalog' as const,     label: l('Отправлять каталог',       'Каталог жіберу',         'Send catalog'),         hint: l('Ссылка / примеры работ', '...', 'Link / portfolio') },
-                    { k: 'askForContacts' as const,  label: l('Запрашивать контакты',     'Байланыс сұрау',         'Ask for contact info'), hint: l('Имя и телефон', '...', 'Name + phone') },
+                    { k: 'answerFaq' as const,       label: l('Отвечать на FAQ',          'FAQ-ға жауап',           'Answer FAQs'),         hint: l('Часы, адрес, материалы', 'Сағат, мекенжай, материалдар', 'Hours, address, materials') },
+                    { k: 'calculatePrice' as const,  label: l('Прикидывать стоимость',    'Бағаны бағалау',         'Estimate price'),       hint: l('Ориентировочно, по габаритам', 'Шамамен, өлшем бойынша', 'Rough, by dimensions') },
+                    { k: 'bookMeasurement' as const, label: l('Записывать на замер',      'Өлшеуге жазу',           'Book measurement'),     hint: l('Спросит имя, телефон, адрес', 'Аты-жөн, телефон, мекенжайды сұрайды', 'Asks name + phone + addr') },
+                    { k: 'sendCatalog' as const,     label: l('Отправлять каталог',       'Каталог жіберу',         'Send catalog'),         hint: l('Ссылка / примеры работ', 'Сілтеме / жұмыс үлгілері', 'Link / portfolio') },
+                    { k: 'askForContacts' as const,  label: l('Запрашивать контакты',     'Байланыс сұрау',         'Ask for contact info'), hint: l('Имя и телефон', 'Аты-жөн мен телефон', 'Name + phone') },
                   ].map(s => (
                     <label key={s.k} className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition ${cfg.scenarios[s.k] ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}>
                       <input type="checkbox" checked={cfg.scenarios[s.k]} onChange={e => updSc(s.k, e.target.checked)} className="accent-emerald-500 mt-0.5" />
@@ -1958,7 +1959,8 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
             <div className="space-y-3">
               <div className="text-[11px] text-gray-500 mb-1">
                 {l('Включите канал чтобы AI отвечал в нём. Webhook-интеграция подключается отдельно — пока что бот будет работать только из тест-чата.',
-                   '...', 'Toggle a channel and AI replies will route to it once the webhook is connected.')}
+                   'AI жауап беретін арнаны қосыңыз. Webhook-интеграция бөлек қосылады — әзірге бот тек тест-чаттан жұмыс істейді.',
+                   'Toggle a channel and AI replies will route to it once the webhook is connected.')}
               </div>
 
               {/* WhatsApp */}
@@ -2000,7 +2002,8 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
               <div className="mt-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl text-[11px] text-blue-700 flex gap-2 items-start">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                 <div>{l('Пока подключение каналов на этапе разработки. Используйте тест-чат — он применяет точно те же настройки, что и реальные диалоги.',
-                       '...', 'Channel integration is in progress. Use the test chat — it applies the exact same settings as production.')}</div>
+                       'Арналарды қосу әзірлеу сатысында. Тест-чатты пайдаланыңыз — ол нақты диалогтар сияқты дәл сол баптауларды қолданады.',
+                       'Channel integration is in progress. Use the test chat — it applies the exact same settings as production.')}</div>
               </div>
             </div>
           )}
@@ -2015,7 +2018,7 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                     {l('Реальный тест-чат', 'Шынайы тест-чат', 'Real test chat')}
                   </div>
                   <div className="text-[10px] text-gray-400">
-                    {l('Пишите «как клиент» — бот применяет текущие настройки', '...', 'Type as a customer — bot uses current settings')}
+                    {l('Пишите «как клиент» — бот применяет текущие настройки', '«Клиент сияқты» жазыңыз — бот ағымдағы баптауларды қолданады', 'Type as a customer — bot uses current settings')}
                   </div>
                 </div>
                 <button
@@ -2055,12 +2058,12 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                   {chatMessages.length === 0 && !chatSending && (
                     <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 text-xs">
                       <MessagesSquare className="w-8 h-8 mb-2 text-gray-300" />
-                      <div>{l('Начните диалог — напишите как обычный клиент', '...', 'Start a conversation — write as a customer')}</div>
+                      <div>{l('Начните диалог — напишите как обычный клиент', 'Диалогты бастаңыз — кәдімгі клиент сияқты жазыңыз', 'Start a conversation — write as a customer')}</div>
                       <div className="mt-3 flex flex-wrap gap-1.5 justify-center max-w-sm">
                         {[
-                          l('Здравствуйте! Подскажите, сколько примерно стоит кухня?', '...', 'Hi! How much does a kitchen cost roughly?'),
-                          l('Можно записаться на замер?', '...', 'Can I book a measurement?'),
-                          l('У вас есть примеры работ?', '...', 'Do you have past work examples?'),
+                          l('Здравствуйте! Подскажите, сколько примерно стоит кухня?', 'Сәлеметсіз бе! Ас үй шамамен қанша тұратынын айтасыз ба?', 'Hi! How much does a kitchen cost roughly?'),
+                          l('Можно записаться на замер?', 'Өлшемге жазылуға болады ма?', 'Can I book a measurement?'),
+                          l('У вас есть примеры работ?', 'Жұмыс үлгілері бар ма?', 'Do you have past work examples?'),
                         ].map((s, i) => (
                           <button key={i} onClick={() => setChatInput(s)} className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[10px] hover:bg-gray-50">
                             {s}
@@ -2127,7 +2130,8 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
 
               <div className="text-[10px] text-gray-400 px-1">
                 {l('💡 Тест использует те же настройки, что и реальные каналы. Меняйте настройки слева — следующий ответ применит изменения сразу, без Сохранить.',
-                   '...', '💡 Test uses the same settings as production. Edit any section — next reply applies your unsaved tweaks instantly.')}
+                   '💡 Тест нақты арналармен бірдей баптауларды пайдаланады. Сол жақта баптауларды өзгертіңіз — келесі жауап өзгерістерді бірден қолданады, Сақтаусыз.',
+                   '💡 Test uses the same settings as production. Edit any section — next reply applies your unsaved tweaks instantly.')}
               </div>
             </div>
           )}
@@ -2216,7 +2220,7 @@ function RequisitesCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
         </div>
         <div className="md:col-span-2">
           <div className="text-[10px] text-gray-400 mb-1">{l('Юридический адрес', 'Мекенжай', 'Legal address')}</div>
-          <input type="text" value={r.address || ''} onChange={e => up('address', e.target.value)} placeholder={l('г. Алматы, ул. ..., 1', '...', 'Almaty, ...')} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+          <input type="text" value={r.address || ''} onChange={e => up('address', e.target.value)} placeholder={l('г. Алматы, ул. ..., 1', 'Алматы қ., ... көш., 1', 'Almaty, ...')} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
         </div>
         <div className="md:col-span-2">
           <div className="text-[10px] text-gray-400 mb-1">{l('Банк', 'Банк', 'Bank')}</div>
@@ -2247,7 +2251,7 @@ function RequisitesCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
       {/* ── KZ tax flags ── */}
       <div className="mt-5 pt-4 border-t border-gray-100">
         <div className="text-xs text-gray-900 mb-1">{l('Налоговый статус', 'Салық мәртебесі', 'Tax status')}</div>
-        <div className="text-[10px] text-gray-400 mb-3">{l('Используется при расчёте налогов в разделе «Финансы → Налоги»', '...', 'Used by the tax calculator in Finance → Taxes')}</div>
+        <div className="text-[10px] text-gray-400 mb-3">{l('Используется при расчёте налогов в разделе «Финансы → Налоги»', '«Қаржы → Салықтар» бөлімінде салықты есептегенде қолданылады', 'Used by the tax calculator in Finance → Taxes')}</div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <div className="text-[10px] text-gray-400 mb-1.5">{l('Форма юр.лица', 'Тұлға түрі', 'Entity type')}</div>
@@ -2273,14 +2277,14 @@ function RequisitesCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
               <span className="text-xs text-gray-700">{l('Плательщик НДС (12%)', 'ҚҚС төлеушісі', 'VAT payer')}</span>
             </label>
             <div className="text-[10px] text-gray-400 mt-1.5">
-              {l('Включите если оборот > 20 000 МРП (~80 млн ₸) в год или зарегистрированы добровольно', '...', 'Enable if turnover above threshold or registered voluntarily')}
+              {l('Включите если оборот > 20 000 МРП (~80 млн ₸) в год или зарегистрированы добровольно', 'Жылдық айналым 20 000 АЕК-тен (~80 млн ₸) асса немесе ерікті тіркелсеңіз қосыңыз', 'Enable if turnover above threshold or registered voluntarily')}
             </div>
           </div>
         </div>
       </div>
 
       <div className="flex items-center justify-between mt-4">
-        <div className="text-[11px] text-gray-500">{msg || l('Заполните чтобы счета формировались с банковскими данными', '...', 'Fill in so invoices include bank details')}</div>
+        <div className="text-[11px] text-gray-500">{msg || l('Заполните чтобы счета формировались с банковскими данными', 'Шот-фактуралар банктік деректермен қалыптасуы үшін толтырыңыз', 'Fill in so invoices include bank details')}</div>
         <button onClick={save} disabled={saving} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 disabled:opacity-50">
           {saving ? l('Сохраняю…', 'Сақталуда…', 'Saving…') : l('Сохранить', 'Сақтау', 'Save')}
         </button>
