@@ -453,7 +453,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
       {/* Legacy inline new-deal modal — kept gated `false` for backward
           compat; NewDealModal above is the live one. */}
       {false && (
-        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowNewDealModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowNewDealModal(false)}>
           <div className="bg-white/85 backdrop-blur-2xl rounded-3xl max-w-md w-full ring-1 ring-white/70 shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <span className="text-sm text-slate-900">{l('Новая сделка', 'Жаңа мәміле', 'New Deal')}</span>
@@ -475,7 +475,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
 
       {/* ─── Rejected archive modal (glass) ───────────────────── */}
       {showArchive && (
-        <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowArchive(false)}>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowArchive(false)}>
           <div className={`${GLASS_DEEP} max-w-lg w-full max-h-[80vh] flex flex-col`} onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2.5">
@@ -547,7 +547,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
       {/* ─── Glass delete-confirmation dialog ─────────────────── */}
       {confirmDelete && (
         <div
-          className="fixed inset-0 bg-emerald-600/50 backdrop-blur-md z-[60] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-[60] flex items-center justify-center p-4"
           onClick={() => setConfirmDelete(null)}
         >
           <div

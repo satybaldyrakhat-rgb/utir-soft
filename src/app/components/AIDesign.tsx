@@ -795,7 +795,7 @@ export function AIDesign({ language }: AIDesignProps) {
                       >
                         <img src={r.imageUrl || r.imageDataUrl} alt="" className="w-full h-full object-cover transition-transform group-hover/card:scale-[1.02]" />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none" />
-                        <div className="absolute top-2 right-2 w-8 h-8 bg-emerald-600/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
+                        <div className="absolute top-2 right-2 w-8 h-8 bg-slate-900/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
                           <Maximize2 className="w-3.5 h-3.5" />
                         </div>
                       </button>
@@ -898,7 +898,7 @@ export function AIDesign({ language }: AIDesignProps) {
                       <>
                         <img src={h.imageUrl} alt={h.prompt} className="w-full h-full object-cover transition-transform group-hover/card:scale-[1.02]" />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none" />
-                        <div className="absolute top-2 right-2 w-8 h-8 bg-emerald-600/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
+                        <div className="absolute top-2 right-2 w-8 h-8 bg-slate-900/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
                           <Maximize2 className="w-3.5 h-3.5" />
                         </div>
                       </>
@@ -936,7 +936,7 @@ export function AIDesign({ language }: AIDesignProps) {
         {/* ─── Attach-to-deal picker (glass dialog) ──────────── */}
         {attachingId && (
           <div
-            className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/30 backdrop-blur-md z-50 flex items-center justify-center p-4"
             onClick={() => setAttachingId(null)}
           >
             <div
@@ -1007,7 +1007,7 @@ export function AIDesign({ language }: AIDesignProps) {
         {/* ─── Lightbox — full image + every per-image action ──── */}
         {viewing && viewing.imageUrl && (
           <div
-            className="fixed inset-0 bg-emerald-600/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
             onClick={() => setViewing(null)}
           >
             <div
@@ -1131,7 +1131,7 @@ export function AIDesign({ language }: AIDesignProps) {
         {/* ─── Delete confirmation ─────────────────────────────── */}
         {confirmDeleteId && (
           <div
-            className="fixed inset-0 bg-emerald-600/50 backdrop-blur-md z-[60] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-[60] flex items-center justify-center p-4"
             onClick={() => setConfirmDeleteId(null)}
           >
             <div

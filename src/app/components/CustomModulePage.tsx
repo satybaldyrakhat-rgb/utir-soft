@@ -165,7 +165,7 @@ export function CustomModulePage({ moduleId, language, onNotFound }: Props) {
       {/* Glass delete confirmation */}
       {confirmDelete && (
         <div
-          className="fixed inset-0 bg-emerald-600/50 backdrop-blur-md z-[80] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-[80] flex items-center justify-center p-4"
           onClick={() => setConfirmDelete(null)}
         >
           <div
@@ -242,7 +242,7 @@ function RecordForm({ mod, editing, language, onClose }: RecordFormProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-[80] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[80] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]" onClick={e => e.stopPropagation()}>
         <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between">
           <div>

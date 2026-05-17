@@ -693,7 +693,7 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
   };
 
   return (
-    <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-white/60 flex items-center justify-between">
           <h2 className="text-gray-900">Новая задача</h2>
@@ -826,7 +826,7 @@ function TaskDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="p-5 border-b border-white/60">

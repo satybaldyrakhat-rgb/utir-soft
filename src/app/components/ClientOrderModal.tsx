@@ -204,7 +204,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   ];
 
   return (
-    <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)] overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between flex-shrink-0">

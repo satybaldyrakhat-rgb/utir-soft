@@ -296,7 +296,7 @@ export function Warehouse({ language }: WarehouseProps) {
 
       {/* ===== MODALS ===== */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <span className="text-sm text-gray-900">{l('Добавить материал', 'Материал қосу', 'Add Material')}</span>
@@ -321,7 +321,7 @@ export function Warehouse({ language }: WarehouseProps) {
       )}
 
       {showEditModal && selectedProduct && (
-        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => { setShowEditModal(false); setSelectedProduct(null); }}>
+        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => { setShowEditModal(false); setSelectedProduct(null); }}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <div><div className="text-[10px] text-slate-400">{selectedProduct.category} · {selectedProduct.supplier}</div><div className="text-sm text-gray-900">{selectedProduct.name}</div></div>
@@ -347,7 +347,7 @@ export function Warehouse({ language }: WarehouseProps) {
       )}
 
       {selectedOrder && (
-        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setSelectedOrder(null)}>
+        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setSelectedOrder(null)}>
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <div><div className="text-sm text-gray-900">{selectedOrder.name}</div><div className="text-[10px] text-slate-400">#{selectedOrder.id} · {selectedOrder.client}</div></div>

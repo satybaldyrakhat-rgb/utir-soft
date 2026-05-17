@@ -324,13 +324,16 @@ function AppContent() {
   };
 
   return (
-    <div className="flex min-h-screen relative">
+    // h-screen + overflow-hidden so the only scroll container is <main>.
+    // Otherwise the document itself scrolls and the sidebar (lg:static)
+    // scrolls along with the content — user wants the sidebar fixed.
+    <div className="flex h-screen overflow-hidden relative">
       {/* Themable global page backdrop — paints once, every page renders
           on top. Theme changes recolour orbs instantly via CSS vars. */}
       <div className="app-backdrop" aria-hidden="true" />
       {/* Invite link held by a logged-in user — modal explaining what it's for. */}
       {heldInviteCode && (
-        <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-[60] flex items-center justify-center p-4" onClick={dismissHeldInvite}>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-center justify-center p-4" onClick={dismissHeldInvite}>
           <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md p-6 shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]" onClick={e => e.stopPropagation()}>
             <div className="text-lg text-slate-900 mb-2 tracking-tight">
               {language === 'kz' ? 'Командаға шақыру сілтемесі'
@@ -398,7 +401,7 @@ function AppContent() {
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-40 mt-[57px]"
+          className="lg:hidden fixed inset-0 bg-slate-900/40 backdrop-blur-md z-40 mt-[57px]"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}

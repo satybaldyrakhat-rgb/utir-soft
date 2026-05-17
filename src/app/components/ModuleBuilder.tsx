@@ -99,7 +99,7 @@ export function ModuleBuilder({ language, onClose, editing }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-[80] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[80] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/60 flex items-center justify-between flex-shrink-0">

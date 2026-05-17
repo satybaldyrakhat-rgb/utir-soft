@@ -112,7 +112,7 @@ export function NewDealModal({ language, onClose, seed }: Props) {
 
   return (
     <div
-      className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div

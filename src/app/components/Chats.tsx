@@ -445,7 +445,7 @@ export function Chats({ language }: ChatsProps) {
 
       {/* ===== SCENARIO MODAL ===== */}
       {scenarioModal && currentScenario && (
-        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setScenarioModal(null)}>
+        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setScenarioModal(null)}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -487,7 +487,7 @@ export function Chats({ language }: ChatsProps) {
 
       {/* Call Modal */}
       {showCallModal && (
-        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl w-72 p-6 text-center shadow-xl">
             <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3"><Phone className={`w-6 h-6 ${isInCall ? 'text-green-500' : 'text-gray-400'}`} /></div>
             <div className="text-sm text-slate-900 mb-1">{selectedChat?.name}</div>
