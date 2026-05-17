@@ -163,19 +163,36 @@ async function genGemini(inp: GenInputs): Promise<GenResult> {
       : ((inp.referenceImages?.length || 0) > 0 ? 'Используй изображения как референсы стиля. ' : '');
     parts.push({ text: hint + inp.prompt });
 
-    // Try the stable model first, then fall back to the preview alias and
-    // an older snapshot. Google rotates image-model names — having a few
-    // fallbacks keeps the integration alive when one of them gets
-    // deprecated/retired without us having to rush a deploy.
+    // Model fallback chain — newest «Nano Banana 2» first, then the
+    // original Nano Banana, then older snapshots. Order based on Google's
+    // March 2026 state (gemini-3-pro-image-preview was shut down → we
+    // skip it). If 3.1 hits a 404 (Google rotates names) we roll to 2.5
+    // automatically, so the integration survives Google's churn.
     const MODEL_CANDIDATES = [
-      'gemini-2.5-flash-image',
-      'gemini-2.5-flash-image-preview',
+      'gemini-3.1-flash-image-preview',  // Nano Banana 2 — newest, up to 4K, 14 aspect ratios
+      'gemini-2.5-flash-image',           // Nano Banana original — stable GA
+      'gemini-2.5-flash-image-preview',   // old preview alias (kept as safety net)
       'gemini-2.0-flash-exp-image-generation',
     ];
     let res: Response | null = null;
     let j: any = null;
     let lastError = '';
     for (const model of MODEL_CANDIDATES) {
+      // Nano Banana 2 (gemini-3.1-flash-image-preview) supports 4K output
+      // and aspectRatio config. Older models silently ignore the extras,
+      // so we send the same body to all candidates.
+      const generationConfig: any = {
+        responseModalities: ['IMAGE'],
+        // Interior shots read best in horizontal 16:9 (mirrors how listings
+        // are shown on Etsy / Pinterest / Houzz). Falls back to 1:1 on
+        // models that don't accept the option.
+        imageConfig: {
+          aspectRatio: '16:9',
+          // Newer models accept `imageSize: '2K'` or `'4K'`. Default to 2K
+          // for a nice quality bump without burning quota.
+          imageSize: '2K',
+        },
+      };
       res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
         {
@@ -183,7 +200,7 @@ async function genGemini(inp: GenInputs): Promise<GenResult> {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts }],
-            generationConfig: { responseModalities: ['IMAGE'] },
+            generationConfig,
           }),
         },
       );
@@ -211,6 +228,12 @@ async function genGemini(inp: GenInputs): Promise<GenResult> {
 }
 
 // ─── Claude — prompt enhancer + auto-route to an image provider ─────
+// Acts as a Creative Director for the image model. Constructs a prompt
+// using Google's officially validated 5-component formula (Subject +
+// Action + Location/Context + Composition + Style/Lighting) instead
+// of comma-separated keywords. Pattern adapted from the banana-claude
+// project (AgriciDaniel/banana-claude) — aligned with Google's March
+// 2026 «Ultimate Prompting Guide» for Gemini image models.
 async function enhancePromptWithClaude(prompt: string): Promise<string | null> {
   if (!ANTHROPIC_KEY) return null;
   try {
@@ -223,14 +246,41 @@ async function enhancePromptWithClaude(prompt: string): Promise<string | null> {
       },
       body: JSON.stringify({
         model: 'claude-opus-4-5',
-        max_tokens: 400,
+        max_tokens: 600,
         messages: [{
           role: 'user',
-          content:
-            'You are an interior-design prompt engineer. Take the user brief below and rewrite it ' +
-            'into a single rich, English-language prompt for an image model. Keep it under 80 words. ' +
-            'Include style, lighting, materials, colour palette, camera angle. Reply with only the prompt, no preface.\n\n' +
+          content: [
+            'You are a Creative Director constructing prompts for the Gemini',
+            'image model. Take the Russian/Kazakh interior-design brief below',
+            'and rewrite it into a single rich English narrative paragraph',
+            'using Google\'s 5-component formula. Write as flowing natural',
+            'prose, NEVER as comma-separated keyword lists. Total length:',
+            '70-120 words.',
+            '',
+            'The 5 components (in order, woven into a single paragraph):',
+            '  1. SUBJECT — the primary focus (room type), with specific',
+            '     materials, finishes, age, character',
+            '  2. ACTION / STATE — arrangement, what is present in the scene',
+            '  3. LOCATION / CONTEXT — apartment vs house, city, time of day,',
+            '     atmospheric conditions, view from windows',
+            '  4. COMPOSITION — camera perspective and framing (e.g. wide',
+            '     three-quarter shot, eye-level, slight low angle)',
+            '  5. STYLE & LIGHTING — reference real cameras (Canon EOS R5,',
+            '     Sony A7 IV), publication style (Architectural Digest,',
+            '     Dezeen, Dwell editorial), film stock, and explicit lighting',
+            '     (e.g. soft directional morning light from camera-left,',
+            '     warm interior lamps for fill, gentle Rembrandt on textures)',
+            '',
+            'BANNED keywords (do not use): "photorealistic", "8K", "4K",',
+            '"masterpiece", "highly detailed", "ultra realistic". They make',
+            'Gemini worse, not better — describe specific cameras and light',
+            'instead.',
+            '',
+            'Reply with ONLY the enhanced prompt paragraph, no preface, no',
+            'list, no explanation.',
+            '',
             `Brief: ${prompt}`,
+          ].join('\n'),
         }],
       }),
     });
