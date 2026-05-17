@@ -204,8 +204,8 @@ export function AdAnalytics({ language }: AdAnalyticsProps) {
     return (
       <div className="max-w-2xl mx-auto py-16 px-6">
         <div className="bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-2xl p-8 text-center">
-          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
-            <MetaLogo className="w-8 h-8" />
+          <div className="w-16 h-16 bg-white ring-1 ring-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-[0_4px_12px_-4px_rgba(15,23,42,0.10)]">
+            <MetaLogo className="w-10 h-10" />
           </div>
           <div className="text-lg text-slate-900 mb-2">
             {metaConnected ? 'Ждём первую синхронизацию' : 'Реклама ещё не подключена'}

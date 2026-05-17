@@ -44,6 +44,9 @@ const SLUG_MAP: Record<string, string> = {
   'whatsapp-business': 'whatsapp',
   instagram:         'instagram',
   'instagram-direct': 'instagram',
+  meta:              'meta',
+  'meta-ads':        'meta',
+  facebook:          'meta',
   tiktok:            'tiktok',
   zapier:            'zapier',
   'zapier-webhooks': 'zapier',
@@ -77,6 +80,7 @@ const BRAND_COLOR: Record<string, string> = {
   telegram:          '#2AABEE',
   whatsapp:          '#25D366',
   instagram:         '#E4405F',  // Instagram pink (gradient flattened)
+  meta:              '#0467DF',  // Meta brand blue
   tiktok:            '#000000',
   zapier:            '#FF4F00',
   n8n:               '#EA4B71',

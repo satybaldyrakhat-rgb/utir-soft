@@ -136,6 +136,21 @@ export const INTEGRATION_CATALOG: IntegrationDef[] = [
     helpUrl: 'https://developers.facebook.com/docs/messenger-platform/instagram',
     instructions: 'Подключите Instagram-Business к Facebook-странице → получите Page Access Token через Meta Graph Explorer.',
   },
+  {
+    id: 'meta-ads',
+    name: 'Meta Ads',
+    shortDesc: 'Реклама Facebook + Instagram, кампании, лиды, ROMI',
+    longDesc: 'Подключите рекламный кабинет Meta — данные кампаний, расходы, лиды и ROMI появятся в Аналитике → Реклама.',
+    category: 'other',
+    kind: 'config',
+    configFields: [
+      { id: 'adAccountId', label: 'Ad Account ID',  required: true, placeholder: 'act_1234567890', hint: 'Формат act_<число>' },
+      { id: 'businessId',  label: 'Business Manager ID', required: true },
+      { id: 'accessToken', label: 'System User Access Token', type: 'password', required: true, hint: 'Долгоживущий токен из Business Settings → System Users' },
+    ],
+    helpUrl: 'https://business.facebook.com/settings/system-users',
+    instructions: 'Meta Business Suite → Business Settings → System Users → создайте System User с ролью «Admin» и доступом к рекламному аккаунту → сгенерируйте Access Token (нужны права ads_read, ads_management, business_management, leads_retrieval).',
+  },
 
   // ── Payments (KZ-specific) ──
   {
