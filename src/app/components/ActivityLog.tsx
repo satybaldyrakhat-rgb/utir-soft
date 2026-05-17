@@ -132,7 +132,7 @@ export function ActivityLog({ language }: Props) {
         <button
           onClick={handleExportCSV}
           disabled={filtered.length === 0}
-          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-30"
+          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-30"
         >
           <Download className="w-3.5 h-3.5" />
           {l('Экспорт CSV', 'CSV экспорт', 'Export CSV')}

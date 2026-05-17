@@ -38,7 +38,7 @@ export function ComingSoon({ title, description, onBack, language = 'ru' }: Comi
           {onBack && (
             <button
               onClick={onBack}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] hover:shadow-[0_12px_32px_-8px_rgba(5,150,105,0.45)] hover:bg-emerald-700 transition-all ring-1 ring-white/10"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_var(--accent-shadow)] hover:shadow-[0_12px_32px_-8px_var(--accent-shadow)] hover:bg-emerald-700 transition-all ring-1 ring-white/10"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               {l('На главную', 'Басты бетке', 'Back to home')}

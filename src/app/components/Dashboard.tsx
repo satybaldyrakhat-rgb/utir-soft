@@ -164,7 +164,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
             </div>
             <button
               onClick={() => onNavigate?.('sales')}
-              className="group flex items-center gap-2 px-5 py-3 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] hover:shadow-[0_12px_32px_-8px_rgba(5,150,105,0.45)] hover:bg-emerald-700 transition-all w-fit ring-1 ring-white/10"
+              className="group flex items-center gap-2 px-5 py-3 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_var(--accent-shadow)] hover:shadow-[0_12px_32px_-8px_var(--accent-shadow)] hover:bg-emerald-700 transition-all w-fit ring-1 ring-white/10"
             >
               <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
               {t('newOrder', language)}
@@ -476,7 +476,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
             onClick={() => setSelectedOrder(null)}
           >
             <div
-              className="bg-white/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl max-w-md w-full shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]"
+              className="bg-white/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl max-w-md w-full shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]"
               onClick={e => e.stopPropagation()}
             >
               <div className="p-6 border-b border-white/60 flex items-center justify-between">
@@ -529,7 +529,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
 
                 <button
                   onClick={() => { setSelectedOrder(null); onNavigate?.('sales'); }}
-                  className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)]"
+                  className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-[0_8px_24px_-8px_var(--accent-shadow)]"
                 >
                   {l('Открыть заказ', 'Тапсырысты ашу', 'Open order')}
                   <ArrowRight className="w-4 h-4" />

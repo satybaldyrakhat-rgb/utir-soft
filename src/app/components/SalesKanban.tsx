@@ -236,7 +236,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
               {store.canWriteModule('orders') && (
                 <button
                   onClick={() => setShowNewDealModal(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-xs shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] hover:bg-emerald-700 ring-1 ring-white/10 transition-all"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-xs shadow-[0_8px_24px_-8px_var(--accent-shadow)] hover:bg-emerald-700 ring-1 ring-white/10 transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" />{l('Новая сделка', 'Жаңа мәміле', 'New Deal')}
                 </button>
@@ -454,7 +454,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
           compat; NewDealModal above is the live one. */}
       {false && (
         <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowNewDealModal(false)}>
-          <div className="bg-white/85 backdrop-blur-2xl rounded-3xl max-w-md w-full ring-1 ring-white/70 shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]" onClick={e => e.stopPropagation()}>
+          <div className="bg-white/85 backdrop-blur-2xl rounded-3xl max-w-md w-full ring-1 ring-white/70 shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <span className="text-sm text-slate-900">{l('Новая сделка', 'Жаңа мәміле', 'New Deal')}</span>
               <button onClick={() => setShowNewDealModal(false)} className="w-8 h-8 bg-white/60 ring-1 ring-white/60 rounded-2xl flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-500" /></button>
@@ -551,7 +551,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
           onClick={() => setConfirmDelete(null)}
         >
           <div
-            className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-sm p-6 shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]"
+            className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-sm p-6 shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]"
             onClick={e => e.stopPropagation()}
           >
             <div className="w-12 h-12 rounded-2xl bg-rose-100/70 text-rose-700 ring-1 ring-white/60 flex items-center justify-center mx-auto mb-4">

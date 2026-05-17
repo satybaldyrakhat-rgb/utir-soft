@@ -117,7 +117,7 @@ export function NewDealModal({ language, onClose, seed }: Props) {
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="bg-white/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)] overflow-hidden"
+        className="bg-white/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)] overflow-hidden"
       >
         {/* Header */}
         <div className="px-6 py-5 border-b border-white/60 flex items-start justify-between gap-3 flex-shrink-0">
@@ -150,7 +150,7 @@ export function NewDealModal({ language, onClose, seed }: Props) {
                 onClick={() => setTab(i as any)}
                 className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
                   active
-                    ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]'
+                    ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
                     : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
                 }`}
               >
@@ -383,7 +383,7 @@ export function NewDealModal({ language, onClose, seed }: Props) {
             <button
               onClick={() => canNext && setTab(Math.min(3, tab + 1) as any)}
               disabled={!canNext}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 flex items-center gap-1 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 disabled:opacity-40 disabled:shadow-none transition-all"
+              className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 flex items-center gap-1 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 disabled:opacity-40 disabled:shadow-none transition-all"
             >
               {l('Вперёд', 'Алға', 'Next')} <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -391,7 +391,7 @@ export function NewDealModal({ language, onClose, seed }: Props) {
             <button
               onClick={() => create(false)}
               disabled={!client.name}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 disabled:opacity-40 disabled:shadow-none transition-all"
+              className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 disabled:opacity-40 disabled:shadow-none transition-all"
             >
               {l('Создать сделку', 'Мәміле жасау', 'Create deal')}
             </button>

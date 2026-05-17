@@ -309,7 +309,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             </p>
 
             <div className="w-full space-y-2.5 mb-6">
-              <button onClick={() => { setStep('login-email'); setError(''); }} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">
+              <button onClick={() => { setStep('login-email'); setError(''); }} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
                 {l('Войти', 'Кіру', 'Log in')}
               </button>
               <button onClick={() => { setStep('signup-email'); setError(''); }} className="w-full py-3 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-700 hover:bg-white transition-all backdrop-blur-xl">
@@ -360,7 +360,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </div>
             </div>
 
-            <button onClick={() => handleEmailContinue('login')} disabled={isLoading || !email} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
+            <button onClick={() => handleEmailContinue('login')} disabled={isLoading || !email} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
 
@@ -411,7 +411,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               <button onClick={() => { setStep('forgot'); setError(''); }} className="text-xs text-slate-500 hover:text-gray-900 transition-colors">{l('Забыли пароль?', 'Құпия сөзді ұмыттыңыз ба?', 'Forgot password?')}</button>
             </div>
 
-            <button onClick={handleLogin} disabled={isLoading || !password} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleLogin} disabled={isLoading || !password} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : l('Войти', 'Кіру', 'Log in')}
             </button>
           </div>
@@ -474,7 +474,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </div>
             </div>
 
-            <button onClick={() => handleEmailContinue('signup')} disabled={isLoading || !email} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
+            <button onClick={() => handleEmailContinue('signup')} disabled={isLoading || !email} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
 
@@ -543,7 +543,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               )}
             </div>
 
-            <button onClick={handleSignupNameContinue} disabled={isLoading || !name.trim() || (!(invitePreview && !('error' in invitePreview)) && !company.trim())} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleSignupNameContinue} disabled={isLoading || !name.trim() || (!(invitePreview && !('error' in invitePreview)) && !company.trim())} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
@@ -601,7 +601,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </span>
             </label>
 
-            <button onClick={handleSignup} disabled={isLoading || !password || !confirmPassword || !agreeTerms} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleSignup} disabled={isLoading || !password || !confirmPassword || !agreeTerms} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Создать аккаунт', 'Аккаунт жасау', 'Create account')} <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
@@ -655,7 +655,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               <button onClick={handleResendCode} disabled={isLoading} className="text-xs text-gray-900 hover:underline mb-6 disabled:opacity-40">{l('Отправить код повторно', 'Кодты қайта жіберу', 'Resend code')}</button>
             )}
 
-            <button onClick={handleOtpVerify} disabled={isLoading || otp.join('').length < 6} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleOtpVerify} disabled={isLoading || otp.join('').length < 6} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Подтвердить', 'Растау', 'Verify')} <Check className="w-4 h-4" /></>}
             </button>
           </div>
@@ -676,7 +676,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </div>
             </div>
 
-            <button onClick={handleForgotPassword} disabled={isLoading || !email} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleForgotPassword} disabled={isLoading || !email} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : l('Отправить ссылку', 'Сілтеме жіберу', 'Send reset link')}
             </button>
           </div>
@@ -693,7 +693,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             <p className="text-sm text-slate-500 mb-1">{l('Мы отправили ссылку для сброса на', 'Біз қалпына келтіру сілтемесін жібердік', 'We sent a reset link to')}</p>
             <p className="text-sm text-gray-900 mb-6">{email}</p>
 
-            <button onClick={() => { setStep('login-email'); setPassword(''); setError(''); }} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">
+            <button onClick={() => { setStep('login-email'); setPassword(''); setError(''); }} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
               {l('Вернуться к входу', 'Кіруге оралу', 'Back to login')}
             </button>
             <p className="text-xs text-slate-500 mt-4">{l('Не получили? Проверьте папку спам', 'Алмадыңыз ба? Спам қалтасын тексеріңіз', "Didn't receive it? Check spam folder")}</p>
@@ -774,7 +774,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                 key={lang}
                 onClick={() => onLanguageChange(lang)}
                 className={`px-2.5 py-1 rounded-xl text-[10px] transition-all ${
-                  language === lang ? 'bg-emerald-600 text-white shadow-[0_2px_8px_-2px_rgba(5,150,105,0.4)]' : 'text-slate-500 hover:text-slate-900'
+                  language === lang ? 'bg-emerald-600 text-white shadow-[0_2px_8px_-2px_var(--accent-shadow)]' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 {lang.toUpperCase()}

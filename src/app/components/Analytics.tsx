@@ -145,7 +145,7 @@ export function Analytics({ language }: AnalyticsProps) {
                 onClick={() => setActiveTab(tab)}
                 className={`px-3.5 py-2 rounded-2xl text-xs ring-1 transition-all ${
                   active
-                    ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]'
+                    ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
                     : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
                 }`}
               >

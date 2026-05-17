@@ -248,7 +248,7 @@ export function Booking() {
           <div className="flex-1" />
           {step < 4 ? (
             <button onClick={() => canNext && setStep(step + 1)} disabled={!canNext}
-              className="flex items-center gap-1 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40">
+              className="flex items-center gap-1 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40">
               Далее <ChevronRight className="w-3.5 h-3.5" />
             </button>
           ) : (

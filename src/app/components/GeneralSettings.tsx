@@ -416,12 +416,12 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
           <div className="text-[11px] text-slate-500">
             {l('Выбрано:', 'Таңдалған:', 'Selected:')} <b className="text-slate-900">{THEMES.find(t => t.id === theme)?.label[language]}</b>
           </div>
-          {theme !== 'emerald' && (
+          {theme !== 'black' && (
             <button
-              onClick={() => pickTheme('emerald')}
+              onClick={() => pickTheme('black')}
               className="text-[11px] text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline"
             >
-              {l('Сбросить к бренду', 'Брендке қайтару', 'Reset to brand')}
+              {l('Сбросить', 'Қайтару', 'Reset')}
             </button>
           )}
         </div>

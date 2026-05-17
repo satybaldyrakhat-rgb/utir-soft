@@ -38,7 +38,7 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
             <button onClick={() => setSection('deals')}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
                 section === 'deals'
-                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]'
+                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
                   : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
               }`}>
               <CreditCard className="w-3.5 h-3.5" />
@@ -47,7 +47,7 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
             <button onClick={() => setSection('finance')}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
                 section === 'finance'
-                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]'
+                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
                   : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
               }`}>
               <TrendingUp className="w-3.5 h-3.5" />
@@ -443,7 +443,7 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
           <button
             disabled={!prompt || sending}
             onClick={() => { ask(prompt); setPrompt(''); }}
-            className="w-8 h-8 bg-emerald-600 disabled:bg-white/40 disabled:text-slate-400 text-white rounded-xl flex items-center justify-center transition-colors ring-1 ring-white/10 shadow-[0_4px_12px_-4px_rgba(5,150,105,0.4)] disabled:shadow-none"
+            className="w-8 h-8 bg-emerald-600 disabled:bg-white/40 disabled:text-slate-400 text-white rounded-xl flex items-center justify-center transition-colors ring-1 ring-white/10 shadow-[0_4px_12px_-4px_var(--accent-shadow)] disabled:shadow-none"
           >
             {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
           </button>
@@ -651,7 +651,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
           <Filter className="w-3 h-3 text-gray-300 mr-1 flex-shrink-0" />
           {FILTERS.map(f => (
             <button key={f.id} onClick={() => setFilter(f.id)}
-              className={`px-2.5 py-1 rounded-full text-[10px] whitespace-nowrap transition-colors flex items-center gap-1.5 ring-1 ${filter === f.id ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.35)]' : `${f.cls} ring-white/40 hover:bg-white/70`}`}>
+              className={`px-2.5 py-1 rounded-full text-[10px] whitespace-nowrap transition-colors flex items-center gap-1.5 ring-1 ${filter === f.id ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow-sm)]' : `${f.cls} ring-white/40 hover:bg-white/70`}`}>
               {f[language]}
               <span className={`px-1.5 py-0.5 rounded ${filter === f.id ? 'bg-white/20' : 'bg-gray-100'} text-[9px]`}>{counts[f.id]}</span>
             </button>

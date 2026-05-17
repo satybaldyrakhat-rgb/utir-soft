@@ -245,7 +245,7 @@ export function ModuleBuilder({ language, onClose, editing }: Props) {
           {error && <span className="text-xs text-red-500 mr-auto">{error}</span>}
           <div className="flex-1" />
           <button onClick={onClose} className="px-4 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">{tt('cancel')}</button>
-          <button onClick={handleSave} className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">{tt('builderSave')}</button>
+          <button onClick={handleSave} className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">{tt('builderSave')}</button>
         </div>
       </div>
     </div>

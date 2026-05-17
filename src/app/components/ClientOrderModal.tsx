@@ -205,7 +205,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
   return (
     <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)] overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)] overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between flex-shrink-0">
           <div className="min-w-0">
@@ -237,7 +237,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
                 activeTab === tab.id
-                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]'
+                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
                   : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
               }`}
             >
@@ -557,7 +557,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
           {store.canWriteModule('orders') && (
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all"
+              className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
             >
               {tt('save')}
             </button>

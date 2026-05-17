@@ -140,7 +140,7 @@ export function Chats({ language }: ChatsProps) {
               onClick={() => setActiveTab(t.id)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
                 activeTab === t.id
-                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]'
+                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
                   : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
               }`}
             >
@@ -437,7 +437,7 @@ export function Chats({ language }: ChatsProps) {
                   { icon: TrendingUp, label: l('Аналитика', 'Аналитика', 'Analytics'), hint: l('Отслеживание', 'Бақылау', 'Tracking') },
                 ].map((c, i) => <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4"><c.icon className="w-5 h-5 text-slate-400 mb-2" /><div className="text-xs text-slate-900 mb-0.5">{c.label}</div><div className="text-[10px] text-slate-400">{c.hint}</div></div>)}
               </div>
-              <button className="mt-6 px-5 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">{l('Настроить', 'Баптау', 'Configure')}</button>
+              <button className="mt-6 px-5 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">{l('Настроить', 'Баптау', 'Configure')}</button>
             </div>
           </div>
         )}
@@ -479,7 +479,7 @@ export function Chats({ language }: ChatsProps) {
             </div>
             <div className="p-5 pt-0 flex gap-2">
               <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">Отмена</button>
-              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">Сохранить</button>
+              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">Сохранить</button>
             </div>
           </div>
         </div>

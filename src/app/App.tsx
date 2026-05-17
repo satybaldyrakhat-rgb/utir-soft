@@ -26,8 +26,9 @@ import { api, getToken, setToken } from './utils/api';
 import { applyTheme, loadTheme } from './utils/theme';
 
 // Apply the user's saved accent theme as early as possible — before
-// React even mounts — so first paint doesn't flash the default
-// emerald. The picker UI lives in Settings → Основные.
+// React even mounts — so first paint doesn't flash the platform default
+// (black) when the user has chosen something else. The picker UI lives
+// in Settings → Основные.
 if (typeof document !== 'undefined') {
   applyTheme(loadTheme());
 }
@@ -330,7 +331,7 @@ function AppContent() {
       {/* Invite link held by a logged-in user — modal explaining what it's for. */}
       {heldInviteCode && (
         <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-[60] flex items-center justify-center p-4" onClick={dismissHeldInvite}>
-          <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md p-6 shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]" onClick={e => e.stopPropagation()}>
+          <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md p-6 shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]" onClick={e => e.stopPropagation()}>
             <div className="text-lg text-slate-900 mb-2 tracking-tight">
               {language === 'kz' ? 'Командаға шақыру сілтемесі'
                 : language === 'eng' ? 'Team invitation link'
@@ -350,7 +351,7 @@ function AppContent() {
                   try { await navigator.clipboard.writeText(`${window.location.origin}/?invite=${heldInviteCode}`); } catch { /* ignore */ }
                   dismissHeldInvite();
                 }}
-                className="w-full py-2.5 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all"
+                className="w-full py-2.5 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
               >
                 {language === 'kz' ? 'Көшіріп, жабу'
                   : language === 'eng' ? 'Copy and close'
@@ -409,7 +410,7 @@ function AppContent() {
         <div className="px-5 pt-5 pb-4 border-b border-white/60 hidden lg:block">
           {!isSidebarCollapsed ? (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl flex items-center justify-center overflow-hidden ring-1 ring-emerald-200/60 shadow-[0_4px_12px_-4px_rgba(5,150,105,0.3)]">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center overflow-hidden ring-1 ring-emerald-200/60 shadow-[0_4px_12px_-4px_var(--accent-shadow-sm)]">
                 <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
               </div>
               <div className="min-w-0">
@@ -420,7 +421,7 @@ function AppContent() {
               </div>
             </div>
           ) : (
-            <div className="w-9 h-9 rounded-2xl flex items-center justify-center mx-auto overflow-hidden ring-1 ring-emerald-200/60 shadow-[0_4px_12px_-4px_rgba(5,150,105,0.3)]">
+            <div className="w-9 h-9 rounded-2xl flex items-center justify-center mx-auto overflow-hidden ring-1 ring-emerald-200/60 shadow-[0_4px_12px_-4px_var(--accent-shadow-sm)]">
               <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
             </div>
           )}
@@ -459,10 +460,10 @@ function AppContent() {
                   onClick={() => handleMenuClick(id)}
                   className={`group w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-2xl transition-all ${
                     active
-                      ? 'bg-emerald-600 text-white shadow-[0_8px_20px_-6px_rgba(5,150,105,0.45)] ring-1 ring-white/20'
+                      ? 'bg-emerald-600 text-white shadow-[0_8px_20px_-6px_var(--accent-shadow)] ring-1 ring-white/20'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
                   }`}
-                  style={active ? { backgroundColor: 'var(--accent-600, #059669)', boxShadow: '0 8px 20px -6px var(--accent-shadow, rgba(5,150,105,0.45))' } : undefined}
+                  style={active ? { backgroundColor: 'var(--accent-600)', boxShadow: '0 8px 20px -6px var(--accent-shadow)' } : undefined}
                   title={isSidebarCollapsed ? label : ''}
                 >
                   <span
@@ -634,7 +635,7 @@ function AppContent() {
                   };
                   return (
                     <>
-                      <div className="w-10 h-10 rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-500 ring-1 ring-white/70 flex items-center justify-center text-sm text-white font-medium flex-shrink-0 shadow-[0_4px_12px_-4px_rgba(5,150,105,0.4)]">
+                      <div className="w-10 h-10 rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-500 ring-1 ring-white/70 flex items-center justify-center text-sm text-white font-medium flex-shrink-0 shadow-[0_4px_12px_-4px_var(--accent-shadow)]">
                         {profile.avatar
                           ? <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover" />
                           : <span>{initials || '?'}</span>}
