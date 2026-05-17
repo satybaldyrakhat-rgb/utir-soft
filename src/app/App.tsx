@@ -29,9 +29,10 @@ import { api, getToken, setToken } from './utils/api';
 const LAST_PAGE_KEY = 'utir_current_page';
 
 function AppContent() {
-  // Initial value: try localStorage first; falls back to 'dashboard'.
-  // Hash-route fallback (#/sales) wins if present so deep links keep working.
-  const [currentPage, setCurrentPage] = useState<string>(() => {
+  // Initial value: try URL hash first (deep links), then localStorage
+  // (the last page the user visited), fall back to 'dashboard'. This runs
+  // BEFORE first render so the right component mounts on refresh.
+  const [currentPageRaw, setCurrentPageRaw] = useState<string>(() => {
     try {
       const hash = window.location.hash.replace(/^#\/?/, '').trim();
       if (hash) return hash;
@@ -40,6 +41,19 @@ function AppContent() {
     } catch { /* localStorage blocked — use default */ }
     return 'dashboard';
   });
+  const currentPage = currentPageRaw;
+  // Wrapped setter: persists synchronously on every navigation so there's
+  // no race condition with useEffect ordering. Previously the persistence
+  // ran inside a useEffect gated on isAuthenticated, which could miss the
+  // first navigation before auth completed.
+  const setCurrentPage = (page: string) => {
+    setCurrentPageRaw(page);
+    try { localStorage.setItem(LAST_PAGE_KEY, page); } catch { /* ignore */ }
+    try {
+      const hashTarget = `#/${page}`;
+      if (window.location.hash !== hashTarget) window.history.replaceState(null, '', hashTarget);
+    } catch { /* ignore */ }
+  };
   const [language, setLanguage] = useState<'kz' | 'ru' | 'eng'>('ru');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -126,7 +140,14 @@ function AppContent() {
   };
 
   // If the currently open page got disabled, fall back to dashboard.
+  // We wait until modules are actually loaded (length > 0) — otherwise the
+  // first paint (empty modules array) could falsely flag «settings» / any
+  // real page as «not visible» and bounce the user to Dashboard, wiping
+  // their saved last-page. We also use setCurrentPage (not raw) so the
+  // localStorage gets updated to dashboard too — the old page is genuinely
+  // gone, so we shouldn't restore it on next refresh.
   useEffect(() => {
+    if (dataStore.modules.length === 0) return;
     if (!isModuleVisible(currentPage)) setCurrentPage('dashboard');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataStore.modules, currentPage]);
@@ -143,27 +164,13 @@ function AppContent() {
     return () => window.removeEventListener('app:navigate', onNavigate as EventListener);
   }, []);
 
-  // Persist the active page to localStorage on every change so a browser
-  // refresh returns the user to the same section. Also mirror it into
-  // window.location.hash so the address bar reflects where we are and
-  // the back / forward buttons work intuitively. Skipped on auth screen
-  // (currentPage is meaningless until logged in).
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    try { localStorage.setItem(LAST_PAGE_KEY, currentPage); } catch { /* ignore */ }
-    try {
-      const hashTarget = `#/${currentPage}`;
-      if (window.location.hash !== hashTarget) window.history.replaceState(null, '', hashTarget);
-    } catch { /* ignore */ }
-  }, [currentPage, isAuthenticated]);
-
   // Browser back / forward button → sync currentPage with the URL hash so
-  // navigation feels native. Without this, hitting Back wouldn't change
-  // the visible page even though the URL changed.
+  // navigation feels native. Use setCurrentPageRaw here to avoid an
+  // immediate replaceState ping-pong (the hash is already the new value).
   useEffect(() => {
     const onHash = () => {
       const hash = window.location.hash.replace(/^#\/?/, '').trim();
-      if (hash) setCurrentPage(hash);
+      if (hash) setCurrentPageRaw(hash);
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
