@@ -5,6 +5,7 @@ import { ActivityLog } from './ActivityLog';
 import { TelegramPairing } from './TelegramPairing';
 import { TeamInvitePanel } from './TeamInvitePanel';
 import { WebhooksPanel } from './WebhooksPanel';
+import { IntegrationsPanel } from './IntegrationsPanel';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
 import { useDataStore, ALL_MODULES, ALL_ROLES, MODULE_GROUPS, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
 import { api } from '../utils/api';
@@ -956,34 +957,13 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
       {/* ===== INTEGRATIONS ===== */}
       {activeTab === 'integrations' && (
         <div className="space-y-5">
-          {/* Outbound webhook subscriptions — admin can wire Make / Zapier / n8n / own backend. */}
-          <WebhooksPanel language={language} />
+          {/* New real-status panel: env-var detection for AI providers + Telegram,
+              team-stored configs for Kaspi / WhatsApp / Instagram, OAuth stubs. */}
+          <IntegrationsPanel language={language} canEdit={isAdmin} />
 
-          {['msg', 'fin', 'ai', 'other'].map(cat => {
-            const items = integrations.filter(i => i.cat === cat);
-            const catLabel = { msg: l('Мессенджеры', 'Мессенджерлер', 'Messaging'), fin: l('Финансы', 'Қаржы', 'Finance'), ai: 'AI', other: l('Другое', 'Басқа', 'Other') }[cat];
-            return (
-              <div key={cat}>
-                <div className="text-[11px] text-gray-400 mb-2">{catLabel}</div>
-                <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
-                  {items.map(intg => (
-                    <div key={intg.id} className="px-4 py-3 flex items-center gap-3">
-                      <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">{intg.icon}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm text-gray-900">{intg.name}</div>
-                        <div className="text-[10px] text-gray-400">{intg.desc}</div>
-                      </div>
-                      {intg.connected ? (
-                        <span className="flex items-center gap-1 text-[10px] text-green-500"><span className="w-1.5 h-1.5 bg-green-500 rounded-full" />{l('Подключено', 'Қосылды', 'Connected')}</span>
-                      ) : (
-                        <button onClick={() => store.toggleIntegration(intg.id)} className="px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] text-gray-500 hover:bg-gray-50">{l('Подключить', 'Қосу', 'Connect')}</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+          {/* Outbound webhook subscriptions kept as its own block since it has
+              its own subscription list UI (URL + events + HMAC secret). */}
+          <WebhooksPanel language={language} />
         </div>
       )}
 

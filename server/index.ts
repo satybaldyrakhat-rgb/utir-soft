@@ -14,6 +14,7 @@ import aiTools from './aiTools.js';
 import { getPermissionLevel as getPermLevel, canRunTool } from './permissions.js';
 import { transcribeAudio, parseAudioDataUrl, isWhisperReady } from './whisper.js';
 import { readClientAI, writeClientAI, runClientAITest, DEFAULT_CLIENT_AI, ALL_CLIENT_AI_MODELS, type ClientAIConfig, type DayKey } from './clientAi.js';
+import { INTEGRATION_CATALOG, getAllStatuses as getIntegrationStatuses, saveConfig as saveIntegrationConfig, disconnect as disconnectIntegration } from './integrations2.js';
 import { createHmac, randomBytes } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -267,6 +268,11 @@ migrateColumn('team_settings', 'client_ai', 'TEXT');
 // invoice PDFs. Lives on team_settings so the whole team uses the same
 // bank details on every счёт the admin prints.
 migrateColumn('team_settings', 'company_requisites', 'TEXT');
+// Integration configs — JSON keyed by integration id (e.g. 'kaspi-qr':
+// { config: { merchantId, ... }, savedAt }). Env-key integrations (AI,
+// Telegram bot) are NOT stored here — those live in Railway env vars
+// and we just read process.env at status-time.
+migrateColumn('team_settings', 'integrations', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -2073,6 +2079,52 @@ integrationsRouter.patch('/:id', (req: AuthedRequest, res) => {
 });
 
 app.use('/api/integrations', integrationsRouter);
+
+// ─── INTEGRATIONS v2 — real status + team-wide configs ────────────
+// Replaces the legacy per-user toggle list with a catalog-driven system.
+// Returns:
+//   • catalog: definitions (name, fields, helpUrl, instructions, ...)
+//   • statuses: live state (env vars set / config saved / connected bool)
+// Admin-or-manager can write team config; everyone can read status.
+const integrationsV2Router = express.Router();
+integrationsV2Router.use(authMiddleware);
+
+integrationsV2Router.get('/', (req: AuthedRequest, res) => {
+  res.json({
+    catalog: INTEGRATION_CATALOG,
+    statuses: getIntegrationStatuses(db, req.teamId!),
+  });
+});
+
+integrationsV2Router.put('/:id/config', requireRole('manager'), (req: AuthedRequest, res) => {
+  const result = saveIntegrationConfig(db, req.teamId!, req.params.id, req.body || {});
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  // Activity log entry so admin can audit integration changes.
+  const def = INTEGRATION_CATALOG.find(d => d.id === req.params.id);
+  const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  logActivity(req.userId!, {
+    user: actor?.name || 'Пользователь', actor: 'human',
+    action: 'Настроил интеграцию',
+    target: def?.name || req.params.id,
+    type: 'settings', page: 'settings',
+  });
+  res.json({ ok: true, statuses: getIntegrationStatuses(db, req.teamId!) });
+});
+
+integrationsV2Router.delete('/:id', requireRole('manager'), (req: AuthedRequest, res) => {
+  disconnectIntegration(db, req.teamId!, req.params.id);
+  const def = INTEGRATION_CATALOG.find(d => d.id === req.params.id);
+  const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  logActivity(req.userId!, {
+    user: actor?.name || 'Пользователь', actor: 'human',
+    action: 'Отключил интеграцию',
+    target: def?.name || req.params.id,
+    type: 'settings', page: 'settings',
+  });
+  res.json({ ok: true, statuses: getIntegrationStatuses(db, req.teamId!) });
+});
+
+app.use('/api/integrations/v2', integrationsV2Router);
 
 // ─── ACTIVITY LOG ──────────────────────────────────────
 const activityRouter = express.Router();
