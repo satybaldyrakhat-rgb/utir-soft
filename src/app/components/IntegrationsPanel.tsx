@@ -4,10 +4,8 @@ import {
   Copy, ExternalLink, Lock, Settings as SettingsIcon, Power, Search, KeyRound, ShieldCheck, Trash2,
 } from 'lucide-react';
 import { api } from '../utils/api';
-import {
-  WhatsAppLogo, TelegramLogo, InstagramLogo, KaspiLogo, HalykLogo, OneCLogo,
-  ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo, AnthropicLogo, DeepSeekLogo, ZapierLogo,
-} from './PlatformLogos';
+import { KaspiLogo, HalykLogo, OneCLogo } from './PlatformLogos';
+import { BrandLogo, hasBrandLogo } from './BrandLogo';
 
 interface Props { language: 'kz' | 'ru' | 'eng'; canEdit: boolean }
 
@@ -32,24 +30,16 @@ interface IntegrationStatus {
   config?: Record<string, string>;
 }
 
-// Logo registry — uses the real SVG marks from PlatformLogos so the cards
-// have authentic-looking brand identity instead of placeholder monograms.
+// Logo registry — for KZ-local brands (Kaspi, Halyk, 1С) we keep the
+// hand-drawn SVGs from PlatformLogos (Simple Icons doesn't cover them).
+// Everything else goes through the unified <BrandLogo> which inlines
+// pre-processed Simple Icons SVGs with brand-correct colour.
 function logoFor(id: string): JSX.Element {
-  switch (id) {
-    case 'anthropic':         return <AnthropicLogo  className="w-6 h-6" />;
-    case 'openai':            return <ChatGPTLogo    className="w-6 h-6" />;
-    case 'google-gemini':     return <GeminiLogo     className="w-6 h-6" />;
-    case 'deepseek':          return <DeepSeekLogo   className="w-6 h-6" />;
-    case 'telegram-bot':      return <TelegramLogo   className="w-6 h-6" />;
-    case 'whatsapp-business': return <WhatsAppLogo   className="w-6 h-6" />;
-    case 'instagram-direct':  return <InstagramLogo  className="w-6 h-6" />;
-    case 'kaspi-qr':          return <KaspiLogo      className="w-6 h-6" />;
-    case 'halyk-pos':         return <HalykLogo      className="w-6 h-6" />;
-    case '1c':                return <OneCLogo       className="w-6 h-6" />;
-    case 'google-workspace':  return <GoogleLogo     className="w-6 h-6" />;
-    case 'zapier-webhooks':   return <ZapierLogo    className="w-6 h-6" />;
-    default:                  return <Zap className="w-5 h-5 text-gray-400" />;
-  }
+  if (id === 'kaspi-qr') return <KaspiLogo className="w-6 h-6" />;
+  if (id === 'halyk-pos') return <HalykLogo className="w-6 h-6" />;
+  if (id === '1c')        return <OneCLogo className="w-6 h-6" />;
+  if (hasBrandLogo(id))   return <BrandLogo id={id} size={24} />;
+  return <Zap className="w-5 h-5 text-gray-400" />;
 }
 
 const CAT_META: Record<IntegrationCategory, { ru: string; icon: any; cls: string }> = {
