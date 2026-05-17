@@ -1,4 +1,4 @@
-import { Sparkles, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 interface ComingSoonProps {
   title: string;
@@ -17,50 +17,40 @@ export function ComingSoon({ title, description, onBack, language = 'ru' }: Comi
   );
 
   return (
-    // No card at all — Linear-style centred composition on the page
-    // backdrop. Bigger typography, ghost CTA, animated pulse halo
-    // around the icon. Symmetric by construction so all corners stay
-    // visually equal.
+    // Liquid-glass composition — no big icon, no card frame. Three
+    // floating glass pills (eyebrow, title surround, CTA) sit on the
+    // shared page backdrop. Symmetric by construction.
     <div className="min-h-full flex items-center justify-center px-6 py-16">
       <div className="max-w-lg w-full text-center">
-        {/* Icon with animated pulse ring + glass tile */}
-        <div className="relative inline-flex mb-8">
-          <div
-            className="absolute inset-0 rounded-3xl animate-ping opacity-30"
-            style={{ background: 'var(--accent-200)', animationDuration: '3s' }}
-          />
-          <div className="relative w-20 h-20 rounded-3xl bg-white ring-1 ring-slate-200 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] flex items-center justify-center">
-            <Sparkles className="w-9 h-9" style={{ color: 'var(--accent-600)' }} />
-          </div>
-        </div>
-
-        {/* Eyebrow — uppercase tracking-widest with pulsing dot */}
-        <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-slate-500 mb-5">
+        {/* Glass eyebrow capsule with pulsing accent dot */}
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 rounded-full shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] mb-6">
           <span
             className="w-1.5 h-1.5 rounded-full animate-pulse"
             style={{ background: 'var(--accent-500)' }}
           />
-          {eyebrow}
+          <span className="text-[10px] uppercase tracking-[0.22em] text-slate-600">{eyebrow}</span>
         </div>
 
         {/* Large title */}
-        <h2 className="text-3xl md:text-4xl text-slate-900 tracking-tight mb-3 font-medium">
+        <h2 className="text-3xl md:text-5xl text-slate-900 tracking-tight mb-4 font-medium leading-[1.05]">
           {title}
         </h2>
 
         {/* Description */}
-        <p className="text-[15px] text-slate-500 leading-relaxed mb-8 max-w-md mx-auto">
+        <p className="text-[15px] text-slate-500 leading-relaxed mb-10 max-w-md mx-auto">
           {description || fallbackDesc}
         </p>
 
-        {/* Ghost CTA — minimalist, no shadow, no solid bg.
-            Hover slides the arrow + darkens text. */}
+        {/* Glass CTA — translucent capsule, slate text, accent arrow */}
         {onBack && (
           <button
             onClick={onBack}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm text-slate-500 hover:text-slate-900 transition-colors group"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 hover:bg-white/80 hover:ring-white/80 text-sm text-slate-700 hover:text-slate-900 rounded-full transition-all shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] hover:shadow-[0_8px_24px_-8px_rgba(15,23,42,0.15)] group"
           >
-            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
+            <ArrowLeft
+              className="w-4 h-4 transition-transform group-hover:-translate-x-0.5"
+              style={{ color: 'var(--accent-600)' }}
+            />
             {l('Вернуться на главную', 'Басты бетке оралу', 'Back to dashboard')}
           </button>
         )}
