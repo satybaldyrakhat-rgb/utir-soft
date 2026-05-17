@@ -258,6 +258,13 @@ function AppContent() {
         return <ComingSoon
           language={language}
           title={language === 'kz' ? 'Өндіріс' : language === 'eng' ? 'Production' : 'Производство'}
+          description={
+            language === 'kz'
+              ? 'Жеткізушілер, материалдар, қойма қалдықтары мен өндіріс тапсырыстары жақын арада осында пайда болады.'
+              : language === 'eng'
+              ? 'Suppliers, materials, stock balances and production orders — coming here soon.'
+              : 'Поставщики, материалы, остатки на складе и производственные заказы появятся здесь.'
+          }
           onBack={() => setCurrentPage('dashboard')}
         />;
       case 'finance':
@@ -268,6 +275,13 @@ function AppContent() {
         return <ComingSoon
           language={language}
           title={language === 'kz' ? 'Чаттар' : language === 'eng' ? 'Chats' : 'Чаты'}
+          description={
+            language === 'kz'
+              ? 'WhatsApp Business, Instagram Direct, Telegram — барлық диалогтар бір терезеде. Қазір — Параметрлер → Интеграциялар арқылы қосыңыз.'
+              : language === 'eng'
+              ? 'WhatsApp Business, Instagram Direct, Telegram — all conversations in one window. Connect via Settings → Integrations.'
+              : 'WhatsApp Business, Instagram Direct, Telegram — все диалоги в одном окне. Пока — подключайте через Настройки → Интеграции.'
+          }
           onBack={() => setCurrentPage('dashboard')}
         />;
       case 'analytics':
