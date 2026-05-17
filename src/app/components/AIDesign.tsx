@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Sparkles, Loader2, Download, Check, X, Bot, History, Wand2,
   CookingPot, BedDouble, Sofa, Bath, Baby, DoorOpen, Link as LinkIcon, Search,
+  TreePine, Square as SquareIcon, Building2, Landmark, Leaf, Camera,
 } from 'lucide-react';
 import { api } from '../utils/api';
 import { useDataStore } from '../utils/dataStore';
@@ -56,10 +57,14 @@ interface ProviderStatus { id: ProviderId; name: string; enabled: boolean; envVa
 interface GenResult { id?: string; provider: ProviderId; ok: boolean; imageUrl?: string; imageDataUrl?: string; enhancedPrompt?: string; error?: string }
 interface HistoryEntry { id: string; userId: string; userName: string; provider: ProviderId; prompt: string; imageUrl: string | null; enhancedPrompt: string | null; createdAt: string }
 
+// Shared glass-card class — same vocabulary as the Dashboard so pages
+// feel like part of the same surface.
+const GLASS = 'bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl';
+const GLASS_HOVER = 'transition-all hover:bg-white/70 hover:shadow-[0_16px_48px_-12px_rgba(15,23,42,0.18)]';
+
 // ─── Wizard data ──────────────────────────────────────────────────
 // Each room / style is paired with a short Russian phrase that goes into
-// the auto-assembled prompt. Icons are picked from lucide-react where
-// reasonable; fallbacks are emoji.
+// the auto-assembled prompt. Icons are real lucide marks — no emoji.
 const ROOMS: { id: string; label: { ru: string; kz: string; eng: string }; icon: React.ComponentType<{ className?: string }>; promptRu: string }[] = [
   { id: 'kitchen',    label: { ru: 'Кухня',     kz: 'Ас үй',      eng: 'Kitchen' },     icon: CookingPot, promptRu: 'просторная кухня' },
   { id: 'bedroom',    label: { ru: 'Спальня',   kz: 'Жатын бөлме',eng: 'Bedroom' },     icon: BedDouble,  promptRu: 'уютная спальня' },
@@ -69,13 +74,23 @@ const ROOMS: { id: string; label: { ru: string; kz: string; eng: string }; icon:
   { id: 'hallway',    label: { ru: 'Прихожая',  kz: 'Дәліз',      eng: 'Hallway' },     icon: DoorOpen,   promptRu: 'прихожая' },
 ];
 
-const STYLES: { id: string; label: { ru: string; kz: string; eng: string }; promptRu: string; emoji: string }[] = [
-  { id: 'scandi',    label: { ru: 'Скандинавский', kz: 'Скандинав',    eng: 'Scandi' },     promptRu: 'в скандинавском стиле, белые матовые фасады, дерево, мягкое естественное освещение', emoji: '🌲' },
-  { id: 'minimal',   label: { ru: 'Минимализм',    kz: 'Минимализм',   eng: 'Minimal' },    promptRu: 'в стиле минимализм, чистые линии, монохромная палитра, скрытые ручки',             emoji: '◻️' },
-  { id: 'loft',      label: { ru: 'Лофт',          kz: 'Лофт',         eng: 'Loft' },       promptRu: 'в стиле лофт, кирпичная кладка, открытые балки, металл, индустриальные лампы',     emoji: '🧱' },
-  { id: 'classic',   label: { ru: 'Классика',      kz: 'Классика',     eng: 'Classic' },    promptRu: 'в классическом стиле, лепнина, благородные материалы, тёплый свет',                 emoji: '🏛' },
-  { id: 'modern',    label: { ru: 'Модерн',        kz: 'Модерн',       eng: 'Modern' },     promptRu: 'в стиле современный модерн, акцентные геометрии, тёмный дуб, латунь',                emoji: '✨' },
-  { id: 'eco',       label: { ru: 'Эко',           kz: 'Эко',          eng: 'Eco' },        promptRu: 'в эко-стиле, натуральные материалы, лён, ротанг, много зелени и дневного света',    emoji: '🌿' },
+// Style cards now use lucide icons + a soft pastel tint instead of emoji.
+// `iconCls` is the colour pair painted on the icon chip; `tint` paints
+// the glass card with a faint gradient when the style is selected.
+const STYLES: {
+  id: string;
+  label: { ru: string; kz: string; eng: string };
+  promptRu: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconCls: string;
+  tint: string;
+}[] = [
+  { id: 'scandi',  label: { ru: 'Скандинавский', kz: 'Скандинав',  eng: 'Scandi' },  promptRu: 'в скандинавском стиле, белые матовые фасады, дерево, мягкое естественное освещение', icon: TreePine,   iconCls: 'text-emerald-700 bg-emerald-100/70', tint: 'from-emerald-100/40 to-emerald-50/0' },
+  { id: 'minimal', label: { ru: 'Минимализм',    kz: 'Минимализм', eng: 'Minimal' }, promptRu: 'в стиле минимализм, чистые линии, монохромная палитра, скрытые ручки',             icon: SquareIcon, iconCls: 'text-slate-700    bg-slate-100/70',   tint: 'from-slate-100/40    to-slate-50/0' },
+  { id: 'loft',    label: { ru: 'Лофт',          kz: 'Лофт',       eng: 'Loft' },    promptRu: 'в стиле лофт, кирпичная кладка, открытые балки, металл, индустриальные лампы',     icon: Building2,  iconCls: 'text-amber-700    bg-amber-100/70',   tint: 'from-amber-100/40    to-amber-50/0' },
+  { id: 'classic', label: { ru: 'Классика',      kz: 'Классика',   eng: 'Classic' }, promptRu: 'в классическом стиле, лепнина, благородные материалы, тёплый свет',                 icon: Landmark,   iconCls: 'text-yellow-700   bg-yellow-100/70',  tint: 'from-yellow-100/40   to-yellow-50/0' },
+  { id: 'modern',  label: { ru: 'Модерн',        kz: 'Модерн',     eng: 'Modern' },  promptRu: 'в стиле современный модерн, акцентные геометрии, тёмный дуб, латунь',                icon: Sparkles,   iconCls: 'text-violet-700   bg-violet-100/70',  tint: 'from-violet-100/40   to-violet-50/0' },
+  { id: 'eco',     label: { ru: 'Эко',           kz: 'Эко',        eng: 'Eco' },     promptRu: 'в эко-стиле, натуральные материалы, лён, ротанг, много зелени и дневного света',    icon: Leaf,       iconCls: 'text-emerald-700  bg-emerald-100/70', tint: 'from-emerald-100/40  to-emerald-50/0' },
 ];
 
 const MOODS: { id: string; label: { ru: string; kz: string; eng: string }; promptRu: string }[] = [
@@ -120,6 +135,22 @@ const PROVIDER_VISUAL: Record<ProviderId, {
     fullBleed: true,
   },
 };
+
+// Small numbered step pill used as a section heading. Glass chip + soft
+// ring; turns into the slate-900 dot when its step is unlocked.
+function StepBadge({ n, active }: { n: number | string; active: boolean }) {
+  return (
+    <div
+      className={`w-6 h-6 rounded-full text-[11px] flex items-center justify-center ring-1 transition-colors ${
+        active
+          ? 'bg-slate-900 text-white ring-white/30 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+          : 'bg-white/60 text-slate-400 ring-white/60 backdrop-blur-xl'
+      }`}
+    >
+      {n}
+    </div>
+  );
+}
 
 export function AIDesign({ language }: AIDesignProps) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
@@ -279,477 +310,553 @@ export function AIDesign({ language }: AIDesignProps) {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-[1400px]">
-      {/* Header */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div>
-          <p className="text-sm text-gray-400 mb-1">AI Дизайн</p>
-          <h1 className="text-gray-900 mb-1">
-            {l('Генерация интерьеров', 'Интерьер генерациясы', 'Interior generator')}
-          </h1>
-          <p className="text-xs text-gray-500 max-w-xl">
-            {l('Выберите комнату и стиль — а мы сами соберём идеальный запрос для AI.',
-               'Бөлме мен стильді таңдаңыз — біз AI үшін сұранысты өзіміз жинаймыз.',
-               'Pick a room and style — we craft the perfect AI prompt for you.')}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setFreeMode(f => !f)}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${freeMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            {freeMode ? l('Wizard режим', 'Wizard режимі', 'Wizard mode') : l('Свой prompt', 'Өз prompt', 'Custom prompt')}
-          </button>
-          {!freeMode && (roomId || styleId) && (
-            <button onClick={resetWizard} className="px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:bg-gray-100">
-              {l('Сбросить', 'Тазарту', 'Reset')}
-            </button>
-          )}
-        </div>
-      </div>
+    // Liquid-glass page backdrop. Same vocabulary as Dashboard: soft
+    // pastel base + four blurred orbs (violet/rose/sky/emerald) so the
+    // translucent cards always have something living underneath them.
+    <div
+      className="min-h-full relative"
+      style={{
+        background: `
+          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.32), transparent 45%),
+          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.26), transparent 45%),
+          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.30), transparent 50%),
+          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.28), transparent 50%),
+          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+        `,
+      }}
+    >
+      <div className="relative p-4 md:p-8 max-w-[1400px] mx-auto">
 
-      {/* WIZARD */}
-      {!freeMode && (
-        <div className="space-y-6 mb-6">
-          {/* Step 1 — Room */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] flex items-center justify-center">1</div>
-              <div className="text-sm text-gray-900">{l('Какая комната?', 'Қандай бөлме?', 'Which room?')}</div>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-              {ROOMS.map(r => {
-                const Icon = r.icon;
-                const active = roomId === r.id;
-                return (
-                  <button
-                    key={r.id}
-                    onClick={() => setRoomId(r.id)}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
-                      active ? 'border-gray-900 bg-gray-50' : 'border-gray-100 hover:border-gray-300 bg-white'
-                    }`}
-                  >
-                    <Icon className={`w-5 h-5 ${active ? 'text-gray-900' : 'text-gray-400'}`} />
-                    <span className={`text-[11px] ${active ? 'text-gray-900' : 'text-gray-600'}`}>{r.label[language]}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Step 2 — Style */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center ${roomId ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-400'}`}>2</div>
-              <div className={`text-sm ${roomId ? 'text-gray-900' : 'text-gray-400'}`}>{l('Какой стиль?', 'Қандай стиль?', 'Which style?')}</div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              {STYLES.map(s => {
-                const active = styleId === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setStyleId(s.id)}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
-                      active ? 'border-gray-900 bg-gray-50' : 'border-gray-100 hover:border-gray-300 bg-white'
-                    }`}
-                  >
-                    <span className="text-xl">{s.emoji}</span>
-                    <span className={`text-[11px] ${active ? 'text-gray-900' : 'text-gray-600'}`}>{s.label[language]}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Step 3 — Mood / details (optional) */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center ${styleId ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-400'}`}>3</div>
-              <div className={`text-sm ${styleId ? 'text-gray-900' : 'text-gray-400'}`}>
-                {l('Дополнительные акценты', 'Қосымша акценттер', 'Mood & details')} <span className="text-[11px] text-gray-400">— {l('по желанию', 'қалау бойынша', 'optional')}</span>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {MOODS.map(m => {
-                const active = moodIds.includes(m.id);
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => toggleMood(m.id)}
-                    className={`px-3 py-1.5 rounded-lg text-[11px] border transition-colors ${
-                      active ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    {active && <span className="mr-1">✓</span>}{m.label[language]}
-                  </button>
-                );
-              })}
-            </div>
-            <input
-              type="text"
-              value={extraText}
-              onChange={e => setExtraText(e.target.value)}
-              placeholder={l('Ещё что-то добавить? Например: "бежевые шторы, мраморный пол"',
-                            'Тағы не қосасыз?',
-                            'Anything else? e.g. "beige curtains, marble floor"')}
-              className="mt-3 w-full px-3 py-2 bg-gray-50 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200"
-            />
-          </section>
-        </div>
-      )}
-
-      {/* FREE PROMPT MODE */}
-      {freeMode && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-          <label className="text-[11px] text-gray-500 block mb-2">{l('Опишите интерьер своими словами', 'Интерьерді өз сөзіңізбен сипаттаңыз', 'Describe the interior yourself')}</label>
-          <textarea
-            value={freePrompt}
-            onChange={e => setFreePrompt(e.target.value)}
-            rows={4}
-            placeholder={l(
-              'Например: кухня в стиле сканди, белые матовые фасады, дубовая столешница, остров с барными стульями, утренний свет из окна',
-              'Мысалы: сканди стиліндегі ас үй, ақ фасадтар, емен үстелі, бар орындықтары бар арал, таңертеңгі жарық',
-              'e.g. scandi-style kitchen, matte white cabinets, oak countertop, island with bar stools, morning daylight',
-            )}
-            className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 resize-none"
-          />
-        </div>
-      )}
-
-      {/* Optional photo uploads (img2img + style references). Both are
-          optional — UI shows compact upload tiles with previews. */}
-      <section className="mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-5 h-5 rounded-full bg-gray-200 text-gray-400 text-[10px] flex items-center justify-center">📷</div>
-          <div className="text-sm text-gray-900">{l('Фото комнаты и референсы', 'Бөлме фотосы мен референстер', 'Room photo & references')}</div>
-          <span className="text-[11px] text-gray-400">— {l('по желанию', 'қалау бойынша', 'optional')}</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Room photo — single image, used as the img2img source */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-3">
-            <div className="text-[11px] text-gray-500 mb-2">{l('Фото вашей комнаты', 'Бөлмеңіздің фотосы', 'Your room photo')}</div>
-            {roomPhoto ? (
-              <div className="relative">
-                <img src={roomPhoto} alt="" className="w-full aspect-video object-cover rounded-xl" />
-                <button onClick={() => setRoomPhoto(undefined)} className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center gap-1 aspect-video border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-gray-300 hover:bg-gray-50/50">
-                <span className="text-2xl">📷</span>
-                <span className="text-[11px] text-gray-500">{l('Загрузить фото', 'Фото жүктеу', 'Upload photo')}</span>
-                <input type="file" accept="image/*" onChange={onRoomFile} className="hidden" />
-              </label>
-            )}
-            <div className="text-[10px] text-gray-400 mt-2">
-              {l('AI «перерисует» вашу комнату в выбранном стиле.',
-                 'AI бөлмеңізді таңдалған стильде «қайта сызады».',
-                 'AI will redesign your room in the chosen style.')}
-            </div>
+        {/* ─── Header ────────────────────────────────────────── */}
+        <div className="mb-7 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div>
+            <p className="text-[11px] text-slate-400 mb-2 tracking-widest uppercase">AI Дизайн</p>
+            <h1 className="text-slate-900 text-3xl md:text-4xl font-medium tracking-tight mb-1">
+              {l('Генерация интерьеров', 'Интерьер генерациясы', 'Interior generator')}
+            </h1>
+            <p className="text-sm text-slate-500 max-w-xl">
+              {l('Выберите комнату и стиль — мы соберём идеальный запрос для AI.',
+                 'Бөлме мен стильді таңдаңыз — біз AI үшін сұранысты өзіміз жинаймыз.',
+                 'Pick a room and style — we craft the perfect AI prompt for you.')}
+            </p>
           </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFreeMode(f => !f)}
+              className={`px-3.5 py-2 rounded-2xl text-xs ring-1 transition-all ${
+                freeMode
+                  ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)]'
+                  : 'bg-white/60 text-slate-600 ring-white/60 backdrop-blur-xl hover:bg-white/80'
+              }`}
+            >
+              {freeMode ? l('Wizard режим', 'Wizard режимі', 'Wizard mode') : l('Свой prompt', 'Өз prompt', 'Custom prompt')}
+            </button>
+            {!freeMode && (roomId || styleId) && (
+              <button
+                onClick={resetWizard}
+                className="px-3.5 py-2 rounded-2xl text-xs text-slate-500 hover:text-slate-900 bg-white/40 hover:bg-white/70 ring-1 ring-white/50 backdrop-blur-xl transition-all"
+              >
+                {l('Сбросить', 'Тазарту', 'Reset')}
+              </button>
+            )}
+          </div>
+        </div>
 
-          {/* References — up to 3 inspiration images */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-3">
-            <div className="text-[11px] text-gray-500 mb-2">
-              {l('Референсы стиля', 'Стиль референстері', 'Style references')} <span className="text-gray-400">({referenceImages.length}/3)</span>
+        {/* ─── WIZARD ────────────────────────────────────────── */}
+        {!freeMode && (
+          <div className="space-y-5 mb-5">
+            {/* Step 1 — Room */}
+            <section className={`${GLASS} p-5`}>
+              <div className="flex items-center gap-2 mb-4">
+                <StepBadge n={1} active />
+                <div className="text-sm text-slate-900">{l('Какая комната?', 'Қандай бөлме?', 'Which room?')}</div>
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+                {ROOMS.map(r => {
+                  const Icon = r.icon;
+                  const active = roomId === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => setRoomId(r.id)}
+                      className={`flex flex-col items-center gap-2 p-3.5 rounded-2xl ring-1 transition-all ${
+                        active
+                          ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)]'
+                          : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+                      }`}
+                    >
+                      <Icon className={`w-5 h-5 ${active ? 'text-white' : 'text-slate-500'}`} />
+                      <span className="text-[11px]">{r.label[language]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Step 2 — Style */}
+            <section className={`${GLASS} p-5`}>
+              <div className="flex items-center gap-2 mb-4">
+                <StepBadge n={2} active={!!roomId} />
+                <div className={`text-sm ${roomId ? 'text-slate-900' : 'text-slate-400'}`}>{l('Какой стиль?', 'Қандай стиль?', 'Which style?')}</div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                {STYLES.map(s => {
+                  const Icon = s.icon;
+                  const active = styleId === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => setStyleId(s.id)}
+                      className={`relative overflow-hidden flex flex-col items-center gap-2 p-3.5 rounded-2xl ring-1 transition-all ${
+                        active
+                          ? 'bg-white/85 text-slate-900 ring-slate-900/15 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18)]'
+                          : 'bg-white/40 text-slate-600 ring-white/60 hover:bg-white/70 backdrop-blur-xl'
+                      }`}
+                    >
+                      {active && (
+                        <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full bg-gradient-to-br ${s.tint} blur-2xl`} />
+                      )}
+                      <div className={`relative w-9 h-9 rounded-xl flex items-center justify-center ring-1 ring-white/60 ${s.iconCls}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <span className="relative text-[11px]">{s.label[language]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Step 3 — Mood / details (optional) */}
+            <section className={`${GLASS} p-5`}>
+              <div className="flex items-center gap-2 mb-4">
+                <StepBadge n={3} active={!!styleId} />
+                <div className={`text-sm ${styleId ? 'text-slate-900' : 'text-slate-400'}`}>
+                  {l('Дополнительные акценты', 'Қосымша акценттер', 'Mood & details')}
+                </div>
+                <span className="text-[11px] text-slate-400">— {l('по желанию', 'қалау бойынша', 'optional')}</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {MOODS.map(m => {
+                  const active = moodIds.includes(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => toggleMood(m.id)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] ring-1 transition-all flex items-center gap-1 ${
+                        active
+                          ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+                          : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+                      }`}
+                    >
+                      {active && <Check className="w-3 h-3" />}
+                      {m.label[language]}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                value={extraText}
+                onChange={e => setExtraText(e.target.value)}
+                placeholder={l('Ещё что-то добавить? Например: «бежевые шторы, мраморный пол»',
+                              'Тағы не қосасыз?',
+                              'Anything else? e.g. "beige curtains, marble floor"')}
+                className="mt-4 w-full px-3.5 py-2.5 bg-white/40 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white/70 focus:ring-slate-300 placeholder:text-slate-400"
+              />
+            </section>
+          </div>
+        )}
+
+        {/* ─── FREE PROMPT MODE ─────────────────────────────── */}
+        {freeMode && (
+          <div className={`${GLASS} p-5 mb-5`}>
+            <label className="text-[11px] text-slate-500 block mb-2">{l('Опишите интерьер своими словами', 'Интерьерді өз сөзіңізбен сипаттаңыз', 'Describe the interior yourself')}</label>
+            <textarea
+              value={freePrompt}
+              onChange={e => setFreePrompt(e.target.value)}
+              rows={4}
+              placeholder={l(
+                'Например: кухня в стиле сканди, белые матовые фасады, дубовая столешница, остров с барными стульями, утренний свет из окна',
+                'Мысалы: сканди стиліндегі ас үй, ақ фасадтар, емен үстелі, бар орындықтары бар арал, таңертеңгі жарық',
+                'e.g. scandi-style kitchen, matte white cabinets, oak countertop, island with bar stools, morning daylight',
+              )}
+              className="w-full px-3.5 py-3 bg-white/40 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white/70 focus:ring-slate-300 resize-none placeholder:text-slate-400"
+            />
+          </div>
+        )}
+
+        {/* ─── Photo uploads — img2img + style references ──── */}
+        <section className={`${GLASS} p-5 mb-5`}>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-6 h-6 rounded-full bg-white/60 backdrop-blur-xl ring-1 ring-white/60 flex items-center justify-center">
+              <Camera className="w-3 h-3 text-slate-500" />
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {referenceImages.map((src, i) => (
-                <div key={i} className="relative">
-                  <img src={src} alt="" className="w-full aspect-square object-cover rounded-lg" />
-                  <button onClick={() => setReferenceImages(prev => prev.filter((_, j) => j !== i))} className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80">
-                    <X className="w-3 h-3" />
+            <div className="text-sm text-slate-900">{l('Фото комнаты и референсы', 'Бөлме фотосы мен референстер', 'Room photo & references')}</div>
+            <span className="text-[11px] text-slate-400">— {l('по желанию', 'қалау бойынша', 'optional')}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Room photo — single image, used as the img2img source */}
+            <div className="bg-white/30 ring-1 ring-white/60 rounded-2xl p-3 backdrop-blur-xl">
+              <div className="text-[11px] text-slate-500 mb-2">{l('Фото вашей комнаты', 'Бөлмеңіздің фотосы', 'Your room photo')}</div>
+              {roomPhoto ? (
+                <div className="relative">
+                  <img src={roomPhoto} alt="" className="w-full aspect-video object-cover rounded-xl" />
+                  <button
+                    onClick={() => setRoomPhoto(undefined)}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-slate-900/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center hover:bg-slate-900/90 ring-1 ring-white/20"
+                  >
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              ))}
-              {referenceImages.length < 3 && (
-                <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-gray-300 hover:bg-gray-50/50">
-                  <span className="text-xl text-gray-400">+</span>
-                  <input type="file" accept="image/*" multiple onChange={onRefsAdd} className="hidden" />
+              ) : (
+                <label className="flex flex-col items-center justify-center gap-2 aspect-video border-2 border-dashed border-white/70 rounded-xl cursor-pointer hover:border-slate-300 hover:bg-white/40 transition-colors">
+                  <Camera className="w-6 h-6 text-slate-400" />
+                  <span className="text-[11px] text-slate-500">{l('Загрузить фото', 'Фото жүктеу', 'Upload photo')}</span>
+                  <input type="file" accept="image/*" onChange={onRoomFile} className="hidden" />
                 </label>
               )}
+              <div className="text-[10px] text-slate-500 mt-2 leading-relaxed">
+                {l('AI «перерисует» вашу комнату в выбранном стиле.',
+                   'AI бөлмеңізді таңдалған стильде «қайта сызады».',
+                   'AI will redesign your room in the chosen style.')}
+              </div>
             </div>
-            <div className="text-[10px] text-gray-400 mt-2">
-              {l('Несколько вдохновляющих фото — AI подхватит палитру и настроение.',
-                 'Бірнеше шабыттандыратын фото — AI палитра мен көңіл-күйді алады.',
-                 'A few inspiration shots — AI picks up the palette and mood.')}
+
+            {/* References — up to 3 inspiration images */}
+            <div className="bg-white/30 ring-1 ring-white/60 rounded-2xl p-3 backdrop-blur-xl">
+              <div className="text-[11px] text-slate-500 mb-2 flex items-center justify-between">
+                <span>{l('Референсы стиля', 'Стиль референстері', 'Style references')}</span>
+                <span className="text-slate-400 tabular-nums">{referenceImages.length}/3</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {referenceImages.map((src, i) => (
+                  <div key={i} className="relative">
+                    <img src={src} alt="" className="w-full aspect-square object-cover rounded-xl" />
+                    <button
+                      onClick={() => setReferenceImages(prev => prev.filter((_, j) => j !== i))}
+                      className="absolute top-1 right-1 w-5 h-5 bg-slate-900/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center hover:bg-slate-900/90 ring-1 ring-white/20"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                {referenceImages.length < 3 && (
+                  <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-white/70 rounded-xl cursor-pointer hover:border-slate-300 hover:bg-white/40 transition-colors">
+                    <span className="text-2xl text-slate-400 leading-none">+</span>
+                    <input type="file" accept="image/*" multiple onChange={onRefsAdd} className="hidden" />
+                  </label>
+                )}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-2 leading-relaxed">
+                {l('Несколько вдохновляющих фото — AI подхватит палитру и настроение.',
+                   'Бірнеше шабыттандыратын фото — AI палитра мен көңіл-күйді алады.',
+                   'A few inspiration shots — AI picks up the palette and mood.')}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Provider grid */}
-      <section className="mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <div className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center ${(freeMode ? freePrompt.trim() : (roomId && styleId)) ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-400'}`}>{freeMode ? 1 : 4}</div>
-          <div className="text-sm text-gray-900">{l('Каким AI генерировать?', 'Қай AI-мен генерациялау?', 'Which AI?')}</div>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {providers.map(p => {
-            const vis = PROVIDER_VISUAL[p.id];
-            const active = selectedProvider === p.id;
-            return (
-              <button
-                key={p.id}
-                onClick={() => p.enabled && setSelectedProvider(p.id)}
-                disabled={!p.enabled}
-                className={`relative text-left p-3 rounded-2xl border-2 transition-all ${
-                  active && p.enabled ? 'border-gray-900 shadow-sm' : 'border-gray-100 hover:border-gray-300'
-                } ${!p.enabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-              >
-                {/* Brand logo square — real SVG for ChatGPT / Gemini / Claude.
-                    UTIR-mix uses the platform logo full-bleed (fills the box). */}
-                <div className={`w-10 h-10 rounded-xl ${vis.bg} flex items-center justify-center overflow-hidden mb-2 ${vis.fullBleed ? 'border border-gray-200' : ''}`}>
-                  {vis.fullBleed ? vis.icon('') : vis.icon('w-6 h-6')}
-                </div>
-                <div className="text-xs text-gray-900">{p.name}</div>
-                <div className="text-[10px] text-gray-400 mt-0.5">{vis.sub}</div>
-                {!p.enabled && p.envVar && (
-                  <div className="text-[10px] text-amber-700 mt-1.5 leading-snug">
-                    {l('Подключите', 'Қосыңыз', 'Add env')}: <code>{p.envVar}</code>
-                  </div>
-                )}
-                {active && p.enabled && (
-                  <div className="absolute top-2 right-2 w-4 h-4 bg-gray-900 rounded-full flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white" /></div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Prompt preview + Generate */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-8">
-        <div className="flex items-start gap-3 mb-3">
-          <Wand2 className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-2">
-              <span>{l('Что отправим в AI', 'AI-ге не жібереміз', 'AI prompt')}</span>
-              {/* Brand-kit applied indicator — non-empty hint OR photoreal flag */}
-              {brandKit && (brandKit.styleHint.trim() || brandKit.photorealism) && (
-                <span
-                  className="px-1.5 py-0.5 bg-violet-50 text-violet-700 rounded text-[9px] normal-case tracking-normal"
-                  title={`${brandKit.photorealism ? '📷 фотореализм' : ''}${brandKit.styleHint ? ' · ' + brandKit.styleHint.slice(0, 80) + (brandKit.styleHint.length > 80 ? '…' : '') : ''}`}
+        {/* ─── Provider grid ────────────────────────────────── */}
+        <section className={`${GLASS} p-5 mb-5`}>
+          <div className="flex items-center gap-2 mb-4">
+            <StepBadge n={freeMode ? 1 : 4} active={(freeMode ? !!freePrompt.trim() : !!(roomId && styleId))} />
+            <div className="text-sm text-slate-900">{l('Каким AI генерировать?', 'Қай AI-мен генерациялау?', 'Which AI?')}</div>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+            {providers.map(p => {
+              const vis = PROVIDER_VISUAL[p.id];
+              const active = selectedProvider === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => p.enabled && setSelectedProvider(p.id)}
+                  disabled={!p.enabled}
+                  className={`relative text-left p-3.5 rounded-2xl ring-1 transition-all ${
+                    active && p.enabled
+                      ? 'bg-white/85 ring-slate-900/15 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18)]'
+                      : 'bg-white/40 ring-white/60 hover:bg-white/70 backdrop-blur-xl'
+                  } ${!p.enabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                 >
-                  ✨ {l('Бренд-стиль применён', 'Бренд-стиль қосылды', 'Brand kit applied')}
+                  {/* Brand logo square — real SVG for ChatGPT / Gemini / Claude.
+                      UTIR-mix uses the platform logo full-bleed (fills the box). */}
+                  <div className={`w-11 h-11 rounded-2xl ${vis.bg} flex items-center justify-center overflow-hidden mb-2.5 ring-1 ring-white/30 ${vis.fullBleed ? 'ring-white/60' : ''}`}>
+                    {vis.fullBleed ? vis.icon('') : vis.icon('w-6 h-6')}
+                  </div>
+                  <div className="text-sm text-slate-900">{p.name}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">{vis.sub}</div>
+                  {!p.enabled && p.envVar && (
+                    <div className="text-[10px] text-amber-700 mt-2 leading-snug">
+                      {l('Подключите', 'Қосыңыз', 'Add env')}: <code className="bg-amber-100/70 px-1 rounded">{p.envVar}</code>
+                    </div>
+                  )}
+                  {active && p.enabled && (
+                    <div className="absolute top-2 right-2 w-5 h-5 bg-slate-900 ring-2 ring-white/80 rounded-full flex items-center justify-center">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ─── Prompt preview + Generate ─────────────────────── */}
+        <div className={`${GLASS} p-5 mb-8`}>
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-9 h-9 rounded-2xl bg-violet-100/70 text-violet-700 ring-1 ring-white/60 flex items-center justify-center flex-shrink-0">
+              <Wand2 className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-2">
+                <span>{l('Что отправим в AI', 'AI-ге не жібереміз', 'AI prompt')}</span>
+                {/* Brand-kit applied indicator — non-empty hint OR photoreal flag */}
+                {brandKit && (brandKit.styleHint.trim() || brandKit.photorealism) && (
+                  <span
+                    className="px-2 py-0.5 bg-violet-100/70 text-violet-700 rounded-full text-[10px] normal-case tracking-normal ring-1 ring-white/40 flex items-center gap-1"
+                    title={`${brandKit.photorealism ? 'фотореализм' : ''}${brandKit.styleHint ? ' · ' + brandKit.styleHint.slice(0, 80) + (brandKit.styleHint.length > 80 ? '…' : '') : ''}`}
+                  >
+                    <Sparkles className="w-2.5 h-2.5" />
+                    {l('Бренд-стиль', 'Бренд-стиль', 'Brand kit')}
+                  </span>
+                )}
+              </div>
+              <div className="text-sm text-slate-800 leading-relaxed">
+                {finalPrompt
+                  ? finalPrompt
+                  : <span className="text-slate-400">{l('Выберите комнату и стиль выше — prompt соберётся автоматически.',
+                                                         'Жоғарыдан бөлме мен стильді таңдаңыз.',
+                                                         'Pick a room and style above — prompt assembles itself.')}</span>}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
+              <span>{l('Обычно 10–60 секунд', '10–60 секунд алады', 'Usually 10–60s')}</span>
+              {usage && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] ring-1 ring-white/40 ${
+                  usage.limit === null
+                    ? 'bg-emerald-100/60 text-emerald-700'
+                    : usage.used >= usage.limit
+                      ? 'bg-rose-100/60 text-rose-700'
+                      : usage.used >= usage.limit * 0.8
+                        ? 'bg-amber-100/60 text-amber-700'
+                        : 'bg-white/60 text-slate-600'
+                }`}>
+                  {usage.limit === null
+                    ? l('Без лимита', 'Шектеусіз', 'Unlimited')
+                    : `${usage.used} / ${usage.limit} ${l('в этом месяце', 'осы айда', 'this month')}`}
                 </span>
               )}
             </div>
-            <div className="text-sm text-gray-700 leading-relaxed">
-              {finalPrompt
-                ? finalPrompt
-                : <span className="text-gray-400">{l('Выберите комнату и стиль выше — prompt соберётся автоматически.',
-                                                       'Жоғарыдан бөлме мен стильді таңдаңыз.',
-                                                       'Pick a room and style above — prompt assembles itself.')}</span>}
+            <button
+              onClick={generate}
+              disabled={!canGenerate}
+              className="group flex items-center gap-2 px-5 py-2.5 bg-slate-900/95 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] hover:shadow-[0_12px_32px_-8px_rgba(15,23,42,0.5)] hover:bg-slate-900 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ring-1 ring-white/10"
+            >
+              {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 transition-transform group-hover:scale-110" />}
+              {generating
+                ? l('Генерирую…', 'Генерация…', 'Generating…')
+                : l('Сгенерировать', 'Генерациялау', 'Generate')}
+            </button>
+          </div>
+        </div>
+
+        {/* ─── Errors ────────────────────────────────────────── */}
+        {error && (
+          <div className="mb-5 px-4 py-2.5 bg-rose-100/60 backdrop-blur-xl ring-1 ring-rose-200/60 rounded-2xl text-xs text-rose-700">
+            {error}
+          </div>
+        )}
+
+        {/* ─── Generation results ────────────────────────────── */}
+        {results.length > 0 && (
+          <div className="mb-8">
+            <div className="text-sm text-slate-700 mb-3">{l('Результат', 'Нәтиже', 'Result')}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {results.map((r, i) => (
+                <div key={r.id || i} className={`${GLASS} overflow-hidden`}>
+                  {r.ok && (r.imageUrl || r.imageDataUrl) ? (
+                    <>
+                      <div className="aspect-square bg-white/30">
+                        <img src={r.imageUrl || r.imageDataUrl} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-xs text-slate-900 flex items-center gap-1.5">
+                            <span className={`w-4 h-4 rounded ${PROVIDER_VISUAL[r.provider].bg} flex items-center justify-center overflow-hidden ring-1 ring-white/40`}>
+                              {PROVIDER_VISUAL[r.provider].icon('w-2.5 h-2.5')}
+                            </span>
+                            <span>{r.provider}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {r.id && (
+                              <button
+                                onClick={() => setAttachingId(r.id!)}
+                                className="p-1.5 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl text-slate-400 hover:text-slate-700 transition-all"
+                                title={l('Прикрепить к сделке', 'Мәмілеге қосу', 'Attach to deal')}
+                              >
+                                <LinkIcon className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <a
+                              href={r.imageUrl || r.imageDataUrl}
+                              download={`utir-design-${r.provider}.png`}
+                              className="p-1.5 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl text-slate-400 hover:text-slate-700 transition-all"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        </div>
+                        {r.enhancedPrompt && (
+                          <details className="text-[10px] text-slate-500 mt-1">
+                            <summary className="cursor-pointer flex items-center gap-1 hover:text-slate-700"><Wand2 className="w-2.5 h-2.5" /> {l('Улучшенный prompt', 'Жақсартылған prompt', 'Enhanced prompt')}</summary>
+                            <div className="mt-1 leading-relaxed">{r.enhancedPrompt}</div>
+                          </details>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-6 text-center">
+                      <div className="w-9 h-9 rounded-2xl bg-rose-100/60 text-rose-700 ring-1 ring-white/40 mx-auto mb-2 flex items-center justify-center">
+                        <X className="w-4 h-4" />
+                      </div>
+                      <div className="text-xs text-slate-700">{r.provider}</div>
+                      <div className="text-[10px] text-rose-600 mt-1">{r.error}</div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="text-[11px] text-gray-400 flex items-center gap-2">
-            <span>{l('Обычно 10–60 секунд', '10–60 секунд алады', 'Usually 10–60s')}</span>
-            {usage && (
-              <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                usage.limit === null
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : usage.used >= usage.limit
-                    ? 'bg-red-50 text-red-700'
-                    : usage.used >= usage.limit * 0.8
-                      ? 'bg-amber-50 text-amber-700'
-                      : 'bg-gray-100 text-gray-600'
-              }`}>
-                {usage.limit === null
-                  ? l('Без лимита', 'Шектеусіз', 'Unlimited')
-                  : `${usage.used} / ${usage.limit} ${l('в этом месяце', 'осы айда', 'this month')}`}
-              </span>
-            )}
+        )}
+
+        {/* ─── Team history ─────────────────────────────────── */}
+        <div className="mt-10">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-7 h-7 rounded-2xl bg-white/60 backdrop-blur-xl ring-1 ring-white/60 flex items-center justify-center">
+              <History className="w-3.5 h-3.5 text-slate-500" />
+            </div>
+            <div className="text-sm text-slate-700">{l('История генераций команды', 'Команданың генерация тарихы', 'Team generation history')}</div>
+            <span className="text-[11px] text-slate-400 px-2 py-0.5 rounded-full bg-white/50 ring-1 ring-white/50 tabular-nums">{history.length}</span>
           </div>
-          <button
-            onClick={generate}
-            disabled={!canGenerate}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {generating
-              ? l('Генерирую…', 'Генерация…', 'Generating…')
-              : l('Сгенерировать', 'Генерациялау', 'Generate')}
-          </button>
-        </div>
-      </div>
-
-      {/* Generation results */}
-      {error && <div className="mb-5 px-3 py-2 bg-red-50 border border-red-100 rounded-lg text-xs text-red-700">{error}</div>}
-
-      {results.length > 0 && (
-        <div className="mb-8">
-          <div className="text-sm text-gray-700 mb-3">{l('Результат', 'Нәтиже', 'Result')}</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {results.map((r, i) => (
-              <div key={r.id || i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                {r.ok && (r.imageUrl || r.imageDataUrl) ? (
-                  <>
-                    <div className="aspect-square bg-gray-50">
-                      <img src={r.imageUrl || r.imageDataUrl} alt="" className="w-full h-full object-cover" />
-                    </div>
-                    <div className="p-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="text-xs text-gray-900 flex items-center gap-1.5">
-                          <span className={`w-4 h-4 rounded ${PROVIDER_VISUAL[r.provider].bg} flex items-center justify-center overflow-hidden`}>
-                            {PROVIDER_VISUAL[r.provider].icon('w-2.5 h-2.5')}
-                          </span>
-                          <span>{r.provider}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {r.id && (
-                            <button
-                              onClick={() => setAttachingId(r.id!)}
-                              className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-700"
-                              title={l('Прикрепить к сделке', 'Мәмілеге қосу', 'Attach to deal')}
-                            >
-                              <LinkIcon className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          <a
-                            href={r.imageUrl || r.imageDataUrl}
-                            download={`utir-design-${r.provider}.png`}
-                            className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-700"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </a>
-                        </div>
-                      </div>
-                      {r.enhancedPrompt && (
-                        <details className="text-[10px] text-gray-400 mt-1">
-                          <summary className="cursor-pointer flex items-center gap-1"><Wand2 className="w-2.5 h-2.5" /> {l('Улучшенный prompt', 'Жақсартылған prompt', 'Enhanced prompt')}</summary>
-                          <div className="mt-1 leading-relaxed">{r.enhancedPrompt}</div>
-                        </details>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="p-5 text-center">
-                    <X className="w-6 h-6 text-red-400 mx-auto mb-2" />
-                    <div className="text-xs text-gray-700">{r.provider}</div>
-                    <div className="text-[10px] text-red-600 mt-1">{r.error}</div>
+          {history.length === 0 ? (
+            <div className={`${GLASS} text-xs text-slate-400 py-10 text-center`}>{l('Пока нет генераций', 'Әзірге генерациялар жоқ', 'No generations yet')}</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {history.map(h => (
+                <div key={h.id} className={`${GLASS} ${GLASS_HOVER} overflow-hidden group`}>
+                  <div className="aspect-square bg-white/30 relative">
+                    {h.imageUrl ? (
+                      <img src={h.imageUrl} alt={h.prompt} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-300"><Bot className="w-8 h-8" /></div>
+                    )}
+                    <button
+                      onClick={() => setAttachingId(h.id)}
+                      className="absolute top-2 right-2 w-8 h-8 bg-slate-900/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-slate-900/90 transition-all ring-1 ring-white/20"
+                      title={l('Прикрепить к сделке', 'Мәмілеге қосу', 'Attach to deal')}
+                    >
+                      <LinkIcon className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Team history */}
-      <div className="mt-10">
-        <div className="flex items-center gap-2 mb-3">
-          <History className="w-4 h-4 text-gray-400" />
-          <div className="text-sm text-gray-700">{l('История генераций команды', 'Команданың генерация тарихы', 'Team generation history')}</div>
-          <span className="text-[11px] text-gray-400">· {history.length}</span>
-        </div>
-        {history.length === 0 ? (
-          <div className="text-xs text-gray-400 py-6 text-center">{l('Пока нет генераций.', 'Әзірге генерациялар жоқ.', 'No generations yet.')}</div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {history.map(h => (
-              <div key={h.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden group">
-                <div className="aspect-square bg-gray-50 relative">
-                  {h.imageUrl ? (
-                    <img src={h.imageUrl} alt={h.prompt} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300"><Bot className="w-8 h-8" /></div>
-                  )}
-                  <button
-                    onClick={() => setAttachingId(h.id)}
-                    className="absolute top-1.5 right-1.5 w-7 h-7 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/80 transition-opacity"
-                    title={l('Прикрепить к сделке', 'Мәмілеге қосу', 'Attach to deal')}
-                  >
-                    <LinkIcon className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <div className="p-2.5">
-                  <div className="text-[10px] text-gray-500 flex items-center justify-between mb-1">
-                    <span className="flex items-center gap-1">
-                      <span className={`w-3.5 h-3.5 rounded ${PROVIDER_VISUAL[h.provider]?.bg || 'bg-gray-100'} flex items-center justify-center overflow-hidden`}>
-                        {PROVIDER_VISUAL[h.provider]?.icon('w-2 h-2') || <Bot className="w-2 h-2 text-gray-400" />}
+                  <div className="p-3">
+                    <div className="text-[10px] text-slate-500 flex items-center justify-between mb-1.5">
+                      <span className="flex items-center gap-1">
+                        <span className={`w-3.5 h-3.5 rounded ${PROVIDER_VISUAL[h.provider]?.bg || 'bg-white/60'} flex items-center justify-center overflow-hidden ring-1 ring-white/40`}>
+                          {PROVIDER_VISUAL[h.provider]?.icon('w-2 h-2') || <Bot className="w-2 h-2 text-slate-400" />}
+                        </span>
+                        {h.provider}
                       </span>
-                      {h.provider}
-                    </span>
-                    <span>{new Date(h.createdAt).toLocaleDateString(language === 'eng' ? 'en-GB' : 'ru-RU', { day: '2-digit', month: '2-digit' })}</span>
+                      <span>{new Date(h.createdAt).toLocaleDateString(language === 'eng' ? 'en-GB' : 'ru-RU', { day: '2-digit', month: '2-digit' })}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-700 line-clamp-2 leading-snug" title={h.prompt}>{h.prompt}</div>
+                    <div className="text-[10px] text-slate-400 mt-1">{h.userName}</div>
                   </div>
-                  <div className="text-[11px] text-gray-700 line-clamp-2 leading-snug" title={h.prompt}>{h.prompt}</div>
-                  <div className="text-[10px] text-gray-400 mt-1">{h.userName}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ─── Attach-to-deal picker (glass dialog) ──────────── */}
+        {attachingId && (
+          <div
+            className="fixed inset-0 bg-slate-900/30 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            onClick={() => setAttachingId(null)}
+          >
+            <div
+              className="bg-white/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-5 border-b border-white/60 flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-slate-900">{l('Прикрепить к сделке', 'Мәмілеге қосу', 'Attach to deal')}</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">{l('Выберите сделку из списка', 'Тізімнен мәмілені таңдаңыз', 'Pick a deal from the list')}</div>
+                </div>
+                <button
+                  onClick={() => setAttachingId(null)}
+                  className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+              <div className="p-3 border-b border-white/60">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={attachQuery}
+                    onChange={e => setAttachQuery(e.target.value)}
+                    placeholder={l('Поиск по клиенту или телефону', 'Клиент немесе телефон бойынша іздеу', 'Search by customer or phone')}
+                    autoFocus
+                    className="w-full pl-9 pr-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300"
+                  />
                 </div>
               </div>
-            ))}
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {dealsForAttach.length === 0 && (
+                  <div className="text-xs text-slate-400 text-center py-8">{l('Сделок не найдено', 'Мәмілелер табылмады', 'No deals found')}</div>
+                )}
+                {dealsForAttach.map(d => {
+                  const alreadyHas = (d.designIds || []).includes(attachingId);
+                  return (
+                    <button
+                      key={d.id}
+                      onClick={() => attachToDeal(d.id)}
+                      className={`w-full text-left p-3 rounded-2xl transition-all ring-1 ${
+                        alreadyHas
+                          ? 'bg-emerald-100/60 ring-emerald-200/60'
+                          : 'bg-white/40 ring-white/50 hover:bg-white/70'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-slate-900 truncate">{d.customerName}</div>
+                          <div className="text-[10px] text-slate-500 truncate">
+                            {d.phone || '—'} · {d.product || d.furnitureType || ''}
+                            {(d.designIds?.length || 0) > 0 && (
+                              <span className="text-emerald-700 ml-1.5">· {d.designIds!.length} концепт{d.designIds!.length === 1 ? '' : 'ов'}</span>
+                            )}
+                          </div>
+                        </div>
+                        {alreadyHas && <Check className="w-4 h-4 text-emerald-700 flex-shrink-0" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Toast that fades after attach. */}
+        {attachToast && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 bg-slate-900/90 backdrop-blur-xl text-white text-xs rounded-2xl shadow-[0_12px_32px_-8px_rgba(15,23,42,0.5)] ring-1 ring-white/10 z-50 flex items-center gap-2">
+            <Check className="w-3.5 h-3.5 text-emerald-300" />
+            {attachToast}
           </div>
         )}
       </div>
-
-      {/* Attach-to-deal picker — opens when admin clicks the link icon on
-          any result/history card. Lists active team deals with a quick
-          search box; tapping a row attaches the generation id and closes. */}
-      {attachingId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setAttachingId(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-900">{l('Прикрепить к сделке', 'Мәмілеге қосу', 'Attach to deal')}</div>
-                <div className="text-[10px] text-gray-400 mt-0.5">{l('Выберите сделку из списка', 'Тізімнен мәмілені таңдаңыз', 'Pick a deal from the list')}</div>
-              </div>
-              <button onClick={() => setAttachingId(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-3 border-b border-gray-100">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
-                <input
-                  type="text"
-                  value={attachQuery}
-                  onChange={e => setAttachQuery(e.target.value)}
-                  placeholder={l('Поиск по клиенту или телефону', 'Клиент немесе телефон бойынша іздеу', 'Search by customer or phone')}
-                  autoFocus
-                  className="w-full pl-9 pr-3 py-2 bg-gray-50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
-                />
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {dealsForAttach.length === 0 && (
-                <div className="text-xs text-gray-400 text-center py-8">{l('Сделок не найдено', 'Мәмілелер табылмады', 'No deals found')}</div>
-              )}
-              {dealsForAttach.map(d => {
-                const alreadyHas = (d.designIds || []).includes(attachingId);
-                return (
-                  <button
-                    key={d.id}
-                    onClick={() => attachToDeal(d.id)}
-                    className={`w-full text-left p-3 rounded-xl transition-colors ${alreadyHas ? 'bg-emerald-50 border border-emerald-100' : 'hover:bg-gray-50 border border-transparent'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm text-gray-900 truncate">{d.customerName}</div>
-                        <div className="text-[10px] text-gray-400 truncate">
-                          {d.phone || '—'} · {d.product || d.furnitureType || ''}
-                          {(d.designIds?.length || 0) > 0 && (
-                            <span className="text-emerald-600 ml-1.5">· {d.designIds!.length} концепт{d.designIds!.length === 1 ? '' : 'ов'}</span>
-                          )}
-                        </div>
-                      </div>
-                      {alreadyHas && <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Toast that fades after attach. */}
-      {attachToast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-gray-900 text-white text-xs rounded-full shadow-lg z-50">
-          ✓ {attachToast}
-        </div>
-      )}
     </div>
   );
 }
