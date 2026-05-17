@@ -9,7 +9,8 @@ import { useAutoRefresh } from '../utils/useAutoRefresh';
 import { t } from '../utils/translations';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo } from './PlatformLogos';
 import { Finance } from './Finance';
-import { PaymentsHub } from './PaymentsHub';
+// PaymentsHub moved to its own top-level menu item «Финансы» (App.tsx /
+// 'finance' route) — no longer embedded here as a tab.
 
 interface SalesKanbanProps {
   language: 'kz' | 'ru' | 'eng';
@@ -52,7 +53,10 @@ export function SalesKanban({ language }: SalesKanbanProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchive, setShowArchive] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [activeTab, setActiveTab] = useState<'funnel' | 'payments'>('funnel');
+  // Only one view remains here ('funnel') since «Платежи» moved to its own
+  // top-level menu item. The state is kept for backward-compat with logic
+  // that read `activeTab === 'funnel'` below; can be removed later.
+  const [activeTab] = useState<'funnel'>('funnel');
   // Seed for the new-deal modal — populated when the user clicks
   // «В заказ» on a BOM template in Warehouse. NewDealModal reads it on
   // mount to pre-fill product / dimensions / materials / amount. Cleared
@@ -66,7 +70,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
     const onTemplate = (e: Event) => {
       const detail = (e as CustomEvent<any>).detail || {};
       setTemplateSeed(detail);
-      setActiveTab('funnel');
+      // Only «funnel» view exists now — payments moved to its own menu item.
       setShowNewDealModal(true);
     };
     window.addEventListener('sales:create-deal-from-template', onTemplate as EventListener);
@@ -145,16 +149,11 @@ export function SalesKanban({ language }: SalesKanbanProps) {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
               <p className="text-xs text-gray-400 mb-0.5">{l('Заказы', 'Тапсырыстар', 'Orders')}</p>
-              <h1 className="text-gray-900">{activeTab === 'payments' ? l('Оплаты', 'Төлемдер', 'Payments') : l('Воронка продаж', 'Сату воронкасы', 'Sales Funnel')}</h1>
+              {/* Payments tab moved to a top-level «Финансы» menu item — this
+                  page is now just the sales funnel. */}
+              <h1 className="text-gray-900">{l('Воронка продаж', 'Сату воронкасы', 'Sales Funnel')}</h1>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex gap-1 bg-gray-50 p-0.5 rounded-xl">
-                <button onClick={() => setActiveTab('funnel')} className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${activeTab === 'funnel' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}>{l('Воронка', 'Воронка', 'Funnel')}</button>
-                {/* Платежи прячутся, если матрица роли = 'none' для модуля payments */}
-                {store.getModuleLevel('payments') !== 'none' && (
-                  <button onClick={() => setActiveTab('payments')} className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${activeTab === 'payments' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}>{l('Оплаты', 'Төлемдер', 'Payments')}</button>
-                )}
-              </div>
               {/* Archive button */}
               <button
                 onClick={() => setShowArchive(true)}
@@ -228,9 +227,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
           </div>
         </div>
 
-        {activeTab === 'payments' && store.getModuleLevel('payments') !== 'none' && <PaymentsHub language={language} />}
-
-        {/* Kanban Board */}
+        {/* Kanban Board — payments tab removed, now lives under top-level «Финансы» */}
         {activeTab === 'funnel' && (
           <div className="flex-1 overflow-hidden px-4 md:px-6">
           <div className="flex gap-3 overflow-x-auto h-full py-4 pb-6">

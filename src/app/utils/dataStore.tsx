@@ -379,6 +379,7 @@ const DEFAULT_MODULES: PlatformModule[] = [
   { id: 'dashboard',  enabled: true, locked: true,  labels: { ru: 'Главная',       kz: 'Басты бет',    eng: 'Home' },        roleAccess: { manager: true,  employee: true  } },
   { id: 'ai-design',  enabled: true,                labels: { ru: 'AI Дизайн',     kz: 'AI Дизайн',    eng: 'AI Design' },   roleAccess: { manager: true,  employee: false } },
   { id: 'sales',      enabled: true,                labels: { ru: 'Заказы',        kz: 'Тапсырыстар',  eng: 'Orders' },      roleAccess: { manager: true,  employee: true  } },
+  { id: 'finance',    enabled: true,                labels: { ru: 'Финансы',       kz: 'Қаржы',        eng: 'Finance' },     roleAccess: { manager: true,  employee: false } },
   { id: 'warehouse',  enabled: true,                labels: { ru: 'Производство',  kz: 'Өндіріс',      eng: 'Production' },  roleAccess: { manager: true,  employee: true  } },
   { id: 'chats',      enabled: true,                labels: { ru: 'Чаты',          kz: 'Чаттар',       eng: 'Chats' },       roleAccess: { manager: true,  employee: false } },
   { id: 'tasks',      enabled: true,                labels: { ru: 'Задачи',        kz: 'Тапсырмалар',  eng: 'Tasks' },       roleAccess: { manager: true,  employee: true  } },

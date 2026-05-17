@@ -6,7 +6,7 @@ import { Booking } from './components/Booking';
 import { AIDesign } from './components/AIDesign';
 import { SalesKanban } from './components/SalesKanban';
 import { Warehouse } from './components/Warehouse';
-import { Finance } from './components/Finance';
+import { PaymentsHub } from './components/PaymentsHub';
 import { Chats } from './components/Chats';
 import { Analytics } from './components/Analytics';
 import { Tasks } from './components/Tasks';
@@ -245,11 +245,9 @@ function AppContent() {
           onBack={() => setCurrentPage('dashboard')}
         />;
       case 'finance':
-        return <ComingSoon
-          language={language}
-          title={language === 'kz' ? 'Қаржы' : language === 'eng' ? 'Finance' : 'Финансы'}
-          onBack={() => setCurrentPage('dashboard')}
-        />;
+        // PaymentsHub gives both «Платежи по сделкам» and «Финансы компании»
+        // tabs at the top — same component we used to embed inside SalesKanban.
+        return <PaymentsHub language={language} />;
       case 'chats':
         return <ComingSoon
           language={language}
@@ -454,6 +452,24 @@ function AppContent() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
             {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'sales')?.labels[language] || getMenuText('orders')}</span>}
+          </button>
+          )}
+
+          {/* Финансы — отдельный раздел (раньше был вкладкой внутри «Заказы»).
+              Открывает PaymentsHub с двумя подвкладками: «Платежи по сделкам»
+              и «Финансы компании» (P&L, баланс, налоги, календарь и т.д.). */}
+          {isModuleVisible('finance') && (
+          <button
+            onClick={() => handleMenuClick('finance')}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
+              currentPage === 'finance' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+            }`}
+            title={isSidebarCollapsed ? getMenuText('finance') : ''}
+          >
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'finance')?.labels[language] || getMenuText('finance')}</span>}
           </button>
           )}
 
