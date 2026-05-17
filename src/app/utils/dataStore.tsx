@@ -550,6 +550,7 @@ interface DataStore {
 
   addTransaction: (tx: Omit<FinanceTransaction, 'id'>) => void;
   updateTransaction: (id: string, updates: Partial<FinanceTransaction>) => void;
+  deleteTransaction: (id: string) => void;
 
   toggleIntegration: (id: string) => void;
   updateIntegration: (id: string, updates: Partial<Integration>) => void;
@@ -1098,13 +1099,45 @@ export function DataProvider({ children }: { children: ReactNode }) {
     api.post<FinanceTransaction>('/api/transactions', tx)
       .then(saved => setTransactions(prev => [...prev, saved]))
       .catch(err => console.error('[addTransaction]', err));
-    addActivity({ user: 'Вы', action: tx.type === 'income' ? 'Добавили приход' : 'Добавили расход', target: `${tx.amount.toLocaleString()} ₸`, type: 'create', page: 'finance' });
+    addActivity({
+      user: 'Вы', actor: 'human',
+      action: tx.type === 'income' ? 'Добавил приход' : 'Добавил расход',
+      target: `${tx.amount.toLocaleString('ru-RU')} ₸ · ${tx.category || ''}${tx.description ? ' (' + tx.description + ')' : ''}`,
+      type: 'create', page: 'finance',
+    });
   }, [addActivity]);
 
   const updateTransaction = useCallback((id: string, updates: Partial<FinanceTransaction>) => {
+    // Capture the pre-update row so we can log a meaningful before/after.
+    const prevRow = transactions.find(t => t.id === id);
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     api.patch(`/api/transactions/${id}`, updates).catch(err => console.error('[updateTransaction]', err));
-  }, []);
+    if (prevRow) {
+      const merged = { ...prevRow, ...updates };
+      addActivity({
+        user: 'Вы', actor: 'human',
+        action: merged.type === 'income' ? 'Изменил приход' : 'Изменил расход',
+        target: `${merged.amount.toLocaleString('ru-RU')} ₸ · ${merged.category || ''}`,
+        type: 'update', page: 'finance',
+        before: `${prevRow.amount.toLocaleString('ru-RU')} ₸`,
+        after: `${merged.amount.toLocaleString('ru-RU')} ₸`,
+      });
+    }
+  }, [transactions, addActivity]);
+
+  const deleteTransaction = useCallback((id: string) => {
+    const removed = transactions.find(t => t.id === id);
+    setTransactions(prev => prev.filter(t => t.id !== id));
+    api.delete(`/api/transactions/${id}`).catch(err => console.error('[deleteTransaction]', err));
+    if (removed) {
+      addActivity({
+        user: 'Вы', actor: 'human',
+        action: removed.type === 'income' ? 'Удалил приход' : 'Удалил расход',
+        target: `${removed.amount.toLocaleString('ru-RU')} ₸ · ${removed.description || removed.category || ''}`,
+        type: 'delete', page: 'finance',
+      });
+    }
+  }, [transactions, addActivity]);
 
   // Integration
   const toggleIntegration = useCallback((id: string) => {
@@ -1156,7 +1189,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     addEmployee, updateEmployee, deleteEmployee,
     addTask, updateTask, deleteTask,
     addProduct, updateProduct, deleteProduct,
-    addTransaction, updateTransaction,
+    addTransaction, updateTransaction, deleteTransaction,
     toggleIntegration, updateIntegration,
     addActivity,
     updateProfile,

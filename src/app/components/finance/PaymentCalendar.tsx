@@ -1,9 +1,22 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, ArrowDownRight, ArrowUpRight, X, Receipt, Wallet } from 'lucide-react';
-import { useDataStore } from '../../utils/dataStore';
+import { ChevronLeft, ChevronRight, Calendar, ArrowDownRight, ArrowUpRight, X, Receipt, Wallet, Plus, Edit2, Trash2 } from 'lucide-react';
+import { useDataStore, type FinanceTransaction } from '../../utils/dataStore';
 
 type Cat = 'income' | 'expense' | 'tax' | 'salary' | 'planned';
-type Pay = { id: string; date: string; client: string; type: 'in' | 'out'; cat: Cat; amount: number; method: string; note?: string; status: 'paid' | 'pending' | 'overdue' };
+// kind tells us whether a row is a real DB transaction (editable) or
+// a synthesised projection from an active deal (read-only — edit the
+// deal itself instead).
+type Pay = {
+  id: string; date: string; client: string;
+  type: 'in' | 'out'; cat: Cat;
+  amount: number; method: string; note?: string;
+  status: 'paid' | 'pending' | 'overdue';
+  kind: 'tx' | 'planned';
+};
+
+// Categories the user can pick when adding/editing a payment.
+const INCOME_CATEGORIES  = ['Оплата сделки', 'Возврат', 'Аванс', 'Прочее'];
+const EXPENSE_CATEGORIES = ['Материалы', 'Зарплата', 'Налоги', 'Аренда', 'Транспорт', 'Подрядчик', 'Прочее'];
 
 const MOCK: Pay[] = [];
 
@@ -38,6 +51,12 @@ export function PaymentCalendar() {
   const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [filter, setFilter] = useState<Filter>('all');
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  // Payment add/edit modal state. `editingId === null` → new payment;
+  // string → edit existing transaction. Pre-filled date defaults to the
+  // selected day or today.
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [initialDate, setInitialDate] = useState<string>('');
 
   const txPays: Pay[] = store.transactions.map(t => ({
     id: t.id,
@@ -49,6 +68,7 @@ export function PaymentCalendar() {
     method: t.category,
     status: t.status === 'completed' ? 'paid' : t.status === 'overdue' ? 'overdue' : 'pending',
     note: t.dealId ? `#${t.dealId}` : undefined,
+    kind: 'tx',
   }));
   // Generate "planned" calendar entries from active deals — both the final
   // completion payment AND milestone dates (measurement, installation) so
@@ -61,19 +81,19 @@ export function PaymentCalendar() {
     if (d.completionDate && (d.progress || 0) < 100 && outstanding > 0) {
       dealPays.push({
         id: `dc_${d.id}`, date: d.completionDate, client: d.customerName, type: 'in', cat: 'planned',
-        amount: outstanding, method: 'Окончательная оплата', status: 'pending', note: d.product,
+        amount: outstanding, method: 'Окончательная оплата', status: 'pending', note: d.product, kind: 'planned',
       });
     }
     if (d.measurementDate) {
       dealPays.push({
         id: `dm_${d.id}`, date: d.measurementDate, client: d.customerName, type: 'in', cat: 'planned',
-        amount: 0, method: 'Замер', status: 'pending', note: d.product,
+        amount: 0, method: 'Замер', status: 'pending', note: d.product, kind: 'planned',
       });
     }
     if (d.installationDate) {
       dealPays.push({
         id: `di_${d.id}`, date: d.installationDate, client: d.customerName, type: 'in', cat: 'planned',
-        amount: outstanding > 0 ? outstanding : 0, method: 'Установка / финал', status: 'pending', note: d.product,
+        amount: outstanding > 0 ? outstanding : 0, method: 'Установка / финал', status: 'pending', note: d.product, kind: 'planned',
       });
     }
   }
@@ -126,13 +146,25 @@ export function PaymentCalendar() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-3 text-[10px] text-gray-500">
+        <div className="flex items-center gap-3 text-[10px] text-gray-500 flex-wrap">
           {(['income', 'expense', 'tax', 'salary', 'planned'] as Cat[]).map(c => (
             <span key={c} className="flex items-center gap-1.5">
               <span className={`w-2 h-2 rounded-full ${CAT_COLOR[c]}`} />
               {c === 'income' ? 'Поступления' : c === 'expense' ? 'Расходы' : c === 'tax' ? 'Налоги' : c === 'salary' ? 'Зарплата' : 'Запланировано'}
             </span>
           ))}
+          {/* «+ Платёж» — opens the add/edit modal pre-filled with today's
+              date (or the currently-selected day in the calendar). */}
+          <button
+            onClick={() => {
+              setEditingId(null);
+              setInitialDate(selectedDay ? dayKey(selectedDay) : new Date().toISOString().slice(0, 10));
+              setModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-900 text-white rounded-md text-[10px] hover:bg-gray-800"
+          >
+            <Plus className="w-3 h-3" /> Платёж
+          </button>
         </div>
       </div>
 
@@ -216,7 +248,7 @@ export function PaymentCalendar() {
                 <div className="p-6 text-center text-xs text-gray-400">Платежей на эту дату нет</div>
               )}
               {selectedPays.map(p => (
-                <div key={p.id} className="px-3 py-2.5 flex items-center gap-3 hover:bg-gray-50/50">
+                <div key={p.id} className="px-3 py-2.5 flex items-center gap-3 hover:bg-gray-50/50 group">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${p.type === 'in' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
                     {p.cat === 'tax' ? <Receipt className="w-3.5 h-3.5" /> :
                       p.cat === 'salary' ? <Wallet className="w-3.5 h-3.5" /> :
@@ -226,6 +258,7 @@ export function PaymentCalendar() {
                     <div className="text-xs text-gray-900 truncate flex items-center gap-1.5">
                       <span className={`w-1.5 h-1.5 rounded-full ${CAT_COLOR[p.cat]}`} />
                       {p.client}
+                      {p.kind === 'planned' && <span className="text-[8px] px-1 py-0.5 bg-sky-50 text-sky-600 rounded uppercase tracking-wide">план</span>}
                     </div>
                     <div className="text-[10px] text-gray-400 truncate">{p.method}{p.note ? ` · ${p.note}` : ''}</div>
                   </div>
@@ -233,6 +266,24 @@ export function PaymentCalendar() {
                     <div className={`text-xs tabular-nums ${p.type === 'in' ? 'text-emerald-600' : 'text-rose-500'}`}>{p.type === 'in' ? '+' : '−'}{fmt(p.amount)}</div>
                     <span className={`text-[9px] px-1.5 py-0.5 rounded ${STATUS[p.status].cls}`}>{STATUS[p.status].label}</span>
                   </div>
+                  {/* Edit / Delete shown only on real transactions (planned
+                       deal milestones are edited from the deal itself). */}
+                  {p.kind === 'tx' && (
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button
+                        onClick={() => { setEditingId(p.id); setInitialDate(p.date); setModalOpen(true); }}
+                        title="Редактировать"
+                        className="w-7 h-7 hover:bg-gray-100 rounded-md flex items-center justify-center"
+                      ><Edit2 className="w-3 h-3 text-gray-500" /></button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Удалить платёж ${fmt(p.amount)}?`)) store.deleteTransaction(p.id);
+                        }}
+                        title="Удалить"
+                        className="w-7 h-7 hover:bg-rose-50 rounded-md flex items-center justify-center"
+                      ><Trash2 className="w-3 h-3 text-rose-500" /></button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -255,6 +306,135 @@ export function PaymentCalendar() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {modalOpen && (
+        <PaymentModal
+          initialDate={initialDate || new Date().toISOString().slice(0, 10)}
+          editing={editingId ? store.transactions.find(t => t.id === editingId) : undefined}
+          onClose={() => { setModalOpen(false); setEditingId(null); }}
+          onSave={(payload) => {
+            if (editingId) store.updateTransaction(editingId, payload);
+            else           store.addTransaction(payload);
+            setModalOpen(false); setEditingId(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── PaymentModal ────────────────────────────────────────────────
+// Reused for both Add and Edit. Receives optional `editing` row to
+// prefill fields. Calls onSave with a complete FinanceTransaction
+// payload (parent decides add vs update).
+function PaymentModal({ initialDate, editing, onClose, onSave }: {
+  initialDate: string;
+  editing?: FinanceTransaction;
+  onClose: () => void;
+  onSave: (payload: Omit<FinanceTransaction, 'id'>) => void;
+}) {
+  const [type,        setType]        = useState<'income' | 'expense'>(editing?.type        || 'income');
+  const [date,        setDate]        = useState<string>(editing?.date                      || initialDate);
+  const [amount,      setAmount]      = useState<string>(editing ? String(editing.amount)   : '');
+  const [category,    setCategory]    = useState<string>(editing?.category                  || INCOME_CATEGORIES[0]);
+  const [description, setDescription] = useState<string>(editing?.description               || '');
+  const [status,      setStatus]      = useState<FinanceTransaction['status']>(editing?.status || 'completed');
+
+  // When the user flips income↔expense, the category list changes — reset
+  // category to the first of the new list if it's not in there.
+  const catList = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  if (!catList.includes(category)) {
+    // Side-effect during render — safe since it only fires when the user
+    // toggled type, and setState is idempotent on equal values.
+    queueMicrotask(() => setCategory(catList[0]));
+  }
+
+  function commit() {
+    const amt = Number(amount);
+    if (!amt || amt <= 0) { alert('Укажите сумму'); return; }
+    if (!date) { alert('Укажите дату'); return; }
+    onSave({
+      type, date, amount: amt, category,
+      description: description.trim(),
+      status,
+      // Keep dealId on edit (linked to a sale we don't want to break),
+      // empty on create.
+      dealId: editing?.dealId,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="text-sm text-gray-900">{editing ? 'Редактировать платёж' : 'Новый платёж'}</div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          {/* Type — income / expense segmented control */}
+          <div>
+            <div className="text-[10px] text-gray-400 mb-1.5">Тип</div>
+            <div className="flex gap-1 bg-gray-50 rounded-xl p-1">
+              <button
+                onClick={() => setType('income')}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${type === 'income' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500'}`}
+              >
+                <ArrowDownRight className="w-3 h-3 inline mr-1" /> Поступление
+              </button>
+              <button
+                onClick={() => setType('expense')}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${type === 'expense' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500'}`}
+              >
+                <ArrowUpRight className="w-3 h-3 inline mr-1" /> Расход
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-[10px] text-gray-400 mb-1">Дата</div>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400 mb-1">Сумма (₸)</div>
+              <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="100 000" className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[10px] text-gray-400 mb-1">Категория</div>
+            <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200">
+              {catList.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <div className="text-[10px] text-gray-400 mb-1">Описание (опционально)</div>
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Оплата от клиента Айгуль" className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+          </div>
+
+          <div>
+            <div className="text-[10px] text-gray-400 mb-1.5">Статус</div>
+            <div className="flex gap-1 bg-gray-50 rounded-xl p-1">
+              {(['completed', 'pending', 'overdue'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setStatus(s)}
+                  className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] transition ${status === s ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+                >{s === 'completed' ? 'Оплачен' : s === 'pending' ? 'Ожидает' : 'Просрочен'}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900">Отмена</button>
+          <button onClick={commit} className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs">
+            {editing ? 'Сохранить' : 'Создать'}
+          </button>
         </div>
       </div>
     </div>

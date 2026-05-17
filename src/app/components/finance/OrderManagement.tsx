@@ -101,10 +101,20 @@ export function OrderManagement() {
           {visible.map(o => (
             <div key={o.id} className="grid grid-cols-12 gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors items-center">
               <div className="col-span-12 md:col-span-4 flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center text-[10px] text-gray-500 flex-shrink-0">#{o.id}</div>
+                {/* Customer initials avatar instead of the raw 16-char deal ID.
+                    The full ID was overflowing its 8×8 box and bleeding into
+                    the next column. We show the customer's first letters here
+                    and surface the short id in the line below as small grey. */}
+                <div className="w-8 h-8 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center text-[10px] text-gray-600 flex-shrink-0 font-medium uppercase">
+                  {((o.client || o.name || '?').replace(/[^A-Za-zА-Яа-яЁё ]/g, '').trim().slice(0, 2) || '·')}
+                </div>
                 <div className="min-w-0">
-                  <div className="text-sm text-gray-900 truncate">{o.name}</div>
-                  {o.client && <div className="text-[10px] text-gray-400 truncate">{o.client}</div>}
+                  <div className="text-sm text-gray-900 truncate" title={o.name}>{o.name}</div>
+                  {o.client && (
+                    <div className="text-[10px] text-gray-400 truncate" title={`${o.id} · ${o.client}`}>
+                      <span className="font-mono opacity-60">#{o.id.slice(-6)}</span> · {o.client}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="col-span-6 md:col-span-2 text-xs text-gray-600">{o.master}</div>
