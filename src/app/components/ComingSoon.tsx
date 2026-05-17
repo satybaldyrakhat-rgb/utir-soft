@@ -24,11 +24,12 @@ export function ComingSoon({ title, description, onBack, language = 'ru' }: Comi
       className="min-h-full relative flex items-center justify-center p-6"
     >
       <div className="max-w-md w-full bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 text-center relative overflow-hidden">
-        {/* Decorative corner orb — rounded square so it matches the
-            icon chip's shape language (was a circle, looked unrelated). */}
+        {/* Ambient halo centred behind the icon — all 4 corners of the
+            card stay visually equal (previous corner orb made the
+            top-right heavier than the rest). */}
         <div
-          className="absolute -top-16 -right-16 w-48 h-48 rounded-3xl blur-2xl pointer-events-none"
-          style={{ background: 'linear-gradient(135deg, var(--accent-200), var(--accent-100))' }}
+          className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full blur-3xl pointer-events-none opacity-70"
+          style={{ background: 'radial-gradient(circle, var(--accent-200) 0%, transparent 70%)' }}
         />
         <div className="relative">
           <div
