@@ -6,7 +6,7 @@ import {
 import { api } from '../utils/api';
 import {
   WhatsAppLogo, TelegramLogo, InstagramLogo, KaspiLogo, HalykLogo, OneCLogo,
-  ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo, AnthropicLogo, DeepSeekLogo,
+  ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo, AnthropicLogo, DeepSeekLogo, ZapierLogo,
 } from './PlatformLogos';
 
 interface Props { language: 'kz' | 'ru' | 'eng'; canEdit: boolean }
@@ -47,7 +47,7 @@ function logoFor(id: string): JSX.Element {
     case 'halyk-pos':         return <HalykLogo      className="w-6 h-6" />;
     case '1c':                return <OneCLogo       className="w-6 h-6" />;
     case 'google-workspace':  return <GoogleLogo     className="w-6 h-6" />;
-    case 'zapier-webhooks':   return <Zap className="w-5 h-5 text-orange-500" />;
+    case 'zapier-webhooks':   return <ZapierLogo    className="w-6 h-6" />;
     default:                  return <Zap className="w-5 h-5 text-gray-400" />;
   }
 }

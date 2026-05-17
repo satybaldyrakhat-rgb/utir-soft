@@ -37,11 +37,17 @@ export const TikTokLogo = ({ className = "w-5 h-5" }: { className?: string }) =>
   </svg>
 );
 
+// Kaspi.kz — signature red tile with bold white «K» monogram and
+// the small «.kz» tag that's actually part of their wordmark.
 export const KaspiLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className}>
     <rect width="24" height="24" rx="6" fill="#F14635"/>
-    <path d="M7 7h3.5l3.5 5-3.5 5H7l3.5-5L7 7z" fill="#fff"/>
-    <path d="M12 7h3.5l-3.5 5 3.5 5H12l-3.5-5L12 7z" fill="#fff" opacity="0.7"/>
+    {/* Big K — two diagonal strokes meeting on a vertical stem */}
+    <path
+      d="M6.5 5.5h2.7v5.6l4.3-5.6h3.2l-4.6 5.7 4.9 7.3h-3.4l-3.5-5.3-.9 1.1v4.2H6.5z"
+      fill="#fff"
+    />
+    {/* «.kz» tag below — too small to render legibly at 24px, omit */}
   </svg>
 );
 
@@ -52,17 +58,36 @@ export const FreedomLogo = ({ className = "w-5 h-5" }: { className?: string }) =
   </svg>
 );
 
+// Halyk Bank — signature dark-green tile with the «sun-rays» mark
+// (their actual brand logo is a stylised rising sun under the «H»).
 export const HalykLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className}>
     <rect width="24" height="24" rx="6" fill="#00703C"/>
-    <text x="12" y="16" textAnchor="middle" fill="#FFD700" fontSize="11" fontWeight="bold">HB</text>
+    {/* Bold «H» */}
+    <path d="M5.5 6h2.4v4.6h4.2V6h2.4v12h-2.4v-5.2H7.9V18H5.5z" fill="#FFD200"/>
+    {/* Sun-burst rays at bottom-right */}
+    <g transform="translate(17.5 17.5)" fill="#FFD200">
+      <circle r="1.2" />
+      {[0, 60, 120, 180, 240, 300].map(a => (
+        <rect key={a} x="-0.25" y="-3.4" width="0.5" height="1.6" rx="0.25" transform={`rotate(${a})`} />
+      ))}
+    </g>
   </svg>
 );
 
+// 1С:Предприятие — official yellow tile with the iconic red «1С».
+// We render «1С» as inline SVG paths (not <text>) so the look is
+// consistent across browsers regardless of installed Cyrillic fonts.
 export const OneCLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className}>
     <rect width="24" height="24" rx="6" fill="#FFD500"/>
-    <text x="12" y="16.5" textAnchor="middle" fill="#E4002B" fontSize="10" fontWeight="bold">1C</text>
+    {/* «1» — vertical stem with serif top */}
+    <path d="M7.2 6.5h2.1v11h-2.1v-9l-1.4.9V8.1z" fill="#E4002B"/>
+    {/* «С» — open ring on the right */}
+    <path
+      d="M17.5 9.5c-.5-.7-1.4-1.1-2.3-1.1-1.7 0-3 1.4-3 3.6 0 2.2 1.3 3.6 3 3.6.9 0 1.8-.4 2.3-1.1l1.3 1.3a4.7 4.7 0 01-3.7 1.7c-2.9 0-4.9-2.2-4.9-5.5s2-5.5 4.9-5.5c1.5 0 2.8.6 3.7 1.7z"
+      fill="#E4002B"
+    />
   </svg>
 );
 
@@ -103,6 +128,21 @@ export const GeminiLogo = ({ className = "w-5 h-5" }: { className?: string }) =>
       fill="url(#gemini-grad)"
       opacity="0.85"
     />
+  </svg>
+);
+
+// Zapier — orange tile with their distinctive 6-point "flower" mark
+// (three crossed bars forming an asterisk). Used for the Webhooks
+// integration card since Zapier is the most-used webhook consumer.
+export const ZapierLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className}>
+    <rect width="24" height="24" rx="6" fill="#FF4A00"/>
+    {/* 6-point asterisk: 3 crossed rectangles + a centre dot */}
+    <g transform="translate(12 12)" fill="#fff">
+      <rect x="-1.1" y="-7" width="2.2" height="14" rx="1" />
+      <rect x="-1.1" y="-7" width="2.2" height="14" rx="1" transform="rotate(60)" />
+      <rect x="-1.1" y="-7" width="2.2" height="14" rx="1" transform="rotate(120)" />
+    </g>
   </svg>
 );
 
