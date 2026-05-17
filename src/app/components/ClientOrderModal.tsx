@@ -184,15 +184,15 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
   const FieldInput = ({ label, value, onChange, ...props }: { label: string; value: string; onChange: (v: string) => void } & Record<string, any>) => (
     <div>
-      <label className="block text-[11px] text-gray-400 mb-1">{label}</label>
-      <input type="text" value={value} onChange={e => onChange(e.target.value)} className="w-full px-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" {...props} />
+      <label className="block text-[11px] text-slate-500 mb-1.5">{label}</label>
+      <input type="text" value={value} onChange={e => onChange(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" {...props} />
     </div>
   );
 
   const FieldSelect = ({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: React.ReactNode }) => (
     <div>
-      <label className="block text-[11px] text-gray-400 mb-1">{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)} className="w-full px-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none">{children}</select>
+      <label className="block text-[11px] text-slate-500 mb-1.5">{label}</label>
+      <select value={value} onChange={e => onChange(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">{children}</select>
     </div>
   );
 
@@ -204,33 +204,43 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)] overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between flex-shrink-0">
-          <div>
-            <div className="text-sm text-gray-900">{deal.customerName}</div>
-            <div className="text-[10px] text-gray-400">{l('Заказ', 'Тапсырыс', 'Order')} #{deal.id} · {deal.product} · {deal.amount.toLocaleString()} ₸</div>
+        <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between flex-shrink-0">
+          <div className="min-w-0">
+            <div className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Заказ', 'Тапсырыс', 'Order')} · #{(deal.id || '').slice(-6)}</div>
+            <div className="text-lg text-slate-900 tracking-tight truncate">{deal.customerName}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5 truncate">{deal.product} · <span className="tabular-nums">{deal.amount.toLocaleString('ru-RU')} ₸</span></div>
           </div>
-          <button onClick={onClose} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-gray-400" /></button>
+          <button onClick={onClose} className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center transition-colors flex-shrink-0">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
         </div>
 
         {/* Sync status (real 1C/ERP sync — coming later) */}
-        <div className="px-5 py-2 bg-gray-50/50 border-b border-gray-50 flex items-center justify-between flex-shrink-0">
+        <div className="px-6 py-2 bg-white/30 backdrop-blur-xl border-b border-white/60 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2 text-[10px]">
-            <span className="flex items-center gap-1 text-gray-400">
-              <span className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
+            <span className="flex items-center gap-1.5 text-slate-500 px-2 py-0.5 rounded-full bg-white/50 ring-1 ring-white/60">
+              <span className="w-1.5 h-1.5 bg-slate-300 rounded-full" />
               {tt('notSynced')}
             </span>
-            <span className="text-gray-300">·</span>
-            <span className="text-[10px] text-gray-400">{tt('syncSoon')}</span>
+            <span className="text-slate-400">{tt('syncSoon')}</span>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="px-5 border-b border-gray-50 flex gap-1 flex-shrink-0">
+        {/* Tabs — glass capsules */}
+        <div className="px-6 pt-4 pb-3 flex gap-1.5 flex-shrink-0 overflow-x-auto">
           {tabs.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-1.5 px-3 py-2.5 text-xs transition-all border-b-2 ${activeTab === tab.id ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
+                activeTab === tab.id
+                  ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+                  : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+              }`}
+            >
               {tab.id === 'chat' && <MessageCircle className="w-3 h-3" />}
               {tab.label}
             </button>
@@ -248,7 +258,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
               {/* ── Section: Contacts ── */}
               <section>
-                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Контакты', 'Байланыс', 'Contacts')}</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Контакты', 'Байланыс', 'Contacts')}</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <FieldInput label={tt('phone')} value={phone} onChange={setPhone} placeholder={tt('phoneMask')} />
                   <FieldSelect label={l('Источник', 'Көзі', 'Source')} value={source} onChange={setSource}>
@@ -259,7 +269,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
               {/* ── Section: Object addresses ── */}
               <section>
-                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Объект', 'Объект', 'Object')}</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Объект', 'Объект', 'Object')}</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <FieldInput label={tt('clientAddress')} value={address} onChange={setAddress} placeholder={tt('addressMask')} />
                   <FieldInput label={tt('siteAddress')} value={siteAddress} onChange={setSiteAddress} placeholder={tt('siteAddressMask')} />
@@ -268,26 +278,26 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
               {/* ── Section: Furniture details ── */}
               <section>
-                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Изделие', 'Бұйым', 'Product')}</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Изделие', 'Бұйым', 'Product')}</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] text-gray-400 mb-1">{tt('furnitureType')}</label>
+                    <label className="block text-[11px] text-slate-500 mb-1.5">{tt('furnitureType')}</label>
                     <input
                       list="dl-card-furniture-types"
                       value={furnitureType}
                       onChange={e => setFurnitureType(e.target.value)}
                       placeholder={catalogs.furnitureTypes.length ? '' : tt('catalogEmpty')}
-                      className="w-full px-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+                      className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-gray-400 mb-1">{l('Материалы', 'Материалдар', 'Materials')}</label>
+                    <label className="block text-[11px] text-slate-500 mb-1.5">{l('Материалы', 'Материалдар', 'Materials')}</label>
                     <input
                       list="dl-card-materials"
                       value={materials}
                       onChange={e => setMaterials(e.target.value)}
                       placeholder={catalogs.materials.length ? '' : tt('catalogEmpty')}
-                      className="w-full px-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+                      className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all"
                     />
                   </div>
                 </div>
@@ -295,7 +305,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
               {/* ── Section: Team ── */}
               <section>
-                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Команда', 'Команда', 'Team')}</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Команда', 'Команда', 'Team')}</div>
                 {/* Owner — explicit employee link. Falls back to first-name match
                     on measurer/designer/foreman fields when missing; this makes
                     revenue / conversion in the Team-metrics tab accurate. */}
@@ -320,20 +330,20 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
               {/* ── Section: Notes ── */}
               <section>
-                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Заметки', 'Жазбалар', 'Notes')}</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Заметки', 'Жазбалар', 'Notes')}</div>
                 <textarea
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
                   rows={3}
                   placeholder={l('Любые заметки по заказу', 'Тапсырыс бойынша жазбалар', 'Order notes')}
-                  className="w-full px-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none"
+                  className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none"
                 />
               </section>
 
               {/* ── Section: Documents (placeholder) ── */}
               <section>
-                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Документы', 'Құжаттар', 'Documents')}</div>
-                <div className="bg-gray-50 rounded-xl px-3 py-3 flex items-center gap-2 text-[11px] text-gray-400">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Документы', 'Құжаттар', 'Documents')}</div>
+                <div className="bg-white/40 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl px-3 py-3 flex items-center gap-2 text-[11px] text-slate-500">
                   <FileText className="w-3.5 h-3.5" />
                   {l('Загрузка файлов появится после интеграции хранилища', 'Файлдарды жүктеу қойма интеграциясынан кейін шығады', 'File uploads will appear after storage integration')}
                 </div>
@@ -343,37 +353,45 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
           {/* PROGRESS TAB */}
           {activeTab === 'progress' && (
-            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Timeline — furniture lifecycle: Замер → Готовность → Установка */}
               <div>
-                <div className="text-xs text-gray-900 mb-3">{l('Сроки', 'Мерзімдер', 'Timeline')}</div>
-                <div className="space-y-3">
+                <div className="text-xs text-slate-900 mb-3">{l('Сроки', 'Мерзімдер', 'Timeline')}</div>
+                <div className="space-y-2">
                   {[
                     { label: tt('timelineMeasure'),       date: measurementDate,   done: !!measurementDate },
                     { label: tt('timelineCompletion'),    date: completionDate,    done: false },
                     { label: tt('timelineInstallation'),  date: installationDate,  done: false },
                   ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${item.done ? 'bg-green-500' : 'bg-gray-200'}`}>
-                        {item.done ? <Check className="w-3 h-3 text-white" /> : <span className="text-[9px] text-white">{i + 1}</span>}
+                    <div key={i} className="flex items-center gap-3 p-3 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl">
+                      <div className={`w-7 h-7 rounded-xl flex items-center justify-center ring-1 ring-white/60 ${item.done ? 'bg-emerald-500 text-white' : 'bg-white/60 text-slate-400'}`}>
+                        {item.done ? <Check className="w-3.5 h-3.5" /> : <span className="text-[10px] tabular-nums">{i + 1}</span>}
                       </div>
-                      <div className="flex-1"><div className="text-xs text-gray-900">{item.label}</div><div className="text-[10px] text-gray-400">{item.date}</div></div>
+                      <div className="flex-1">
+                        <div className="text-xs text-slate-900">{item.label}</div>
+                        <div className="text-[10px] text-slate-500">{item.date || '—'}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
                 <div className="mt-4">
-                  <div className="flex items-center justify-between text-[10px] mb-1"><span className="text-gray-400">{l('Прогресс', 'Прогресс', 'Progress')}</span><span className="text-gray-900">65%</span></div>
-                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-gray-900 rounded-full" style={{ width: '65%' }} /></div>
+                  <div className="flex items-center justify-between text-[10px] mb-1">
+                    <span className="text-slate-500">{l('Прогресс', 'Прогресс', 'Progress')}</span>
+                    <span className="text-slate-900 tabular-nums">65%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-white/60 rounded-full overflow-hidden ring-1 ring-white/40">
+                    <div className="h-full bg-gradient-to-r from-sky-400 to-violet-400 rounded-full" style={{ width: '65%' }} />
+                  </div>
                 </div>
               </div>
 
               {/* Payment */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <div className="text-xs text-gray-900">{tt('payment')}</div>
+                  <div className="text-xs text-slate-900">{tt('payment')}</div>
                   <button
                     onClick={addPaymentMethod}
-                    className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-900 px-2 py-1 rounded-lg hover:bg-gray-50"
+                    className="flex items-center gap-1 text-[10px] text-slate-600 hover:text-slate-900 px-2.5 py-1 rounded-xl bg-white/50 ring-1 ring-white/60 hover:bg-white/80 transition-colors"
                   >
                     <Plus className="w-3 h-3" />{tt('addPaymentMethod')}
                   </button>
@@ -382,44 +400,54 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                   {Object.keys(paymentMethods).map(key => {
                     const meta = iconForPaymentKey(key);
                     const Icon = meta.icon;
+                    const checked = !!paymentMethods[key];
                     return (
-                      <div key={key} className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-gray-50 transition-colors group">
+                      <div
+                        key={key}
+                        className={`flex items-center gap-2.5 p-2.5 rounded-2xl transition-colors group ring-1 ${
+                          checked ? 'bg-white/70 ring-white/60' : 'bg-white/30 ring-white/40 hover:bg-white/60'
+                        } backdrop-blur-xl`}
+                      >
                         <input
                           type="checkbox"
-                          checked={!!paymentMethods[key]}
+                          checked={checked}
                           onChange={e => setPaymentMethods({ ...paymentMethods, [key]: e.target.checked })}
-                          className="w-3.5 h-3.5 rounded accent-gray-900"
+                          className="w-3.5 h-3.5 rounded accent-slate-900"
                         />
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${meta.color}`}><Icon className="w-3.5 h-3.5" /></div>
-                        <span className="text-xs text-gray-700 flex-1">{labelForPaymentKey(key)}</span>
+                        <div className={`w-7 h-7 rounded-xl ring-1 ring-white/60 flex items-center justify-center ${meta.color.replace('bg-', 'bg-').replace('-50', '-100/70')}`}>
+                          <Icon className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs text-slate-700 flex-1">{labelForPaymentKey(key)}</span>
                         <button
                           onClick={() => removePaymentMethod(key)}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 rounded-lg transition"
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-rose-100/70 rounded-lg transition"
                           title={tt('delete')}
                         >
-                          <Trash2 className="w-3 h-3 text-gray-400 hover:text-red-500" />
+                          <Trash2 className="w-3 h-3 text-slate-400 hover:text-rose-600" />
                         </button>
                       </div>
                     );
                   })}
                   {Object.keys(paymentMethods).length === 0 && (
-                    <div className="text-[11px] text-gray-400 italic px-2">{tt('paymentMethods')}: —</div>
+                    <div className="text-[11px] text-slate-500 italic px-2">{tt('paymentMethods')}: —</div>
                   )}
                 </div>
-                <div className="bg-gray-50 rounded-xl p-3">
+                <div className="bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-4">
                   <div className="flex items-center justify-between text-[10px] mb-1">
-                    <span className="text-gray-400">{tt('paid')}: {paidPercent}%</span>
-                    <span className="text-gray-900">{formatKZT(paidAmount)} / {formatKZT(deal.amount || 0)}</span>
+                    <span className="text-slate-500">{tt('paid')}: <span className="tabular-nums">{paidPercent}%</span></span>
+                    <span className="text-slate-900 tabular-nums">{formatKZT(paidAmount)} / {formatKZT(deal.amount || 0)}</span>
                   </div>
-                  <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500 rounded-full" style={{ width: `${paidPercent}%` }} />
+                  <div className="w-full h-1.5 bg-white/60 rounded-full overflow-hidden ring-1 ring-white/40">
+                    <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full" style={{ width: `${paidPercent}%` }} />
                   </div>
                   <div className="mt-2 flex items-center justify-between text-[10px]">
-                    <span className="text-gray-400">{tt('remaining')}</span>
-                    <span className="text-gray-900">{formatKZT(remaining)}</span>
+                    <span className="text-slate-500">{tt('remaining')}</span>
+                    <span className="text-slate-900 tabular-nums">{formatKZT(remaining)}</span>
                   </div>
-                  <div className="mt-2">
-                    <label className="block text-[10px] text-gray-400 mb-1">{tt('paid')} ({tt('contractAmount')}: {formatKZT(deal.amount || 0)})</label>
+                  <div className="mt-3">
+                    <label className="block text-[10px] text-slate-500 mb-1">
+                      {tt('paid')} ({tt('contractAmount')}: <span className="tabular-nums">{formatKZT(deal.amount || 0)}</span>)
+                    </label>
                     <input
                       type="number"
                       min={0}
@@ -427,7 +455,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                       value={paidAmount || ''}
                       onChange={e => setPaidAmount(Math.max(0, Number(e.target.value) || 0))}
                       placeholder="0"
-                      className="w-full px-2.5 py-1.5 bg-white border-0 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-gray-200"
+                      className="w-full px-3 py-2 bg-white/70 backdrop-blur-xl ring-1 ring-white/60 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
                     />
                   </div>
                 </div>
@@ -438,16 +466,16 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
           {/* CHAT TAB — empty state until WhatsApp Business integration ships */}
           {activeTab === 'chat' && (
             <div className="flex flex-col items-center justify-center min-h-[400px] py-12 px-6 text-center">
-              <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
-                <MessageCircle className="w-6 h-6 text-gray-400" />
+              <div className="w-14 h-14 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl flex items-center justify-center mb-4">
+                <MessageCircle className="w-6 h-6 text-slate-400" />
               </div>
-              <div className="text-sm text-gray-900 mb-2">{tt('chatComingSoon')}</div>
-              <div className="text-xs text-gray-500 max-w-md leading-relaxed mb-5">
+              <div className="text-sm text-slate-900 mb-2">{tt('chatComingSoon')}</div>
+              <div className="text-xs text-slate-500 max-w-md leading-relaxed mb-5">
                 {tt('chatEmptyDesc')}
               </div>
               <button
                 disabled
-                className="px-4 py-2 bg-gray-100 text-gray-400 rounded-xl text-xs cursor-not-allowed"
+                className="px-4 py-2 bg-white/40 ring-1 ring-white/60 text-slate-400 rounded-2xl text-xs cursor-not-allowed backdrop-blur-xl"
                 title={tt('syncSoon')}
               >
                 {tt('connectWorkNumber')}
@@ -457,43 +485,42 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
           {/* HISTORY TAB — audit trail of edits, newest first */}
           {activeTab === 'history' && (
-            <div className="px-5 py-4">
-              <div className="flex items-center gap-2 mb-3">
-                <History className="w-4 h-4 text-gray-400" />
-                <div className="text-sm text-gray-900">{l('История изменений', 'Өзгерістер тарихы', 'Change history')}</div>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-7 h-7 rounded-xl bg-white/60 ring-1 ring-white/60 flex items-center justify-center">
+                  <History className="w-3.5 h-3.5 text-slate-500" />
+                </div>
+                <div className="text-sm text-slate-900">{l('История изменений', 'Өзгерістер тарихы', 'Change history')}</div>
               </div>
               {historyLoading && history.length === 0 && (
-                <div className="text-xs text-gray-400 py-6 text-center">{l('Загрузка…', 'Жүктелуде…', 'Loading…')}</div>
+                <div className="text-xs text-slate-500 py-6 text-center">{l('Загрузка…', 'Жүктелуде…', 'Loading…')}</div>
               )}
               {!historyLoading && history.length === 0 && (
-                <div className="text-xs text-gray-400 py-10 text-center">
+                <div className="text-xs text-slate-500 py-10 text-center">
                   {l('Пока изменений нет — карточка ни разу не редактировалась.',
                      'Әзірге өзгерістер жоқ — карточка әлі редакцияланбаған.',
                      'No edits yet — the deal has not been changed.')}
                 </div>
               )}
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {history.map(entry => {
-                  // Only the latest non-rollback entry gets a Rollback button.
-                  // (Rolling back an old entry mid-timeline is hard to reason
-                  // about — admin can roll back top-most repeatedly instead.)
                   const isRollback = entry.userName?.includes('(rollback)');
                   const isTopActionable = !isRollback && entry.id === history.find(h => !h.userName?.includes('(rollback)'))?.id;
                   return (
-                  <div key={entry.id} className="bg-gray-50 rounded-xl border border-gray-100 p-3">
-                    <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
+                  <div key={entry.id} className="bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3.5">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 mb-2">
                       <span>
-                        <b className={isRollback ? 'text-amber-700' : 'text-gray-700'}>{entry.userName || l('Неизвестно', 'Белгісіз', 'Unknown')}</b>
+                        <b className={isRollback ? 'text-amber-700' : 'text-slate-700'}>{entry.userName || l('Неизвестно', 'Белгісіз', 'Unknown')}</b>
                       </span>
                       <div className="flex items-center gap-2">
-                        <span>{new Date(entry.createdAt).toLocaleString(language === 'eng' ? 'en-GB' : 'ru-RU', {
+                        <span className="tabular-nums">{new Date(entry.createdAt).toLocaleString(language === 'eng' ? 'en-GB' : 'ru-RU', {
                           day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
                         })}</span>
                         {isTopActionable && (
                           <button
                             onClick={() => rollbackEntry(entry.id)}
                             disabled={rollingBackId === entry.id}
-                            className="flex items-center gap-1 px-2 py-0.5 text-[10px] text-amber-700 hover:bg-amber-50 rounded transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 px-2 py-0.5 text-[10px] text-amber-700 bg-amber-100/60 ring-1 ring-amber-200/40 hover:bg-amber-100 rounded-full transition-colors disabled:opacity-50"
                             title={l('Откатить эту правку', 'Бұл түзетуді қайтару', 'Roll back this change')}
                           >
                             <RotateCcw className="w-2.5 h-2.5" />
@@ -507,10 +534,10 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                     <div className="space-y-1">
                       {Object.entries(entry.changes).map(([key, diff]) => (
                         <div key={key} className="text-[11px] flex flex-wrap items-baseline gap-1.5">
-                          <span className="text-gray-500">{FIELD_LABEL[key] || key}:</span>
-                          <span className="text-gray-400 line-through truncate max-w-[40%]">{formatHistoryValue(key, diff.before)}</span>
-                          <span className="text-gray-300">→</span>
-                          <span className="text-gray-900 truncate max-w-[40%]">{formatHistoryValue(key, diff.after)}</span>
+                          <span className="text-slate-500">{FIELD_LABEL[key] || key}:</span>
+                          <span className="text-slate-400 line-through truncate max-w-[40%]">{formatHistoryValue(key, diff.before)}</span>
+                          <span className="text-slate-300">→</span>
+                          <span className="text-slate-900 truncate max-w-[40%]">{formatHistoryValue(key, diff.after)}</span>
                         </div>
                       ))}
                     </div>
@@ -523,12 +550,17 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-gray-50 flex justify-end gap-2 flex-shrink-0">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-100 rounded-xl text-xs hover:bg-gray-50">{tt('cancel')}</button>
+        <div className="px-6 py-4 border-t border-white/60 flex justify-end gap-2 flex-shrink-0">
+          <button onClick={onClose} className="px-4 py-2 bg-white/60 ring-1 ring-white/60 rounded-2xl text-xs hover:bg-white text-slate-700 transition-colors">{tt('cancel')}</button>
           {/* Save hidden for roles with only 'view' permission on orders/sales.
               Without this they'd hit the form, edit, click Save and get a 403. */}
           {store.canWriteModule('orders') && (
-            <button onClick={handleSave} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">{tt('save')}</button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all"
+            >
+              {tt('save')}
+            </button>
           )}
         </div>
       </div>
@@ -565,16 +597,16 @@ function DesignConcepts({ deal, language }: { deal: Deal; language: 'kz' | 'ru' 
 
   return (
     <section>
-      <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3 flex items-center justify-between">
+      <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3 flex items-center justify-between">
         <span>{l('AI Дизайн концепты', 'AI Дизайн концептері', 'AI Design concepts')}</span>
-        <span className="text-gray-300 normal-case">{designIds.length}</span>
+        <span className="text-slate-400 normal-case tabular-nums px-2 py-0.5 rounded-full bg-white/50 ring-1 ring-white/60">{designIds.length}</span>
       </div>
       {designIds.length === 0 ? (
-        <div className="text-[11px] text-gray-400 leading-relaxed bg-gray-50 rounded-xl p-3">
+        <div className="text-[11px] text-slate-500 leading-relaxed bg-white/40 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3">
           {l(
-            'Нет привязанных концептов. Сгенерируйте дизайн в разделе «AI Дизайн» и нажмите 🔗, чтобы прикрепить сюда.',
-            'Концептер жоқ. AI Дизайн бөлімінде дизайн жасап, осында тіркеу үшін 🔗 басыңыз.',
-            'No concepts attached yet. Generate in AI Design and click 🔗 to attach here.',
+            'Нет привязанных концептов. Сгенерируйте дизайн в разделе «AI Дизайн» и прикрепите его к сделке кнопкой «К сделке».',
+            'Концептер жоқ. AI Дизайн бөлімінде дизайн жасап, мәмілеге қосыңыз.',
+            'No concepts attached yet. Generate in AI Design and attach via «To deal».',
           )}
         </div>
       ) : (
@@ -583,17 +615,17 @@ function DesignConcepts({ deal, language }: { deal: Deal; language: 'kz' | 'ru' 
             <div key={c.id} className="relative group">
               {c.imageUrl ? (
                 <a href={c.imageUrl} target="_blank" rel="noreferrer">
-                  <img src={c.imageUrl} alt={c.prompt} className="w-full aspect-square object-cover rounded-xl border border-gray-100" />
+                  <img src={c.imageUrl} alt={c.prompt} className="w-full aspect-square object-cover rounded-2xl ring-1 ring-white/60" />
                 </a>
               ) : (
-                <div className="w-full aspect-square bg-gray-100 rounded-xl flex items-center justify-center text-gray-300">—</div>
+                <div className="w-full aspect-square bg-white/40 ring-1 ring-white/60 rounded-2xl flex items-center justify-center text-slate-400">—</div>
               )}
-              <div className="absolute bottom-1 left-1 right-1 px-1.5 py-0.5 bg-black/60 text-white text-[9px] rounded truncate">
+              <div className="absolute bottom-1.5 left-1.5 right-1.5 px-2 py-0.5 bg-slate-900/70 backdrop-blur-xl text-white text-[9px] rounded-full truncate ring-1 ring-white/20">
                 {c.provider}
               </div>
               <button
                 onClick={() => detach(c.id)}
-                className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/80 transition-opacity"
+                className="absolute top-1.5 right-1.5 w-6 h-6 bg-slate-900/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-slate-900/90 transition-opacity ring-1 ring-white/20"
                 title={l('Открепить', 'Ажырату', 'Detach')}
               >
                 <X className="w-3 h-3" />
@@ -603,9 +635,9 @@ function DesignConcepts({ deal, language }: { deal: Deal; language: 'kz' | 'ru' 
           {/* Stale ids (concept got deleted) — show placeholder so admin knows. */}
           {designIds.filter(id => !history.find(h => h.id === id)).map(id => (
             <div key={id} className="relative">
-              <div className="w-full aspect-square bg-gray-50 border border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-[10px] text-gray-400 p-2 text-center">
+              <div className="w-full aspect-square bg-white/30 border-2 border-dashed border-white/60 rounded-2xl flex flex-col items-center justify-center text-[10px] text-slate-500 p-2 text-center backdrop-blur-xl">
                 {l('Удалён', 'Жойылды', 'Deleted')}
-                <button onClick={() => detach(id)} className="mt-1 text-red-400 hover:text-red-600">{l('убрать', 'жою', 'remove')}</button>
+                <button onClick={() => detach(id)} className="mt-1 text-rose-600 hover:text-rose-700">{l('убрать', 'жою', 'remove')}</button>
               </div>
             </div>
           ))}
