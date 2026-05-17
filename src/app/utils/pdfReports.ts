@@ -29,6 +29,12 @@ async function loadRobotoFont(): Promise<string> {
   return cachedRobotoBase64;
 }
 
+// Sentinel error so callers can branch on font-load failure (show a toast
+// telling the user to check internet) vs other errors (generic «не удалось»).
+export class PdfFontError extends Error {
+  constructor(message: string) { super(message); this.name = 'PdfFontError'; }
+}
+
 async function newDoc(): Promise<jsPDF> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   try {
@@ -37,9 +43,11 @@ async function newDoc(): Promise<jsPDF> {
     doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
     doc.setFont('Roboto', 'normal');
   } catch (e) {
-    // Fall back to default font — Cyrillic will look broken but at least
-    // the report opens. Surface to console for debugging.
-    console.warn('[pdfReports] font load failed, falling back to Helvetica', e);
+    // Without the Cyrillic font, jsPDF's built-in fonts only support
+    // Latin/WinAnsi — the report would print «????» where Russian letters
+    // should be. Better to fail loud and let the user retry.
+    console.warn('[pdfReports] font load failed', e);
+    throw new PdfFontError('Не удалось загрузить шрифт для PDF. Проверьте интернет и попробуйте ещё раз.');
   }
   return doc;
 }
@@ -688,4 +696,221 @@ export async function generatePLPDF(transactions: FinanceTxRow[], opts: { period
 
   drawFooter(doc);
   doc.save(`pribyl-ubytki-${periodSlug(opts.period)}.pdf`);
+}
+
+// ─── Акт выполненных работ (Act of work completion) ────────────────
+// KZ business standard — client signs this after the work is delivered
+// so both sides have proof the service was rendered. Usually paired with
+// the invoice (same deal). Two signature lines + dashed М.П. circles.
+export interface ActDeal {
+  id: string;
+  customerName: string;
+  product?: string;
+  amount: number;
+  // Optional override of the act date; defaults to today.
+  date?: string;
+}
+
+export async function generateActPDF(deal: ActDeal, requisites: CompanyRequisites = {}, opts?: { actNumber?: string }) {
+  const doc = await newDoc();
+  const pageW = doc.internal.pageSize.getWidth();
+  const num = opts?.actNumber || invoiceNumberFor(deal.id);
+  const actDate = deal.date ? new Date(deal.date) : new Date();
+  drawHeader(doc, `Акт выполненных работ № ${num}`, `от ${fmtDate(actDate)}`, requisites.legalName);
+
+  let y = 38;
+
+  // Party blocks — Исполнитель (we) + Заказчик (client)
+  doc.setFontSize(10); doc.setTextColor(120, 120, 120);
+  doc.text('Исполнитель', 14, y); y += 5;
+  doc.setFontSize(9);  doc.setTextColor(15, 23, 42);
+  const sellerLines = [
+    requisites.legalName || '—',
+    requisites.bin ? `БИН/ИИН: ${requisites.bin}` : '',
+    requisites.address || '',
+  ].filter(Boolean);
+  sellerLines.forEach(line => { doc.text(line, 14, y); y += 4.5; });
+
+  y += 3;
+  doc.setFontSize(10); doc.setTextColor(120, 120, 120);
+  doc.text('Заказчик', 14, y); y += 5;
+  doc.setFontSize(9);  doc.setTextColor(15, 23, 42);
+  doc.text(deal.customerName, 14, y); y += 6;
+
+  // Body paragraph (formal КЗ language)
+  doc.setFontSize(9.5); doc.setTextColor(15, 23, 42);
+  const body =
+    `Настоящий акт составлен в подтверждение того, что Исполнитель выполнил, а Заказчик принял ` +
+    `работы (услуги) в полном объёме и в соответствии с условиями договора / заказа № ${deal.id}.`;
+  doc.text(body, 14, y, { maxWidth: pageW - 28 });
+  y += 14;
+
+  // Line items table
+  autoTable(doc, {
+    startY: y,
+    head: [['№', 'Наименование работ / услуг', 'Кол-во', 'Цена', 'Сумма']],
+    body: [
+      ['1', deal.product || `Работы по заказу ${deal.id}`, '1', KZT(deal.amount), KZT(deal.amount)],
+    ],
+    styles: { font: 'Roboto', fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 12 },
+      2: { halign: 'center', cellWidth: 20 },
+      3: { halign: 'right',  cellWidth: 32 },
+      4: { halign: 'right',  cellWidth: 36 },
+    },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as any).lastAutoTable.finalY + 4;
+
+  // Total + sum in words
+  const rightX = pageW - 14;
+  doc.setFontSize(11); doc.setTextColor(15, 23, 42);
+  doc.text(`Итого: ${KZT(deal.amount)}`, rightX, y, { align: 'right' });
+  y += 7;
+  doc.setFontSize(9); doc.setTextColor(80, 80, 80);
+  doc.text(`Сумма прописью: ${kztInWords(deal.amount)}`, 14, y, { maxWidth: pageW - 28 });
+  y += 12;
+
+  // Acceptance statement
+  doc.setFontSize(9.5); doc.setTextColor(15, 23, 42);
+  doc.text(
+    'Работы выполнены полностью и в срок. Заказчик претензий по объёму, качеству и срокам выполнения работ не имеет.',
+    14, y, { maxWidth: pageW - 28 },
+  );
+  y += 16;
+
+  // Two signature blocks side by side
+  const halfW = (pageW - 28 - 10) / 2;
+  const drawSignBlock = (x: number, label: string, name?: string) => {
+    doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+    doc.text(label, x, y);
+    doc.setDrawColor(180, 180, 180);
+    doc.line(x, y + 14, x + halfW - 32, y + 14);
+    doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+    doc.text('подпись', x, y + 18);
+    if (name) { doc.setFontSize(9); doc.setTextColor(15, 23, 42); doc.text(name, x, y + 8); }
+    // М.П. dashed circle
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineDashPattern([1, 1], 0);
+    doc.circle(x + halfW - 14, y + 10, 12);
+    doc.setLineDashPattern([], 0);
+    doc.setFontSize(7); doc.setTextColor(180, 180, 180);
+    doc.text('М.П.', x + halfW - 17, y + 11);
+  };
+  drawSignBlock(14, 'Сдал / Исполнитель:', requisites.director);
+  drawSignBlock(14 + halfW + 10, 'Принял / Заказчик:', deal.customerName);
+
+  drawFooter(doc);
+  doc.save(`akt-${num}-${todayStamp()}.pdf`);
+}
+
+// fmtDate exists for the report header but takes Date; surface for Act override.
+// (Re-declaration not needed — already imported via module scope.)
+
+// ─── Cash flow forecast ────────────────────────────────────────────
+// Forward-looking cash projection by month. Adds expected inflows from
+// active deals (outstanding balances on deals with completion/installation
+// dates ahead) to provide a 3-month cash forecast. Helpful for «can I
+// afford to pay salaries on the 25th?» kind of decisions.
+export interface ForecastInflow {
+  date: string;          // ISO yyyy-mm-dd
+  customerName: string;
+  product?: string;
+  expectedAmount: number;
+}
+export interface ForecastOutflow {
+  date: string;
+  category: string;
+  description?: string;
+  expectedAmount: number;
+}
+
+export async function generateCashFlowForecastPDF(
+  inflows: ForecastInflow[],
+  outflows: ForecastOutflow[],
+  opts: { company?: string; openingBalance?: number; horizonMonths?: number },
+) {
+  const doc = await newDoc();
+  const horizon = opts.horizonMonths || 3;
+  drawHeader(doc, 'Прогноз денежного потока', `На ${horizon} месяца(ев) вперёд · ${fmtDate()}`, opts.company);
+  let y = 38;
+
+  const now = new Date();
+  // Build N month buckets
+  const months: Array<{ key: string; label: string; start: Date; end: Date }> = [];
+  for (let i = 0; i < horizon; i++) {
+    const start = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const end   = new Date(now.getFullYear(), now.getMonth() + i + 1, 0, 23, 59, 59);
+    months.push({
+      key: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
+      label: start.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }),
+      start, end,
+    });
+  }
+  const sumIn = (m: typeof months[number]) => inflows
+    .filter(x => x.date && new Date(x.date) >= m.start && new Date(x.date) <= m.end)
+    .reduce((s, x) => s + x.expectedAmount, 0);
+  const sumOut = (m: typeof months[number]) => outflows
+    .filter(x => x.date && new Date(x.date) >= m.start && new Date(x.date) <= m.end)
+    .reduce((s, x) => s + x.expectedAmount, 0);
+
+  let balance = opts.openingBalance || 0;
+  const rows = months.map(m => {
+    const i = sumIn(m); const o = sumOut(m);
+    const net = i - o;
+    balance += net;
+    return [
+      m.label.charAt(0).toUpperCase() + m.label.slice(1),
+      KZT(i),
+      `-${KZT(o)}`,
+      `${net >= 0 ? '+' : ''}${KZT(net)}`,
+      KZT(balance),
+    ];
+  });
+
+  const totalIn = months.reduce((s, m) => s + sumIn(m), 0);
+  const totalOut = months.reduce((s, m) => s + sumOut(m), 0);
+  y = drawKpiCards(doc, y, [
+    { label: 'Открыто на счёте', value: KZT(opts.openingBalance || 0), sub: 'на сегодня' },
+    { label: 'Ожидается прихода', value: KZT(totalIn),  accent: [16, 185, 129], sub: `${inflows.length} платежей` },
+    { label: 'Ожидается расхода', value: KZT(totalOut), accent: [239, 68, 68], sub: `${outflows.length} платежей` },
+    { label: 'Прогноз остатка', value: KZT(balance), accent: balance >= 0 ? [99, 102, 241] : [239, 68, 68] },
+  ]);
+
+  doc.setFontSize(11); doc.setTextColor(15, 23, 42);
+  doc.text('Помесячный прогноз', 14, y);
+  autoTable(doc, {
+    startY: y + 2,
+    head: [['Месяц', 'Приход', 'Расход', 'Чистый поток', 'Остаток']],
+    body: rows,
+    styles: { font: 'Roboto', fontSize: 9, cellPadding: 2.5, textColor: [30, 41, 59] },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as any).lastAutoTable.finalY + 6;
+
+  if (inflows.length > 0) {
+    if (y > 220) { doc.addPage(); y = 20; }
+    doc.setFontSize(11); doc.setTextColor(15, 23, 42);
+    doc.text('Ожидаемые поступления', 14, y);
+    autoTable(doc, {
+      startY: y + 2,
+      head: [['Дата', 'Клиент', 'Продукт', 'Сумма']],
+      body: inflows
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+        .map(x => [x.date, x.customerName, (x.product || '—').slice(0, 50), KZT(x.expectedAmount)]),
+      styles: { font: 'Roboto', fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
+      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: { 3: { halign: 'right' } },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  drawFooter(doc);
+  doc.save(`forecast-${todayStamp()}.pdf`);
 }

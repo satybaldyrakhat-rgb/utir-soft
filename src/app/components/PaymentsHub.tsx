@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, CreditCard, Wallet, TrendingUp, AlertCircle, CheckCircle2, Clock, Download, Filter, Sparkles, ChevronDown, Send, Zap, FileText, Loader2 } from 'lucide-react';
+import { Search, CreditCard, Wallet, TrendingUp, AlertCircle, CheckCircle2, Clock, Download, Filter, Sparkles, ChevronDown, Send, Zap, FileText, Loader2, Copy, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDataStore, Deal, FinanceTransaction } from '../utils/dataStore';
 import { Finance } from './Finance';
 import { AI_MODELS } from './AIAssistant';
@@ -247,6 +247,7 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
   const [askedQ, setAskedQ] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Sync model with what's actually configured on the server (greys out
   // tiles whose key is missing).
@@ -448,10 +449,25 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
             </div>
           )}
           {reply && (
-            <div className="bg-white border border-violet-200 rounded-xl px-4 py-3 text-[13px] text-gray-800 whitespace-pre-line leading-relaxed">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Sparkles className="w-3 h-3 text-violet-500" />
-                <span className="text-[10px] text-violet-600 uppercase tracking-wide">{model.short}</span>
+            <div className="bg-white border border-violet-200 rounded-xl px-4 py-3 text-[13px] text-gray-800 whitespace-pre-line leading-relaxed relative group">
+              <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-violet-500" />
+                  <span className="text-[10px] text-violet-600 uppercase tracking-wide">{model.short}</span>
+                </div>
+                {/* Copy-to-clipboard — opacity-fade on hover so it doesn't visually fight the reply text */}
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(reply);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }}
+                  className="text-[10px] text-gray-400 hover:text-violet-600 inline-flex items-center gap-1 opacity-60 hover:opacity-100 transition"
+                  title={l('Скопировать ответ', 'Көшіру', 'Copy reply')}
+                >
+                  {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                  {copied ? l('Скопировано', 'Көшірілді', 'Copied') : l('Копировать', 'Көшіру', 'Copy')}
+                </button>
               </div>
               {reply}
             </div>
@@ -473,6 +489,10 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [query, setQuery] = useState('');
   const [exportBusy, setExportBusy] = useState<'pdf' | 'csv' | null>(null);
+  // Pagination — 25 rows per page. Reset to page 0 when filter/query changes
+  // so the user always sees the top of the new result set.
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(0);
 
   const active = deals.filter(d => d.status !== 'rejected');
 
@@ -500,6 +520,13 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
     .filter(d => filter === 'all' || d._status === filter)
     .filter(d => !query || d.customerName.toLowerCase().includes(query.toLowerCase()) || (d.product || '').toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => b._due - a._due);
+
+  // Slice to current page; clamp page when filtered count changes.
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageRows = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+  // Reset to page 0 whenever the filter / query is changed by the user.
+  useEffect(() => { setPage(0); }, [filter, query]);
 
   const counts = {
     all: enriched.length,
@@ -630,7 +657,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
         </div>
 
         <div className="divide-y divide-gray-50">
-          {filtered.map(d => {
+          {pageRows.map(d => {
             const badge = STATUS_BADGE[d._status];
             return (
               <div key={d.id} className="px-4 py-3 hover:bg-gray-50/50 transition-colors grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
@@ -680,8 +707,29 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
         </div>
 
         {filtered.length > 0 && (
-          <div className="px-4 py-2.5 bg-gray-50/40 border-t border-gray-50 flex items-center justify-between text-[10px] text-gray-500">
-            <span>{l('Показано', 'Көрсетілді', 'Showing')} {filtered.length} {l('из', 'ішінен', 'of')} {enriched.length}</span>
+          <div className="px-4 py-2.5 bg-gray-50/40 border-t border-gray-50 flex items-center justify-between flex-wrap gap-2 text-[10px] text-gray-500">
+            <div className="flex items-center gap-2">
+              <span>
+                {l('Показано', 'Көрсетілді', 'Showing')}
+                {' '}{safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, filtered.length)}
+                {' '}{l('из', 'ішінен', 'of')} {filtered.length}
+              </span>
+              {pageCount > 1 && (
+                <div className="flex items-center gap-1 ml-2">
+                  <button
+                    onClick={() => setPage(p => Math.max(0, p - 1))}
+                    disabled={safePage === 0}
+                    className="w-6 h-6 hover:bg-gray-100 rounded-md flex items-center justify-center disabled:opacity-30"
+                  ><ChevronLeft className="w-3 h-3" /></button>
+                  <span className="text-gray-600 tabular-nums px-1">{safePage + 1} / {pageCount}</span>
+                  <button
+                    onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
+                    disabled={safePage >= pageCount - 1}
+                    className="w-6 h-6 hover:bg-gray-100 rounded-md flex items-center justify-center disabled:opacity-30"
+                  ><ChevronRight className="w-3 h-3" /></button>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-3 tabular-nums">
               <span>Σ {fmt(filtered.reduce((s, d) => s + d._amount, 0))}</span>
               <span className="text-emerald-600">✓ {fmt(filtered.reduce((s, d) => s + d._paid, 0))}</span>

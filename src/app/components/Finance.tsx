@@ -96,7 +96,13 @@ export function Finance({ language }: FinanceProps) {
     .reduce((s, t) => s + t.amount, 0);
   const monthProfit = monthRevenue - monthExpenses;
   const margin = monthRevenue ? Math.round((monthProfit / monthRevenue) * 100) : 0;
-  const inProductionDeals = store.deals.filter(d => ['production', 'assembly', 'contract'].includes(d.status));
+  // «In production» = anything that's actively being worked on (not just one
+  // hardcoded status string). Covers the full middle of the lifecycle:
+  // measurement done → project agreed → manufacturing → assembly → installation.
+  // Excludes terminal states (rejected / completed / paid) and the very first
+  // touch (new).
+  const PRODUCTION_STATUSES = ['contract', 'project-agreed', 'production', 'manufacturing', 'assembly', 'installation', 'measured'];
+  const inProductionDeals = store.deals.filter(d => PRODUCTION_STATUSES.includes(d.status));
   const inProductionSum = inProductionDeals.reduce((s, d) => s + d.amount, 0);
   const receivablesSum = store.transactions
     .filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'overdue'))
@@ -119,7 +125,7 @@ export function Finance({ language }: FinanceProps) {
   // ─── Report period + download state ─────────────────────────────
   // Default to «this month». Users can pick a different month/quarter/year
   // from the period chip; advanced range picker shown when «диапазон» chosen.
-  type ReportType = 'finance' | 'pl' | 'aging';
+  type ReportType = 'finance' | 'pl' | 'aging' | 'forecast';
   const today = new Date();
   const [period, setPeriod] = useState<{ from: string; to: string; preset: string }>(() => {
     const from = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -168,14 +174,44 @@ export function Finance({ language }: FinanceProps) {
           return { id: d.id, customerName: d.customerName, product: d.product, outstanding, daysOverdue };
         }).filter(r => r.outstanding > 0);
         await pdf.generateAgingPDF(rows, { company });
+      } else if (kind === 'forecast') {
+        // Build inflows from active deals' planned completion / installation dates +
+        // outflows from scheduled / pending expense transactions. Opening balance
+        // = sum of completed-status balances we've collected so far.
+        const today = new Date();
+        const inflows: any[] = [];
+        for (const d of store.deals) {
+          if (d.status === 'rejected' || !d.amount) continue;
+          const paid = Math.round((d.amount || 0) * (d.progress || 0) / 100);
+          const outstanding = (d.amount || 0) - paid;
+          if (outstanding <= 0) continue;
+          const dueDate = d.completionDate || d.installationDate;
+          if (dueDate && new Date(dueDate) >= today) {
+            inflows.push({ date: dueDate, customerName: d.customerName, product: d.product, expectedAmount: outstanding });
+          }
+        }
+        const outflows = store.transactions
+          .filter(t => t.type === 'expense' && t.status !== 'completed' && t.date && new Date(t.date) >= today)
+          .map(t => ({ date: t.date, category: t.category, description: t.description, expectedAmount: t.amount }));
+        const openingBalance = store.transactions
+          .filter(t => t.status === 'completed')
+          .reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
+        await pdf.generateCashFlowForecastPDF(inflows, outflows, { company, openingBalance, horizonMonths: 3 });
       }
     } catch (e: any) {
       console.error('[Finance/downloadReport]', e);
-      alert('Не удалось сформировать отчёт: ' + String(e?.message || e));
+      const isFont = e?.name === 'PdfFontError';
+      // Surface as a top-of-page red banner so it's hard to miss but doesn't
+      // hijack the page like alert() does.
+      setReportError(isFont
+        ? String(e?.message || e)
+        : 'Не удалось сформировать отчёт: ' + String(e?.message || e));
+      setTimeout(() => setReportError(null), 7000);
     } finally {
       setReportBusy(null);
     }
   }
+  const [reportError, setReportError] = useState<string | null>(null);
 
   async function downloadCSV() {
     setDownloadOpen(false);
@@ -295,6 +331,10 @@ export function Finance({ language }: FinanceProps) {
                   <span>⏰ {l('Дебиторка (aging)', 'Дебитор', 'Aging report')}</span>
                   <span className="text-[9px] text-gray-400">0/30/60/90+</span>
                 </button>
+                <button onClick={() => downloadReport('forecast')} className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center justify-between">
+                  <span>🔮 {l('Прогноз cash flow', 'Cash flow болжамы', 'Cash flow forecast')}</span>
+                  <span className="text-[9px] text-gray-400">3 месяца</span>
+                </button>
                 <div className="px-3 py-2 text-[10px] uppercase tracking-wide text-gray-400 border-y border-gray-50">{l('Таблицы', 'Кесте', 'Tables')}</div>
                 <button onClick={downloadCSV} className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center justify-between">
                   <span>📥 CSV (Excel)</span>
@@ -308,7 +348,7 @@ export function Finance({ language }: FinanceProps) {
             className="flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 transition-colors"
           >
             <FileText className="w-3.5 h-3.5" />
-            {l('Создать счёт', 'Шот жасау', 'Create invoice')}
+            {l('Счёт / Акт', 'Шот / Акт', 'Invoice / Act')}
           </button>
           <button
             onClick={() => askAI(l(
@@ -323,6 +363,14 @@ export function Finance({ language }: FinanceProps) {
           </button>
         </div>
       </div>
+
+      {reportError && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-xs text-rose-700 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">{reportError}</div>
+          <button onClick={() => setReportError(null)} className="text-rose-400 hover:text-rose-700">×</button>
+        </div>
+      )}
 
       <div>
         <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-2">
@@ -426,15 +474,21 @@ export function Finance({ language }: FinanceProps) {
 // Picks a deal from the team's deals, loads company requisites from the
 // backend, then generates and downloads a single-deal invoice PDF. Admin
 // can edit the invoice number before generating (default: «YY-{last 6}»).
+// Doc kinds the modal can generate. Both reuse the same deal picker and
+// company requisites — only the PDF template differs.
+type DocKind = 'invoice' | 'akt';
+
 function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'kz' | 'ru' | 'eng' }) {
   const store = useDataStore();
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [docKind, setDocKind] = useState<DocKind>('invoice');
   const [dealId, setDealId] = useState<string>('');
   const [number, setNumber] = useState('');
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
   const [requisites, setRequisites] = useState<any>(null);
   const [reqLoaded, setReqLoaded] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
 
   useEffect(() => {
     api.get('/api/team/requisites')
@@ -454,18 +508,30 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
     setBusy(true);
     try {
       const pdf = await import('../utils/pdfReports');
-      const paidAmount = Math.round((selected.amount || 0) * (selected.progress || 0) / 100);
-      await pdf.generateInvoicePDF({
-        id: selected.id,
-        customerName: selected.customerName,
-        customerPhone: selected.phone,
-        product: selected.product,
-        amount: selected.amount || 0,
-        paidAmount,
-      }, requisites || {}, number ? { invoiceNumber: number } : undefined);
+      if (docKind === 'invoice') {
+        const paidAmount = Math.round((selected.amount || 0) * (selected.progress || 0) / 100);
+        await pdf.generateInvoicePDF({
+          id: selected.id,
+          customerName: selected.customerName,
+          customerPhone: selected.phone,
+          product: selected.product,
+          amount: selected.amount || 0,
+          paidAmount,
+        }, requisites || {}, number ? { invoiceNumber: number } : undefined);
+      } else {
+        // Akt — uses the full deal amount (act = work completed in full).
+        await pdf.generateActPDF({
+          id: selected.id,
+          customerName: selected.customerName,
+          product: selected.product,
+          amount: selected.amount || 0,
+        }, requisites || {}, number ? { actNumber: number } : undefined);
+      }
       onClose();
     } catch (e: any) {
-      alert('Ошибка: ' + String(e?.message || e));
+      // Stay in modal and surface a banner so the user can retry without
+      // losing their selection. Font errors get a clearer message.
+      setGenError(String(e?.message || e));
     } finally { setBusy(false); }
   }
 
@@ -474,22 +540,43 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div>
-            <div className="text-sm text-gray-900">{l('Создать счёт на оплату', 'Шот жасау', 'Create invoice')}</div>
-            <div className="text-[11px] text-gray-400">{l('PDF · с реквизитами компании', 'PDF', 'PDF · with company details')}</div>
+        <div className="px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-sm text-gray-900">{l('Документы для клиента', 'Клиентке құжаттар', 'Client documents')}</div>
+              <div className="text-[11px] text-gray-400">{l('PDF · с реквизитами компании', 'PDF', 'PDF · with company details')}</div>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+          {/* Doc-kind tabs */}
+          <div className="flex gap-1 bg-gray-50 rounded-xl p-1">
+            <button
+              onClick={() => { setDocKind('invoice'); setNumber(''); }}
+              className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'invoice' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+            >📄 {l('Счёт на оплату', 'Шот', 'Invoice')}</button>
+            <button
+              onClick={() => { setDocKind('akt'); setNumber(''); }}
+              className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'akt' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+            >📋 {l('Акт выполненных работ', 'Орындалған жұмыстар актісі', 'Work act')}</button>
+          </div>
         </div>
 
         {missingReqs && (
           <div className="mx-5 mt-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 flex items-start gap-2">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <div>
-              {l('Не заполнены реквизиты компании (название / IBAN). Счёт сформируется, но без банковских данных.', '...', 'Company requisites are empty.')}
+              {l('Не заполнены реквизиты компании (название / IBAN). Документ сформируется, но без банковских данных.', '...', 'Company requisites are empty.')}
               {' '}
               <a href="#" onClick={e => { e.preventDefault(); onClose(); window.dispatchEvent(new CustomEvent('navigate:settings', { detail: { tab: 'general' } })); }} className="underline">{l('Заполнить →', 'Толтыру →', 'Fill in →')}</a>
             </div>
+          </div>
+        )}
+
+        {genError && (
+          <div className="mx-5 mt-4 px-3 py-2 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-700 flex items-start gap-2">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">{genError}</div>
+            <button onClick={() => setGenError(null)} className="text-rose-400 hover:text-rose-700">×</button>
           </div>
         )}
 
@@ -519,7 +606,11 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
           {selected && (
             <>
               <div>
-                <div className="text-xs text-gray-900 mb-1">{l('Номер счёта', 'Шот №', 'Invoice number')}</div>
+                <div className="text-xs text-gray-900 mb-1">
+                  {docKind === 'invoice'
+                    ? l('Номер счёта', 'Шот №', 'Invoice number')
+                    : l('Номер акта', 'Акт №', 'Act number')}
+                </div>
                 <input
                   type="text" value={number} onChange={e => setNumber(e.target.value)}
                   placeholder={`${String(new Date().getFullYear()).slice(-2)}-${selected.id.replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase()}`}
@@ -529,9 +620,17 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
               </div>
 
               <div className="bg-gray-50 rounded-xl p-3 text-[11px] space-y-1">
-                <div className="text-gray-500">{l('В счёте будет:', 'Шотта болады:', 'Will be in invoice:')}</div>
+                <div className="text-gray-500">
+                  {docKind === 'invoice'
+                    ? l('В счёте будет:', 'Шотта болады:', 'Will be in invoice:')
+                    : l('В акте будет:', 'Актіде болады:', 'Will be in act:')}
+                </div>
                 <div className="text-gray-900">{selected.customerName} · {selected.product || '—'}</div>
-                <div className="text-gray-900 tabular-nums">{l('К оплате:', 'Төлеуге:', 'Amount:')} {(selected.amount || 0).toLocaleString('ru-RU')} ₸</div>
+                <div className="text-gray-900 tabular-nums">
+                  {docKind === 'invoice'
+                    ? `${l('К оплате:', 'Төлеуге:', 'Amount:')} ${(selected.amount || 0).toLocaleString('ru-RU')} ₸`
+                    : `${l('Сумма работ:', 'Жұмыс сомасы:', 'Work amount:')} ${(selected.amount || 0).toLocaleString('ru-RU')} ₸`}
+                </div>
                 {requisites?.legalName && <div className="text-gray-500">от {requisites.legalName}</div>}
               </div>
             </>
@@ -558,6 +657,22 @@ type ChartPoint = { m: string; revenue: number; expenses: number; profit: number
 
 function MiniAreaChart({ data, unit }: { data: ChartPoint[]; unit: string }) {
   const [hover, setHover] = useState<number | null>(null);
+
+  // If every series is zero, render an empty-state instead of a flat
+  // chart with nothing on it (no axis labels = looks like a bug).
+  const hasAnyData = data.some(d => d.revenue !== 0 || d.expenses !== 0 || d.profit !== 0);
+  if (!hasAnyData) {
+    return (
+      <div className="h-[220px] flex items-center justify-center text-center">
+        <div>
+          <TrendingUp className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+          <div className="text-xs text-gray-400">Пока нет операций за выбранный период</div>
+          <div className="text-[10px] text-gray-300 mt-1">График построится автоматически когда появятся доходы и расходы</div>
+        </div>
+      </div>
+    );
+  }
+
   const w = 800;
   const h = 220;
   const padL = 40;
