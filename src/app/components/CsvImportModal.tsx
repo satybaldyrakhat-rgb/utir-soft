@@ -188,9 +188,9 @@ export function CsvImportModal({ language, title, fields, onImport, onClose }: P
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]" onClick={e => e.stopPropagation()}>
+        <div className="p-5 border-b border-white/60 flex items-center justify-between">
           <div>
             <div className="text-sm text-gray-900">{l('Импорт', 'Импорт', 'Import')} · {title}</div>
             <div className="text-[11px] text-gray-400 mt-0.5">
@@ -203,7 +203,7 @@ export function CsvImportModal({ language, title, fields, onImport, onClose }: P
         </div>
 
         <div className="p-5 space-y-4">
-          <label className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-gray-300 hover:bg-gray-50/50">
+          <label className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-white/70 bg-white/30 backdrop-blur-xl rounded-2xl cursor-pointer hover:border-slate-300 hover:bg-white/60 transition-colors">
             <Upload className="w-4 h-4 text-gray-400" />
             <span className="text-sm text-gray-600 flex-1">{fileName || l('Выберите .csv файл', '.csv файлды таңдаңыз', 'Pick a .csv file')}</span>
             <input type="file" accept=".csv,text/csv" onChange={onFileChange} className="hidden" />
@@ -227,9 +227,9 @@ export function CsvImportModal({ language, title, fields, onImport, onClose }: P
                   </span>
                 )}
               </div>
-              <div className="border border-gray-100 rounded-xl overflow-x-auto">
+              <div className="bg-white/40 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-white/40 border-b border-white/60">
                     <tr>
                       <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 w-8">#</th>
                       {fields.map(f => (
@@ -273,14 +273,14 @@ export function CsvImportModal({ language, title, fields, onImport, onClose }: P
         </div>
 
         <div className="p-5 pt-0 flex gap-2">
-          <button onClick={onClose} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm hover:bg-gray-50">
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-2xl text-sm hover:bg-white transition-colors">
             {result ? l('Закрыть', 'Жабу', 'Close') : l('Отмена', 'Бас тарту', 'Cancel')}
           </button>
           {preview.length > 0 && !result && (
             <button
               onClick={runImport}
               disabled={importing || validCount === 0}
-              className="flex-1 px-4 py-2.5 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 disabled:opacity-50"
+              className="flex-1 px-4 py-2.5 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 disabled:opacity-50 disabled:shadow-none transition-all"
             >
               {importing
                 ? l('Импортирую…', 'Импортталуда…', 'Importing…')

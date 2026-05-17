@@ -359,36 +359,40 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating button — glass slate pill with long shadow + slight ring,
+          same vocabulary as primary CTAs across the app. */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 z-50 w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center transition-all duration-300 ${
-          isOpen ? 'bg-gray-900 rotate-90 scale-90' : 'bg-gray-900 hover:scale-105 hover:shadow-xl'
+        className={`fixed bottom-6 right-6 z-50 w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 bg-slate-900/95 backdrop-blur-xl text-white ring-1 ring-white/10 shadow-[0_12px_32px_-8px_rgba(15,23,42,0.5)] ${
+          isOpen ? 'rotate-90 scale-95' : 'hover:scale-105 hover:shadow-[0_16px_40px_-8px_rgba(15,23,42,0.6)]'
         }`}
       >
-        {isOpen ? <X className="w-5 h-5 text-white" /> : <Sparkles className="w-5 h-5 text-white" />}
+        {isOpen ? <X className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
       </button>
 
-      {/* Chat panel */}
+      {/* Chat panel — glass shell */}
       {isOpen && (
-        <div className="fixed bottom-20 right-6 z-50 w-[400px] max-w-[calc(100vw-3rem)] h-[600px] max-h-[calc(100vh-7rem)] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
+        <div className="fixed bottom-20 right-6 z-50 w-[400px] max-w-[calc(100vw-3rem)] h-[600px] max-h-[calc(100vh-7rem)] bg-white/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl shadow-[0_24px_64px_-12px_rgba(15,23,42,0.30)] flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between relative">
+          <div className="px-5 py-4 border-b border-white/60 flex items-center justify-between relative">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 bg-gray-900 rounded-xl flex items-center justify-center flex-shrink-0">
+              <div className="w-9 h-9 bg-gradient-to-br from-slate-900 to-slate-700 rounded-2xl flex items-center justify-center flex-shrink-0 ring-1 ring-white/20 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]">
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
               <div className="min-w-0">
                 {/* Title is identical for every model — switching providers
                     only changes WHO answers (visible in the subline as the
                     model id), not the role the popup plays for the user. */}
-                <div className="text-sm text-gray-900 truncate">
+                <div className="text-sm text-slate-900 truncate">
                   {language === 'ru' ? 'AI Помощник платформы'
                     : language === 'kz' ? 'Платформа AI көмекшісі'
                     : 'Platform AI Assistant'}
                 </div>
-                <button onClick={() => setShowModelMenu(s => !s)} className="text-[10px] text-gray-400 flex items-center gap-1 hover:text-gray-700">
-                  <span className={`w-1.5 h-1.5 rounded-full ${selectedProvider?.enabled ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                <button
+                  onClick={() => setShowModelMenu(s => !s)}
+                  className="text-[10px] text-slate-500 flex items-center gap-1 hover:text-slate-900 mt-0.5 px-1.5 py-0.5 rounded-full bg-white/50 ring-1 ring-white/60 hover:bg-white/80 transition-colors"
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${selectedProvider?.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                   {selectedModel.short}
                   <ChevronDown className="w-3 h-3" />
                 </button>
@@ -398,17 +402,20 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
               <button
                 onClick={clearHistory}
                 title="Очистить историю чата"
-                className="w-8 h-8 hover:bg-gray-100 rounded-lg flex items-center justify-center transition-colors"
+                className="w-8 h-8 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl flex items-center justify-center transition-all"
               >
-                <Trash2 className="w-3.5 h-3.5 text-gray-400" />
+                <Trash2 className="w-3.5 h-3.5 text-slate-500" />
               </button>
-              <button onClick={() => setIsOpen(false)} className="w-8 h-8 hover:bg-gray-100 rounded-lg flex items-center justify-center transition-colors">
-                <X className="w-4 h-4 text-gray-400" />
+              <button
+                onClick={() => setIsOpen(false)}
+                className="w-8 h-8 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl flex items-center justify-center transition-all"
+              >
+                <X className="w-4 h-4 text-slate-500" />
               </button>
             </div>
             {showModelMenu && (
-              <div className="absolute top-full left-4 mt-1 bg-white border border-gray-100 rounded-xl shadow-lg py-1 z-20 w-[340px] max-h-[400px] overflow-y-auto">
-                <div className="px-3 py-2 text-[10px] text-gray-400 uppercase tracking-wide">Модель AI</div>
+              <div className="absolute top-full left-4 mt-1 bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-2xl shadow-[0_12px_32px_-12px_rgba(15,23,42,0.25)] py-1 z-20 w-[340px] max-h-[400px] overflow-y-auto">
+                <div className="px-3 py-2 text-[10px] text-slate-500 uppercase tracking-wide">Модель AI</div>
                 {AI_MODELS.map(m => {
                   const status = providers.find(p => p.id === m.id);
                   const enabled = status?.enabled !== false;
@@ -416,22 +423,22 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                     <button
                       key={m.id}
                       onClick={() => { setProviderId(m.id); setShowModelMenu(false); }}
-                      className="w-full px-3 py-2.5 hover:bg-gray-50 flex items-start justify-between gap-2 text-left"
+                      className="w-full px-3 py-2.5 hover:bg-white/70 flex items-start justify-between gap-2 text-left transition-colors"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs text-gray-900 flex items-center gap-1.5">
-                          <span className={`w-1.5 h-1.5 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                        <div className="text-xs text-slate-900 flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                           {m.name}
                           {m.id === 'utir-ai' && (
-                            <span className="ml-1 inline-flex px-1.5 py-0.5 rounded text-[8px] bg-violet-100 text-violet-700 uppercase tracking-wide">tools</span>
+                            <span className="ml-1 inline-flex px-1.5 py-0.5 rounded-full text-[8px] bg-violet-100/70 text-violet-700 ring-1 ring-white/40 uppercase tracking-wide">tools</span>
                           )}
                         </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">{m.desc}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">{m.desc}</div>
                         {!enabled && status?.envVar && (
-                          <div className="text-[10px] text-amber-600 mt-0.5">Подключите {status.envVar} в Railway</div>
+                          <div className="text-[10px] text-amber-700 mt-0.5">Подключите {status.envVar} в Railway</div>
                         )}
                       </div>
-                      {providerId === m.id && <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />}
+                      {providerId === m.id && <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />}
                     </button>
                   );
                 })}
@@ -443,19 +450,19 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
               actually happened via the bot recently. Lets admin see who is
               doing what in real time without switching to the Журнал tab. */}
           {telegramFeed.length > 0 && (
-            <div className="px-4 pt-3 pb-2 border-b border-gray-100 bg-blue-50/30">
-              <div className="flex items-center justify-between text-[10px] text-[#2AABEE] mb-1.5">
-                <span className="flex items-center gap-1">✈️ <b>Из Telegram-бота</b></span>
-                <span className="text-gray-400">{telegramFeed.length}</span>
+            <div className="px-4 pt-3 pb-2 border-b border-white/60 bg-sky-100/30 backdrop-blur-xl">
+              <div className="flex items-center justify-between text-[10px] text-sky-700 mb-1.5">
+                <span className="flex items-center gap-1"><b>Из Telegram-бота</b></span>
+                <span className="text-slate-500 tabular-nums">{telegramFeed.length}</span>
               </div>
               <div className="space-y-1">
                 {telegramFeed.map(a => (
-                  <div key={a.id} className="text-[11px] text-gray-700 flex items-baseline gap-1.5">
-                    <span className="text-[9px] text-gray-400 font-mono flex-shrink-0">
+                  <div key={a.id} className="text-[11px] text-slate-700 flex items-baseline gap-1.5">
+                    <span className="text-[9px] text-slate-500 font-mono flex-shrink-0 tabular-nums">
                       {new Date(a.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    <span className="text-gray-900">{a.user}</span>
-                    <span className="text-gray-500 truncate">{a.action}{a.target ? ' · ' + a.target : ''}</span>
+                    <span className="text-slate-900">{a.user}</span>
+                    <span className="text-slate-500 truncate">{a.action}{a.target ? ' · ' + a.target : ''}</span>
                   </div>
                 ))}
               </div>
@@ -469,18 +476,18 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                 <div className="max-w-[85%]">
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-1.5 mb-1">
-                      <div className="w-5 h-5 bg-gray-900 rounded-md flex items-center justify-center">
+                      <div className="w-5 h-5 bg-gradient-to-br from-slate-900 to-slate-700 rounded-lg flex items-center justify-center ring-1 ring-white/20">
                         <Sparkles className="w-3 h-3 text-white" />
                       </div>
-                      <span className="text-[10px] text-gray-400">{selectedModel.short} · {msg.timestamp}</span>
+                      <span className="text-[10px] text-slate-500">{selectedModel.short} · <span className="tabular-nums">{msg.timestamp}</span></span>
                     </div>
                   )}
                   <div className={`px-3.5 py-2.5 text-sm ${
                     msg.role === 'user'
-                      ? 'bg-gray-900 text-white rounded-2xl rounded-tr-md'
+                      ? 'bg-slate-900/95 text-white rounded-2xl rounded-tr-md shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10'
                       : msg.pendingTool
-                      ? 'bg-violet-50 text-gray-800 rounded-2xl rounded-tl-md border border-violet-200'
-                      : 'bg-gray-50 text-gray-800 rounded-2xl rounded-tl-md'
+                      ? 'bg-violet-100/60 text-slate-800 rounded-2xl rounded-tl-md ring-1 ring-violet-200/60 backdrop-blur-xl'
+                      : 'bg-white/60 text-slate-800 rounded-2xl rounded-tl-md ring-1 ring-white/60 backdrop-blur-xl'
                   }`}>
                     {/* Server summarize() returns simple HTML (<b>); render as-is for tool proposals. */}
                     {msg.pendingTool ? (
@@ -489,7 +496,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                       <p className="whitespace-pre-line leading-relaxed text-[13px]">{msg.content}</p>
                     )}
                     {msg.role === 'user' && (
-                      <span className="text-[10px] text-white/50 block mt-1">{msg.timestamp}</span>
+                      <span className="text-[10px] text-white/60 block mt-1 tabular-nums">{msg.timestamp}</span>
                     )}
                   </div>
 
@@ -498,7 +505,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                       <button
                         disabled={executingToolId === msg.id}
                         onClick={() => confirmTool(msg)}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-lg text-[11px] flex items-center gap-1"
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl text-[11px] flex items-center gap-1 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all"
                       >
                         {executingToolId === msg.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                         Выполнить
@@ -506,7 +513,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                       <button
                         disabled={executingToolId === msg.id}
                         onClick={() => cancelTool(msg)}
-                        className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg text-[11px]"
+                        className="px-3 py-1.5 bg-white/60 hover:bg-white ring-1 ring-white/60 text-slate-700 rounded-xl text-[11px] backdrop-blur-xl transition-all"
                       >
                         Отмена
                       </button>
@@ -520,14 +527,14 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
             {isTyping && (
               <div className="flex justify-start">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-5 h-5 bg-gray-900 rounded-md flex items-center justify-center">
+                  <div className="w-5 h-5 bg-gradient-to-br from-slate-900 to-slate-700 rounded-lg flex items-center justify-center ring-1 ring-white/20">
                     <Sparkles className="w-3 h-3 text-white" />
                   </div>
-                  <div className="px-4 py-3 bg-gray-50 rounded-2xl rounded-tl-md">
+                  <div className="px-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl rounded-tl-md">
                     <div className="flex gap-1">
-                      <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
                   </div>
                 </div>
@@ -537,15 +544,15 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
             {/* Quick actions on empty state — only when just the greeting is shown */}
             {messages.length === 1 && messages[0].id === 'greet' && !isTyping && (
               <div className="space-y-1.5 pt-1">
-                <p className="text-[10px] text-gray-400 px-1">Быстро начать</p>
+                <p className="text-[10px] text-slate-500 px-1 uppercase tracking-wide">Быстро начать</p>
                 {getQuickActions(language).map((text, idx) => (
                   <button
                     key={idx}
                     onClick={() => sendMessage(text)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 rounded-xl text-[13px] text-left text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-between group"
+                    className="w-full px-3.5 py-2.5 bg-white/50 ring-1 ring-white/60 rounded-2xl text-[13px] text-left text-slate-700 hover:bg-white/80 backdrop-blur-xl transition-all flex items-center justify-between group"
                   >
                     <span>{text}</span>
-                    <ChevronRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-all" />
                   </button>
                 ))}
               </div>
@@ -553,10 +560,10 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
 
             {/* Error banner */}
             {error && (
-              <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-[11px] text-red-700">
+              <div className="px-3 py-2 bg-rose-100/70 ring-1 ring-rose-200/60 backdrop-blur-xl rounded-2xl flex items-start gap-2 text-[11px] text-rose-700">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">{error}</div>
-                <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600"><X className="w-3 h-3" /></button>
+                <button onClick={() => setError(null)} className="text-rose-500 hover:text-rose-700"><X className="w-3 h-3" /></button>
               </div>
             )}
 
@@ -564,18 +571,18 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
           </div>
 
           {/* Input */}
-          <div className="p-3 border-t border-gray-100">
+          <div className="p-3 border-t border-white/60 bg-white/30 backdrop-blur-xl">
             {recording ? (
               // Recording bar — pulses red so the user can see we're listening.
               // Click ⏹ to finish; the recorder also auto-cuts at 60s.
-              <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl">
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                <div className="flex-1 text-[12px] text-red-700">
-                  Идёт запись… <span className="font-mono">{Math.floor(recordSec / 60)}:{(recordSec % 60).toString().padStart(2, '0')}</span>
+              <div className="flex items-center gap-2 px-3 py-2 bg-rose-100/70 ring-1 ring-rose-200/60 rounded-2xl backdrop-blur-xl">
+                <span className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+                <div className="flex-1 text-[12px] text-rose-700">
+                  Идёт запись… <span className="font-mono tabular-nums">{Math.floor(recordSec / 60)}:{(recordSec % 60).toString().padStart(2, '0')}</span>
                 </div>
                 <button
                   onClick={stopRecording}
-                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[11px] flex items-center gap-1"
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[11px] flex items-center gap-1 shadow-[0_4px_12px_-2px_rgba(225,29,72,0.4)] ring-1 ring-white/10"
                 >
                   <Square className="w-3 h-3 fill-current" /> Стоп
                 </button>
@@ -593,22 +600,22 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                       ? 'Распознаю речь…'
                       : selectedProvider?.enabled === false
                         ? `Подключите ${selectedProvider?.envVar || 'API key'} в Railway`
-                        : language === 'ru' ? 'Сообщение или 🎤 голос…' : language === 'kz' ? 'Хабар немесе 🎤 дауыс…' : 'Message or 🎤 voice…'
+                        : language === 'ru' ? 'Сообщение или голос…' : language === 'kz' ? 'Хабар немесе дауыс…' : 'Message or voice…'
                   }
-                  className="flex-1 px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 disabled:opacity-50"
+                  className="flex-1 px-3 py-2 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 disabled:opacity-50 placeholder:text-slate-400 transition-all"
                 />
                 <button
                   onClick={startRecording}
                   disabled={isTyping || transcribing || selectedProvider?.enabled === false}
                   title={language === 'ru' ? 'Записать голосовое' : language === 'kz' ? 'Дауыс жазу' : 'Record voice'}
-                  className="w-8 h-8 hover:bg-gray-100 rounded-xl flex items-center justify-center transition-colors disabled:opacity-30"
+                  className="w-8 h-8 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-xl flex items-center justify-center transition-all disabled:opacity-30 backdrop-blur-xl"
                 >
-                  {transcribing ? <Loader2 className="w-3.5 h-3.5 text-gray-500 animate-spin" /> : <Mic className="w-3.5 h-3.5 text-gray-500" />}
+                  {transcribing ? <Loader2 className="w-3.5 h-3.5 text-slate-600 animate-spin" /> : <Mic className="w-3.5 h-3.5 text-slate-600" />}
                 </button>
                 <button
                   onClick={() => sendMessage(inputValue)}
                   disabled={!inputValue.trim() || isTyping || transcribing || selectedProvider?.enabled === false}
-                  className="w-8 h-8 bg-gray-900 text-white rounded-xl flex items-center justify-center hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="w-8 h-8 bg-slate-900/95 text-white rounded-xl flex items-center justify-center hover:bg-slate-900 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)] ring-1 ring-white/10"
                 >
                   {isTyping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 </button>
@@ -616,8 +623,8 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
             )}
             {/* Same hint regardless of model — non-UTIR providers will just
                 politely redirect to UTIR AI when asked to write data. */}
-            <p className="text-[10px] text-gray-400 mt-1.5 px-1">
-              💡 Можно создавать сделки, оплаты, задачи и менять статусы — спросит подтверждение перед записью.
+            <p className="text-[10px] text-slate-500 mt-1.5 px-1">
+              Можно создавать сделки, оплаты, задачи и менять статусы — спросит подтверждение перед записью.
             </p>
           </div>
         </div>

@@ -315,22 +315,29 @@ function AppContent() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div
+      className="flex min-h-screen relative"
+      style={{
+        // Subtle base behind every page. Pages paint their own orb backdrops
+        // on top — this only shows through the sidebar's translucency.
+        background: 'linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)',
+      }}
+    >
       {/* Invite link held by a logged-in user — modal explaining what it's for. */}
       {heldInviteCode && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={dismissHeldInvite}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-            <div className="text-lg text-gray-900 mb-2">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-center justify-center p-4" onClick={dismissHeldInvite}>
+          <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md p-6 shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]" onClick={e => e.stopPropagation()}>
+            <div className="text-lg text-slate-900 mb-2 tracking-tight">
               {language === 'kz' ? 'Командаға шақыру сілтемесі'
                 : language === 'eng' ? 'Team invitation link'
                 : 'Ссылка-приглашение в команду'}
             </div>
-            <div className="text-sm text-gray-500 mb-4 leading-relaxed">
+            <div className="text-sm text-slate-500 mb-4 leading-relaxed">
               {language === 'kz' ? 'Бұл сілтеме жаңа қызметкерлерді тіркеуге арналған. Сіз қазір тіркелген аккаунттасыз — оны ашылғыңыз келген адамға жіберіңіз немесе incognito режимінде ашыңыз.'
                 : language === 'eng' ? 'This link is for inviting a new teammate to sign up. You are currently logged in — share it with the person you want to invite, or open it in an incognito window.'
                 : 'Эта ссылка нужна, чтобы новый сотрудник зарегистрировался в вашей команде. Вы сейчас в своём аккаунте — отправьте ссылку нужному человеку или откройте её в режиме инкогнито.'}
             </div>
-            <div className="px-3 py-2 bg-gray-50 rounded-lg text-xs font-mono text-gray-700 break-all mb-4">
+            <div className="px-3 py-2.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs font-mono text-slate-700 break-all mb-4">
               {typeof window !== 'undefined' ? `${window.location.origin}/?invite=${heldInviteCode}` : `/?invite=${heldInviteCode}`}
             </div>
             <div className="flex flex-col gap-2">
@@ -339,7 +346,7 @@ function AppContent() {
                   try { await navigator.clipboard.writeText(`${window.location.origin}/?invite=${heldInviteCode}`); } catch { /* ignore */ }
                   dismissHeldInvite();
                 }}
-                className="w-full py-2.5 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800 transition-colors"
+                className="w-full py-2.5 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all"
               >
                 {language === 'kz' ? 'Көшіріп, жабу'
                   : language === 'eng' ? 'Copy and close'
@@ -347,7 +354,7 @@ function AppContent() {
               </button>
               <button
                 onClick={handleAcceptHeldInvite}
-                className="w-full py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                className="w-full py-2.5 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-2xl text-sm hover:bg-white transition-colors"
               >
                 {language === 'kz' ? 'Шығып, осы сілтеме арқылы тіркелу'
                   : language === 'eng' ? 'Sign out and accept this invite'
@@ -355,7 +362,7 @@ function AppContent() {
               </button>
               <button
                 onClick={dismissHeldInvite}
-                className="w-full py-2 text-gray-500 rounded-lg text-xs hover:bg-gray-50 transition-colors"
+                className="w-full py-2 text-slate-500 rounded-xl text-xs hover:bg-white/50 transition-colors"
               >
                 {language === 'kz' ? 'Жабу' : language === 'eng' ? 'Dismiss' : 'Закрыть'}
               </button>
@@ -364,38 +371,38 @@ function AppContent() {
         </div>
       )}
 
-      {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-40 px-4 py-3 flex items-center justify-between">
+      {/* Mobile Header — glass */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 bg-white/70 backdrop-blur-2xl backdrop-saturate-150 border-b border-white/60 z-40 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-md flex items-center justify-center overflow-hidden">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden bg-white/80 ring-1 ring-white/60">
             <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
           </div>
           <div>
-            <div className="text-sm">Utir Soft</div>
-            <div className="text-xs text-gray-500">{getCurrentPageTitle()}</div>
+            <div className="text-sm text-slate-900">Utir Soft</div>
+            <div className="text-xs text-slate-500">{getCurrentPageTitle()}</div>
           </div>
         </div>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 hover:bg-gray-100 rounded-lg"
+          className="p-2 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl transition-all"
         >
-          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          {isMobileMenuOpen ? <X className="w-6 h-6 text-slate-700" /> : <Menu className="w-6 h-6 text-slate-700" />}
         </button>
       </div>
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div 
-          className="lg:hidden fixed inset-0 bg-black/50 z-40 mt-[57px]"
+        <div
+          className="lg:hidden fixed inset-0 bg-slate-900/40 backdrop-blur-md z-40 mt-[57px]"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
-      <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-60'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300
-        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} 
+      {/* Sidebar — glass column */}
+      <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-60'} bg-white/70 backdrop-blur-2xl backdrop-saturate-150 border-r border-white/60 flex flex-col transition-all duration-300
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0 fixed lg:static h-full z-50 mt-[57px] lg:mt-0`}>
-        <div className="p-6 border-b border-gray-200 hidden lg:block">
+        <div className="p-6 border-b border-white/60 hidden lg:block">
           {!isSidebarCollapsed ? (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-md flex items-center justify-center overflow-hidden">
@@ -417,7 +424,7 @@ function AppContent() {
           <button
             onClick={() => handleMenuClick('dashboard')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'dashboard' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+              currentPage === 'dashboard' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
             }`}
             title={isSidebarCollapsed ? getMenuText('home') : ''}
           >
@@ -431,7 +438,7 @@ function AppContent() {
             <button
               onClick={() => handleMenuClick('ai-design')}
               className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-                currentPage === 'ai-design' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+                currentPage === 'ai-design' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
               }`}
               title={isSidebarCollapsed ? getMenuText('aiDesign') : ''}
             >
@@ -451,7 +458,7 @@ function AppContent() {
           <button
             onClick={() => handleMenuClick('sales')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'sales' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+              currentPage === 'sales' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
             }`}
             title={isSidebarCollapsed ? getMenuText('orders') : ''}
           >
@@ -469,7 +476,7 @@ function AppContent() {
           <button
             onClick={() => handleMenuClick('finance')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'finance' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+              currentPage === 'finance' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
             }`}
             title={isSidebarCollapsed ? getMenuText('finance') : ''}
           >
@@ -484,7 +491,7 @@ function AppContent() {
           <button
             onClick={() => handleMenuClick('warehouse')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'warehouse' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+              currentPage === 'warehouse' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
             }`}
             title={isSidebarCollapsed ? getMenuText('production') : ''}
           >
@@ -499,7 +506,7 @@ function AppContent() {
           <button
             onClick={() => handleMenuClick('chats')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'chats' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+              currentPage === 'chats' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
             }`}
             title={isSidebarCollapsed ? getMenuText('chats') : ''}
           >
@@ -514,7 +521,7 @@ function AppContent() {
           <button
             onClick={() => handleMenuClick('tasks')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'tasks' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+              currentPage === 'tasks' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
             }`}
             title={isSidebarCollapsed ? getMenuText('tasks') : ''}
           >
@@ -529,7 +536,7 @@ function AppContent() {
           <button
             onClick={() => handleMenuClick('analytics')}
             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'analytics' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+              currentPage === 'analytics' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
             }`}
             title={isSidebarCollapsed ? getMenuText('analytics') : ''}
           >
@@ -546,7 +553,7 @@ function AppContent() {
               key={m.id}
               onClick={() => handleMenuClick(m.id)}
               className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-                currentPage === m.id ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+                currentPage === m.id ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
               }`}
               title={isSidebarCollapsed ? m.labels[language] : ''}
             >
@@ -559,7 +566,7 @@ function AppContent() {
             <button
               onClick={() => handleMenuClick('settings')}
               className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-                currentPage === 'settings' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+                currentPage === 'settings' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
               }`}
               title={isSidebarCollapsed ? getMenuText('settings') : ''}
             >
@@ -572,11 +579,11 @@ function AppContent() {
           )}
         </nav>
 
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-white/60">
           {/* Toggle Sidebar Button - Desktop only */}
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="hidden lg:flex w-full items-center justify-center px-3 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors mb-4"
+            className="hidden lg:flex w-full items-center justify-center px-3 py-2 text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl transition-all mb-4"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isSidebarCollapsed ? "M13 5l7 7-7 7M5 5l7 7-7 7" : "M11 19l-7-7 7-7m8 14l-7-7 7-7"} />
@@ -589,8 +596,8 @@ function AppContent() {
               <button
                 onClick={() => { if (moduleAllowedByRole('settings')) handleMenuClick('settings'); }}
                 disabled={!moduleAllowedByRole('settings')}
-                className={`w-full flex items-center gap-3 p-3 bg-gray-50 rounded-lg transition-colors ${
-                  moduleAllowedByRole('settings') ? 'hover:bg-gray-100' : 'cursor-default'
+                className={`w-full flex items-center gap-3 p-3 bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl transition-all ${
+                  moduleAllowedByRole('settings') ? 'hover:bg-white/80' : 'cursor-default'
                 }`}
               >
                 {(() => {
@@ -605,18 +612,18 @@ function AppContent() {
                   };
                   return (
                     <>
-                      <div className="w-10 h-10 rounded-md overflow-hidden bg-gray-200 flex items-center justify-center text-sm text-gray-600 flex-shrink-0">
+                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-br from-violet-100 to-sky-100 ring-1 ring-white/70 flex items-center justify-center text-sm text-slate-700 flex-shrink-0">
                         {profile.avatar
                           ? <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover" />
-                          : <span>{initials || '👤'}</span>}
+                          : <span>{initials || '?'}</span>}
                       </div>
                       <div className="flex-1 min-w-0 text-left">
-                        <div className="text-sm truncate">{displayName}</div>
-                        <div className="text-[10px] text-gray-500 truncate flex items-center gap-1.5">
-                          <span className={`px-1.5 py-0.5 rounded ${
-                            role === 'admin' ? 'bg-purple-50 text-purple-700' :
-                            role === 'manager' ? 'bg-blue-50 text-blue-700' :
-                            'bg-gray-100 text-gray-600'
+                        <div className="text-sm truncate text-slate-900">{displayName}</div>
+                        <div className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded-full ring-1 ring-white/40 ${
+                            role === 'admin' ? 'bg-violet-100/70 text-violet-700' :
+                            role === 'manager' ? 'bg-sky-100/70 text-sky-700' :
+                            'bg-white/60 text-slate-600'
                           }`}>{roleLabel[role]}</span>
                           <span className="truncate">{displayEmail}</span>
                         </div>
@@ -626,9 +633,9 @@ function AppContent() {
                 })()}
               </button>
               {/* Logout */}
-              <button 
+              <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3 py-2 mt-2 text-gray-500 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+                className="w-full flex items-center gap-3 px-3 py-2 mt-2 text-slate-500 hover:bg-rose-100/70 hover:text-rose-700 ring-1 ring-transparent hover:ring-rose-200/60 rounded-xl transition-all"
               >
                 <LogOut className="w-4 h-4" />
                 <span className="text-sm">{getMenuText('logout')}</span>
