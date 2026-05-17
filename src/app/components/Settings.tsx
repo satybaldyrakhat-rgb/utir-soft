@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle, Bot, Sparkles, Users, Settings as SettingsIcon, Zap, Activity, Plus, Search, Edit2, Trash2, UserPlus, Star, CheckCircle, X, Shield, Check, Eye, ChevronDown, LayoutGrid, Camera, BookOpen, Send, Download } from 'lucide-react';
+import { MessageCircle, Bot, Sparkles, Users, Settings as SettingsIcon, Zap, Activity, Plus, Search, Edit2, Trash2, UserPlus, Star, CheckCircle, X, Shield, Check, Eye, ChevronDown, LayoutGrid, Camera, BookOpen, Send, Download, Brain, Palette, Sliders, Clock, ShieldOff, MessagesSquare, RotateCcw, Loader2, AlertCircle } from 'lucide-react';
 import { ModulesSettings } from './ModulesSettings';
 import { ActivityLog } from './ActivityLog';
 import { TelegramPairing } from './TelegramPairing';
@@ -1582,26 +1582,30 @@ function BrandKitCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
   );
 }
 
+
 // ─── ClientAIBackendCard ─────────────────────────────────────────────
-// Backend-stored client AI configuration (separate from the legacy
-// localStorage `aiSettings.client` block below, which we keep for UI
-// continuity but will retire once this is fully wired).
+// AI-менеджер для клиентов (Instagram / WhatsApp).
 //
-// What gets stored on team_settings.client_ai:
-//   - tone preset, persona text, 1-3 writing samples (AI mimics our style)
-//   - scenarios (FAQ, price calc, book measurement, send catalog, ask contacts)
-//   - handoff triggers + blacklist topics (free-text lists)
-//   - working hours + out-of-hours / handoff messages
-//   - channels toggle (instagram / whatsapp) — gates which webhooks consume it
+// Layout: left-side section nav + right-side editor + real multi-turn
+// test chat panel at the bottom. Inspired by tools like ChatPlace and
+// NextBot but with our own structure — one card, six sections you tab
+// through, instant test without leaving the page.
 //
-// The actual Instagram & WhatsApp webhook handlers (next phase) read this
-// config and feed it into the system prompt before replying to customers.
-//
-// The «Тест» panel runs the exact same prompt against Claude with a sample
-// customer message so admins can iterate on tone without waiting for messages.
+// Sections:
+//   • 🧠 Мозг          — какая нейросеть, креативность, имя бота
+//   • 🎭 Личность      — тон, персона, образцы наших писем
+//   • 🛡 Поведение     — что AI делает / запрещённые темы / передача менеджеру
+//   • 🕘 Часы          — расписание + сообщение вне часов
+//   • 📡 Каналы        — Instagram / WhatsApp toggle (с реальными логотипами)
+//   • 💬 Тест          — реальный чат-плейграунд для проверки настроек
+type SectionId = 'brain' | 'persona' | 'behavior' | 'hours' | 'channels' | 'test';
+
 interface ClientAIConfigUI {
   enabled: boolean;
   channels: { instagram: boolean; whatsapp: boolean };
+  aiModel: 'claude' | 'gpt4o' | 'gemini' | 'deepseek';
+  creativity: number;
+  botName: string;
   tone: 'polite' | 'casual' | 'premium' | 'strict';
   persona: string;
   writingSamples: string[];
@@ -1627,6 +1631,9 @@ interface ClientAIConfigUI {
 const DEFAULT_CLIENT_AI_UI: ClientAIConfigUI = {
   enabled: false,
   channels: { instagram: false, whatsapp: false },
+  aiModel: 'claude',
+  creativity: 0.7,
+  botName: 'Аяна',
   tone: 'polite',
   persona: '',
   writingSamples: [],
@@ -1638,23 +1645,38 @@ const DEFAULT_CLIENT_AI_UI: ClientAIConfigUI = {
   handoffMessage: 'Передаю вас живому менеджеру — он подключится к диалогу в ближайшее время.',
 };
 
+interface TestMsg { id: string; role: 'user' | 'assistant'; content: string; ts: string; handoff?: boolean; outOfHours?: boolean }
+
 export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+
   const [cfg, setCfg] = useState<ClientAIConfigUI>(DEFAULT_CLIENT_AI_UI);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  // Test playground state
-  const [testMsg, setTestMsg] = useState('');
-  const [testing, setTesting] = useState(false);
-  const [testReply, setTestReply] = useState<{ text: string; handoff?: boolean; outOfHours?: boolean } | null>(null);
-  const [testError, setTestError] = useState<string | null>(null);
+  const [section, setSection] = useState<SectionId>('brain');
+  // Test chat state
+  const [chatMessages, setChatMessages] = useState<TestMsg[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatSending, setChatSending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api.get<ClientAIConfigUI>('/api/team/client-ai')
-      .then(c => { setCfg({ ...DEFAULT_CLIENT_AI_UI, ...c, channels: { ...DEFAULT_CLIENT_AI_UI.channels, ...(c.channels || {}) }, scenarios: { ...DEFAULT_CLIENT_AI_UI.scenarios, ...(c.scenarios || {}) }, workingHours: { ...DEFAULT_CLIENT_AI_UI.workingHours, ...(c.workingHours || {}) } }); setLoaded(true); })
+      .then(c => {
+        setCfg({
+          ...DEFAULT_CLIENT_AI_UI, ...c,
+          channels:     { ...DEFAULT_CLIENT_AI_UI.channels,     ...(c.channels     || {}) },
+          scenarios:    { ...DEFAULT_CLIENT_AI_UI.scenarios,    ...(c.scenarios    || {}) },
+          workingHours: { ...DEFAULT_CLIENT_AI_UI.workingHours, ...(c.workingHours || {}) },
+        });
+        setLoaded(true);
+      })
       .catch(() => setLoaded(true));
   }, []);
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages, chatSending]);
 
   async function save() {
     setSaving(true); setSaveMsg(null);
@@ -1667,279 +1689,549 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
     } finally { setSaving(false); }
   }
 
-  async function runTest() {
-    if (!testMsg.trim()) return;
-    setTesting(true); setTestReply(null); setTestError(null);
+  // Send a customer message through the live test chat.
+  // We pass the FULL chat history each time so the bot remembers context, and
+  // overlay the current (possibly unsaved) cfg so the admin can test tweaks
+  // before clicking Save.
+  async function sendTest() {
+    const t = chatInput.trim();
+    if (!t || chatSending) return;
+    setChatError(null);
+    const userMsg: TestMsg = { id: 'u_' + Date.now().toString(36), role: 'user', content: t, ts: nowHHMM() };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    setChatSending(true);
     try {
-      const r = await api.post<{ ok: boolean; reply?: string; handoff?: boolean; outOfHours?: boolean; error?: string }>(
-        '/api/team/client-ai/test', { message: testMsg },
+      const history = [...chatMessages, userMsg].map(m => ({ role: m.role, content: m.content }));
+      const r = await api.post<{ ok: boolean; reply?: string; handoff?: boolean; outOfHours?: boolean; error?: string; modelUsed?: string }>(
+        '/api/team/client-ai/test', { history, override: cfg },
       );
-      if (r.ok && r.reply) setTestReply({ text: r.reply, handoff: r.handoff, outOfHours: r.outOfHours });
-      else setTestError(r.error || l('Не получилось', 'Болмады', 'Failed'));
+      if (r.ok && r.reply) {
+        setChatMessages(prev => [...prev, {
+          id: 'a_' + Date.now().toString(36), role: 'assistant', content: r.reply!,
+          ts: nowHHMM(), handoff: r.handoff, outOfHours: r.outOfHours,
+        }]);
+      } else {
+        setChatError(r.error || l('Не получилось', 'Болмады', 'Failed'));
+      }
     } catch (e: any) {
-      setTestError(String(e?.message || e));
-    } finally { setTesting(false); }
+      setChatError(String(e?.message || e));
+    } finally { setChatSending(false); }
   }
+
+  function resetTestChat() { setChatMessages([]); setChatError(null); }
 
   const upd = (patch: Partial<ClientAIConfigUI>) => setCfg(c => ({ ...c, ...patch }));
   const updWH = (patch: Partial<ClientAIConfigUI['workingHours']>) => setCfg(c => ({ ...c, workingHours: { ...c.workingHours, ...patch } }));
   const updSc = (k: keyof ClientAIConfigUI['scenarios'], v: boolean) => setCfg(c => ({ ...c, scenarios: { ...c.scenarios, [k]: v } }));
 
-  if (!loaded) return null;
+  if (!loaded) return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-8 flex items-center justify-center text-gray-400 text-sm">
+      <Loader2 className="w-4 h-4 animate-spin mr-2" /> {l('Загружаю настройки…', 'Баптауларды жүктеудемін…', 'Loading settings…')}
+    </div>
+  );
 
-  const TONE_OPTIONS: Array<{ id: ClientAIConfigUI['tone']; emoji: string; label: string }> = [
-    { id: 'polite',  emoji: '🙏', label: l('Вежливый',  'Сыпайы',     'Polite') },
-    { id: 'casual',  emoji: '✌️', label: l('Неформальный','Бейресми',  'Casual') },
-    { id: 'premium', emoji: '💎', label: l('Премиум',    'Премиум',    'Premium') },
-    { id: 'strict',  emoji: '📐', label: l('Строгий',    'Қатаң',      'Strict') },
+  const SECTIONS: Array<{ id: SectionId; icon: any; label: string; sub: string }> = [
+    { id: 'brain',    icon: Brain,          label: l('Мозг', 'Ми', 'Brain'),                       sub: l('Какая нейросеть', 'Қандай AI', 'Which AI') },
+    { id: 'persona',  icon: Palette,        label: l('Личность', 'Тұлға', 'Persona'),              sub: l('Тон + стиль', 'Мәнер', 'Tone + style') },
+    { id: 'behavior', icon: Shield,         label: l('Поведение', 'Тәртібі', 'Behavior'),          sub: l('Что делает', 'Не істейді', 'What it does') },
+    { id: 'hours',    icon: Clock,          label: l('Часы работы', 'Жұмыс уақыты', 'Hours'),      sub: l('Расписание', 'Кесте', 'Schedule') },
+    { id: 'channels', icon: MessagesSquare, label: l('Каналы', 'Арналар', 'Channels'),             sub: 'Instagram / WhatsApp' },
+    { id: 'test',     icon: Sparkles,       label: l('Тест-чат', 'Тест-чат', 'Test chat'),         sub: l('Проверь как отвечает', 'Тексеру', 'Try it live') },
+  ];
+
+  const MODEL_OPTIONS: Array<{ id: ClientAIConfigUI['aiModel']; name: string; tag: string; tone: string }> = [
+    { id: 'claude',   name: 'Claude Opus 4.5', tag: 'claude-opus-4-5', tone: l('Самая внимательная к стилю и нюансам', 'Стильге мұқият', 'Best at nuance / style') },
+    { id: 'gpt4o',    name: 'GPT-4o',          tag: 'gpt-4o',          tone: l('Универсал, быстрая', 'Әмбебап',           'Versatile, fast') },
+    { id: 'gemini',   name: 'Gemini 2.5 Pro',  tag: 'gemini-2.5-pro',  tone: l('2M контекст, мультимодальная', '...',     'Multimodal, 2M ctx') },
+    { id: 'deepseek', name: 'DeepSeek V3',     tag: 'deepseek-chat',   tone: l('Дешёвая, отлично пишет на русском', '...', 'Cheap, great in RU') },
   ];
 
   return (
     <div className="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-emerald-50 to-white p-5 border-b border-emerald-100">
+      {/* ─── HEADER ─────────────────────────────────────────────── */}
+      <div className="bg-gradient-to-br from-emerald-50 via-white to-white p-5 border-b border-emerald-100">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
-            <MessageCircle className="w-5 h-5 text-white" />
+          <div className="w-11 h-11 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm">
+            <Bot className="w-5 h-5 text-white" />
           </div>
-          <div className="flex-1">
-            <div className="text-sm text-gray-900 mb-1">
-              {l('AI для клиентов через мессенджеры', 'Клиенттерге арналған AI', 'AI for clients in messengers')}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <div className="text-sm text-gray-900">
+                {l('AI-менеджер для клиентов', 'Клиенттерге арналған AI', 'AI client manager')}
+              </div>
+              {cfg.enabled
+                ? <span className="text-[9px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded uppercase tracking-wide">{l('Активен', 'Белсенді', 'Active')}</span>
+                : <span className="text-[9px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded uppercase tracking-wide">{l('Выключен', 'Өшірілген', 'Off')}</span>}
+              <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">BETA</span>
             </div>
             <div className="text-[11px] text-gray-500 leading-relaxed">
-              {l('Настройте как AI будет общаться с клиентами в Instagram и WhatsApp. Конфиг применится автоматически когда подключим каналы.',
-                 'Instagram және WhatsApp-та клиенттермен AI қалай сөйлесетінін баптаңыз.',
-                 'Configure how the AI talks to customers in Instagram and WhatsApp.')}
+              {l('Отвечает клиентам в Instagram и WhatsApp в вашем стиле. Конфиг применится автоматически когда подключим каналы.',
+                 'Instagram және WhatsApp клиенттеріне сіздің стильмен жауап береді.',
+                 'Replies to customers in Instagram and WhatsApp in your style.')}
             </div>
           </div>
-          <button onClick={() => upd({ enabled: !cfg.enabled })} className={`relative w-10 h-5 rounded-full transition-colors ${cfg.enabled ? 'bg-emerald-600' : 'bg-gray-200'}`}>
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.enabled ? 'translate-x-5' : ''}`} />
-          </button>
-        </div>
-        <div className="mt-3 flex gap-1.5">
           <button
-            onClick={() => upd({ channels: { ...cfg.channels, instagram: !cfg.channels.instagram } })}
-            className={`px-2.5 py-1 rounded-lg text-[11px] border ${cfg.channels.instagram ? 'bg-pink-50 border-pink-200 text-pink-700' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
-          >📷 Instagram {cfg.channels.instagram ? '✓' : ''}</button>
-          <button
-            onClick={() => upd({ channels: { ...cfg.channels, whatsapp: !cfg.channels.whatsapp } })}
-            className={`px-2.5 py-1 rounded-lg text-[11px] border ${cfg.channels.whatsapp ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
-          >💬 WhatsApp {cfg.channels.whatsapp ? '✓' : ''}</button>
-        </div>
-      </div>
-
-      {/* Tone */}
-      <div className="p-5 border-b border-gray-100">
-        <div className="text-xs text-gray-900 mb-2">{l('Тон общения', 'Сөйлесу мәнері', 'Tone of voice')}</div>
-        <div className="grid grid-cols-4 gap-2">
-          {TONE_OPTIONS.map(opt => (
-            <button
-              key={opt.id}
-              onClick={() => upd({ tone: opt.id })}
-              className={`p-2.5 rounded-xl border text-center transition ${cfg.tone === opt.id ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}
-            >
-              <div className="text-lg mb-0.5">{opt.emoji}</div>
-              <div className="text-[10px] text-gray-600">{opt.label}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Persona */}
-      <div className="p-5 border-b border-gray-100">
-        <div className="text-xs text-gray-900 mb-1">{l('Персона (необязательно)', 'Персона (міндетті емес)', 'Persona (optional)')}</div>
-        <div className="text-[10px] text-gray-400 mb-2">
-          {l('Например: «Представляйся как Айгуль, менеджер фабрики мебели Utir»', 'Мысалы: «Айгүл деп таныс»', 'e.g. "Introduce yourself as Aigul, manager at Utir furniture"')}
-        </div>
-        <input
-          type="text"
-          value={cfg.persona}
-          onChange={e => upd({ persona: e.target.value })}
-          className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-200"
-          maxLength={500}
-        />
-      </div>
-
-      {/* Writing samples */}
-      <div className="p-5 border-b border-gray-100">
-        <div className="text-xs text-gray-900 mb-1">{l('Образцы наших писем', 'Хаттардың үлгілері', 'Writing samples')}</div>
-        <div className="text-[10px] text-gray-400 mb-2">
-          {l('1-3 примера как вы реально общаетесь с клиентами — AI скопирует стиль', 'AI стильді көшіреді', 'AI mimics this style')}
-        </div>
-        {(cfg.writingSamples.length === 0 ? [''] : cfg.writingSamples).map((s, idx) => (
-          <div key={idx} className="mb-2 flex gap-2 items-start">
-            <textarea
-              value={s}
-              onChange={e => {
-                const next = [...cfg.writingSamples];
-                next[idx] = e.target.value;
-                upd({ writingSamples: next.filter((_, i) => i !== idx || e.target.value).concat(idx >= cfg.writingSamples.length ? [] : []) });
-                // simpler: set the full array
-                const arr = (cfg.writingSamples.length === 0 ? [''] : [...cfg.writingSamples]);
-                arr[idx] = e.target.value;
-                upd({ writingSamples: arr.filter(x => x.length > 0 || arr.length === 1) });
-              }}
-              rows={2}
-              maxLength={1000}
-              placeholder={l('Здравствуйте! Спасибо за интерес — отправлю каталог в личку…', '...', 'Hello! Thanks for your interest...')}
-              className="flex-1 px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none"
-            />
-            {cfg.writingSamples.length > 0 && (
-              <button
-                onClick={() => upd({ writingSamples: cfg.writingSamples.filter((_, i) => i !== idx) })}
-                className="px-2 py-1 text-gray-400 hover:text-red-500 text-xs"
-              >✕</button>
-            )}
-          </div>
-        ))}
-        {cfg.writingSamples.length < 3 && (
-          <button
-            onClick={() => upd({ writingSamples: [...cfg.writingSamples, ''] })}
-            className="text-[11px] text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1"
+            onClick={() => upd({ enabled: !cfg.enabled })}
+            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${cfg.enabled ? 'bg-emerald-600' : 'bg-gray-200'}`}
           >
-            <Plus className="w-3 h-3" /> {l('Добавить пример', 'Үлгі қосу', 'Add sample')}
-          </button>
-        )}
-      </div>
-
-      {/* Scenarios */}
-      <div className="p-5 border-b border-gray-100">
-        <div className="text-xs text-gray-900 mb-2">{l('Что AI делает сам', 'AI өзі не істейді', 'What AI handles autonomously')}</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {[
-            { k: 'answerFaq' as const,       label: l('Отвечать на FAQ',         'FAQ-ға жауап беру',         'Answer FAQs') },
-            { k: 'calculatePrice' as const,  label: l('Прикидывать стоимость',   'Бағаны бағалау',            'Estimate price') },
-            { k: 'bookMeasurement' as const, label: l('Записывать на замер',     'Өлшеуге жазу',              'Book measurement') },
-            { k: 'sendCatalog' as const,     label: l('Отправлять каталог',      'Каталог жіберу',            'Send catalog') },
-            { k: 'askForContacts' as const,  label: l('Запрашивать контакты',    'Байланыс сұрау',            'Ask for contact info') },
-          ].map(s => (
-            <label key={s.k} className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer ${cfg.scenarios[s.k] ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}>
-              <input type="checkbox" checked={cfg.scenarios[s.k]} onChange={e => updSc(s.k, e.target.checked)} className="accent-emerald-500" />
-              <span className="text-[12px] text-gray-700">{s.label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Handoff triggers + blacklist */}
-      <div className="p-5 border-b border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <div className="text-xs text-gray-900 mb-1">{l('Передавать менеджеру если есть слова', 'Менеджерге беру', 'Hand off to manager on phrases')}</div>
-          <div className="text-[10px] text-gray-400 mb-2">{l('Через запятую', 'Үтір арқылы', 'Comma-separated')}</div>
-          <input
-            type="text"
-            value={cfg.handoffTriggers.join(', ')}
-            onChange={e => upd({ handoffTriggers: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-            className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200"
-          />
-        </div>
-        <div>
-          <div className="text-xs text-gray-900 mb-1">{l('Запрещённые темы', 'Тыйым салынған тақырыптар', 'Blacklisted topics')}</div>
-          <div className="text-[10px] text-gray-400 mb-2">{l('AI не будет это обсуждать', 'AI бұл туралы айтпайды', 'AI will refuse these topics')}</div>
-          <input
-            type="text"
-            value={cfg.blacklistTopics.join(', ')}
-            onChange={e => upd({ blacklistTopics: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-            className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200"
-          />
-        </div>
-      </div>
-
-      {/* Working hours */}
-      <div className="p-5 border-b border-gray-100">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <div className="text-xs text-gray-900">{l('Часы работы AI', 'AI жұмыс уақыты', 'AI working hours')}</div>
-            <div className="text-[10px] text-gray-400">{l('Asia/Almaty (UTC+5). Вне часов отправляется фраза-заглушка', 'Asia/Almaty', 'Asia/Almaty timezone')}</div>
-          </div>
-          <button onClick={() => updWH({ enabled: !cfg.workingHours.enabled })} className={`relative w-10 h-5 rounded-full transition-colors ${cfg.workingHours.enabled ? 'bg-emerald-600' : 'bg-gray-200'}`}>
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.workingHours.enabled ? 'translate-x-5' : ''}`} />
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${cfg.enabled ? 'translate-x-5' : ''}`} />
           </button>
         </div>
-        {cfg.workingHours.enabled && (
-          <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-2 items-center">
-              <div className="text-[11px] text-gray-500">{l('Пн–Пт', 'Дс–Жм', 'Mon–Fri')}</div>
-              <input type="time" value={cfg.workingHours.weekdayStart} onChange={e => updWH({ weekdayStart: e.target.value })} className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
-              <input type="time" value={cfg.workingHours.weekdayEnd}   onChange={e => updWH({ weekdayEnd: e.target.value })}   className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
-            </div>
-            <div className="grid grid-cols-3 gap-2 items-center">
-              <div className="text-[11px] text-gray-500">{l('Суббота', 'Сенбі', 'Saturday')}</div>
-              <input type="time" value={cfg.workingHours.saturdayStart || ''} onChange={e => updWH({ saturdayStart: e.target.value })} className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
-              <input type="time" value={cfg.workingHours.saturdayEnd   || ''} onChange={e => updWH({ saturdayEnd: e.target.value })}   className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
-            </div>
-            <label className="flex items-center gap-2 mt-1">
-              <input type="checkbox" checked={cfg.workingHours.sundayOff} onChange={e => updWH({ sundayOff: e.target.checked })} className="accent-emerald-500" />
-              <span className="text-[12px] text-gray-700">{l('Воскресенье — выходной', 'Жексенбі — демалыс', 'Sunday off')}</span>
-            </label>
-            <div>
-              <div className="text-[11px] text-gray-500 mt-2 mb-1">{l('Сообщение вне часов', 'Жұмыс емес сағаттардағы хабарлама', 'Out-of-hours message')}</div>
-              <textarea value={cfg.outOfHoursMessage} onChange={e => upd({ outOfHoursMessage: e.target.value })} rows={2} maxLength={500} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none" />
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Handoff message */}
-      <div className="p-5 border-b border-gray-100">
-        <div className="text-xs text-gray-900 mb-1">{l('Сообщение при передаче живому менеджеру', 'Менеджерге беру кезіндегі хабар', 'Handoff message')}</div>
-        <textarea value={cfg.handoffMessage} onChange={e => upd({ handoffMessage: e.target.value })} rows={2} maxLength={500} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none" />
+      {/* ─── BODY: nav + editor ─────────────────────────────────── */}
+      <div className="grid md:grid-cols-[200px_1fr]">
+        {/* Section nav */}
+        <nav className="bg-gray-50 md:border-r border-gray-100 p-2 md:py-3 md:px-2 flex md:flex-col gap-1 overflow-x-auto md:overflow-visible">
+          {SECTIONS.map(s => {
+            const Icon = s.icon;
+            const active = section === s.id;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setSection(s.id)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-left transition-all flex-shrink-0 ${active ? 'bg-white shadow-sm border border-gray-100' : 'hover:bg-white/60'}`}
+              >
+                <Icon className={`w-4 h-4 ${active ? 'text-emerald-600' : 'text-gray-400'}`} />
+                <div className="min-w-0">
+                  <div className={`text-[12px] ${active ? 'text-gray-900' : 'text-gray-600'}`}>{s.label}</div>
+                  <div className="text-[10px] text-gray-400 hidden md:block">{s.sub}</div>
+                </div>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Editor panel */}
+        <div className="p-5">
+          {/* — BRAIN — */}
+          {section === 'brain' && (
+            <div className="space-y-5">
+              <div>
+                <div className="text-xs text-gray-900 mb-1">{l('Имя бота', 'Бот атауы', 'Bot name')}</div>
+                <div className="text-[10px] text-gray-400 mb-2">{l('Так клиент будет его звать в переписке', 'Клиент осылай атайды', 'How customers will address it')}</div>
+                <input
+                  type="text" maxLength={60} value={cfg.botName}
+                  onChange={e => upd({ botName: e.target.value })}
+                  placeholder="Аяна / Aiana / Aigerim"
+                  className="w-full md:w-72 px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-200"
+                />
+              </div>
+
+              <div>
+                <div className="text-xs text-gray-900 mb-2">{l('Нейросеть', 'AI моделі', 'AI model')}</div>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {MODEL_OPTIONS.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => upd({ aiModel: m.id })}
+                      className={`text-left p-3 rounded-xl border transition ${cfg.aiModel === m.id ? 'border-emerald-500 bg-emerald-50/40' : 'border-gray-100 hover:bg-gray-50'}`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="text-[13px] text-gray-900">{m.name}</div>
+                        {cfg.aiModel === m.id && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                      </div>
+                      <div className="text-[10px] text-gray-500 mb-0.5">{m.tone}</div>
+                      <div className="text-[10px] font-mono text-gray-400">{m.tag}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-xs text-gray-900">{l('Креативность', 'Креативтілік', 'Creativity')}</div>
+                  <div className="text-[11px] font-mono text-gray-500">{cfg.creativity.toFixed(2)}</div>
+                </div>
+                <div className="text-[10px] text-gray-400 mb-2">
+                  {l('0 — строго и предсказуемо · 1 — разговорно и креативно',
+                     '0 — қатаң · 1 — креативті',
+                     '0 — strict · 1 — creative')}
+                </div>
+                <input
+                  type="range" min={0} max={1} step={0.05}
+                  value={cfg.creativity}
+                  onChange={e => upd({ creativity: Number(e.target.value) })}
+                  className="w-full accent-emerald-600"
+                />
+                <div className="flex justify-between text-[9px] text-gray-400 mt-0.5">
+                  <span>0.0 точно</span><span>0.5</span><span>1.0 живо</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* — PERSONA — */}
+          {section === 'persona' && (
+            <div className="space-y-5">
+              <div>
+                <div className="text-xs text-gray-900 mb-2">{l('Тон общения', 'Сөйлеу мәнері', 'Tone of voice')}</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {([
+                    { id: 'polite' as const,  emoji: '🙏', label: l('Вежливый', 'Сыпайы', 'Polite') },
+                    { id: 'casual' as const,  emoji: '✌️', label: l('Неформальный', 'Бейресми', 'Casual') },
+                    { id: 'premium' as const, emoji: '💎', label: l('Премиум', 'Премиум', 'Premium') },
+                    { id: 'strict' as const,  emoji: '📐', label: l('Строгий', 'Қатаң', 'Strict') },
+                  ]).map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => upd({ tone: opt.id })}
+                      className={`p-2.5 rounded-xl border text-center transition ${cfg.tone === opt.id ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}
+                    >
+                      <div className="text-lg mb-0.5">{opt.emoji}</div>
+                      <div className="text-[10px] text-gray-600">{opt.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs text-gray-900 mb-1">{l('Персона (необязательно)', 'Персона', 'Persona (optional)')}</div>
+                <div className="text-[10px] text-gray-400 mb-2">
+                  {l('Например: «Я — Айгуль, менеджер фабрики мебели Utir. Помогаю подобрать кухню под ваш интерьер»',
+                     '...', 'e.g. "I\'m Aigul, a kitchen consultant at Utir"')}
+                </div>
+                <textarea
+                  value={cfg.persona}
+                  onChange={e => upd({ persona: e.target.value })}
+                  rows={3} maxLength={500}
+                  className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none"
+                />
+              </div>
+
+              <div>
+                <div className="text-xs text-gray-900 mb-1">{l('Образцы наших писем', 'Хаттардың үлгілері', 'Writing samples')}</div>
+                <div className="text-[10px] text-gray-400 mb-2">
+                  {l('1–3 примера как вы реально общаетесь с клиентами — AI скопирует стиль',
+                     'AI стильді көшіреді', 'AI mimics this style')}
+                </div>
+                {cfg.writingSamples.map((s, idx) => (
+                  <div key={idx} className="mb-2 flex gap-2 items-start">
+                    <textarea
+                      value={s} rows={2} maxLength={1000}
+                      onChange={e => {
+                        const next = [...cfg.writingSamples];
+                        next[idx] = e.target.value;
+                        upd({ writingSamples: next });
+                      }}
+                      className="flex-1 px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none"
+                    />
+                    <button
+                      onClick={() => upd({ writingSamples: cfg.writingSamples.filter((_, i) => i !== idx) })}
+                      className="px-2 py-1 text-gray-400 hover:text-red-500 text-xs"
+                    >✕</button>
+                  </div>
+                ))}
+                {cfg.writingSamples.length < 3 && (
+                  <button
+                    onClick={() => upd({ writingSamples: [...cfg.writingSamples, ''] })}
+                    className="text-[11px] text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> {l('Добавить пример', 'Үлгі қосу', 'Add sample')}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* — BEHAVIOR — */}
+          {section === 'behavior' && (
+            <div className="space-y-5">
+              <div>
+                <div className="text-xs text-gray-900 mb-2">{l('Что AI делает сам', 'AI өзі не істейді', 'What AI handles autonomously')}</div>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {[
+                    { k: 'answerFaq' as const,       label: l('Отвечать на FAQ',          'FAQ-ға жауап',           'Answer FAQs'),         hint: l('Часы, адрес, материалы', '...', 'Hours, address, materials') },
+                    { k: 'calculatePrice' as const,  label: l('Прикидывать стоимость',    'Бағаны бағалау',         'Estimate price'),       hint: l('Ориентировочно, по габаритам', '...', 'Rough, by dimensions') },
+                    { k: 'bookMeasurement' as const, label: l('Записывать на замер',      'Өлшеуге жазу',           'Book measurement'),     hint: l('Спросит имя, телефон, адрес', '...', 'Asks name + phone + addr') },
+                    { k: 'sendCatalog' as const,     label: l('Отправлять каталог',       'Каталог жіберу',         'Send catalog'),         hint: l('Ссылка / примеры работ', '...', 'Link / portfolio') },
+                    { k: 'askForContacts' as const,  label: l('Запрашивать контакты',     'Байланыс сұрау',         'Ask for contact info'), hint: l('Имя и телефон', '...', 'Name + phone') },
+                  ].map(s => (
+                    <label key={s.k} className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition ${cfg.scenarios[s.k] ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                      <input type="checkbox" checked={cfg.scenarios[s.k]} onChange={e => updSc(s.k, e.target.checked)} className="accent-emerald-500 mt-0.5" />
+                      <div className="min-w-0">
+                        <div className="text-[12px] text-gray-800">{s.label}</div>
+                        <div className="text-[10px] text-gray-400">{s.hint}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <UserPlus className="w-3 h-3 text-amber-500" />
+                  <div className="text-xs text-gray-900">{l('Передавать менеджеру если есть слова', 'Менеджерге беру', 'Hand off on these phrases')}</div>
+                </div>
+                <div className="text-[10px] text-gray-400 mb-2">{l('Через запятую', 'Үтір арқылы', 'Comma-separated')}</div>
+                <input
+                  type="text"
+                  value={cfg.handoffTriggers.join(', ')}
+                  onChange={e => upd({ handoffTriggers: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                  className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <ShieldOff className="w-3 h-3 text-red-500" />
+                  <div className="text-xs text-gray-900">{l('Запрещённые темы', 'Тыйым салынған тақырыптар', 'Blacklisted topics')}</div>
+                </div>
+                <div className="text-[10px] text-gray-400 mb-2">{l('AI не будет это обсуждать', 'AI бұл туралы айтпайды', 'AI will refuse these')}</div>
+                <input
+                  type="text"
+                  value={cfg.blacklistTopics.join(', ')}
+                  onChange={e => upd({ blacklistTopics: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                  className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200"
+                />
+              </div>
+
+              <div>
+                <div className="text-xs text-gray-900 mb-1">{l('Сообщение при передаче живому менеджеру', 'Менеджерге беру кезіндегі хабар', 'Handoff message')}</div>
+                <textarea value={cfg.handoffMessage} onChange={e => upd({ handoffMessage: e.target.value })} rows={2} maxLength={500}
+                  className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none" />
+              </div>
+            </div>
+          )}
+
+          {/* — HOURS — */}
+          {section === 'hours' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between bg-gray-50 px-3 py-2.5 rounded-xl">
+                <div>
+                  <div className="text-[12px] text-gray-900">{l('Включить расписание', 'Кестені қосу', 'Enable schedule')}</div>
+                  <div className="text-[10px] text-gray-400">{l('Asia/Almaty (UTC+5)', 'Asia/Almaty', 'Asia/Almaty TZ')}</div>
+                </div>
+                <button
+                  onClick={() => updWH({ enabled: !cfg.workingHours.enabled })}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${cfg.workingHours.enabled ? 'bg-emerald-600' : 'bg-gray-200'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.workingHours.enabled ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+              {cfg.workingHours.enabled && (
+                <>
+                  <div className="grid grid-cols-3 gap-2 items-center">
+                    <div className="text-[11px] text-gray-500">{l('Пн–Пт', 'Дс–Жм', 'Mon–Fri')}</div>
+                    <input type="time" value={cfg.workingHours.weekdayStart} onChange={e => updWH({ weekdayStart: e.target.value })} className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
+                    <input type="time" value={cfg.workingHours.weekdayEnd}   onChange={e => updWH({ weekdayEnd: e.target.value })}   className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 items-center">
+                    <div className="text-[11px] text-gray-500">{l('Суббота', 'Сенбі', 'Saturday')}</div>
+                    <input type="time" value={cfg.workingHours.saturdayStart || ''} onChange={e => updWH({ saturdayStart: e.target.value })} className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
+                    <input type="time" value={cfg.workingHours.saturdayEnd   || ''} onChange={e => updWH({ saturdayEnd: e.target.value })}   className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
+                  </div>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={cfg.workingHours.sundayOff} onChange={e => updWH({ sundayOff: e.target.checked })} className="accent-emerald-500" />
+                    <span className="text-[12px] text-gray-700">{l('Воскресенье — выходной', 'Жексенбі — демалыс', 'Sunday off')}</span>
+                  </label>
+                  <div>
+                    <div className="text-[11px] text-gray-500 mb-1">{l('Сообщение вне часов', 'Жұмыс емес сағаттардағы хабар', 'Out-of-hours message')}</div>
+                    <textarea
+                      value={cfg.outOfHoursMessage}
+                      onChange={e => upd({ outOfHoursMessage: e.target.value })}
+                      rows={2} maxLength={500}
+                      className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* — CHANNELS — */}
+          {section === 'channels' && (
+            <div className="space-y-3">
+              <div className="text-[11px] text-gray-500 mb-1">
+                {l('Включите канал чтобы AI отвечал в нём. Webhook-интеграция подключается отдельно — пока что бот будет работать только из тест-чата.',
+                   '...', 'Toggle a channel and AI replies will route to it once the webhook is connected.')}
+              </div>
+
+              {/* WhatsApp */}
+              <div className={`flex items-center gap-3 p-4 rounded-2xl border transition ${cfg.channels.whatsapp ? 'border-green-400 bg-green-50/40' : 'border-gray-100'}`}>
+                <WhatsAppLogo className="w-10 h-10 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm text-gray-900">WhatsApp Business</div>
+                    <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded uppercase">{l('скоро', 'жақын арада', 'soon')}</span>
+                  </div>
+                  <div className="text-[11px] text-gray-500">{l('Авто-ответы клиентам в WhatsApp от вашего номера', 'WhatsApp-та авто-жауап', 'Auto-reply to customers in WhatsApp')}</div>
+                </div>
+                <button
+                  onClick={() => upd({ channels: { ...cfg.channels, whatsapp: !cfg.channels.whatsapp } })}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${cfg.channels.whatsapp ? 'bg-green-500' : 'bg-gray-200'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.channels.whatsapp ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+
+              {/* Instagram */}
+              <div className={`flex items-center gap-3 p-4 rounded-2xl border transition ${cfg.channels.instagram ? 'border-pink-400 bg-pink-50/40' : 'border-gray-100'}`}>
+                <InstagramLogo className="w-10 h-10 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm text-gray-900">Instagram Direct</div>
+                    <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded uppercase">{l('скоро', 'жақын арада', 'soon')}</span>
+                  </div>
+                  <div className="text-[11px] text-gray-500">{l('Авто-ответы в Direct-сообщениях Instagram Business', 'Instagram Direct авто-жауап', 'Auto-reply in Instagram Direct')}</div>
+                </div>
+                <button
+                  onClick={() => upd({ channels: { ...cfg.channels, instagram: !cfg.channels.instagram } })}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${cfg.channels.instagram ? 'bg-pink-500' : 'bg-gray-200'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.channels.instagram ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+
+              <div className="mt-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl text-[11px] text-blue-700 flex gap-2 items-start">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <div>{l('Пока подключение каналов на этапе разработки. Используйте тест-чат — он применяет точно те же настройки, что и реальные диалоги.',
+                       '...', 'Channel integration is in progress. Use the test chat — it applies the exact same settings as production.')}</div>
+              </div>
+            </div>
+          )}
+
+          {/* — TEST CHAT — */}
+          {section === 'test' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-gray-900 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-violet-500" />
+                    {l('Реальный тест-чат', 'Шынайы тест-чат', 'Real test chat')}
+                  </div>
+                  <div className="text-[10px] text-gray-400">
+                    {l('Пишите «как клиент» — бот применяет текущие настройки', '...', 'Type as a customer — bot uses current settings')}
+                  </div>
+                </div>
+                <button
+                  onClick={resetTestChat}
+                  className="text-[11px] text-gray-500 hover:text-gray-700 inline-flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" /> {l('Очистить', 'Тазарту', 'Reset')}
+                </button>
+              </div>
+
+              {/* Chat surface — styled like a real messenger thread */}
+              <div className="bg-gradient-to-b from-violet-50/30 to-white border border-violet-100 rounded-2xl flex flex-col h-[420px] overflow-hidden">
+                {/* Mock chat header so it FEELS like Insta/WhatsApp */}
+                <div className="px-4 py-2.5 bg-white border-b border-violet-50 flex items-center gap-2.5">
+                  <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center text-white text-xs">
+                    {(cfg.botName || 'A').slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] text-gray-900 truncate">{cfg.botName || 'AI'}</div>
+                    <div className="text-[10px] text-emerald-600 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> online · {MODEL_OPTIONS.find(m => m.id === cfg.aiModel)?.name}
+                    </div>
+                  </div>
+                  {cfg.channels.whatsapp && <WhatsAppLogo className="w-4 h-4" />}
+                  {cfg.channels.instagram && <InstagramLogo className="w-4 h-4" />}
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {chatMessages.length === 0 && !chatSending && (
+                    <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 text-xs">
+                      <MessagesSquare className="w-8 h-8 mb-2 text-gray-300" />
+                      <div>{l('Начните диалог — напишите как обычный клиент', '...', 'Start a conversation — write as a customer')}</div>
+                      <div className="mt-3 flex flex-wrap gap-1.5 justify-center max-w-sm">
+                        {[
+                          l('Здравствуйте! Сколько стоит кухня 3 метра?', '...', 'Hi! How much for a 3m kitchen?'),
+                          l('Можно записаться на замер на завтра?', '...', 'Can I book a measurement for tomorrow?'),
+                          l('У вас есть готовые проекты?', '...', 'Do you have ready-made designs?'),
+                        ].map((s, i) => (
+                          <button key={i} onClick={() => setChatInput(s)} className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[10px] hover:bg-gray-50">
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {chatMessages.map(m => (
+                    <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[80%] ${m.role === 'user' ? '' : ''}`}>
+                        <div className={`px-3 py-2 text-[13px] leading-relaxed whitespace-pre-line ${
+                          m.role === 'user'
+                            ? 'bg-emerald-500 text-white rounded-2xl rounded-tr-md'
+                            : 'bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-tl-md shadow-sm'
+                        }`}>
+                          {m.content}
+                        </div>
+                        <div className={`mt-1 text-[9px] flex items-center gap-1 ${m.role === 'user' ? 'justify-end text-gray-400' : 'text-gray-400'}`}>
+                          {m.ts}
+                          {m.handoff && <span className="px-1 py-0.5 bg-amber-100 text-amber-700 rounded">📞 HANDOFF</span>}
+                          {m.outOfHours && <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded">🌙 вне часов</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {chatSending && (
+                    <div className="flex justify-start">
+                      <div className="px-3 py-2 bg-white border border-gray-100 rounded-2xl rounded-tl-md shadow-sm">
+                        <div className="flex gap-1">
+                          <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {chatError && (
+                    <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-[11px] text-red-700 flex items-start gap-2">
+                      <X className="w-3 h-3 flex-shrink-0 mt-0.5" /> {chatError}
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Input */}
+                <div className="p-2.5 border-t border-violet-100 bg-white flex items-center gap-2">
+                  <input
+                    type="text" value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !chatSending) { e.preventDefault(); sendTest(); } }}
+                    placeholder={l('Напишите как клиент…', 'Клиент болып жазыңыз…', 'Type as a customer…')}
+                    className="flex-1 px-3 py-2 bg-gray-50 rounded-xl text-[13px] focus:outline-none focus:ring-1 focus:ring-violet-200"
+                  />
+                  <button
+                    onClick={sendTest}
+                    disabled={!chatInput.trim() || chatSending}
+                    className="w-8 h-8 bg-violet-600 hover:bg-violet-700 text-white rounded-xl flex items-center justify-center disabled:opacity-40"
+                  >
+                    {chatSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-[10px] text-gray-400 px-1">
+                {l('💡 Тест использует те же настройки, что и реальные каналы. Меняйте настройки слева — следующий ответ применит изменения сразу, без Сохранить.',
+                   '...', '💡 Test uses the same settings as production. Edit any section — next reply applies your unsaved tweaks instantly.')}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Save bar */}
-      <div className="px-5 py-3 bg-gray-50 flex items-center justify-between">
-        <div className="text-[11px] text-gray-500">{saveMsg || l('Не забудьте сохранить изменения', 'Өзгерістерді сақтаңыз', 'Remember to save changes')}</div>
+      {/* ─── FOOTER (save bar) ───────────────────────────────── */}
+      <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+        <div className="text-[11px] text-gray-500">
+          {saveMsg || l('Не забудьте сохранить изменения', 'Өзгерістерді сақтаңыз', 'Remember to save changes')}
+        </div>
         <button
           onClick={save}
           disabled={saving}
-          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs disabled:opacity-50"
-        >{saving ? l('Сохраняю…', 'Сақталуда…', 'Saving…') : l('Сохранить', 'Сақтау', 'Save')}</button>
-      </div>
-
-      {/* Test playground */}
-      <div className="p-5 bg-violet-50/40 border-t border-violet-100">
-        <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="w-3.5 h-3.5 text-violet-500" />
-          <div className="text-xs text-gray-900">{l('Тест — что напишет AI', 'Тест — AI не жазады', 'Sandbox — what AI would reply')}</div>
-        </div>
-        <div className="text-[10px] text-gray-500 mb-2">
-          {l('Введите сообщение «как от клиента» и посмотрите ответ — конфиг применяется как при настоящем разговоре', '...', 'Try a customer message — config applies as it would in production')}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={testMsg}
-            onChange={e => setTestMsg(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !testing) runTest(); }}
-            placeholder={l('Здравствуйте, сколько стоит кухня 3 метра?', '...', 'Hi, how much for a 3m kitchen?')}
-            className="flex-1 px-3 py-2 bg-white border border-violet-200 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-violet-300"
-          />
-          <button
-            onClick={runTest}
-            disabled={!testMsg.trim() || testing}
-            className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl text-xs inline-flex items-center gap-1"
-          >
-            <Send className="w-3 h-3" /> {testing ? l('Думаю…', 'Ойлап жатырмын…', 'Thinking…') : l('Спросить', 'Сұрау', 'Ask')}
-          </button>
-        </div>
-        {testError && (
-          <div className="mt-3 px-3 py-2 bg-red-50 border border-red-200 text-[11px] text-red-700 rounded-lg flex items-center gap-2">
-            <X className="w-3 h-3" /> {testError}
-          </div>
-        )}
-        {testReply && (
-          <div className="mt-3">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-[10px] text-gray-400">{l('Ответ AI', 'AI жауабы', 'AI reply')}:</span>
-              {testReply.handoff && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">📞 HANDOFF</span>}
-              {testReply.outOfHours && <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">🌙 вне часов</span>}
-            </div>
-            <div className="px-3 py-2.5 bg-white border border-violet-200 rounded-xl text-[13px] text-gray-800 whitespace-pre-line">
-              {testReply.text}
-            </div>
-          </div>
-        )}
+          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs disabled:opacity-50 inline-flex items-center gap-1.5"
+        >
+          {saving && <Loader2 className="w-3 h-3 animate-spin" />}
+          {saving ? l('Сохраняю…', 'Сақталуда…', 'Saving…') : l('Сохранить', 'Сақтау', 'Save')}
+        </button>
       </div>
     </div>
   );
+}
+
+function nowHHMM() {
+  return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }

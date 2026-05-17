@@ -29,10 +29,20 @@ export interface WorkingHours {
   sundayOff: boolean;
 }
 
+// Which AI provider answers the customer. UTIR-mix means we route through
+// the same Claude tool-capable agent the platform uses internally; the
+// other ids match aiChat.ts ChatProviderId minus 'utir-ai' (no tools for
+// outside customers — they shouldn't be able to create deals on our behalf).
+export type ClientAIModel = 'claude' | 'gpt4o' | 'gemini' | 'deepseek';
+
 export interface ClientAIConfig {
   enabled: boolean;
   // Channels the config applies to (toggle independently as they're wired up).
   channels: { instagram: boolean; whatsapp: boolean };
+  // Brain
+  aiModel: ClientAIModel;
+  creativity: number;   // 0..1 → temperature for the call
+  botName: string;      // shown in chat header + introduced in greetings
   tone: Tone;
   // Free-form: "представься как Айгуль, менеджер фабрики мебели Utir"
   persona: string;
@@ -61,6 +71,9 @@ export interface ClientAIConfig {
 export const DEFAULT_CLIENT_AI: ClientAIConfig = {
   enabled: false,
   channels: { instagram: false, whatsapp: false },
+  aiModel: 'claude',
+  creativity: 0.7,
+  botName: 'Аяна',
   tone: 'polite',
   persona: '',
   writingSamples: [],
@@ -94,6 +107,9 @@ export function readClientAI(db: Database.Database, teamId: string): ClientAICon
       return {
         ...DEFAULT_CLIENT_AI,
         ...parsed,
+        aiModel:    (['claude', 'gpt4o', 'gemini', 'deepseek'] as const).includes(parsed.aiModel) ? parsed.aiModel : DEFAULT_CLIENT_AI.aiModel,
+        creativity: typeof parsed.creativity === 'number' && parsed.creativity >= 0 && parsed.creativity <= 1 ? parsed.creativity : DEFAULT_CLIENT_AI.creativity,
+        botName:    typeof parsed.botName === 'string' && parsed.botName.trim() ? parsed.botName.slice(0, 60) : DEFAULT_CLIENT_AI.botName,
         channels:   { ...DEFAULT_CLIENT_AI.channels,   ...(parsed.channels   || {}) },
         scenarios:  { ...DEFAULT_CLIENT_AI.scenarios,  ...(parsed.scenarios  || {}) },
         workingHours: { ...DEFAULT_CLIENT_AI.workingHours, ...(parsed.workingHours || {}) },
@@ -134,7 +150,10 @@ const SCENARIO_DESC: Record<keyof ClientAIConfig['scenarios'], string> = {
 
 export function buildClientSystemPrompt(cfg: ClientAIConfig, teamCompany?: string): string {
   const lines: string[] = [];
-  lines.push(`Ты — AI-ассистент компании${teamCompany ? ` «${teamCompany}»` : ''}. Общаешься напрямую с КЛИЕНТОМ в мессенджере (Instagram / WhatsApp).`);
+  const intro = cfg.botName
+    ? `Тебя зовут «${cfg.botName}». Ты — AI-менеджер компании${teamCompany ? ` «${teamCompany}»` : ''}.`
+    : `Ты — AI-менеджер компании${teamCompany ? ` «${teamCompany}»` : ''}.`;
+  lines.push(`${intro} Общаешься напрямую с КЛИЕНТОМ в мессенджере (Instagram / WhatsApp).`);
   lines.push('');
   lines.push(`ТОН: ${TONE_DESC[cfg.tone]}`);
   if (cfg.persona.trim()) {
@@ -182,38 +201,31 @@ export interface TestResult {
   outOfHours?: boolean;
   error?: string;
   systemPromptPreview?: string;
+  modelUsed?: string;
 }
 
+export interface TestTurn { role: 'user' | 'assistant'; content: string }
+
+// Run a single AI turn given the full prior history (the test playground in
+// settings sends [user, assistant, user, ...] so the bot remembers context).
+// Routes to whichever provider the admin selected; falls back to Claude if
+// the chosen one has no key.
 export async function runClientAITest(
   cfg: ClientAIConfig,
-  customerMessage: string,
+  history: TestTurn[],
   teamCompany?: string,
 ): Promise<TestResult> {
-  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
-  if (!ANTHROPIC_KEY) return { ok: false, error: 'ANTHROPIC_API_KEY не задан на сервере' };
+  if (history.length === 0 || history[history.length - 1].role !== 'user') {
+    return { ok: false, error: 'history must end with a user turn' };
+  }
   // Out-of-hours short-circuit (Asia/Almaty, +5).
   if (cfg.workingHours.enabled && isOutOfHours(cfg.workingHours)) {
     return { ok: true, outOfHours: true, reply: cfg.outOfHoursMessage };
   }
   const system = buildClientSystemPrompt(cfg, teamCompany);
+  const temperature = Math.max(0, Math.min(1, cfg.creativity ?? 0.7));
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-opus-4-5',
-        max_tokens: 400,
-        system,
-        messages: [{ role: 'user', content: customerMessage }],
-      }),
-    });
-    const j: any = await res.json();
-    if (!res.ok) return { ok: false, error: j?.error?.message || `HTTP ${res.status}` };
-    const text = (j?.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+    const text = await callProvider(cfg.aiModel, system, history, temperature);
     if (!text) return { ok: false, error: 'пустой ответ от модели' };
     const handoff = /^HANDOFF\b/i.test(text);
     return {
@@ -221,10 +233,91 @@ export async function runClientAITest(
       reply: handoff ? cfg.handoffMessage : text,
       handoff,
       systemPromptPreview: system.slice(0, 600),
+      modelUsed: cfg.aiModel,
     };
   } catch (e: any) {
     return { ok: false, error: String(e?.message || e) };
   }
+}
+
+// ─── Provider call dispatcher ────────────────────────────────────────
+// Same fetch shapes we use in server/aiChat.ts but with a system prompt,
+// temperature, and multi-turn history. Returns just the text reply or
+// throws with a readable message on failure.
+async function callProvider(model: ClientAIModel, system: string, history: TestTurn[], temperature: number): Promise<string> {
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
+  const OPENAI_KEY    = process.env.OPENAI_API_KEY    || '';
+  const GEMINI_KEY    = process.env.GEMINI_API_KEY    || '';
+  const DEEPSEEK_KEY  = process.env.DEEPSEEK_API_KEY  || '';
+
+  if (model === 'claude') {
+    if (!ANTHROPIC_KEY) throw new Error('ANTHROPIC_API_KEY не задан');
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 500, system, temperature, messages: history }),
+    });
+    const j: any = await res.json();
+    if (!res.ok) throw new Error(j?.error?.message || `HTTP ${res.status}`);
+    return (j?.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+  }
+
+  if (model === 'gpt4o') {
+    if (!OPENAI_KEY) throw new Error('OPENAI_API_KEY не задан');
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_tokens: 500,
+        temperature,
+        messages: [{ role: 'system', content: system }, ...history],
+      }),
+    });
+    const j: any = await res.json();
+    if (!res.ok) throw new Error(j?.error?.message || `HTTP ${res.status}`);
+    return String(j?.choices?.[0]?.message?.content || '').trim();
+  }
+
+  if (model === 'gemini') {
+    if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY не задан');
+    // Gemini wants role 'model' for assistant turns and a separate systemInstruction.
+    const contents = history.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { role: 'system', parts: [{ text: system }] },
+        contents,
+        generationConfig: { temperature, maxOutputTokens: 500 },
+      }),
+    });
+    const j: any = await res.json();
+    if (!res.ok) throw new Error(j?.error?.message || `HTTP ${res.status}`);
+    return (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p?.text || '').join('').trim();
+  }
+
+  if (model === 'deepseek') {
+    if (!DEEPSEEK_KEY) throw new Error('DEEPSEEK_API_KEY не задан');
+    const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${DEEPSEEK_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        max_tokens: 500,
+        temperature,
+        messages: [{ role: 'system', content: system }, ...history],
+      }),
+    });
+    const j: any = await res.json();
+    if (!res.ok) throw new Error(j?.error?.message || `HTTP ${res.status}`);
+    return String(j?.choices?.[0]?.message?.content || '').trim();
+  }
+
+  throw new Error(`unknown model: ${model}`);
 }
 
 // True when current time in Asia/Almaty is outside cfg.workingHours. Used by

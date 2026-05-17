@@ -1613,6 +1613,15 @@ clientAiRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
       instagram: !!incoming.channels?.instagram,
       whatsapp:  !!incoming.channels?.whatsapp,
     },
+    aiModel: (['claude', 'gpt4o', 'gemini', 'deepseek'] as const).includes(incoming.aiModel as any)
+      ? (incoming.aiModel as ClientAIConfig['aiModel'])
+      : DEFAULT_CLIENT_AI.aiModel,
+    creativity: typeof incoming.creativity === 'number' && incoming.creativity >= 0 && incoming.creativity <= 1
+      ? incoming.creativity
+      : DEFAULT_CLIENT_AI.creativity,
+    botName: typeof incoming.botName === 'string' && incoming.botName.trim()
+      ? incoming.botName.slice(0, 60)
+      : DEFAULT_CLIENT_AI.botName,
     tone: (['polite', 'casual', 'premium', 'strict'] as const).includes(incoming.tone as any)
       ? (incoming.tone as ClientAIConfig['tone'])
       : DEFAULT_CLIENT_AI.tone,
@@ -1648,16 +1657,39 @@ clientAiRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
   res.json({ ok: true, config: cfg });
 });
 
-// Sandbox — feed a customer message through the current config and return
-// what the AI would actually reply. Used by the «Тест» panel in Settings.
+// Sandbox — feed a multi-turn conversation through the current config and
+// return what the AI would reply on the latest user turn. The test panel
+// sends full history so the bot remembers context turn-to-turn just like
+// it will in a real Instagram/WhatsApp thread.
+//
+// Body: {
+//   history?: [{ role: 'user' | 'assistant', content: string }, ...],
+//   message?: string   // shorthand for single-turn — treated as last user msg
+//   override?: Partial<ClientAIConfig>  // try unsaved tweaks without saving
+// }
 clientAiRouter.post('/test', requireRole('admin'), async (req: AuthedRequest, res) => {
-  const message = String(req.body?.message || '').trim();
-  if (!message) return res.status(400).json({ ok: false, error: 'message required' });
-  const cfg = readClientAI(db, req.teamId!);
-  // Pull the team's company name (if any) so the prompt can introduce itself
-  // properly. Take it from the admin's row.
+  const body = req.body || {};
+  const rawHist = Array.isArray(body.history) ? body.history : [];
+  const history = rawHist
+    .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+    .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: String(m.content) }))
+    .slice(-30);
+  // Allow single-turn shorthand: { message: '...' }
+  if (typeof body.message === 'string' && body.message.trim()) {
+    history.push({ role: 'user', content: body.message.trim() });
+  }
+  if (history.length === 0) return res.status(400).json({ ok: false, error: 'history or message required' });
+  if (history[history.length - 1].role !== 'user') return res.status(400).json({ ok: false, error: 'last turn must be user' });
+
+  // Pick up the saved config and overlay any unsaved override (so admins can
+  // try changes without losing the test conversation).
+  const saved = readClientAI(db, req.teamId!);
+  const cfg = body.override && typeof body.override === 'object'
+    ? { ...saved, ...body.override, scenarios: { ...saved.scenarios, ...(body.override.scenarios || {}) }, channels: { ...saved.channels, ...(body.override.channels || {}) }, workingHours: { ...saved.workingHours, ...(body.override.workingHours || {}) } }
+    : saved;
+
   const meRow = db.prepare('SELECT company FROM users WHERE id = ?').get(req.userId!) as any;
-  const result = await runClientAITest(cfg, message, meRow?.company || undefined);
+  const result = await runClientAITest(cfg, history, meRow?.company || undefined);
   res.json(result);
 });
 
