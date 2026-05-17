@@ -28,18 +28,21 @@ export interface ThemeDef {
   label: { ru: string; kz: string; eng: string };
 }
 
+// Order matters — first item is shown leftmost in the picker. Black is
+// the platform default; the brand emerald sits right after so users can
+// easily switch back to it.
 export const THEMES: ThemeDef[] = [
-  { id: 'emerald', swatch: '#10b981', label: { ru: 'Изумруд (бренд)', kz: 'Зүмірет (бренд)', eng: 'Emerald (brand)' } },
-  { id: 'teal',    swatch: '#14b8a6', label: { ru: 'Бирюзовый',       kz: 'Көгілдір',         eng: 'Teal' } },
-  { id: 'cyan',    swatch: '#06b6d4', label: { ru: 'Голубой',         kz: 'Көк-жасыл',        eng: 'Cyan' } },
-  { id: 'sky',     swatch: '#0ea5e9', label: { ru: 'Небесный',        kz: 'Аспан',            eng: 'Sky' } },
-  { id: 'blue',    swatch: '#2563eb', label: { ru: 'Синий',           kz: 'Көк',              eng: 'Blue' } },
-  { id: 'indigo',  swatch: '#4f46e5', label: { ru: 'Индиго',          kz: 'Индиго',           eng: 'Indigo' } },
-  { id: 'violet',  swatch: '#8b5cf6', label: { ru: 'Фиолетовый',      kz: 'Күлгін',           eng: 'Violet' } },
-  { id: 'rose',    swatch: '#f43f5e', label: { ru: 'Розовый',         kz: 'Қызғылт',          eng: 'Rose' } },
-  { id: 'orange',  swatch: '#f97316', label: { ru: 'Оранжевый',       kz: 'Қызғылт сары',     eng: 'Orange' } },
-  { id: 'slate',   swatch: '#475569', label: { ru: 'Графитовый',      kz: 'Графит',           eng: 'Slate' } },
-  { id: 'black',   swatch: '#0f172a', label: { ru: 'Чёрный',          kz: 'Қара',             eng: 'Black' } },
+  { id: 'black',   swatch: '#0f172a', label: { ru: 'Чёрный (по умолчанию)', kz: 'Қара (әдепкі)',    eng: 'Black (default)' } },
+  { id: 'emerald', swatch: '#10b981', label: { ru: 'Изумруд (бренд)',       kz: 'Зүмірет (бренд)',  eng: 'Emerald (brand)' } },
+  { id: 'teal',    swatch: '#14b8a6', label: { ru: 'Бирюзовый',             kz: 'Көгілдір',         eng: 'Teal' } },
+  { id: 'cyan',    swatch: '#06b6d4', label: { ru: 'Голубой',               kz: 'Көк-жасыл',        eng: 'Cyan' } },
+  { id: 'sky',     swatch: '#0ea5e9', label: { ru: 'Небесный',              kz: 'Аспан',            eng: 'Sky' } },
+  { id: 'blue',    swatch: '#2563eb', label: { ru: 'Синий',                 kz: 'Көк',              eng: 'Blue' } },
+  { id: 'indigo',  swatch: '#4f46e5', label: { ru: 'Индиго',                kz: 'Индиго',           eng: 'Indigo' } },
+  { id: 'violet',  swatch: '#8b5cf6', label: { ru: 'Фиолетовый',            kz: 'Күлгін',           eng: 'Violet' } },
+  { id: 'rose',    swatch: '#f43f5e', label: { ru: 'Розовый',               kz: 'Қызғылт',          eng: 'Rose' } },
+  { id: 'orange',  swatch: '#f97316', label: { ru: 'Оранжевый',             kz: 'Қызғылт сары',     eng: 'Orange' } },
+  { id: 'slate',   swatch: '#475569', label: { ru: 'Графитовый',            kz: 'Графит',           eng: 'Slate' } },
 ];
 
 const STORAGE_KEY = 'utir_user_theme';
@@ -49,7 +52,7 @@ export function loadTheme(): ThemeId {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && THEMES.some(t => t.id === saved)) return saved as ThemeId;
   } catch { /* localStorage blocked */ }
-  return 'emerald';
+  return 'black';
 }
 
 export function saveTheme(id: ThemeId) {
