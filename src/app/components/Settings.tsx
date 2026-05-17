@@ -7,6 +7,7 @@ import { TeamInvitePanel } from './TeamInvitePanel';
 import { WebhooksPanel } from './WebhooksPanel';
 import { IntegrationsPanel } from './IntegrationsPanel';
 import { CatalogsSettings } from './CatalogsSettings';
+import { GeneralSettings } from './GeneralSettings';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
 import { useDataStore, ALL_MODULES, ALL_ROLES, MODULE_GROUPS, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
 import { api } from '../utils/api';
@@ -35,9 +36,10 @@ interface SettingsProps {
   language: 'kz' | 'ru' | 'eng';
   onLanguageChange?: (language: 'kz' | 'ru' | 'eng') => void;
   currentUserEmail?: string;
+  onLogout?: () => void;
 }
 
-export function Settings({ language, onLanguageChange, currentUserEmail }: SettingsProps) {
+export function Settings({ language, onLanguageChange, currentUserEmail, onLogout }: SettingsProps) {
   const store = useDataStore();
   // Real admin check. Used for hard-gated sub-tabs (Команда и права, Журнал)
   // that should never be visible to non-admins regardless of the matrix.
@@ -86,48 +88,11 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
     try { localStorage.setItem(SETTINGS_TAB_KEY, t); } catch { /* ignore */ }
   };
   const tt = (key: Parameters<typeof t>[0]) => t(key, language);
-  const [savedFlash, setSavedFlash] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleAvatarPick = (file: File | null) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) return;
-    if (file.size > 4 * 1024 * 1024) {
-      alert('Файл больше 4 МБ. Выберите меньшее фото.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result || '');
-      // Downscale via canvas to keep localStorage small
-      const img = new Image();
-      img.onload = () => {
-        const max = 256;
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, w, h);
-          store.updateProfile({ avatar: canvas.toDataURL('image/jpeg', 0.85) });
-        } else {
-          store.updateProfile({ avatar: dataUrl });
-        }
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleProfileSave = () => {
-    setSavedFlash(true);
-    setTimeout(() => setSavedFlash(false), 1500);
-    store.addActivity({ user: 'Вы', action: 'Обновили профиль и компанию', target: '', type: 'update', page: 'settings' });
-  };
-
-  const initials = (profile.name || '').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  // Avatar upload, profile-save flash, and Input helper used to live here
+  // for the inline General tab. They moved into GeneralSettings.tsx along
+  // with the rest of the «Основные» block — keep this file focused on team,
+  // catalogs, AI, modules, integrations, and activity tabs.
 
   // Use store employees mapped to local format
   // Map store employees to local view-model. We split into active (visible in
@@ -324,13 +289,6 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
     </button>
   );
 
-  const Input = ({ label, value, onChange, ...props }: { label: string; value: string; onChange: (v: string) => void } & Record<string, any>) => (
-    <div>
-      <label className="block text-[11px] text-gray-400 mb-1">{label}</label>
-      <input type="text" value={value} onChange={e => onChange(e.target.value)} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" {...props} />
-    </div>
-  );
-
   // 'roles' tab was merged into 'employees' — the permission matrix now lives
   // at the bottom of the Команда tab so admin can manage who is in the team
   // and what each role can do in one place.
@@ -422,90 +380,17 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
         ))}
       </div>
 
-      {/* ===== GENERAL ===== */}
+      {/* ===== GENERAL =====
+          Polished sectioned layout lives in GeneralSettings.tsx. The
+          RequisitesCard is passed through as a slot so this file remains
+          the source of truth for banking-requisites wiring. */}
       {activeTab === 'general' && (
-        <div className="space-y-6">
-          {/* Profile */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-5">
-              <div className="text-sm text-gray-900">{l('Мой профиль', 'Менің профилім', 'My Profile')}</div>
-              <span className="flex items-center gap-1 text-[10px] text-green-500"><span className="w-1.5 h-1.5 bg-green-500 rounded-full" />{l('Активен', 'Белсенді', 'Active')}</span>
-            </div>
-            <div className="flex flex-col md:flex-row gap-5">
-              <div className="flex flex-col items-center">
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={e => handleAvatarPick(e.target.files?.[0] || null)}
-                />
-                <button
-                  type="button"
-                  onClick={() => avatarInputRef.current?.click()}
-                  className="relative w-20 h-20 bg-gray-100 rounded-2xl overflow-hidden mb-2 group"
-                  title={l('Загрузить фото', 'Сурет жүктеу', 'Upload photo')}
-                >
-                  {profile.avatar ? (
-                    <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-lg">
-                      {initials || <Camera className="w-5 h-5" />}
-                    </span>
-                  )}
-                  <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                    <Camera className="w-5 h-5 text-white" />
-                  </span>
-                </button>
-                {profile.avatar && (
-                  <button
-                    onClick={() => store.updateProfile({ avatar: '' })}
-                    className="text-[10px] text-gray-400 hover:text-red-500"
-                  >
-                    {l('Удалить', 'Жою', 'Remove')}
-                  </button>
-                )}
-              </div>
-              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input label={l('Имя', 'Аты', 'Name')} value={profile.name} onChange={v => store.updateProfile({ name: v })} placeholder={l('Введите имя', 'Атыңызды енгізіңіз', 'Enter name')} />
-                <Input label={l('Должность', 'Лауазым', 'Position')} value={profile.position} onChange={v => store.updateProfile({ position: v })} placeholder={l('Например: Директор', 'Мысалы: Директор', 'e.g. Director')} />
-                <Input label="Email" value={profile.email} onChange={v => store.updateProfile({ email: v })} placeholder="email@домен.kz" />
-                <Input label={l('Телефон', 'Телефон', 'Phone')} value={profile.phone} onChange={v => store.updateProfile({ phone: v })} placeholder="+7 ___ ___ __ __" />
-              </div>
-            </div>
-          </div>
-
-          {/* Company */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-sm text-gray-900 mb-5">{l('Компания', 'Компания', 'Company')}</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input label={l('Название', 'Атауы', 'Name')} value={profile.companyName} onChange={v => store.updateProfile({ companyName: v })} placeholder={l('Название компании', 'Компания атауы', 'Company name')} />
-              <Input label={l('БИН', 'БСН', 'BIN')} value={profile.companyBIN} onChange={v => store.updateProfile({ companyBIN: v })} placeholder="000000000000" />
-              <div className="md:col-span-2"><Input label={l('Адрес', 'Мекенжай', 'Address')} value={profile.companyAddress} onChange={v => store.updateProfile({ companyAddress: v })} placeholder={l('Город, улица, дом', 'Қала, көше, үй', 'City, street, building')} /></div>
-              <Input label="Email" value={profile.companyEmail} onChange={v => store.updateProfile({ companyEmail: v })} placeholder="info@company.kz" />
-              <Input label={l('Телефон', 'Телефон', 'Phone')} value={profile.companyPhone} onChange={v => store.updateProfile({ companyPhone: v })} placeholder="+7 ___ ___ __ __" />
-            </div>
-            <button onClick={handleProfileSave} className="mt-4 px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">
-              {savedFlash ? l('Сохранено ✓', 'Сақталды ✓', 'Saved ✓') : l('Сохранить', 'Сақтау', 'Save')}
-            </button>
-          </div>
-
-          {/* Banking requisites — used by invoice PDFs in Финансы */}
-          <RequisitesCard language={language} />
-
-          {/* Language */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-sm text-gray-900 mb-4">{l('Язык системы', 'Жүйе тілі', 'Language')}</div>
-            <div className="grid grid-cols-3 gap-2">
-              {[{ code: 'kz' as const, flag: '🇰🇿', name: 'Қазақша' }, { code: 'ru' as const, flag: '🇷🇺', name: 'Русский' }, { code: 'eng' as const, flag: '🇬🇧', name: 'English' }].map(lang => (
-                <button key={lang.code} onClick={() => onLanguageChange?.(lang.code)} className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all ${language === lang.code ? 'border-gray-900 bg-gray-50' : 'border-gray-100 hover:border-gray-200'}`}>
-                  <span className="text-lg">{lang.flag}</span>
-                  <span className="text-xs text-gray-600">{lang.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <GeneralSettings
+          language={language}
+          onLanguageChange={onLanguageChange}
+          onLogout={onLogout}
+          requisitesSlot={<RequisitesCard language={language} />}
+        />
       )}
 
       {/* ===== CATALOGS (Справочники) ===== */}

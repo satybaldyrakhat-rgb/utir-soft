@@ -266,7 +266,7 @@ function AppContent() {
       case 'tasks':
         return <Tasks language={language} />;
       case 'settings':
-        return <Settings language={language} onLanguageChange={setLanguage} currentUserEmail={currentUser?.email} />;
+        return <Settings language={language} onLanguageChange={setLanguage} currentUserEmail={currentUser?.email} onLogout={handleLogout} />;
       default: {
         // Custom modules from Settings → Модули render through the generic page.
         const customMod = dataStore.modules.find(m => m.id === currentPage && m.custom);

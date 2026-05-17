@@ -234,11 +234,18 @@ export interface UserProfile {
   companyAddress: string;
   companyEmail: string;
   companyPhone: string;
+  // Company logo (data URL). Separate from personal `avatar`. Eventually
+  // ends up in invoice / akt PDF headers as branding. Stored as base64 in
+  // localStorage; not synced to server yet.
+  companyLogo?: string;
+  // Timezone (IANA name). Defaults to Asia/Almaty for KZ-first usage.
+  timezone?: string;
 }
 
 const EMPTY_PROFILE: UserProfile = {
   name: '', position: '', email: '', phone: '', avatar: '',
   companyName: '', companyBIN: '', companyAddress: '', companyEmail: '', companyPhone: '',
+  companyLogo: '', timezone: 'Asia/Almaty',
 };
 
 const PROFILE_STORAGE_KEY = 'utir_user_profile';
