@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Instagram, Phone, X, Users, MessageCircle, Mail, Calendar, TrendingUp, AlertCircle, CheckCircle, Package, Hammer, FileCheck, XCircle, Plus, Search, Filter, Archive, Download, Upload } from 'lucide-react';
 import { ClientOrderModal } from './ClientOrderModal';
 import { NewDealModal } from './NewDealModal';
@@ -53,6 +53,25 @@ export function SalesKanban({ language }: SalesKanbanProps) {
   const [showArchive, setShowArchive] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [activeTab, setActiveTab] = useState<'funnel' | 'payments'>('funnel');
+  // Seed for the new-deal modal — populated when the user clicks
+  // «В заказ» on a BOM template in Warehouse. NewDealModal reads it on
+  // mount to pre-fill product / dimensions / materials / amount. Cleared
+  // when the modal closes so the next manual «Новая сделка» starts blank.
+  const [templateSeed, setTemplateSeed] = useState<any | null>(null);
+
+  // Listen for «use template in order» events fired by Warehouse → BOM →
+  // «В заказ» button. Switches us to the funnel tab and opens the modal
+  // with the template's data attached as a seed.
+  useEffect(() => {
+    const onTemplate = (e: Event) => {
+      const detail = (e as CustomEvent<any>).detail || {};
+      setTemplateSeed(detail);
+      setActiveTab('funnel');
+      setShowNewDealModal(true);
+    };
+    window.addEventListener('sales:create-deal-from-template', onTemplate as EventListener);
+    return () => window.removeEventListener('sales:create-deal-from-template', onTemplate as EventListener);
+  }, []);
 
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const tt = (key: Parameters<typeof t>[0]) => t(key, language);
@@ -287,7 +306,13 @@ export function SalesKanban({ language }: SalesKanbanProps) {
         )}
       </div>
 
-      {showNewDealModal && <NewDealModal language={language} onClose={() => setShowNewDealModal(false)} />}
+      {showNewDealModal && (
+        <NewDealModal
+          language={language}
+          seed={templateSeed || undefined}
+          onClose={() => { setShowNewDealModal(false); setTemplateSeed(null); }}
+        />
+      )}
       {showImport && (
         <CsvImportModal
           language={language}

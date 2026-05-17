@@ -464,10 +464,15 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
       materials: t.materials.map(m => m.mat).join(', '),
       notes: `Из шаблона: материалы ${Math.round(totals.materials).toLocaleString('ru-RU')} ₸, работа ${Math.round(totals.labour).toLocaleString('ru-RU')} ₸, наценка ${t.markupPct}%`,
     };
-    // Dispatch a custom event the Sales page picks up to pre-fill its
-    // «Add deal» modal. If the user is somewhere else, we still try.
-    window.dispatchEvent(new CustomEvent('sales:create-deal-from-template', { detail: seed }));
-    alert(l('Шаблон добавлен в форму создания сделки. Перейдите в «Заказы».', '...', 'Template seeded. Open Sales to finish creating the deal.'));
+    // Two-step hop: jump to «Заказы» first via the app:navigate event,
+    // then dispatch the template-fill event on the next tick so the
+    // SalesKanban listener (registered in useEffect) is mounted by the
+    // time the event arrives. Without the delay the modal sometimes
+    // wouldn't open when the user was on a different page.
+    window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'sales' } }));
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('sales:create-deal-from-template', { detail: seed }));
+    }, 50);
   }
 
   if (!loaded) return (

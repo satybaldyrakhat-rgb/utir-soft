@@ -117,6 +117,18 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataStore.modules, currentPage]);
 
+  // Global navigate-to-page event so deep-link buttons in modals (e.g.
+  // «Перейти в Заказы» after picking a BOM template) can jump pages
+  // without prop-drilling onNavigate everywhere.
+  useEffect(() => {
+    const onNavigate = (e: Event) => {
+      const page = (e as CustomEvent<{ page?: string }>).detail?.page;
+      if (page && typeof page === 'string') setCurrentPage(page);
+    };
+    window.addEventListener('app:navigate', onNavigate as EventListener);
+    return () => window.removeEventListener('app:navigate', onNavigate as EventListener);
+  }, []);
+
   // Restore session on mount
   useEffect(() => {
     const token = getToken();

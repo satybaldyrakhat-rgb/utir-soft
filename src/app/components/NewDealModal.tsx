@@ -3,18 +3,51 @@ import { X, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { t } from '../utils/translations';
 
-interface Props { language: 'kz' | 'ru' | 'eng'; onClose: () => void; }
+// Seed shape — pre-fills the modal when opened from a BOM template.
+// All fields optional; whatever is supplied overrides the empty defaults.
+// Dispatched by Warehouse → BOM → «В заказ» via the
+// 'sales:create-deal-from-template' custom event; SalesKanban catches
+// and threads it through here.
+export interface NewDealSeed {
+  product?: string;        // e.g. «Кухня прямая 3м» (goes into product.template)
+  amount?: number;         // ₸ (goes into term.amount)
+  furnitureType?: string;  // «Кухня» / «Шкаф-купе» (goes into product.type)
+  materials?: string;      // comma-separated list (goes into product.material)
+  notes?: string;          // any source-of-truth note (goes into docs.notes)
+  width?: number;          // mm
+  depth?: number;
+  height?: number;
+}
 
-export function NewDealModal({ language, onClose }: Props) {
+interface Props { language: 'kz' | 'ru' | 'eng'; onClose: () => void; seed?: NewDealSeed; }
+
+export function NewDealModal({ language, onClose, seed }: Props) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const tt = (key: Parameters<typeof t>[0]) => t(key, language);
   const store = useDataStore();
   const catalogs = store.catalogs;
-  const [tab, setTab] = useState<0 | 1 | 2 | 3>(0);
+  // When opened from a BOM template we jump straight to the «Product»
+  // tab so the user sees the pre-filled fields immediately and only needs
+  // to fill in client info on tab 0. Plain «Новая сделка» starts on tab 0.
+  const [tab, setTab] = useState<0 | 1 | 2 | 3>(seed ? 1 : 0);
   const [client, setClient] = useState({ name: '', phone: '', email: '', address: '', siteAddress: '', source: 'Instagram' });
-  const [product, setProduct] = useState({ type: '', template: '', l: 3, w: 0.6, h: 0.9, material: '', color: '', hardware: '', addons: [] as string[] });
-  const [term, setTerm] = useState({ measureDate: '', measurer: '', readyDate: '', installDate: '', amount: 0, payMethod: 'kaspi', prepay: 50 });
-  const [docs, setDocs] = useState({ notes: '' });
+  // Seed overrides — note we convert mm dimensions to m for the UI
+  // (which works in meters: 3000mm → 3m).
+  const [product, setProduct] = useState({
+    type: seed?.furnitureType || '',
+    template: seed?.product || '',
+    l: seed?.width ? seed.width / 1000 : 3,
+    w: seed?.depth ? seed.depth / 1000 : 0.6,
+    h: seed?.height ? seed.height / 1000 : 0.9,
+    material: seed?.materials || '',
+    color: '', hardware: '', addons: [] as string[],
+  });
+  const [term, setTerm] = useState({
+    measureDate: '', measurer: '', readyDate: '', installDate: '',
+    amount: seed?.amount || 0,
+    payMethod: 'kaspi', prepay: 50,
+  });
+  const [docs, setDocs] = useState({ notes: seed?.notes || '' });
   // Owner — feeds the team-metrics dashboard precisely. Empty = unassigned.
   const [ownerId, setOwnerId] = useState('');
 
@@ -68,7 +101,15 @@ export function NewDealModal({ language, onClose }: Props) {
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div onClick={e => e.stopPropagation()} className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-xl">
         <div className="p-5 border-b border-gray-50 flex items-center justify-between">
-          <span className="text-sm text-gray-900">{l('Новая сделка', 'Жаңа мәміле', 'New Deal')}</span>
+          <div>
+            <span className="text-sm text-gray-900">{l('Новая сделка', 'Жаңа мәміле', 'New Deal')}</span>
+            {seed && (
+              <div className="text-[10px] text-violet-700 bg-violet-50 px-2 py-0.5 rounded mt-1 inline-block">
+                {l('Из шаблона: ', 'Шаблоннан: ', 'From template: ')}<b>{seed.product}</b>
+                <span className="text-violet-400 ml-1.5">— осталось ввести клиента</span>
+              </div>
+            )}
+          </div>
           <button onClick={onClose} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-gray-400" /></button>
         </div>
         <div className="px-5 pt-4 flex gap-1.5 border-b border-gray-50 overflow-x-auto">
