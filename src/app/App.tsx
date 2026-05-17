@@ -23,6 +23,14 @@ import profileLogo from '../imports/utirsoft.png';
 import { t } from './utils/translations';
 import { DataProvider, useDataStore } from './utils/dataStore';
 import { api, getToken, setToken } from './utils/api';
+import { applyTheme, loadTheme } from './utils/theme';
+
+// Apply the user's saved accent theme as early as possible — before
+// React even mounts — so first paint doesn't flash the default
+// emerald. The picker UI lives in Settings → Основные.
+if (typeof document !== 'undefined') {
+  applyTheme(loadTheme());
+}
 
 // Persist the active page across browser reloads so refreshing
 // «Финансы → Налоги» doesn't bounce the user back to Dashboard.

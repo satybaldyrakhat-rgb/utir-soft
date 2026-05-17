@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   User, Building2, Globe, Camera, Check, X, Mail, Phone, Briefcase, MapPin, Hash,
   LogOut, Download, Lock, AlertCircle, Image as ImageIcon, ShieldCheck, Loader2,
+  Palette,
 } from 'lucide-react';
 import { useDataStore, type UserProfile } from '../utils/dataStore';
+import { THEMES, type ThemeId, loadTheme, saveTheme } from '../utils/theme';
 
 interface Props {
   language: 'kz' | 'ru' | 'eng';
@@ -73,6 +75,14 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
+  // Per-user accent theme — stored in localStorage, applied immediately
+  // via saveTheme() which writes the data-theme attribute on <html>.
+  const [theme, setThemeState] = useState<ThemeId>(loadTheme());
+  const pickTheme = (id: ThemeId) => {
+    setThemeState(id);
+    saveTheme(id);
+    setSavedFlash(true);
+  };
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef   = useRef<HTMLInputElement>(null);
 
@@ -360,6 +370,60 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
               })}
             </div>
           </div>
+        </div>
+      </SectionCard>
+
+      {/* ─── Theme color (per-user accent, like Telegram) ───────── */}
+      <SectionCard
+        icon={Palette}
+        cls="bg-emerald-50 text-emerald-700"
+        title={l('Цвет темы', 'Тақырып түсі', 'Theme color')}
+        subtitle={l(
+          'Каждый сотрудник выбирает свой акцентный цвет — применяется только у вас',
+          'Әр қызметкер өз акцент түсін таңдайды — тек сізге қолданылады',
+          'Each teammate picks their own accent — applied only for you',
+        )}
+      >
+        <div className="grid grid-cols-5 sm:grid-cols-10 gap-2.5">
+          {THEMES.map(t => {
+            const active = theme === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => pickTheme(t.id)}
+                title={t.label[language]}
+                className={`group relative aspect-square rounded-2xl transition-all hover:scale-105 ${
+                  active
+                    ? 'ring-2 ring-offset-2 ring-offset-white shadow-[0_8px_20px_-4px_rgba(0,0,0,0.15)]'
+                    : 'ring-1 ring-white/60 hover:ring-white/80'
+                }`}
+                style={{
+                  backgroundColor: t.swatch,
+                  // Active ring picks up the chosen colour so the selected
+                  // swatch reads as «this is mine».
+                  boxShadow: active ? `0 8px 20px -4px ${t.swatch}66, inset 0 1px 0 rgba(255,255,255,0.3)` : undefined,
+                  ...(active ? { ['--tw-ring-color' as any]: t.swatch } : {}),
+                }}
+              >
+                {active && (
+                  <Check className="w-5 h-5 text-white absolute inset-0 m-auto drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]" strokeWidth={3} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-[11px] text-slate-500">
+            {l('Выбрано:', 'Таңдалған:', 'Selected:')} <b className="text-slate-900">{THEMES.find(t => t.id === theme)?.label[language]}</b>
+          </div>
+          {theme !== 'emerald' && (
+            <button
+              onClick={() => pickTheme('emerald')}
+              className="text-[11px] text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline"
+            >
+              {l('Сбросить к бренду', 'Брендке қайтару', 'Reset to brand')}
+            </button>
+          )}
         </div>
       </SectionCard>
 

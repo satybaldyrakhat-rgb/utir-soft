@@ -1,0 +1,63 @@
+// ─── Per-user accent theme (Telegram-style) ───────────────────────
+// Each teammate picks their own accent color in Settings → Основные.
+// Stored in localStorage so it persists across reloads on the same
+// browser. Applied via the `data-theme="<id>"` attribute on <html>;
+// the actual colour overrides live in src/styles/theme.css and target
+// the Tailwind classes we use for primary actions (bg-emerald-600,
+// text-emerald-700, ring-emerald-*, shadow rgba(5,150,105,*)).
+//
+// `swatch` is the dot rendered in the picker — it's a single solid
+// colour, not the gradient applied to active buttons.
+
+export type ThemeId =
+  | 'emerald'   // Default — matches Utir Soft logo
+  | 'teal'
+  | 'cyan'
+  | 'sky'
+  | 'blue'
+  | 'indigo'
+  | 'violet'
+  | 'rose'
+  | 'orange'
+  | 'slate';
+
+export interface ThemeDef {
+  id: ThemeId;
+  swatch: string;     // hex for the colour-dot in the picker
+  label: { ru: string; kz: string; eng: string };
+}
+
+export const THEMES: ThemeDef[] = [
+  { id: 'emerald', swatch: '#10b981', label: { ru: 'Изумруд (бренд)', kz: 'Зүмірет (бренд)', eng: 'Emerald (brand)' } },
+  { id: 'teal',    swatch: '#14b8a6', label: { ru: 'Бирюзовый',       kz: 'Көгілдір',         eng: 'Teal' } },
+  { id: 'cyan',    swatch: '#06b6d4', label: { ru: 'Голубой',         kz: 'Көк-жасыл',        eng: 'Cyan' } },
+  { id: 'sky',     swatch: '#0ea5e9', label: { ru: 'Небесный',        kz: 'Аспан',            eng: 'Sky' } },
+  { id: 'blue',    swatch: '#2563eb', label: { ru: 'Синий',           kz: 'Көк',              eng: 'Blue' } },
+  { id: 'indigo',  swatch: '#4f46e5', label: { ru: 'Индиго',          kz: 'Индиго',           eng: 'Indigo' } },
+  { id: 'violet',  swatch: '#8b5cf6', label: { ru: 'Фиолетовый',      kz: 'Күлгін',           eng: 'Violet' } },
+  { id: 'rose',    swatch: '#f43f5e', label: { ru: 'Розовый',         kz: 'Қызғылт',          eng: 'Rose' } },
+  { id: 'orange',  swatch: '#f97316', label: { ru: 'Оранжевый',       kz: 'Қызғылт сары',     eng: 'Orange' } },
+  { id: 'slate',   swatch: '#475569', label: { ru: 'Графитовый',      kz: 'Графит',           eng: 'Slate' } },
+];
+
+const STORAGE_KEY = 'utir_user_theme';
+
+export function loadTheme(): ThemeId {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved && THEMES.some(t => t.id === saved)) return saved as ThemeId;
+  } catch { /* localStorage blocked */ }
+  return 'emerald';
+}
+
+export function saveTheme(id: ThemeId) {
+  try { localStorage.setItem(STORAGE_KEY, id); } catch { /* ignore */ }
+  applyTheme(id);
+}
+
+// Writes the data-theme attribute so the CSS rules in theme.css take
+// effect. Called once on app boot and on every picker change.
+export function applyTheme(id: ThemeId) {
+  if (typeof document === 'undefined') return;
+  document.documentElement.setAttribute('data-theme', id);
+}
