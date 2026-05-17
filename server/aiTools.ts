@@ -64,66 +64,97 @@ function patchDeal(db: Database.Database, dealId: string, updates: Record<string
 const addDeal: ToolDef = {
   module: 'sales',
   description:
-    'Создать новую сделку (deal). ВЫЗЫВАЙ когда админ описывает нового клиента, продажу, заказ. ' +
-    'Не задавай уточняющих вопросов про второстепенные поля (адрес, источник) — оставляй пустыми. ' +
-    'Уточняй ТОЛЬКО если нет имени клиента или суммы.',
+    'Создать НОВУЮ сделку (deal). ВЫЗЫВАЙ ТОЛЬКО если клиент ещё не существует в системе. ' +
+    'ПРАВИЛО: если пользователь упомянул имя похожее на существующего клиента — НЕ вызывай add_deal, ' +
+    'вместо этого вызови update_deal с тем же customerName (поиск по подстроке найдёт сделку даже по части имени). ' +
+    'Если сомневаешься — сначала вызови find_client. ' +
+    'Все поля адресов/материалов/типа мебели — отдельные параметры, НЕ запихивай их в notes.',
   input_schema: {
     type: 'object',
     properties: {
-      customerName: { type: 'string', description: 'Имя клиента (обязательно).' },
-      product:      { type: 'string', description: 'Краткое описание продукта/услуги/пакета.' },
-      amount:       { type: 'number', description: 'Полная сумма сделки в тенге (KZT). Обязательно.' },
-      paidAmount:   { type: 'number', description: 'Сколько уже оплачено в тенге. 0 если ничего.' },
-      phone:        { type: 'string', description: 'Телефон клиента (опционально).' },
-      notes:        { type: 'string', description: 'Любые доп. детали: статус оплаты, сроки, особые условия.' },
+      customerName:    { type: 'string', description: 'Имя клиента (обязательно).' },
+      product:         { type: 'string', description: 'Краткое описание продукта/услуги/пакета.' },
+      amount:          { type: 'number', description: 'Полная сумма сделки в тенге (KZT). 0 если пока неизвестно.' },
+      paidAmount:      { type: 'number', description: 'Сколько уже оплачено в тенге. 0 если ничего.' },
+      phone:           { type: 'string', description: 'Телефон клиента. Опционально.' },
+      email:           { type: 'string', description: 'Email клиента. Опционально.' },
+      address:         { type: 'string', description: 'Адрес клиента (для договора). Город, улица, дом. Опционально.' },
+      siteAddress:     { type: 'string', description: 'Адрес объекта/стройки (куда выезжает прораб/замерщик). Опционально.' },
+      furnitureType:   { type: 'string', description: 'Тип мебели: Кухня, Шкаф-купе, Гардероб, Прихожая, Спальня и т.п. Опционально.' },
+      materials:       { type: 'string', description: 'Материалы: МДФ, ЛДСП, массив, шпон, пластик, и т.п. Опционально.' },
+      source:          { type: 'string', description: 'Откуда клиент: Instagram, WhatsApp, Telegram, Сайт, Рекомендация, Звонок. Опционально.' },
+      measurer:        { type: 'string', description: 'Имя замерщика. Опционально.' },
+      designer:        { type: 'string', description: 'Имя дизайнера. Опционально.' },
+      notes:           { type: 'string', description: 'Особые условия / нестандартные пожелания. НЕ дублируй сюда то что уже есть в других полях.' },
     },
-    required: ['customerName', 'amount'],
+    required: ['customerName'],
   },
   summarize: (i) => {
     const lines = [
       `<b>Записываю сделку:</b>`,
       `• Клиент: <b>${i.customerName}</b>`,
     ];
-    if (i.product)    lines.push(`• Продукт: ${i.product}`);
-    lines.push(`• Сумма: <b>${fmtKZT(i.amount)}</b>`);
-    if (i.paidAmount) lines.push(`• Оплачено: ${fmtKZT(i.paidAmount)} (остаток ${fmtKZT(i.amount - i.paidAmount)})`);
-    else              lines.push(`• Оплата: ждём`);
-    if (i.phone)      lines.push(`• Телефон: ${i.phone}`);
-    if (i.notes)      lines.push(`• Заметка: ${i.notes}`);
+    if (i.product)         lines.push(`• Продукт: ${i.product}`);
+    if (i.furnitureType)   lines.push(`• Тип мебели: ${i.furnitureType}`);
+    if (i.materials)       lines.push(`• Материалы: ${i.materials}`);
+    lines.push(`• Сумма: <b>${fmtKZT(i.amount || 0)}</b>`);
+    if (i.paidAmount)      lines.push(`• Оплачено: ${fmtKZT(i.paidAmount)} (остаток ${fmtKZT((i.amount || 0) - i.paidAmount)})`);
+    else                   lines.push(`• Оплата: ждём`);
+    if (i.phone)           lines.push(`• Телефон: ${i.phone}`);
+    if (i.email)           lines.push(`• Email: ${i.email}`);
+    if (i.address)         lines.push(`• Адрес клиента: ${i.address}`);
+    if (i.siteAddress)     lines.push(`• Адрес объекта: ${i.siteAddress}`);
+    if (i.source)          lines.push(`• Источник: ${i.source}`);
+    if (i.measurer)        lines.push(`• Замерщик: ${i.measurer}`);
+    if (i.designer)        lines.push(`• Дизайнер: ${i.designer}`);
+    if (i.notes)           lines.push(`• Заметка: ${i.notes}`);
     return lines.join('\n');
   },
   execute: async (ctx, i) => {
     const id = newId('D');
+    // Map AI source string to the icon used in the UI (phone is default).
+    const sourceLower = String(i.source || '').toLowerCase();
+    const icon =
+      sourceLower.includes('instagram') ? 'instagram' :
+      sourceLower.includes('whatsapp')  ? 'whatsapp'  :
+      sourceLower.includes('telegram')  ? 'telegram'  :
+      sourceLower.includes('tiktok')    ? 'tiktok'    :
+      sourceLower.includes('email')     ? 'email'     :
+                                          'phone';
     const data = {
       id,
-      customerName: i.customerName,
-      phone: i.phone || '',
-      address: '',
-      product: i.product || '',
-      furnitureType: '',
-      amount: Number(i.amount) || 0,
-      paidAmount: Number(i.paidAmount) || 0,
-      status: 'new',
-      icon: 'phone',
-      priority: 'medium',
-      date: new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
-      progress: 5,
-      source: '',
-      measurer: '', designer: '', materials: '',
+      customerName:    i.customerName,
+      phone:           i.phone           || '',
+      email:           i.email           || '',
+      address:         i.address         || '',
+      siteAddress:     i.siteAddress     || '',
+      product:         i.product         || '',
+      furnitureType:   i.furnitureType   || '',
+      materials:       i.materials       || '',
+      amount:          Number(i.amount)     || 0,
+      paidAmount:      Number(i.paidAmount) || 0,
+      status:          'new',
+      icon,
+      priority:        'medium',
+      date:            new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
+      progress:        5,
+      source:          i.source          || '',
+      measurer:        i.measurer        || '',
+      designer:        i.designer        || '',
       measurementDate: '', completionDate: '', installationDate: '',
-      paymentMethods: {},
-      notes: i.notes || '',
-      workType: 'furniture',
-      createdAt: new Date().toISOString(),
+      paymentMethods:  {},
+      notes:           i.notes           || '',
+      workType:        'furniture',
+      createdAt:       new Date().toISOString(),
     };
     ctx.db.prepare('INSERT INTO deals (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, ctx.userId, ctx.teamId, JSON.stringify(data));
     ctx.logActivity(ctx.userId, {
       user: 'AI-ассистент', actor: 'ai',
       action: `Создал сделку (по запросу ${ctx.userName})`,
-      target: `${i.customerName} — ${fmtKZT(i.amount)}`,
+      target: `${i.customerName} — ${fmtKZT(i.amount || 0)}`,
       type: 'create', page: 'sales',
     });
-    return `Сделка <b>${i.customerName}</b> на ${fmtKZT(i.amount)} создана. Открыть → Заказы.`;
+    return `Сделка <b>${i.customerName}</b> на ${fmtKZT(i.amount || 0)} создана. Открыть → Заказы.`;
   },
 };
 
