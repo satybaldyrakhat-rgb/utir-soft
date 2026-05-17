@@ -123,14 +123,37 @@ function rasterUrlFor(slug: string): string | undefined {
       || RASTER_MODULES[`../../assets/logos/${slug}.jpg`];
 }
 
+// Brands whose SVG carries its own gradient (Meta, etc.). For these
+// the BrandLogo `filled` mode must NOT recolour the glyph to white —
+// instead we render the SVG full-bleed on a near-white card, like an
+// iOS app icon. The brand-colour tile look would clash with the
+// gradient inside.
+const FULL_COLOR_BRANDS = new Set(['meta']);
+
 export function BrandLogo({ id, size = 20, color, mono, filled, className = '', label }: Props) {
   const slug = SLUG_MAP[id] || id;
   const brand = BRAND_COLOR[slug];
+  const isFullColor = FULL_COLOR_BRANDS.has(slug);
 
   // ─── SVG path (Simple Icons — vector, recolourable) ─────────────
   const svg = SVG_MODULES[`../../assets/logos/${slug}.svg`];
   if (svg) {
     if (filled) {
+      // Two modes:
+      //   - Normal (Simple Icons monochrome) → brand-colour tile, white glyph
+      //   - Full-colour (Meta gradient) → white tile with the SVG's native
+      //     colours visible at ~85% of the square
+      if (isFullColor) {
+        const innerSize = Math.round(size * 0.85);
+        return (
+          <span
+            className={`inline-flex items-center justify-center rounded-xl ring-1 ring-slate-200 bg-white ${className}`}
+            style={{ width: size, height: size, lineHeight: 0 }}
+            title={label || slug}
+            dangerouslySetInnerHTML={{ __html: svg.replace('<svg ', `<svg width="${innerSize}" height="${innerSize}" `) }}
+          />
+        );
+      }
       // App-icon look: brand-coloured rounded square, white glyph at ~70%.
       const innerSize = Math.round(size * 0.7);
       return (
