@@ -23,13 +23,14 @@ export function ComingSoon({ title, description, onBack, language = 'ru' }: Comi
     <div
       className="min-h-full relative flex items-center justify-center p-6"
     >
-      <div className="max-w-md w-full bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 text-center relative overflow-hidden">
-        {/* Ambient halo centred behind the icon — all 4 corners of the
-            card stay visually equal (previous corner orb made the
-            top-right heavier than the rest). */}
+      <div className="max-w-md w-full bg-white/90 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 text-center relative overflow-hidden">
+        {/* Subtle centred halo behind the icon — symmetric so all 4
+            card corners stay visually equal. Card opacity bumped to
+            white/90 so the global page orbs don't bleed through and
+            make the right side look heavier than the left. */}
         <div
-          className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full blur-3xl pointer-events-none opacity-70"
-          style={{ background: 'radial-gradient(circle, var(--accent-200) 0%, transparent 70%)' }}
+          className="absolute top-24 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full blur-3xl pointer-events-none opacity-50"
+          style={{ background: 'radial-gradient(circle, var(--accent-200) 0%, transparent 65%)' }}
         />
         <div className="relative">
           <div
