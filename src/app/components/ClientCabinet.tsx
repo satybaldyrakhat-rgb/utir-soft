@@ -291,7 +291,7 @@ function HomePage({
             <button className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-white rounded-xl text-xs hover:bg-emerald-600 transition-colors">
               <Phone className="w-3.5 h-3.5" /> {tl(lang, 'Позвонить', 'Қоңырау', 'Call')}
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors">
+            <button className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all transition-colors">
               <MessageCircle className="w-3.5 h-3.5" /> {tl(lang, 'Написать', 'Жазу', 'Message')}
             </button>
             <button className="flex items-center gap-1.5 px-3 py-2 bg-white/60 backdrop-blur-xl border border-white/60 text-slate-700 rounded-xl text-xs hover:bg-white/50 transition-colors">
@@ -381,7 +381,7 @@ function ActiveOrderCard({ lang, deal, onOpen, accent, detailed }: { lang: Lang;
             ))}
           </div>
         )}
-        <button onClick={onOpen} className="w-full mt-2 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all flex items-center justify-center gap-1.5 transition-colors">
+        <button onClick={onOpen} className="w-full mt-2 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all flex items-center justify-center gap-1.5 transition-colors">
           {tl(lang, 'Подробнее', 'Толығырақ', 'Details')} <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -478,7 +478,7 @@ function OrdersPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button className="flex-1 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors">{tl(lang, 'Открыть', 'Ашу', 'Open')}</button>
+                  <button className="flex-1 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all transition-colors">{tl(lang, 'Открыть', 'Ашу', 'Open')}</button>
                   <button className="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-xs hover:bg-emerald-100 transition-colors">{tl(lang, 'Повторить', 'Қайталау', 'Reorder')}</button>
                 </div>
               </div>
@@ -538,7 +538,7 @@ function TrackingPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
             <button className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-500 text-white rounded-xl text-xs hover:bg-emerald-600 transition-colors">
               <Phone className="w-3.5 h-3.5" /> {tl(lang, 'Позвонить водителю', 'Жүргізушіге қоңырау', 'Call driver')}
             </button>
-            <button className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors">
+            <button className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all transition-colors">
               <MessageCircle className="w-3.5 h-3.5" /> {tl(lang, 'Чат с бригадой', 'Бригадамен чат', 'Chat with crew')}
             </button>
           </div>
@@ -743,7 +743,7 @@ function ARPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
             <div className="p-4 space-y-3">
               <div className="text-sm text-gray-900">{d.product} · #{d.id}</div>
               <div className="flex gap-2">
-                <button className="flex-1 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors">{tl(lang, 'Открыть AR', 'AR ашу', 'Open AR')}</button>
+                <button className="flex-1 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all transition-colors">{tl(lang, 'Открыть AR', 'AR ашу', 'Open AR')}</button>
                 <button className="px-3 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-xs hover:bg-emerald-100 transition-colors flex items-center gap-1.5">
                   <Share2 className="w-3.5 h-3.5" /> {tl(lang, 'Дизайнеру', 'Дизайнерге', 'Designer')}
                 </button>
@@ -884,7 +884,7 @@ function ReviewsPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
             <div className="text-xs text-slate-500">{tl(lang, 'Загрузить фото готовой мебели', 'Сурет жүктеу', 'Upload photo')}</div>
           </div>
           <div className="flex gap-2">
-            <button className="flex-1 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors">{tl(lang, 'Опубликовать', 'Жариялау', 'Publish')}</button>
+            <button className="flex-1 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all transition-colors">{tl(lang, 'Опубликовать', 'Жариялау', 'Publish')}</button>
             <button className="flex items-center gap-1.5 px-3 py-2.5 bg-white/60 backdrop-blur border border-white/60 text-slate-700 rounded-xl text-xs hover:bg-white transition-colors">
               <Instagram className="w-3.5 h-3.5 text-emerald-600" /> Instagram
             </button>

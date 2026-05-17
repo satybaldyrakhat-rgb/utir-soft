@@ -218,7 +218,7 @@ export function AdAnalytics({ language }: AdAnalyticsProps) {
           {!metaConnected ? (
             <button
               onClick={() => dataStore.toggleIntegration('meta')}
-              className="px-5 py-2.5 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all"
+              className="px-5 py-2.5 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all"
             >
               Подключить Meta Ads
             </button>

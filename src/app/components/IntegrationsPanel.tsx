@@ -442,7 +442,7 @@ function IntegrationModal({
                   <a
                     href="https://railway.app/dashboard"
                     target="_blank" rel="noopener noreferrer"
-                    className="mt-2 inline-flex items-center gap-1 text-[11px] text-violet-600 hover:text-violet-800"
+                    className="mt-2 inline-flex items-center gap-1 text-[11px] text-emerald-600 hover:text-violet-800"
                   >
                     {l('Открыть Railway →', 'Railway-ге өту', 'Open Railway')} <ExternalLink className="w-3 h-3" />
                   </a>
@@ -485,7 +485,7 @@ function IntegrationModal({
           )}
 
           {def.helpUrl && (
-            <a href={def.helpUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-violet-600 hover:text-violet-800">
+            <a href={def.helpUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-emerald-600 hover:text-violet-800">
               {l('Документация / получить ключ', 'Құжаттама', 'Docs / get keys')} <ExternalLink className="w-3 h-3" />
             </a>
           )}

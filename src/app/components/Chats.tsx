@@ -131,11 +131,11 @@ export function Chats({ language }: ChatsProps) {
       className="flex flex-col h-[calc(100vh-56px)] relative"
       style={{
         background: `
-          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
-          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
-          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
-          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
-          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.45), transparent 45%),
+          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.30), transparent 45%),
+          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.40), transparent 50%),
+          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.50), transparent 50%),
+          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
         `,
       }}
     >
@@ -149,7 +149,7 @@ export function Chats({ language }: ChatsProps) {
               onClick={() => setActiveTab(t.id)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
                 activeTab === t.id
-                  ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]'
                   : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
               }`}
             >
@@ -446,7 +446,7 @@ export function Chats({ language }: ChatsProps) {
                   { icon: TrendingUp, label: l('Аналитика', 'Аналитика', 'Analytics'), hint: l('Отслеживание', 'Бақылау', 'Tracking') },
                 ].map((c, i) => <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4"><c.icon className="w-5 h-5 text-slate-400 mb-2" /><div className="text-xs text-slate-900 mb-0.5">{c.label}</div><div className="text-[10px] text-slate-400">{c.hint}</div></div>)}
               </div>
-              <button className="mt-6 px-5 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">{l('Настроить', 'Баптау', 'Configure')}</button>
+              <button className="mt-6 px-5 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">{l('Настроить', 'Баптау', 'Configure')}</button>
             </div>
           </div>
         )}
@@ -454,7 +454,7 @@ export function Chats({ language }: ChatsProps) {
 
       {/* ===== SCENARIO MODAL ===== */}
       {scenarioModal && currentScenario && (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setScenarioModal(null)}>
+        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setScenarioModal(null)}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -488,7 +488,7 @@ export function Chats({ language }: ChatsProps) {
             </div>
             <div className="p-5 pt-0 flex gap-2">
               <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">Отмена</button>
-              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">Сохранить</button>
+              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">Сохранить</button>
             </div>
           </div>
         </div>
@@ -496,7 +496,7 @@ export function Chats({ language }: ChatsProps) {
 
       {/* Call Modal */}
       {showCallModal && (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl w-72 p-6 text-center shadow-xl">
             <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3"><Phone className={`w-6 h-6 ${isInCall ? 'text-green-500' : 'text-gray-400'}`} /></div>
             <div className="text-sm text-slate-900 mb-1">{selectedChat?.name}</div>

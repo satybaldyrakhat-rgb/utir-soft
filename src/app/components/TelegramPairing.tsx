@@ -68,7 +68,7 @@ export function TelegramPairing({ language }: Props) {
   return (
     <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
       <div className="flex items-center gap-2 mb-1">
-        <Send className="w-4 h-4 text-violet-600" />
+        <Send className="w-4 h-4 text-emerald-600" />
         <div className="text-sm text-gray-900">{l('Подключение Telegram-бота', 'Telegram-ботты қосу', 'Connect Telegram bot')}</div>
       </div>
       <div className="text-[11px] text-slate-400 mb-4 leading-relaxed">

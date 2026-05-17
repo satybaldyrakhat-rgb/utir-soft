@@ -333,7 +333,7 @@ export function CatalogsSettings({ language }: Props) {
                             {item}
                             <button
                               onClick={() => setEditing({ key: meta.key, original: item, value: item })}
-                              className="text-gray-300 hover:text-violet-600 opacity-0 group-hover:opacity-100 transition"
+                              className="text-gray-300 hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition"
                               title={l('Изменить', 'Өзгерту', 'Edit')}
                             >
                               <Edit2 className="w-3 h-3" />

@@ -100,11 +100,11 @@ export function Warehouse({ language }: WarehouseProps) {
       className="min-h-full relative"
       style={{
         background: `
-          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
-          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
-          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
-          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
-          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.45), transparent 45%),
+          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.30), transparent 45%),
+          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.40), transparent 50%),
+          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.50), transparent 50%),
+          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
         `,
       }}
     >
@@ -116,12 +116,12 @@ export function Warehouse({ language }: WarehouseProps) {
           <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight">{l('Производство и склад', 'Өндіріс және қойма', 'Production & Warehouse')}</h1>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <button onClick={() => setActiveView('production')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'production' ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Заказы', 'Тапсырыстар', 'Orders')}</button>
-            <button onClick={() => setActiveView('bom')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'bom' ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('BOM', 'BOM', 'BOM')}</button>
-            <button onClick={() => setActiveView('calculator')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'calculator' ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Калькулятор', 'Калькулятор', 'Calculator')}</button>
-            <button onClick={() => setActiveView('nesting')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'nesting' ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Раскрой', 'Раскрой', 'Nesting')}</button>
-            <button onClick={() => setActiveView('materials')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'materials' ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Склад', 'Қойма', 'Warehouse')}</button>
-          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">
+          <button onClick={() => setActiveView('production')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'production' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Заказы', 'Тапсырыстар', 'Orders')}</button>
+            <button onClick={() => setActiveView('bom')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'bom' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('BOM', 'BOM', 'BOM')}</button>
+            <button onClick={() => setActiveView('calculator')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'calculator' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Калькулятор', 'Калькулятор', 'Calculator')}</button>
+            <button onClick={() => setActiveView('nesting')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'nesting' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Раскрой', 'Раскрой', 'Nesting')}</button>
+            <button onClick={() => setActiveView('materials')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'materials' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Склад', 'Қойма', 'Warehouse')}</button>
+          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">
             <Plus className="w-3.5 h-3.5" />{l('Добавить', 'Қосу', 'Add')}
           </button>
         </div>
@@ -305,7 +305,7 @@ export function Warehouse({ language }: WarehouseProps) {
 
       {/* ===== MODALS ===== */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
+        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <span className="text-sm text-gray-900">{l('Добавить материал', 'Материал қосу', 'Add Material')}</span>
@@ -323,14 +323,14 @@ export function Warehouse({ language }: WarehouseProps) {
             </div>
             <div className="p-5 pt-0 flex gap-2">
               <button onClick={() => setShowAddModal(false)} className="flex-1 px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
-              <button onClick={handleAdd} className="flex-1 px-3 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">{l('Добавить', 'Қосу', 'Add')}</button>
+              <button onClick={handleAdd} className="flex-1 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">{l('Добавить', 'Қосу', 'Add')}</button>
             </div>
           </div>
         </div>
       )}
 
       {showEditModal && selectedProduct && (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => { setShowEditModal(false); setSelectedProduct(null); }}>
+        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => { setShowEditModal(false); setSelectedProduct(null); }}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <div><div className="text-[10px] text-slate-400">{selectedProduct.category} · {selectedProduct.supplier}</div><div className="text-sm text-gray-900">{selectedProduct.name}</div></div>
@@ -349,14 +349,14 @@ export function Warehouse({ language }: WarehouseProps) {
             </div>
             <div className="p-5 pt-0 flex gap-2">
               <button onClick={() => { setShowEditModal(false); setSelectedProduct(null); }} className="flex-1 px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
-              <button onClick={handleSaveEdit} className="flex-1 px-3 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">{l('Сохранить', 'Сақтау', 'Save')}</button>
+              <button onClick={handleSaveEdit} className="flex-1 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">{l('Сохранить', 'Сақтау', 'Save')}</button>
             </div>
           </div>
         </div>
       )}
 
       {selectedOrder && (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setSelectedOrder(null)}>
+        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setSelectedOrder(null)}>
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <div><div className="text-sm text-gray-900">{selectedOrder.name}</div><div className="text-[10px] text-slate-400">#{selectedOrder.id} · {selectedOrder.client}</div></div>
@@ -520,7 +520,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
           <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <div className="text-sm text-slate-900 mb-1">{l('Пока нет шаблонов', '...', 'No templates yet')}</div>
           <div className="text-xs text-slate-400 mb-4">{l('Создайте первый шаблон чтобы быстро повторять типовые изделия', '...', 'Create a template to reuse common items')}</div>
-          <button onClick={() => setEditing(blankTemplate())} className="px-4 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all inline-flex items-center gap-1.5">
+          <button onClick={() => setEditing(blankTemplate())} className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all inline-flex items-center gap-1.5">
             <Plus className="w-3 h-3" /> {l('Создать первый', '...', 'Create first')}
           </button>
         </div>
@@ -636,7 +636,7 @@ function BomEditorModal({ initial, onClose, onSave, busy, language }: {
           <div>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs text-gray-900">{l('Материалы', 'Материалдар', 'Materials')}</div>
-              <button onClick={addMat} className="text-[11px] text-violet-600 hover:text-violet-800 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> {l('Добавить', 'Қосу', 'Add')}</button>
+              <button onClick={addMat} className="text-[11px] text-emerald-600 hover:text-violet-800 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> {l('Добавить', 'Қосу', 'Add')}</button>
             </div>
             <div className="border border-gray-100 rounded-xl overflow-hidden">
               <div className="grid grid-cols-12 gap-1 px-2 py-1.5 bg-gray-50 text-[9px] text-slate-400 uppercase tracking-wide">
@@ -854,7 +854,7 @@ function NestingView({ language, prodOrders, deals }: {
         <div className="space-y-2">
           <button
             onClick={() => setShowCnc(true)}
-            className="w-full px-3 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all inline-flex items-center justify-center gap-1.5"
+            className="w-full px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all inline-flex items-center justify-center gap-1.5"
           >
             <Wrench className="w-3 h-3" /> {l('CNC-интеграция', 'CNC интеграция', 'CNC integration')}
           </button>

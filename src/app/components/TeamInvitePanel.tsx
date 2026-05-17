@@ -136,7 +136,7 @@ export function TeamInvitePanel({ language }: Props) {
         <div className="text-sm text-gray-900">{l('Приглашения в команду', 'Командаға шақыру', 'Team invitations')}</div>
         <button
           onClick={() => { setShowCreate(s => !s); setError(''); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/95 text-white rounded-xl text-xs hover:bg-slate-900 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10 transition-all transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.35)] ring-1 ring-white/10 transition-all transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           {l('Новое приглашение', 'Жаңа шақыру', 'New invitation')}
@@ -181,7 +181,7 @@ export function TeamInvitePanel({ language }: Props) {
             <button
               onClick={createInvite}
               disabled={creating}
-              className="px-3 py-1.5 bg-slate-900/95 text-white rounded-xl text-xs hover:bg-slate-900 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10 transition-all transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.35)] ring-1 ring-white/10 transition-all transition-colors disabled:opacity-50"
             >
               {creating ? l('Создаю…', 'Жасалуда…', 'Creating…') : l('Создать ссылку', 'Сілтеме жасау', 'Create link')}
             </button>

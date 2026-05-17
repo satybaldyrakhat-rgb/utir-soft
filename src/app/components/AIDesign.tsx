@@ -144,7 +144,7 @@ function StepBadge({ n, active }: { n: number | string; active: boolean }) {
     <div
       className={`w-6 h-6 rounded-full text-[11px] flex items-center justify-center ring-1 transition-colors ${
         active
-          ? 'bg-slate-900 text-white ring-white/30 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+          ? 'bg-emerald-600 text-white ring-white/30 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]'
           : 'bg-white/60 text-slate-400 ring-white/60 backdrop-blur-xl'
       }`}
     >
@@ -428,11 +428,11 @@ export function AIDesign({ language }: AIDesignProps) {
       className="min-h-full relative"
       style={{
         background: `
-          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.32), transparent 45%),
-          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.26), transparent 45%),
-          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.30), transparent 50%),
-          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.28), transparent 50%),
-          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.48), transparent 45%),
+          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.32), transparent 45%),
+          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.42), transparent 50%),
+          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.52), transparent 50%),
+          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
         `,
       }}
     >
@@ -456,7 +456,7 @@ export function AIDesign({ language }: AIDesignProps) {
               onClick={() => setFreeMode(f => !f)}
               className={`px-3.5 py-2 rounded-2xl text-xs ring-1 transition-all ${
                 freeMode
-                  ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)]'
+                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)]'
                   : 'bg-white/60 text-slate-600 ring-white/60 backdrop-blur-xl hover:bg-white/80'
               }`}
             >
@@ -492,7 +492,7 @@ export function AIDesign({ language }: AIDesignProps) {
                       onClick={() => setRoomId(r.id)}
                       className={`flex flex-col items-center gap-2 p-3.5 rounded-2xl ring-1 transition-all ${
                         active
-                          ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)]'
+                          ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)]'
                           : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
                       }`}
                     >
@@ -555,7 +555,7 @@ export function AIDesign({ language }: AIDesignProps) {
                       onClick={() => toggleMood(m.id)}
                       className={`px-3 py-1.5 rounded-full text-[11px] ring-1 transition-all flex items-center gap-1 ${
                         active
-                          ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+                          ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]'
                           : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
                       }`}
                     >
@@ -614,7 +614,7 @@ export function AIDesign({ language }: AIDesignProps) {
                   <img src={roomPhoto} alt="" className="w-full aspect-video object-cover rounded-xl" />
                   <button
                     onClick={() => setRoomPhoto(undefined)}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-slate-900/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center hover:bg-slate-900/90 ring-1 ring-white/20"
+                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-emerald-600/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center hover:bg-emerald-700/90 ring-1 ring-white/20"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -645,7 +645,7 @@ export function AIDesign({ language }: AIDesignProps) {
                     <img src={src} alt="" className="w-full aspect-square object-cover rounded-xl" />
                     <button
                       onClick={() => setReferenceImages(prev => prev.filter((_, j) => j !== i))}
-                      className="absolute top-1 right-1 w-5 h-5 bg-slate-900/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center hover:bg-slate-900/90 ring-1 ring-white/20"
+                      className="absolute top-1 right-1 w-5 h-5 bg-emerald-600/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center hover:bg-emerald-700/90 ring-1 ring-white/20"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -701,7 +701,7 @@ export function AIDesign({ language }: AIDesignProps) {
                     </div>
                   )}
                   {active && p.enabled && (
-                    <div className="absolute top-2 right-2 w-5 h-5 bg-slate-900 ring-2 ring-white/80 rounded-full flex items-center justify-center">
+                    <div className="absolute top-2 right-2 w-5 h-5 bg-emerald-600 ring-2 ring-white/80 rounded-full flex items-center justify-center">
                       <Check className="w-3 h-3 text-white" />
                     </div>
                   )}
@@ -714,7 +714,7 @@ export function AIDesign({ language }: AIDesignProps) {
         {/* ─── Prompt preview + Generate ─────────────────────── */}
         <div className={`${GLASS} p-5 mb-8`}>
           <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 rounded-2xl bg-violet-100/70 text-violet-700 ring-1 ring-white/60 flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-100/70 text-emerald-700 ring-1 ring-white/60 flex items-center justify-center flex-shrink-0">
               <Wand2 className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
@@ -723,7 +723,7 @@ export function AIDesign({ language }: AIDesignProps) {
                 {/* Brand-kit applied indicator — non-empty hint OR photoreal flag */}
                 {brandKit && (brandKit.styleHint.trim() || brandKit.photorealism) && (
                   <span
-                    className="px-2 py-0.5 bg-violet-100/70 text-violet-700 rounded-full text-[10px] normal-case tracking-normal ring-1 ring-white/40 flex items-center gap-1"
+                    className="px-2 py-0.5 bg-emerald-100/70 text-emerald-700 rounded-full text-[10px] normal-case tracking-normal ring-1 ring-white/40 flex items-center gap-1"
                     title={`${brandKit.photorealism ? 'фотореализм' : ''}${brandKit.styleHint ? ' · ' + brandKit.styleHint.slice(0, 80) + (brandKit.styleHint.length > 80 ? '…' : '') : ''}`}
                   >
                     <Sparkles className="w-2.5 h-2.5" />
@@ -762,7 +762,7 @@ export function AIDesign({ language }: AIDesignProps) {
             <button
               onClick={generate}
               disabled={!canGenerate}
-              className="group flex items-center gap-2 px-5 py-2.5 bg-slate-900/95 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] hover:shadow-[0_12px_32px_-8px_rgba(15,23,42,0.5)] hover:bg-slate-900 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ring-1 ring-white/10"
+              className="group flex items-center gap-2 px-5 py-2.5 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] hover:shadow-[0_12px_32px_-8px_rgba(5,150,105,0.45)] hover:bg-emerald-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ring-1 ring-white/10"
             >
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 transition-transform group-hover:scale-110" />}
               {generating
@@ -804,7 +804,7 @@ export function AIDesign({ language }: AIDesignProps) {
                       >
                         <img src={r.imageUrl || r.imageDataUrl} alt="" className="w-full h-full object-cover transition-transform group-hover/card:scale-[1.02]" />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none" />
-                        <div className="absolute top-2 right-2 w-8 h-8 bg-slate-900/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
+                        <div className="absolute top-2 right-2 w-8 h-8 bg-emerald-600/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
                           <Maximize2 className="w-3.5 h-3.5" />
                         </div>
                       </button>
@@ -907,7 +907,7 @@ export function AIDesign({ language }: AIDesignProps) {
                       <>
                         <img src={h.imageUrl} alt={h.prompt} className="w-full h-full object-cover transition-transform group-hover/card:scale-[1.02]" />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none" />
-                        <div className="absolute top-2 right-2 w-8 h-8 bg-slate-900/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
+                        <div className="absolute top-2 right-2 w-8 h-8 bg-emerald-600/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
                           <Maximize2 className="w-3.5 h-3.5" />
                         </div>
                       </>
@@ -945,11 +945,11 @@ export function AIDesign({ language }: AIDesignProps) {
         {/* ─── Attach-to-deal picker (glass dialog) ──────────── */}
         {attachingId && (
           <div
-            className="fixed inset-0 bg-slate-900/30 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md z-50 flex items-center justify-center p-4"
             onClick={() => setAttachingId(null)}
           >
             <div
-              className="bg-white/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]"
+              className="bg-white/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]"
               onClick={e => e.stopPropagation()}
             >
               <div className="p-5 border-b border-white/60 flex items-center justify-between">
@@ -1016,11 +1016,11 @@ export function AIDesign({ language }: AIDesignProps) {
         {/* ─── Lightbox — full image + every per-image action ──── */}
         {viewing && viewing.imageUrl && (
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-emerald-600/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
             onClick={() => setViewing(null)}
           >
             <div
-              className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-5xl max-h-[92vh] flex flex-col md:flex-row overflow-hidden shadow-[0_24px_64px_-12px_rgba(15,23,42,0.4)]"
+              className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-5xl max-h-[92vh] flex flex-col md:flex-row overflow-hidden shadow-[0_24px_64px_-12px_rgba(5,150,105,0.4)]"
               onClick={e => e.stopPropagation()}
             >
               {/* Image — fills the left side, scales contained */}
@@ -1082,7 +1082,7 @@ export function AIDesign({ language }: AIDesignProps) {
                       <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                         <Wand2 className="w-2.5 h-2.5" /> {l('Улучшенный prompt', 'Жақсартылған', 'Enhanced')}
                       </div>
-                      <div className="text-[11px] text-slate-600 leading-relaxed bg-violet-50/60 ring-1 ring-violet-100/60 rounded-2xl p-3">
+                      <div className="text-[11px] text-slate-600 leading-relaxed bg-violet-50/60 ring-1 ring-emerald-100/60 rounded-2xl p-3">
                         {viewing.enhancedPrompt}
                       </div>
                     </div>
@@ -1093,7 +1093,7 @@ export function AIDesign({ language }: AIDesignProps) {
                 <div className="p-4 grid grid-cols-2 gap-2">
                   <button
                     onClick={() => regenerate(viewing)}
-                    className="flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 transition-all shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10"
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 transition-all shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     {l('Переделать', 'Қайта жасау', 'Regenerate')}
@@ -1140,11 +1140,11 @@ export function AIDesign({ language }: AIDesignProps) {
         {/* ─── Delete confirmation ─────────────────────────────── */}
         {confirmDeleteId && (
           <div
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-[60] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-emerald-600/50 backdrop-blur-md z-[60] flex items-center justify-center p-4"
             onClick={() => setConfirmDeleteId(null)}
           >
             <div
-              className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-sm p-6 shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]"
+              className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-sm p-6 shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]"
               onClick={e => e.stopPropagation()}
             >
               <div className="w-12 h-12 rounded-2xl bg-rose-100/70 text-rose-700 ring-1 ring-white/60 flex items-center justify-center mx-auto mb-4">
@@ -1178,7 +1178,7 @@ export function AIDesign({ language }: AIDesignProps) {
 
         {/* Toast that fades after attach. */}
         {attachToast && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 bg-slate-900/90 backdrop-blur-xl text-white text-xs rounded-2xl shadow-[0_12px_32px_-8px_rgba(15,23,42,0.5)] ring-1 ring-white/10 z-50 flex items-center gap-2">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 bg-emerald-600/90 backdrop-blur-xl text-white text-xs rounded-2xl shadow-[0_12px_32px_-8px_rgba(5,150,105,0.45)] ring-1 ring-white/10 z-50 flex items-center gap-2">
             <Check className="w-3.5 h-3.5 text-emerald-300" />
             {attachToast}
           </div>
@@ -1186,7 +1186,7 @@ export function AIDesign({ language }: AIDesignProps) {
 
         {/* Action flash toast — copy / delete / edit-loaded */}
         {flash && (
-          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2.5 bg-slate-900/90 backdrop-blur-xl text-white text-xs rounded-2xl shadow-[0_12px_32px_-8px_rgba(15,23,42,0.5)] ring-1 ring-white/10 z-50 flex items-center gap-2 max-w-[90vw]">
+          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2.5 bg-emerald-600/90 backdrop-blur-xl text-white text-xs rounded-2xl shadow-[0_12px_32px_-8px_rgba(5,150,105,0.45)] ring-1 ring-white/10 z-50 flex items-center gap-2 max-w-[90vw]">
             <Sparkles className="w-3.5 h-3.5 text-violet-300" />
             {flash}
           </div>

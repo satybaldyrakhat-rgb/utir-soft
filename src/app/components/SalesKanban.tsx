@@ -144,7 +144,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
       instagram: <InstagramLogo className="w-3.5 h-3.5" />,
       phone: <Phone className="w-3.5 h-3.5 text-sky-600" />,
       whatsapp: <WhatsAppLogo className="w-3.5 h-3.5" />,
-      email: <Mail className="w-3.5 h-3.5 text-violet-600" />,
+      email: <Mail className="w-3.5 h-3.5 text-emerald-600" />,
       users: <Users className="w-3.5 h-3.5 text-amber-600" />,
       telegram: <TelegramLogo className="w-3.5 h-3.5" />,
       tiktok: <TikTokLogo className="w-3.5 h-3.5" />,
@@ -171,11 +171,11 @@ export function SalesKanban({ language }: SalesKanbanProps) {
         className="flex flex-col h-screen relative overflow-hidden"
         style={{
           background: `
-            radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
-            radial-gradient(800px circle at 100% 0%, rgba(252,165,165,0.24), transparent 45%),
-            radial-gradient(900px circle at 100% 100%, rgba(125,211,252,0.28), transparent 50%),
-            radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
-            linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+            radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.45), transparent 45%),
+            radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.30), transparent 45%),
+            radial-gradient(900px circle at 100% 100%, rgba(187,247,208,0.40), transparent 50%),
+            radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.50), transparent 50%),
+            linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
           `,
         }}
       >
@@ -245,7 +245,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
               {store.canWriteModule('orders') && (
                 <button
                   onClick={() => setShowNewDealModal(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-slate-900/95 backdrop-blur-xl text-white rounded-2xl text-xs shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] hover:bg-slate-900 ring-1 ring-white/10 transition-all"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-xs shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] hover:bg-emerald-700 ring-1 ring-white/10 transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" />{l('Новая сделка', 'Жаңа мәміле', 'New Deal')}
                 </button>
@@ -257,7 +257,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 text-[11px] text-slate-600 px-2.5 py-1 rounded-full bg-white/60 ring-1 ring-white/60 backdrop-blur-xl">
-                <span className="w-1.5 h-1.5 bg-slate-900 rounded-full" />
+                <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full" />
                 <span className="tabular-nums">{activeDeals.length}</span> {l('сделок', 'мәміле', 'deals')}
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-slate-600 px-2.5 py-1 rounded-full bg-emerald-100/60 ring-1 ring-white/40 backdrop-blur-xl">
@@ -462,8 +462,8 @@ export function SalesKanban({ language }: SalesKanbanProps) {
       {/* Legacy inline new-deal modal — kept gated `false` for backward
           compat; NewDealModal above is the live one. */}
       {false && (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowNewDealModal(false)}>
-          <div className="bg-white/85 backdrop-blur-2xl rounded-3xl max-w-md w-full ring-1 ring-white/70 shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowNewDealModal(false)}>
+          <div className="bg-white/85 backdrop-blur-2xl rounded-3xl max-w-md w-full ring-1 ring-white/70 shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <span className="text-sm text-slate-900">{l('Новая сделка', 'Жаңа мәміле', 'New Deal')}</span>
               <button onClick={() => setShowNewDealModal(false)} className="w-8 h-8 bg-white/60 ring-1 ring-white/60 rounded-2xl flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-500" /></button>
@@ -476,7 +476,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
             </div>
             <div className="p-5 pt-0 flex gap-2">
               <button onClick={() => setShowNewDealModal(false)} className="flex-1 px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-xs hover:bg-white">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
-              <button onClick={handleAddDeal} disabled={!newDeal.customerName || !newDeal.product || !newDeal.amount} className="flex-1 px-3 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 disabled:opacity-30">{l('Создать', 'Жасау', 'Create')}</button>
+              <button onClick={handleAddDeal} disabled={!newDeal.customerName || !newDeal.product || !newDeal.amount} className="flex-1 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 disabled:opacity-30">{l('Создать', 'Жасау', 'Create')}</button>
             </div>
           </div>
         </div>
@@ -484,7 +484,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
 
       {/* ─── Rejected archive modal (glass) ───────────────────── */}
       {showArchive && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowArchive(false)}>
+        <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowArchive(false)}>
           <div className={`${GLASS_DEEP} max-w-lg w-full max-h-[80vh] flex flex-col`} onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2.5">
@@ -556,11 +556,11 @@ export function SalesKanban({ language }: SalesKanbanProps) {
       {/* ─── Glass delete-confirmation dialog ─────────────────── */}
       {confirmDelete && (
         <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-[60] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-emerald-600/50 backdrop-blur-md z-[60] flex items-center justify-center p-4"
           onClick={() => setConfirmDelete(null)}
         >
           <div
-            className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-sm p-6 shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]"
+            className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-sm p-6 shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]"
             onClick={e => e.stopPropagation()}
           >
             <div className="w-12 h-12 rounded-2xl bg-rose-100/70 text-rose-700 ring-1 ring-white/60 flex items-center justify-center mx-auto mb-4">

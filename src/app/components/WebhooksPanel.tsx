@@ -121,7 +121,7 @@ export function WebhooksPanel({ language }: Props) {
         </div>
         <button
           onClick={() => { setShowForm(s => !s); setError(''); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/95 text-white rounded-xl text-xs hover:bg-slate-900 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10 transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.35)] ring-1 ring-white/10 transition-all"
         >
           <Plus className="w-3 h-3" />
           {l('Добавить', 'Қосу', 'Add')}
@@ -186,7 +186,7 @@ export function WebhooksPanel({ language }: Props) {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={create} className="px-3 py-1.5 bg-slate-900/95 text-white rounded-xl text-xs hover:bg-slate-900 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10 transition-all">
+            <button onClick={create} className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.35)] ring-1 ring-white/10 transition-all">
               {l('Создать', 'Жасау', 'Create')}
             </button>
             <button onClick={() => setShowForm(false)} className="px-3 py-1.5 text-gray-600 rounded-lg text-xs hover:bg-white">

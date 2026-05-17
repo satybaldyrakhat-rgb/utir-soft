@@ -325,8 +325,8 @@ function AppContent() {
     >
       {/* Invite link held by a logged-in user — modal explaining what it's for. */}
       {heldInviteCode && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-center justify-center p-4" onClick={dismissHeldInvite}>
-          <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md p-6 shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-[60] flex items-center justify-center p-4" onClick={dismissHeldInvite}>
+          <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md p-6 shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]" onClick={e => e.stopPropagation()}>
             <div className="text-lg text-slate-900 mb-2 tracking-tight">
               {language === 'kz' ? 'Командаға шақыру сілтемесі'
                 : language === 'eng' ? 'Team invitation link'
@@ -346,7 +346,7 @@ function AppContent() {
                   try { await navigator.clipboard.writeText(`${window.location.origin}/?invite=${heldInviteCode}`); } catch { /* ignore */ }
                   dismissHeldInvite();
                 }}
-                className="w-full py-2.5 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all"
+                className="w-full py-2.5 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all"
               >
                 {language === 'kz' ? 'Көшіріп, жабу'
                   : language === 'eng' ? 'Copy and close'
@@ -393,7 +393,7 @@ function AppContent() {
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-slate-900/40 backdrop-blur-md z-40 mt-[57px]"
+          className="lg:hidden fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-40 mt-[57px]"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
@@ -402,181 +402,187 @@ function AppContent() {
       <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-60'} bg-white/70 backdrop-blur-2xl backdrop-saturate-150 border-r border-white/60 flex flex-col transition-all duration-300
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0 fixed lg:static h-full z-50 mt-[57px] lg:mt-0`}>
-        <div className="p-6 border-b border-white/60 hidden lg:block">
+        <div className="px-5 pt-5 pb-4 border-b border-white/60 hidden lg:block">
           {!isSidebarCollapsed ? (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md flex items-center justify-center overflow-hidden">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center overflow-hidden ring-1 ring-emerald-200/60 shadow-[0_4px_12px_-4px_rgba(5,150,105,0.3)]">
                 <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
               </div>
-              <div>
-                <h1 className="mb-1">Utir Soft</h1>
-                <p className="text-sm text-gray-500">Платформа управления</p>
+              <div className="min-w-0">
+                <div className="text-sm text-slate-900 tracking-tight">Utir Soft</div>
+                <div className="text-[10px] text-slate-500">
+                  {language === 'kz' ? 'Басқару платформасы' : language === 'eng' ? 'Management platform' : 'Платформа управления'}
+                </div>
               </div>
             </div>
           ) : (
-            <div className="w-8 h-8 rounded-md flex items-center justify-center mx-auto overflow-hidden">
+            <div className="w-9 h-9 rounded-2xl flex items-center justify-center mx-auto overflow-hidden ring-1 ring-emerald-200/60 shadow-[0_4px_12px_-4px_rgba(5,150,105,0.3)]">
               <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
             </div>
           )}
         </div>
 
-        <nav className="flex-1 p-4 overflow-y-auto">
-          <button
-            onClick={() => handleMenuClick('dashboard')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'dashboard' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
-            }`}
-            title={isSidebarCollapsed ? getMenuText('home') : ''}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            {!isSidebarCollapsed && <span>{getMenuText('home')}</span>}
-          </button>
+        {/* ─── Structured nav ────────────────────────────────────
+            Items are grouped into 4 sections (Home / Business / Work /
+            System) so the sidebar reads like a hierarchy rather than a
+            flat list. Custom modules sit between Work and System.
+            Active state = emerald gradient pill (matches brand). */}
+        <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1">
+          {(() => {
+            // Section labels — only rendered above the first VISIBLE item
+            // of each section, so we don't show a label for an empty
+            // group (e.g. all business modules permission-locked).
+            const sectionLabel = (txt: { ru: string; kz: string; eng: string }) =>
+              !isSidebarCollapsed && (
+                <div className="text-[9px] uppercase tracking-widest text-slate-400 px-3 pt-3 pb-1.5 select-none">
+                  {txt[language]}
+                </div>
+              );
 
-          {isModuleVisible('ai-design') && (
-            <button
-              onClick={() => handleMenuClick('ai-design')}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-                currentPage === 'ai-design' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
-              }`}
-              title={isSidebarCollapsed ? getMenuText('aiDesign') : ''}
-            >
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            // Single nav-item renderer. Keeps style + active-state logic
+            // in one place so every row looks identical.
+            const NavItem = ({
+              id, icon, label, badge,
+            }: { id: string; icon: React.ReactNode; label: string; badge?: React.ReactNode }) => {
+              const active = currentPage === id;
+              return (
+                <button
+                  onClick={() => handleMenuClick(id)}
+                  className={`group w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-2xl transition-all ${
+                    active
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-[0_8px_20px_-6px_rgba(5,150,105,0.45)] ring-1 ring-white/20'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
+                  }`}
+                  title={isSidebarCollapsed ? label : ''}
+                >
+                  <span className={`flex-shrink-0 ${active ? 'text-white' : 'text-slate-500 group-hover:text-emerald-600'} transition-colors`}>
+                    {icon}
+                  </span>
+                  {!isSidebarCollapsed && (
+                    <span className={`flex-1 flex items-center gap-1.5 text-sm ${active ? 'font-medium' : ''}`}>
+                      {label}
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              );
+            };
+
+            // Reusable icon JSX
+            const IconHome = (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            );
+            const IconAI = (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
               </svg>
-              {!isSidebarCollapsed && (
-                <span className="flex items-center gap-1.5">
-                  {dataStore.modules.find(m => m.id === 'ai-design')?.labels[language] || getMenuText('aiDesign')}
-                  <span className="text-[9px] bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-1.5 py-0.5 rounded">AI</span>
-                </span>
-              )}
-            </button>
-          )}
-
-          {isModuleVisible('sales') && (
-          <button
-            onClick={() => handleMenuClick('sales')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'sales' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
-            }`}
-            title={isSidebarCollapsed ? getMenuText('orders') : ''}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'sales')?.labels[language] || getMenuText('orders')}</span>}
-          </button>
-          )}
-
-          {/* Финансы — отдельный раздел (раньше был вкладкой внутри «Заказы»).
-              Открывает PaymentsHub с двумя подвкладками: «Платежи по сделкам»
-              и «Финансы компании» (P&L, баланс, налоги, календарь и т.д.). */}
-          {isModuleVisible('finance') && (
-          <button
-            onClick={() => handleMenuClick('finance')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'finance' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
-            }`}
-            title={isSidebarCollapsed ? getMenuText('finance') : ''}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'finance')?.labels[language] || getMenuText('finance')}</span>}
-          </button>
-          )}
-
-          {isModuleVisible('warehouse') && (
-          <button
-            onClick={() => handleMenuClick('warehouse')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'warehouse' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
-            }`}
-            title={isSidebarCollapsed ? getMenuText('production') : ''}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-            </svg>
-            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'warehouse')?.labels[language] || getMenuText('production')}</span>}
-          </button>
-          )}
-
-          {isModuleVisible('chats') && (
-          <button
-            onClick={() => handleMenuClick('chats')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'chats' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
-            }`}
-            title={isSidebarCollapsed ? getMenuText('chats') : ''}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'chats')?.labels[language] || getMenuText('chats')}</span>}
-          </button>
-          )}
-
-          {isModuleVisible('tasks') && (
-          <button
-            onClick={() => handleMenuClick('tasks')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'tasks' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
-            }`}
-            title={isSidebarCollapsed ? getMenuText('tasks') : ''}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'tasks')?.labels[language] || getMenuText('tasks')}</span>}
-          </button>
-          )}
-
-          {isModuleVisible('analytics') && (
-          <button
-            onClick={() => handleMenuClick('analytics')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-              currentPage === 'analytics' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
-            }`}
-            title={isSidebarCollapsed ? getMenuText('analytics') : ''}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            {!isSidebarCollapsed && <span>{dataStore.modules.find(m => m.id === 'analytics')?.labels[language] || getMenuText('analytics')}</span>}
-          </button>
-          )}
-
-          {/* Custom modules — rendered in the order they appear in dataStore.modules */}
-          {dataStore.modules.filter(m => m.custom && m.enabled).map(m => (
-            <button
-              key={m.id}
-              onClick={() => handleMenuClick(m.id)}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-                currentPage === m.id ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
-              }`}
-              title={isSidebarCollapsed ? m.labels[language] : ''}
-            >
-              <CustomIcon name={m.icon} className="w-5 h-5 flex-shrink-0" />
-              {!isSidebarCollapsed && <span>{m.labels[language]}</span>}
-            </button>
-          ))}
-
-          {moduleAllowedByRole('settings') && (
-            <button
-              onClick={() => handleMenuClick('settings')}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg mb-1 transition-colors ${
-                currentPage === 'settings' ? 'bg-slate-900/95 text-white shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10' : 'text-slate-600 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
-              }`}
-              title={isSidebarCollapsed ? getMenuText('settings') : ''}
-            >
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            );
+            const IconOrders = (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            );
+            const IconFinance = (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            );
+            const IconWarehouse = (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+              </svg>
+            );
+            const IconChats = (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            );
+            const IconTasks = (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            );
+            const IconAnalytics = (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            );
+            const IconSettings = (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              {!isSidebarCollapsed && <span>{getMenuText('settings')}</span>}
-            </button>
-          )}
+            );
+
+            const aiBadge = currentPage === 'ai-design'
+              ? <span className="text-[8px] bg-white/30 text-white px-1.5 py-0.5 rounded font-medium tracking-wide backdrop-blur-xl">AI</span>
+              : <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium tracking-wide ring-1 ring-emerald-200/60">AI</span>;
+
+            // Build business / work groups so we can render the section
+            // header only when at least one item in the group is visible.
+            const businessItems = [
+              isModuleVisible('ai-design')  && { id: 'ai-design', icon: IconAI,        label: dataStore.modules.find(m => m.id === 'ai-design')?.labels[language] || getMenuText('aiDesign'), badge: aiBadge },
+              isModuleVisible('sales')      && { id: 'sales',     icon: IconOrders,    label: dataStore.modules.find(m => m.id === 'sales')?.labels[language]     || getMenuText('orders') },
+              isModuleVisible('finance')    && { id: 'finance',   icon: IconFinance,   label: dataStore.modules.find(m => m.id === 'finance')?.labels[language]   || getMenuText('finance') },
+              isModuleVisible('warehouse')  && { id: 'warehouse', icon: IconWarehouse, label: dataStore.modules.find(m => m.id === 'warehouse')?.labels[language] || getMenuText('production') },
+            ].filter(Boolean) as Array<{ id: string; icon: React.ReactNode; label: string; badge?: React.ReactNode }>;
+
+            const workItems = [
+              isModuleVisible('chats')     && { id: 'chats',     icon: IconChats,     label: dataStore.modules.find(m => m.id === 'chats')?.labels[language]     || getMenuText('chats') },
+              isModuleVisible('tasks')     && { id: 'tasks',     icon: IconTasks,     label: dataStore.modules.find(m => m.id === 'tasks')?.labels[language]     || getMenuText('tasks') },
+              isModuleVisible('analytics') && { id: 'analytics', icon: IconAnalytics, label: dataStore.modules.find(m => m.id === 'analytics')?.labels[language] || getMenuText('analytics') },
+            ].filter(Boolean) as Array<{ id: string; icon: React.ReactNode; label: string }>;
+
+            const customItems = dataStore.modules.filter(m => m.custom && m.enabled);
+
+            return (
+              <>
+                {/* Section 1: Home */}
+                <NavItem id="dashboard" icon={IconHome} label={getMenuText('home')} />
+
+                {/* Section 2: Business */}
+                {businessItems.length > 0 && (
+                  <>
+                    {sectionLabel({ ru: 'Бизнес', kz: 'Бизнес', eng: 'Business' })}
+                    {businessItems.map(it => <NavItem key={it.id} {...it} />)}
+                  </>
+                )}
+
+                {/* Section 3: Work */}
+                {workItems.length > 0 && (
+                  <>
+                    {sectionLabel({ ru: 'Работа', kz: 'Жұмыс', eng: 'Work' })}
+                    {workItems.map(it => <NavItem key={it.id} {...it} />)}
+                  </>
+                )}
+
+                {/* Section 4: Custom modules */}
+                {customItems.length > 0 && (
+                  <>
+                    {sectionLabel({ ru: 'Мои модули', kz: 'Менің модульдерім', eng: 'My modules' })}
+                    {customItems.map(m => (
+                      <NavItem
+                        key={m.id}
+                        id={m.id}
+                        icon={<CustomIcon name={m.icon} className="w-5 h-5" />}
+                        label={m.labels[language]}
+                      />
+                    ))}
+                  </>
+                )}
+
+                {/* Section 5: System */}
+                {moduleAllowedByRole('settings') && (
+                  <>
+                    {sectionLabel({ ru: 'Система', kz: 'Жүйе', eng: 'System' })}
+                    <NavItem id="settings" icon={IconSettings} label={getMenuText('settings')} />
+                  </>
+                )}
+              </>
+            );
+          })()}
         </nav>
 
         <div className="p-4 border-t border-white/60">
@@ -612,7 +618,7 @@ function AppContent() {
                   };
                   return (
                     <>
-                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-br from-violet-100 to-sky-100 ring-1 ring-white/70 flex items-center justify-center text-sm text-slate-700 flex-shrink-0">
+                      <div className="w-10 h-10 rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-500 ring-1 ring-white/70 flex items-center justify-center text-sm text-white font-medium flex-shrink-0 shadow-[0_4px_12px_-4px_rgba(5,150,105,0.4)]">
                         {profile.avatar
                           ? <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover" />
                           : <span>{initials || '?'}</span>}
@@ -620,10 +626,10 @@ function AppContent() {
                       <div className="flex-1 min-w-0 text-left">
                         <div className="text-sm truncate text-slate-900">{displayName}</div>
                         <div className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
-                          <span className={`px-1.5 py-0.5 rounded-full ring-1 ring-white/40 ${
-                            role === 'admin' ? 'bg-violet-100/70 text-violet-700' :
-                            role === 'manager' ? 'bg-sky-100/70 text-sky-700' :
-                            'bg-white/60 text-slate-600'
+                          <span className={`px-1.5 py-0.5 rounded-full ring-1 ${
+                            role === 'admin'   ? 'bg-emerald-100 text-emerald-700 ring-emerald-200/60' :
+                            role === 'manager' ? 'bg-teal-100 text-teal-700 ring-teal-200/60' :
+                            'bg-white/60 text-slate-600 ring-white/60'
                           }`}>{roleLabel[role]}</span>
                           <span className="truncate">{displayEmail}</span>
                         </div>

@@ -66,11 +66,11 @@ export function CustomModulePage({ moduleId, language, onNotFound }: Props) {
       className="min-h-full relative"
       style={{
         background: `
-          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
-          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
-          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
-          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
-          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.45), transparent 45%),
+          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.30), transparent 45%),
+          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.40), transparent 50%),
+          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.50), transparent 50%),
+          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
         `,
       }}
     >
@@ -99,7 +99,7 @@ export function CustomModulePage({ moduleId, language, onNotFound }: Props) {
           </div>
           <button
             onClick={() => { setEditing(null); setShowForm(true); }}
-            className="flex items-center gap-1.5 px-4 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all"
           >
             <Plus className="w-3.5 h-3.5" />{tt('addRecord')}
           </button>
@@ -174,11 +174,11 @@ export function CustomModulePage({ moduleId, language, onNotFound }: Props) {
       {/* Glass delete confirmation */}
       {confirmDelete && (
         <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-[80] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-emerald-600/50 backdrop-blur-md z-[80] flex items-center justify-center p-4"
           onClick={() => setConfirmDelete(null)}
         >
           <div
-            className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-sm p-6 shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]"
+            className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-sm p-6 shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]"
             onClick={e => e.stopPropagation()}
           >
             <div className="w-12 h-12 rounded-2xl bg-rose-100/70 text-rose-700 ring-1 ring-white/60 flex items-center justify-center mx-auto mb-4">
@@ -251,8 +251,8 @@ function RecordForm({ mod, editing, language, onClose }: RecordFormProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[80] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-[80] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]" onClick={e => e.stopPropagation()}>
         <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between">
           <div>
             <div className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{mod.labels[language]}</div>
@@ -336,7 +336,7 @@ function RecordForm({ mod, editing, language, onClose }: RecordFormProps) {
           <button
             onClick={handleSubmit}
             disabled={fields.length === 0}
-            className="px-4 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 disabled:opacity-30 disabled:shadow-none transition-all"
+            className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 disabled:opacity-30 disabled:shadow-none transition-all"
           >
             {tt('save')}
           </button>

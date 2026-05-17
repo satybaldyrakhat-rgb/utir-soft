@@ -307,7 +307,7 @@ export function Taxes() {
             <div className="text-sm text-gray-900 px-1 capitalize">{periodLabel(kind, ref)}</div>
             <button onClick={() => shiftRef(1)} className="w-7 h-7 hover:bg-gray-50 rounded-lg flex items-center justify-center"><ChevronRight className="w-3.5 h-3.5 text-gray-500" /></button>
           </div>
-          <button onClick={jumpToToday} className="text-[10px] text-violet-600 hover:text-violet-800 inline-flex items-center gap-1">
+          <button onClick={jumpToToday} className="text-[10px] text-emerald-600 hover:text-violet-800 inline-flex items-center gap-1">
             <RotateCcw className="w-3 h-3" /> Сегодня
           </button>
         </div>

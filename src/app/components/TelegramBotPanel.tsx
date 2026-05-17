@@ -167,7 +167,7 @@ export function TelegramBotPanel({ onClose }: Props) {
                 <input type="checkbox" checked={whAlerts.supplier} onChange={() => setWhAlerts(s => ({ ...s, supplier: !s.supplier }))} />
                 <span className="text-xs text-slate-700">Запросы от производства в @UtirSoft_Warehouse</span>
               </label>
-              <button className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">
+              <button className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">
                 <Send className="w-3.5 h-3.5" /> Сделать заказ поставщику
               </button>
             </div>

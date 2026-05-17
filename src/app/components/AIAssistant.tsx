@@ -363,7 +363,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
           same vocabulary as primary CTAs across the app. */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 z-50 w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 bg-slate-900/95 backdrop-blur-xl text-white ring-1 ring-white/10 shadow-[0_12px_32px_-8px_rgba(15,23,42,0.5)] ${
+        className={`fixed bottom-6 right-6 z-50 w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 bg-emerald-600 backdrop-blur-xl text-white ring-1 ring-white/10 shadow-[0_12px_32px_-8px_rgba(5,150,105,0.45)] ${
           isOpen ? 'rotate-90 scale-95' : 'hover:scale-105 hover:shadow-[0_16px_40px_-8px_rgba(15,23,42,0.6)]'
         }`}
       >
@@ -376,7 +376,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
           {/* Header */}
           <div className="px-5 py-4 border-b border-white/60 flex items-center justify-between relative">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 bg-gradient-to-br from-slate-900 to-slate-700 rounded-2xl flex items-center justify-center flex-shrink-0 ring-1 ring-white/20 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]">
+              <div className="w-9 h-9 bg-gradient-to-br from-slate-900 to-slate-700 rounded-2xl flex items-center justify-center flex-shrink-0 ring-1 ring-white/20 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]">
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
               <div className="min-w-0">
@@ -430,7 +430,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                           <span className={`w-1.5 h-1.5 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                           {m.name}
                           {m.id === 'utir-ai' && (
-                            <span className="ml-1 inline-flex px-1.5 py-0.5 rounded-full text-[8px] bg-violet-100/70 text-violet-700 ring-1 ring-white/40 uppercase tracking-wide">tools</span>
+                            <span className="ml-1 inline-flex px-1.5 py-0.5 rounded-full text-[8px] bg-emerald-100/70 text-emerald-700 ring-1 ring-white/40 uppercase tracking-wide">tools</span>
                           )}
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5">{m.desc}</div>
@@ -484,9 +484,9 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                   )}
                   <div className={`px-3.5 py-2.5 text-sm ${
                     msg.role === 'user'
-                      ? 'bg-slate-900/95 text-white rounded-2xl rounded-tr-md shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10'
+                      ? 'bg-emerald-600 text-white rounded-2xl rounded-tr-md shadow-[0_4px_12px_-2px_rgba(5,150,105,0.35)] ring-1 ring-white/10'
                       : msg.pendingTool
-                      ? 'bg-violet-100/60 text-slate-800 rounded-2xl rounded-tl-md ring-1 ring-violet-200/60 backdrop-blur-xl'
+                      ? 'bg-violet-100/60 text-slate-800 rounded-2xl rounded-tl-md ring-1 ring-emerald-200/60 backdrop-blur-xl'
                       : 'bg-white/60 text-slate-800 rounded-2xl rounded-tl-md ring-1 ring-white/60 backdrop-blur-xl'
                   }`}>
                     {/* Server summarize() returns simple HTML (<b>); render as-is for tool proposals. */}
@@ -615,7 +615,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                 <button
                   onClick={() => sendMessage(inputValue)}
                   disabled={!inputValue.trim() || isTyping || transcribing || selectedProvider?.enabled === false}
-                  className="w-8 h-8 bg-slate-900/95 text-white rounded-xl flex items-center justify-center hover:bg-slate-900 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)] ring-1 ring-white/10"
+                  className="w-8 h-8 bg-emerald-600 text-white rounded-xl flex items-center justify-center hover:bg-emerald-700 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)] ring-1 ring-white/10"
                 >
                   {isTyping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 </button>

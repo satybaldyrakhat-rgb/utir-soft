@@ -66,7 +66,7 @@ const priorityConfig: Record<string, { label: string; color: string; bg: string 
 const categoryColors: Record<string, string> = {
   'Замер': 'bg-cyan-100 text-cyan-700',
   'Сборка': 'bg-amber-100 text-amber-700',
-  'Дизайн': 'bg-violet-100 text-violet-700',
+  'Дизайн': 'bg-emerald-100 text-emerald-700',
   'Продажи': 'bg-emerald-100 text-emerald-700',
   'Закупки': 'bg-rose-100 text-rose-700',
   'Монтаж': 'bg-indigo-100 text-indigo-700',
@@ -156,11 +156,11 @@ export function Tasks({ language }: TasksProps) {
       className="min-h-full relative"
       style={{
         background: `
-          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
-          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
-          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
-          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
-          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.45), transparent 45%),
+          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.30), transparent 45%),
+          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.40), transparent 50%),
+          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.50), transparent 50%),
+          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
         `,
       }}
     >
@@ -212,7 +212,7 @@ export function Tasks({ language }: TasksProps) {
           </button>
           <button
             onClick={() => setShowNewTaskModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all"
           >
             <Plus className="w-4 h-4" />
             Новая задача
@@ -702,8 +702,8 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-white/60 flex items-center justify-between">
           <h2 className="text-gray-900">Новая задача</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
@@ -756,7 +756,7 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
           <button
             onClick={handleSubmit}
             disabled={!title.trim()}
-            className="w-full py-2.5 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2.5 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Создать задачу
           </button>
@@ -835,8 +835,8 @@ function TaskDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="p-5 border-b border-white/60">
           <div className="flex items-start justify-between gap-3">
@@ -1009,7 +1009,7 @@ function TaskDetailModal({
               <button
                 onClick={handleSave}
                 disabled={!dirty || !title.trim()}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Check className="w-4 h-4" />
                 Сохранить

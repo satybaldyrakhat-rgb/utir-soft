@@ -364,7 +364,7 @@ export function Calculator({ language }: CalcProps) {
           <div className="space-y-2">
             <button
               onClick={handleCreateOrder}
-              className="w-full px-3 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all"
+              className="w-full px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all"
             >
               {l('Создать заказ', 'Тапсырыс жасау', 'Create order')}
             </button>

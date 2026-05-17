@@ -345,7 +345,7 @@ export function Finance({ language }: FinanceProps) {
           </div>
           <button
             onClick={() => setShowInvoice(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all transition-colors"
           >
             <FileText className="w-3.5 h-3.5" />
             {l('Счёт / Акт', 'Шот / Акт', 'Invoice / Act')}

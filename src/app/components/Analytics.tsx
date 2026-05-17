@@ -126,11 +126,11 @@ export function Analytics({ language }: AnalyticsProps) {
       className="min-h-full relative"
       style={{
         background: `
-          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
-          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
-          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
-          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
-          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.45), transparent 45%),
+          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.30), transparent 45%),
+          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.40), transparent 50%),
+          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.50), transparent 50%),
+          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
         `,
       }}
     >
@@ -154,7 +154,7 @@ export function Analytics({ language }: AnalyticsProps) {
                 onClick={() => setActiveTab(tab)}
                 className={`px-3.5 py-2 rounded-2xl text-xs ring-1 transition-all ${
                   active
-                    ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+                    ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]'
                     : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
                 }`}
               >

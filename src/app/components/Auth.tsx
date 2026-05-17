@@ -309,7 +309,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             </p>
 
             <div className="w-full space-y-2.5 mb-6">
-              <button onClick={() => { setStep('login-email'); setError(''); }} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">
+              <button onClick={() => { setStep('login-email'); setError(''); }} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">
                 {l('Войти', 'Кіру', 'Log in')}
               </button>
               <button onClick={() => { setStep('signup-email'); setError(''); }} className="w-full py-3 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-700 hover:bg-white transition-all backdrop-blur-xl">
@@ -360,7 +360,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </div>
             </div>
 
-            <button onClick={() => handleEmailContinue('login')} disabled={isLoading || !email} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
+            <button onClick={() => handleEmailContinue('login')} disabled={isLoading || !email} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
 
@@ -411,7 +411,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               <button onClick={() => { setStep('forgot'); setError(''); }} className="text-xs text-slate-500 hover:text-gray-900 transition-colors">{l('Забыли пароль?', 'Құпия сөзді ұмыттыңыз ба?', 'Forgot password?')}</button>
             </div>
 
-            <button onClick={handleLogin} disabled={isLoading || !password} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleLogin} disabled={isLoading || !password} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : l('Войти', 'Кіру', 'Log in')}
             </button>
           </div>
@@ -474,7 +474,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </div>
             </div>
 
-            <button onClick={() => handleEmailContinue('signup')} disabled={isLoading || !email} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
+            <button onClick={() => handleEmailContinue('signup')} disabled={isLoading || !email} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
 
@@ -543,7 +543,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               )}
             </div>
 
-            <button onClick={handleSignupNameContinue} disabled={isLoading || !name.trim() || (!(invitePreview && !('error' in invitePreview)) && !company.trim())} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleSignupNameContinue} disabled={isLoading || !name.trim() || (!(invitePreview && !('error' in invitePreview)) && !company.trim())} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
@@ -601,7 +601,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </span>
             </label>
 
-            <button onClick={handleSignup} disabled={isLoading || !password || !confirmPassword || !agreeTerms} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleSignup} disabled={isLoading || !password || !confirmPassword || !agreeTerms} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Создать аккаунт', 'Аккаунт жасау', 'Create account')} <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
@@ -655,7 +655,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               <button onClick={handleResendCode} disabled={isLoading} className="text-xs text-gray-900 hover:underline mb-6 disabled:opacity-40">{l('Отправить код повторно', 'Кодты қайта жіберу', 'Resend code')}</button>
             )}
 
-            <button onClick={handleOtpVerify} disabled={isLoading || otp.join('').length < 6} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleOtpVerify} disabled={isLoading || otp.join('').length < 6} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Подтвердить', 'Растау', 'Verify')} <Check className="w-4 h-4" /></>}
             </button>
           </div>
@@ -676,7 +676,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </div>
             </div>
 
-            <button onClick={handleForgotPassword} disabled={isLoading || !email} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleForgotPassword} disabled={isLoading || !email} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : l('Отправить ссылку', 'Сілтеме жіберу', 'Send reset link')}
             </button>
           </div>
@@ -693,7 +693,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             <p className="text-sm text-slate-500 mb-1">{l('Мы отправили ссылку для сброса на', 'Біз қалпына келтіру сілтемесін жібердік', 'We sent a reset link to')}</p>
             <p className="text-sm text-gray-900 mb-6">{email}</p>
 
-            <button onClick={() => { setStep('login-email'); setPassword(''); setError(''); }} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">
+            <button onClick={() => { setStep('login-email'); setPassword(''); setError(''); }} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all">
               {l('Вернуться к входу', 'Кіруге оралу', 'Back to login')}
             </button>
             <p className="text-xs text-slate-500 mt-4">{l('Не получили? Проверьте папку спам', 'Алмадыңыз ба? Спам қалтасын тексеріңіз', "Didn't receive it? Check spam folder")}</p>
@@ -714,17 +714,17 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
       className="min-h-screen flex relative"
       style={{
         background: `
-          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.32), transparent 45%),
-          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.26), transparent 45%),
-          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.30), transparent 50%),
-          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.28), transparent 50%),
-          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.48), transparent 45%),
+          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.32), transparent 45%),
+          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.42), transparent 50%),
+          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.52), transparent 50%),
+          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
         `,
       }}
     >
       {/* Left side - Features (desktop only) — glass panel */}
       <div className="hidden lg:flex lg:w-[45%] xl:w-[50%] bg-white/30 backdrop-blur-2xl border-r border-white/60 flex-col justify-between p-12 relative overflow-hidden">
-        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-gradient-to-br from-violet-200/60 to-indigo-100/30 blur-3xl pointer-events-none" />
+        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-gradient-to-br from-emerald-200/60 to-teal-100/30 blur-3xl pointer-events-none" />
         <div className="relative">
           <div className="flex items-center gap-3 mb-16">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden bg-white/80 ring-1 ring-white/60 backdrop-blur-xl">
@@ -783,7 +783,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                 key={lang}
                 onClick={() => onLanguageChange(lang)}
                 className={`px-2.5 py-1 rounded-xl text-[10px] transition-all ${
-                  language === lang ? 'bg-slate-900/95 text-white shadow-[0_2px_8px_-2px_rgba(15,23,42,0.4)]' : 'text-slate-500 hover:text-slate-900'
+                  language === lang ? 'bg-emerald-600 text-white shadow-[0_2px_8px_-2px_rgba(5,150,105,0.4)]' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 {lang.toUpperCase()}
@@ -811,7 +811,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               {isSignupFlow && (
                 <div className="flex items-center gap-1 mb-6">
                   {signupSteps.map((s, i) => (
-                    <div key={s} className={`h-1 flex-1 rounded-full transition-all ${i <= currentSignupStep ? 'bg-slate-900' : 'bg-white/60 ring-1 ring-white/40'}`} />
+                    <div key={s} className={`h-1 flex-1 rounded-full transition-all ${i <= currentSignupStep ? 'bg-emerald-600' : 'bg-white/60 ring-1 ring-white/40'}`} />
                   ))}
                 </div>
               )}

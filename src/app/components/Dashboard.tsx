@@ -147,11 +147,11 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
       className="min-h-full relative"
       style={{
         background: `
-          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.35), transparent 45%),
-          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.28), transparent 45%),
-          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.32), transparent 50%),
-          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.30), transparent 50%),
-          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.50), transparent 45%),
+          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.35), transparent 45%),
+          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.45), transparent 50%),
+          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.55), transparent 50%),
+          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
         `,
       }}
     >
@@ -173,7 +173,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
             </div>
             <button
               onClick={() => onNavigate?.('sales')}
-              className="group flex items-center gap-2 px-5 py-3 bg-slate-900/95 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] hover:shadow-[0_12px_32px_-8px_rgba(15,23,42,0.5)] hover:bg-slate-900 transition-all w-fit ring-1 ring-white/10"
+              className="group flex items-center gap-2 px-5 py-3 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] hover:shadow-[0_12px_32px_-8px_rgba(5,150,105,0.45)] hover:bg-emerald-700 transition-all w-fit ring-1 ring-white/10"
             >
               <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
               {t('newOrder', language)}
@@ -184,7 +184,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
         {/* ─── Metric Cards ──────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
-            { label: l('Выручка (мес)', 'Табыс (ай)', 'Revenue (month)'),  value: fmt(totalRevenue),  change: trends.revenue.txt,     up: trends.revenue.up,     icon: TrendingUp,  page: 'finance',   tint: 'from-violet-200/80 to-violet-100/40', iconCls: 'text-violet-700  bg-violet-100/80' },
+            { label: l('Выручка (мес)', 'Табыс (ай)', 'Revenue (month)'),  value: fmt(totalRevenue),  change: trends.revenue.txt,     up: trends.revenue.up,     icon: TrendingUp,  page: 'finance',   tint: 'from-emerald-200/80 to-emerald-100/40', iconCls: 'text-violet-700  bg-violet-100/80' },
             { label: l('Активные заказы', 'Белсенді тапсырыстар', 'Active orders'), value: String(activeDeals), change: trends.activeDeals.txt, up: trends.activeDeals.up, icon: ShoppingBag, page: 'sales',     tint: 'from-sky-200/80 to-sky-100/40',       iconCls: 'text-sky-700     bg-sky-100/80' },
             { label: l('Всего клиентов', 'Барлық клиенттер', 'Total clients'),     value: String(totalClients), change: trends.clients.txt,     up: trends.clients.up,     icon: Users,       page: 'chats',     tint: 'from-rose-200/80 to-rose-100/40',     iconCls: 'text-rose-700    bg-rose-100/80' },
             { label: l('Средний чек', 'Орташа чек', 'Avg. check'),                value: fmt(averageCheck),   change: trends.avgCheck.txt,    up: trends.avgCheck.up,    icon: DollarSign,  page: 'analytics', tint: 'from-emerald-200/80 to-emerald-100/40', iconCls: 'text-emerald-700 bg-emerald-100/80' },
@@ -314,7 +314,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
                       </div>
                       <button
                         onClick={() => onNavigate?.('tasks')}
-                        className="text-[10px] px-2.5 py-1 bg-slate-900/90 text-white rounded-xl hover:bg-slate-900 flex-shrink-0 backdrop-blur-xl"
+                        className="text-[10px] px-2.5 py-1 bg-emerald-600/90 text-white rounded-xl hover:bg-emerald-700 flex-shrink-0 backdrop-blur-xl"
                       >
                         {l('Открыть', 'Ашу', 'Open')}
                       </button>
@@ -481,11 +481,11 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
         {/* ─── Order Modal (glass) ───────────────────────────── */}
         {selectedOrder && (
           <div
-            className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-emerald-600/30 backdrop-blur-md flex items-center justify-center z-50 p-4"
             onClick={() => setSelectedOrder(null)}
           >
             <div
-              className="bg-white/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl max-w-md w-full shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]"
+              className="bg-white/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl max-w-md w-full shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)]"
               onClick={e => e.stopPropagation()}
             >
               <div className="p-6 border-b border-white/60 flex items-center justify-between">
@@ -502,7 +502,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
               </div>
               <div className="p-6 space-y-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 bg-gradient-to-br from-violet-100 to-sky-100 ring-1 ring-white/70 rounded-2xl flex items-center justify-center text-sm text-slate-700">
+                  <div className="w-11 h-11 bg-gradient-to-br from-emerald-100 to-teal-100 ring-1 ring-white/70 rounded-2xl flex items-center justify-center text-sm text-slate-700">
                     {selectedOrder.customerName?.charAt(0)}
                   </div>
                   <div>
@@ -538,7 +538,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
 
                 <button
                   onClick={() => { setSelectedOrder(null); onNavigate?.('sales'); }}
-                  className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 transition-colors flex items-center justify-center gap-2 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)]"
+                  className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)]"
                 >
                   {l('Открыть заказ', 'Тапсырысты ашу', 'Open order')}
                   <ArrowRight className="w-4 h-4" />

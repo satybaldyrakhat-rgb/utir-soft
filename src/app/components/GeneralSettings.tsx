@@ -224,7 +224,7 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
               {profile.avatar ? (
                 <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
               ) : (
-                <span className="absolute inset-0 flex items-center justify-center text-violet-600 text-2xl font-medium">
+                <span className="absolute inset-0 flex items-center justify-center text-emerald-600 text-2xl font-medium">
                   {initials !== '?' ? initials : <Camera className="w-6 h-6" />}
                 </span>
               )}

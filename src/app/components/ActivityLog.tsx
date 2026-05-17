@@ -17,7 +17,7 @@ const TYPE_META: Record<ActivityType, { ru: string; kz: string; eng: string; ico
   invite:     { ru: 'Приглашение',  kz: 'Шақыру',        eng: 'Invite',      icon: Sparkles,     bg: 'bg-amber-50',  fg: 'text-amber-700' },
   permission: { ru: 'Права',        kz: 'Құқықтар',      eng: 'Permissions', icon: Shield,       bg: 'bg-purple-50', fg: 'text-purple-600' },
   settings:   { ru: 'Настройки',    kz: 'Баптаулар',     eng: 'Settings',    icon: SettingsIcon, bg: 'bg-gray-100',  fg: 'text-gray-600' },
-  ai:         { ru: 'AI-ассистент', kz: 'AI-көмекші',    eng: 'AI assistant',icon: Sparkles,     bg: 'bg-violet-50', fg: 'text-violet-600' },
+  ai:         { ru: 'AI-ассистент', kz: 'AI-көмекші',    eng: 'AI assistant',icon: Sparkles,     bg: 'bg-violet-50', fg: 'text-emerald-600' },
 };
 
 const MODULE_OPTIONS: { value: string; ru: string; kz: string; eng: string }[] = [
@@ -132,7 +132,7 @@ export function ActivityLog({ language }: Props) {
         <button
           onClick={handleExportCSV}
           disabled={filtered.length === 0}
-          className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-30"
+          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-30"
         >
           <Download className="w-3.5 h-3.5" />
           {l('Экспорт CSV', 'CSV экспорт', 'Export CSV')}
@@ -241,7 +241,7 @@ export function ActivityLog({ language }: Props) {
               <div key={log.id} className="grid grid-cols-12 gap-3 px-4 py-3 items-center text-xs hover:bg-white/30">
                 <div className="col-span-2 text-slate-500 font-mono text-[11px]">{formatDateTime(log.timestamp, language)}</div>
                 <div className="col-span-2 truncate">
-                  <span className={`${isAI ? 'text-violet-600' : 'text-gray-900'}`}>{log.user || '—'}</span>
+                  <span className={`${isAI ? 'text-emerald-600' : 'text-gray-900'}`}>{log.user || '—'}</span>
                   {isAI && <span className="ml-1 text-[9px] text-violet-500 bg-violet-50 px-1 py-0.5 rounded">AI</span>}
                   {/* Telegram origin badge — admin sees instantly that this
                       action came from the bot, not the platform UI. */}

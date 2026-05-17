@@ -204,8 +204,8 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   ];
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)] overflow-hidden" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(5,150,105,0.35)] overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between flex-shrink-0">
           <div className="min-w-0">
@@ -237,7 +237,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
                 activeTab === tab.id
-                  ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(5,150,105,0.4)]'
                   : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
               }`}
             >
@@ -557,7 +557,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
           {store.canWriteModule('orders') && (
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all"
+              className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_rgba(5,150,105,0.4)] ring-1 ring-white/10 transition-all"
             >
               {tt('save')}
             </button>
@@ -620,12 +620,12 @@ function DesignConcepts({ deal, language }: { deal: Deal; language: 'kz' | 'ru' 
               ) : (
                 <div className="w-full aspect-square bg-white/40 ring-1 ring-white/60 rounded-2xl flex items-center justify-center text-slate-400">—</div>
               )}
-              <div className="absolute bottom-1.5 left-1.5 right-1.5 px-2 py-0.5 bg-slate-900/70 backdrop-blur-xl text-white text-[9px] rounded-full truncate ring-1 ring-white/20">
+              <div className="absolute bottom-1.5 left-1.5 right-1.5 px-2 py-0.5 bg-emerald-600/70 backdrop-blur-xl text-white text-[9px] rounded-full truncate ring-1 ring-white/20">
                 {c.provider}
               </div>
               <button
                 onClick={() => detach(c.id)}
-                className="absolute top-1.5 right-1.5 w-6 h-6 bg-slate-900/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-slate-900/90 transition-opacity ring-1 ring-white/20"
+                className="absolute top-1.5 right-1.5 w-6 h-6 bg-emerald-600/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-emerald-700/90 transition-opacity ring-1 ring-white/20"
                 title={l('Открепить', 'Ажырату', 'Detach')}
               >
                 <X className="w-3 h-3" />
