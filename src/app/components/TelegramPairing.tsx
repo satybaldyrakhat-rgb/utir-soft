@@ -66,12 +66,12 @@ export function TelegramPairing({ language }: Props) {
   const serverIssue = status?.serverReady && (!status.serverReady.telegram || !status.serverReady.claude);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5">
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
       <div className="flex items-center gap-2 mb-1">
         <Send className="w-4 h-4 text-violet-600" />
         <div className="text-sm text-gray-900">{l('Подключение Telegram-бота', 'Telegram-ботты қосу', 'Connect Telegram bot')}</div>
       </div>
-      <div className="text-[11px] text-gray-400 mb-4 leading-relaxed">
+      <div className="text-[11px] text-slate-400 mb-4 leading-relaxed">
         {l(
           'Привяжите ваш Telegram к этому аккаунту, и AI-ассистент сможет обновлять CRM по вашим свободным сообщениям.',
           'Telegram-ыңызды осы аккаунтқа байланыстырыңыз, сонда AI-көмекші еркін хабарламаларыңыз бойынша CRM-ді жаңартады.',
@@ -106,7 +106,7 @@ export function TelegramPairing({ language }: Props) {
           </div>
           <button
             onClick={unlinkBot}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
+            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
           >
             <X className="w-3 h-3" />
             {l('Отвязать', 'Ажырату', 'Unlink')}
@@ -120,7 +120,7 @@ export function TelegramPairing({ language }: Props) {
           </div>
           <div className="bg-white rounded-lg p-3 flex items-center justify-between mb-3">
             <code className="font-mono text-lg tracking-wider text-violet-900">/link {code}</code>
-            <button onClick={copyLine} className="flex items-center gap-1 px-2 py-1 text-[11px] text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg">
+            <button onClick={copyLine} className="flex items-center gap-1 px-2 py-1 text-[11px] text-slate-500 hover:text-gray-900 hover:bg-white/50 rounded-lg">
               {copied ? <><Check className="w-3 h-3 text-emerald-500" /> {l('Скопировано', 'Көшірілді', 'Copied')}</> : <><Copy className="w-3 h-3" /> {l('Копировать', 'Көшіру', 'Copy')}</>}
             </button>
           </div>
@@ -134,7 +134,7 @@ export function TelegramPairing({ language }: Props) {
               <Send className="w-3.5 h-3.5" />
               t.me/{BOT_USERNAME}
             </a>
-            <button onClick={generate} className="text-[11px] text-gray-500 hover:text-gray-900 inline-flex items-center gap-1">
+            <button onClick={generate} className="text-[11px] text-slate-500 hover:text-gray-900 inline-flex items-center gap-1">
               <RefreshCw className="w-3 h-3" />{l('Новый код', 'Жаңа код', 'New code')}
             </button>
           </div>
@@ -155,7 +155,7 @@ export function TelegramPairing({ language }: Props) {
             {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             {l('Сгенерировать код привязки', 'Байланыс кодын жасау', 'Generate link code')}
           </button>
-          <div className="text-[10px] text-gray-400 mt-2">
+          <div className="text-[10px] text-slate-400 mt-2">
             {l('Получите 6-значный код и пришлите его боту командой', 'Ботқа /link командасымен 6 таңбалы кодты жіберіңіз', 'Send the 6-char code to the bot with /link command')}: <code className="text-gray-600">/link XXXXXX</code>
           </div>
         </div>

@@ -28,10 +28,18 @@ export function ClientTrack({ orderId }: Props) {
 
   if (!deal) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-5">
-        <div className="bg-white rounded-2xl border border-gray-100 p-8 max-w-md w-full text-center">
-          <div className="text-base text-gray-900 mb-1">Заказ не найден</div>
-          <div className="text-xs text-gray-400">Проверьте ссылку или обратитесь к менеджеру.</div>
+      <div className="min-h-screen flex items-center justify-center px-5 relative" style={{
+        background: `
+          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
+          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
+          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
+          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
+          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+        `,
+      }}>
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 max-w-md w-full text-center">
+          <div className="text-base text-slate-900 mb-1">Заказ не найден</div>
+          <div className="text-xs text-slate-400">Проверьте ссылку или обратитесь к менеджеру.</div>
         </div>
       </div>
     );
@@ -50,49 +58,57 @@ export function ClientTrack({ orderId }: Props) {
   const manager = store.employees.find(e => e.name === deal.designer) || store.employees.find(e => e.name === deal.measurer);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-100 px-5 py-4">
+    <div className="min-h-screen relative" style={{
+        background: `
+          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
+          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
+          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
+          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
+          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+        `,
+      }}>
+      <div className="bg-white border-b border-white/60 px-5 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 bg-gray-900 rounded-xl flex items-center justify-center text-white text-xs">U</div>
             <div>
               <div className="text-sm text-gray-900">Utir Soft</div>
-              <div className="text-[10px] text-gray-400">Заказ #{deal.id} · {deal.customerName}</div>
+              <div className="text-[10px] text-slate-400">Заказ #{deal.id} · {deal.customerName}</div>
             </div>
           </div>
-          <a href="#/" className="text-[11px] text-gray-400 hover:text-gray-900">utir.kz</a>
+          <a href="#/" className="text-[11px] text-slate-400 hover:text-gray-900">utir.kz</a>
         </div>
       </div>
 
       <div className="max-w-3xl mx-auto px-5 py-6 space-y-5">
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <div className="text-xs text-gray-400 mb-4">Статус заказа</div>
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div className="text-xs text-slate-400 mb-4">Статус заказа</div>
           <div className="space-y-3">
             {stages.map((s, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${s.done ? 'bg-emerald-50' : s.active ? 'bg-sky-50' : 'bg-gray-50'}`}>
-                  {s.done ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : s.active ? <Loader2 className="w-4 h-4 text-sky-500 animate-spin" /> : <Clock className="w-4 h-4 text-gray-300" />}
+                  {s.done ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : s.active ? <Loader2 className="w-4 h-4 text-sky-500 animate-spin" /> : <Clock className="w-4 h-4 text-slate-300" />}
                 </div>
                 <div className="flex-1">
                   <div className={`text-xs ${s.done || s.active ? 'text-gray-900' : 'text-gray-400'}`}>{s.label}{s.active && s.progress ? ` (${s.progress}%)` : ''}</div>
-                  <div className="text-[10px] text-gray-400">{s.date || '—'}</div>
+                  <div className="text-[10px] text-slate-400">{s.date || '—'}</div>
                 </div>
               </div>
             ))}
           </div>
           {deal.installationDate && (
-            <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-700">📦 Установка запланирована: <span className="text-gray-900">{deal.installationDate}</span></div>
+            <div className="mt-4 pt-4 border-t border-white/60 text-xs text-slate-700">📦 Установка запланирована: <span className="text-gray-900">{deal.installationDate}</span></div>
           )}
         </div>
 
         {manager && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-xs text-gray-400 mb-2">Ваш менеджер</div>
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+            <div className="text-xs text-slate-400 mb-2">Ваш менеджер</div>
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-11 h-11 bg-gray-100 rounded-full flex items-center justify-center text-xs text-gray-700">{manager.avatar || manager.name.slice(0, 2)}</div>
+              <div className="w-11 h-11 bg-gray-100 rounded-full flex items-center justify-center text-xs text-slate-700">{manager.avatar || manager.name.slice(0, 2)}</div>
               <div>
                 <div className="text-sm text-gray-900">{manager.name}</div>
-                <div className="text-[11px] text-gray-400">{manager.phone}</div>
+                <div className="text-[11px] text-slate-400">{manager.phone}</div>
               </div>
             </div>
             <div className="flex gap-2">
@@ -107,9 +123,9 @@ export function ClientTrack({ orderId }: Props) {
         )}
 
         {deal.amount > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-xs text-gray-400 mb-2">Оплата</div>
-            <div className="text-sm text-gray-900 mb-2">Оплачено {deal.paidAmount.toLocaleString('ru-RU')} из {deal.amount.toLocaleString('ru-RU')} ₸</div>
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+            <div className="text-xs text-slate-400 mb-2">Оплата</div>
+            <div className="text-sm text-slate-900 mb-2">Оплачено {deal.paidAmount.toLocaleString('ru-RU')} из {deal.amount.toLocaleString('ru-RU')} ₸</div>
             <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-3"><div className="h-full bg-emerald-500" style={{ width: `${paidPct}%` }} /></div>
             {paidPct < 100 && (
               <button className="w-full py-2.5 bg-rose-500 text-white rounded-xl text-xs hover:bg-rose-600">Доплатить через Kaspi</button>
@@ -117,17 +133,17 @@ export function ClientTrack({ orderId }: Props) {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <div className="text-xs text-gray-900 mb-3">Чат с менеджером</div>
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div className="text-xs text-slate-900 mb-3">Чат с менеджером</div>
           <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
             {chat.length === 0 && (
-              <div className="text-[11px] text-gray-400 text-center py-4">Напишите сообщение, чтобы начать диалог</div>
+              <div className="text-[11px] text-slate-400 text-center py-4">Напишите сообщение, чтобы начать диалог</div>
             )}
             {chat.map((m, i) => (
               <div key={i} className={`flex ${m.from === 'me' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-xs ${m.from === 'me' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-700'}`}>
                   {m.text}
-                  <div className="text-[9px] mt-0.5 text-gray-400">{m.time}</div>
+                  <div className="text-[9px] mt-0.5 text-slate-400">{m.time}</div>
                 </div>
               </div>
             ))}
@@ -139,7 +155,7 @@ export function ClientTrack({ orderId }: Props) {
           </div>
         </div>
 
-        <div className="text-center py-4 text-[11px] text-gray-400">
+        <div className="text-center py-4 text-[11px] text-slate-400">
           <div>Utir Soft</div>
         </div>
       </div>

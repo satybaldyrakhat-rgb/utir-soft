@@ -185,17 +185,17 @@ export function Calculator({ language }: CalcProps) {
                 className="w-24 px-2 py-1 bg-gray-50 rounded-lg text-xs text-right focus:outline-none focus:ring-1 focus:ring-gray-200"
               />
               <button onClick={() => saveEdit(list)} className="p-1 hover:bg-green-50 rounded"><Check className="w-3.5 h-3.5 text-green-600" /></button>
-              <button onClick={() => setEditing(null)} className="p-1 hover:bg-gray-50 rounded"><X className="w-3.5 h-3.5 text-gray-400" /></button>
+              <button onClick={() => setEditing(null)} className="p-1 hover:bg-white/50 rounded"><X className="w-3.5 h-3.5 text-slate-400" /></button>
             </>
           ) : (
             <>
-              <span className="text-xs text-gray-700 flex-1">{item.label}</span>
+              <span className="text-xs text-slate-700 flex-1">{item.label}</span>
               <span className="text-xs text-gray-900">{fmt(item.price)} ₸</span>
-              <button onClick={() => startEdit(item)} className="p-1 hover:bg-gray-50 rounded opacity-0 group-hover:opacity-100">
-                <Pencil className="w-3 h-3 text-gray-400" />
+              <button onClick={() => startEdit(item)} className="p-1 hover:bg-white/50 rounded opacity-0 group-hover:opacity-100">
+                <Pencil className="w-3 h-3 text-slate-400" />
               </button>
               <button onClick={() => removeLine(list, item.id)} className="p-1 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100">
-                <Trash2 className="w-3 h-3 text-gray-400 hover:text-red-500" />
+                <Trash2 className="w-3 h-3 text-slate-400 hover:text-red-500" />
               </button>
             </>
           )}
@@ -203,7 +203,7 @@ export function Calculator({ language }: CalcProps) {
       ))}
       <button
         onClick={() => addLine(list)}
-        className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-gray-200 rounded-xl text-[11px] text-gray-400 hover:border-gray-300 hover:text-gray-600 hover:bg-gray-50"
+        className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-gray-200 rounded-xl text-[11px] text-slate-400 hover:border-gray-300 hover:text-gray-600 hover:bg-white/50"
       >
         <Plus className="w-3 h-3" /> {l('Добавить', 'Қосу', 'Add')}
       </button>
@@ -214,9 +214,9 @@ export function Calculator({ language }: CalcProps) {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2 space-y-4">
         {/* Step 1: Product Type */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <div className="text-[10px] text-gray-400 mb-2">{l('Шаг 1', '1-қадам', 'Step 1')}</div>
-          <div className="text-sm text-gray-900 mb-3">{l('Тип изделия', 'Бұйым түрі', 'Product type')}</div>
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div className="text-[10px] text-slate-400 mb-2">{l('Шаг 1', '1-қадам', 'Step 1')}</div>
+          <div className="text-sm text-slate-900 mb-3">{l('Тип изделия', 'Бұйым түрі', 'Product type')}</div>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
             {PRODUCT_TYPES.map(p => (
               <button
@@ -225,7 +225,7 @@ export function Calculator({ language }: CalcProps) {
                 className={`p-3 border rounded-xl text-xs transition-all ${
                   productId === p.id
                     ? 'border-gray-900 bg-gray-900 text-white'
-                    : 'border-gray-100 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                    : 'border-gray-100 text-slate-700 hover:border-gray-300 hover:bg-white/50'
                 }`}
               >
                 {l(p.ru, p.kz, p.eng)}
@@ -235,9 +235,9 @@ export function Calculator({ language }: CalcProps) {
         </div>
 
         {/* Step 2: Dimensions */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <div className="text-[10px] text-gray-400 mb-2">{l('Шаг 2', '2-қадам', 'Step 2')}</div>
-          <div className="text-sm text-gray-900 mb-3">{l('Размеры (м)', 'Өлшемдері (м)', 'Dimensions (m)')}</div>
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div className="text-[10px] text-slate-400 mb-2">{l('Шаг 2', '2-қадам', 'Step 2')}</div>
+          <div className="text-sm text-slate-900 mb-3">{l('Размеры (м)', 'Өлшемдері (м)', 'Dimensions (m)')}</div>
           <div className="grid grid-cols-3 gap-3">
             {([
               { key: 'length', lbl: l('Длина', 'Ұзындығы', 'Length') },
@@ -245,7 +245,7 @@ export function Calculator({ language }: CalcProps) {
               { key: 'height', lbl: l('Высота', 'Биіктігі', 'Height') },
             ] as const).map(f => (
               <div key={f.key}>
-                <label className="block text-[11px] text-gray-400 mb-1">{f.lbl}</label>
+                <label className="block text-[11px] text-slate-400 mb-1">{f.lbl}</label>
                 <input
                   type="number" min={0} step={0.1}
                   value={dims[f.key]}
@@ -255,19 +255,19 @@ export function Calculator({ language }: CalcProps) {
               </div>
             ))}
           </div>
-          <div className="mt-3 text-[11px] text-gray-400">
-            {l('Расчётная площадь', 'Есептік ауданы', 'Calculated area')}: <span className="text-gray-700">{calc.area.toFixed(2)} м²</span>
+          <div className="mt-3 text-[11px] text-slate-400">
+            {l('Расчётная площадь', 'Есептік ауданы', 'Calculated area')}: <span className="text-slate-700">{calc.area.toFixed(2)} м²</span>
           </div>
         </div>
 
         {/* Step 3: Materials */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <div className="text-[10px] text-gray-400 mb-2">{l('Шаг 3', '3-қадам', 'Step 3')}</div>
-          <div className="text-sm text-gray-900 mb-3">{l('Материалы', 'Материалдар', 'Materials')}</div>
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div className="text-[10px] text-slate-400 mb-2">{l('Шаг 3', '3-қадам', 'Step 3')}</div>
+          <div className="text-sm text-slate-900 mb-3">{l('Материалы', 'Материалдар', 'Materials')}</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {MATERIAL_GROUPS.map(g => (
               <div key={g.id}>
-                <label className="block text-[11px] text-gray-400 mb-1">{l(g.ru, g.kz, g.eng)}</label>
+                <label className="block text-[11px] text-slate-400 mb-1">{l(g.ru, g.kz, g.eng)}</label>
                 <select
                   value={materials[g.id]}
                   onChange={e => setMaterials({ ...materials, [g.id]: e.target.value })}
@@ -286,32 +286,32 @@ export function Calculator({ language }: CalcProps) {
         </div>
 
         {/* Step 4: Add-ons */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <div className="text-[10px] text-gray-400">{l('Шаг 4', '4-қадам', 'Step 4')}</div>
+              <div className="text-[10px] text-slate-400">{l('Шаг 4', '4-қадам', 'Step 4')}</div>
               <div className="text-sm text-gray-900">{l('Дополнительно', 'Қосымша', 'Add-ons')}</div>
             </div>
-            <span className="text-[11px] text-gray-400">{l('наведите для редактирования', 'түзеу үшін бағыттаңыз', 'hover to edit')}</span>
+            <span className="text-[11px] text-slate-400">{l('наведите для редактирования', 'түзеу үшін бағыттаңыз', 'hover to edit')}</span>
           </div>
           {renderLineList('addons', addons)}
         </div>
 
         {/* Step 5: Services */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <div className="text-[10px] text-gray-400">{l('Шаг 5', '5-қадам', 'Step 5')}</div>
+              <div className="text-[10px] text-slate-400">{l('Шаг 5', '5-қадам', 'Step 5')}</div>
               <div className="text-sm text-gray-900">{l('Работа', 'Жұмыс', 'Services')}</div>
             </div>
-            <span className="text-[11px] text-gray-400">{l('редактируется', 'түзетіледі', 'editable')}</span>
+            <span className="text-[11px] text-slate-400">{l('редактируется', 'түзетіледі', 'editable')}</span>
           </div>
           {renderLineList('services', services)}
         </div>
 
         {/* Markup */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <div className="text-sm text-gray-900 mb-3">{l('Наценка', 'Үстеме', 'Markup')}</div>
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div className="text-sm text-slate-900 mb-3">{l('Наценка', 'Үстеме', 'Markup')}</div>
           <div className="flex items-center gap-3">
             <input
               type="range" min={0} max={100} step={1}
@@ -325,52 +325,52 @@ export function Calculator({ language }: CalcProps) {
               onChange={e => setMarkupPct(Number(e.target.value))}
               className="w-20 px-2 py-1.5 bg-gray-50 rounded-lg text-sm text-right focus:outline-none focus:ring-1 focus:ring-gray-200"
             />
-            <span className="text-sm text-gray-500">%</span>
+            <span className="text-sm text-slate-500">%</span>
           </div>
         </div>
       </div>
 
       {/* Total panel */}
       <div className="space-y-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 sticky top-4">
-          <div className="text-sm text-gray-900 mb-4">{l('Итого', 'Жиыны', 'Total')}</div>
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 sticky top-4">
+          <div className="text-sm text-slate-900 mb-4">{l('Итого', 'Жиыны', 'Total')}</div>
           <div className="space-y-2.5 mb-4">
             <div className="flex justify-between text-xs">
-              <span className="text-gray-500">{l('Материалы', 'Материалдар', 'Materials')}</span>
+              <span className="text-slate-500">{l('Материалы', 'Материалдар', 'Materials')}</span>
               <span className="text-gray-900">{fmt(calc.materialsCost)} ₸</span>
             </div>
             {calc.addonsCost > 0 && (
               <div className="flex justify-between text-xs">
-                <span className="text-gray-500">{l('Доп. опции', 'Қосымша опциялар', 'Add-ons')}</span>
+                <span className="text-slate-500">{l('Доп. опции', 'Қосымша опциялар', 'Add-ons')}</span>
                 <span className="text-gray-900">{fmt(calc.addonsCost)} ₸</span>
               </div>
             )}
             <div className="flex justify-between text-xs">
-              <span className="text-gray-500">{l('Работа', 'Жұмыс', 'Labor')}</span>
+              <span className="text-slate-500">{l('Работа', 'Жұмыс', 'Labor')}</span>
               <span className="text-gray-900">{fmt(calc.servicesCost)} ₸</span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="text-gray-500">{l('Наценка', 'Үстеме', 'Markup')} {markupPct}%</span>
+              <span className="text-slate-500">{l('Наценка', 'Үстеме', 'Markup')} {markupPct}%</span>
               <span className="text-gray-900">{fmt(calc.markup)} ₸</span>
             </div>
-            <div className="border-t border-gray-100 pt-2.5 flex justify-between">
+            <div className="border-t border-white/60 pt-2.5 flex justify-between">
               <span className="text-sm text-gray-900">{l('ИТОГО', 'ЖИЫНЫ', 'TOTAL')}</span>
               <span className="text-sm text-gray-900">{fmt(calc.total)} ₸</span>
             </div>
           </div>
-          <div className="text-[11px] text-gray-400 mb-4">
+          <div className="text-[11px] text-slate-400 mb-4">
             {l('Срок производства', 'Өндіріс мерзімі', 'Production time')}: {product.days[0]}-{product.days[1]} {l('дней', 'күн', 'days')}
           </div>
           <div className="space-y-2">
             <button
               onClick={handleCreateOrder}
-              className="w-full px-3 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800"
+              className="w-full px-3 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all"
             >
               {l('Создать заказ', 'Тапсырыс жасау', 'Create order')}
             </button>
             <button
               onClick={() => alert(l('Шаблон сохранён', 'Шаблон сақталды', 'Template saved'))}
-              className="w-full px-3 py-2.5 border border-gray-100 rounded-xl text-xs hover:bg-gray-50"
+              className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors"
             >
               {l('Сохранить как шаблон', 'Шаблон ретінде сақтау', 'Save as template')}
             </button>
@@ -379,7 +379,7 @@ export function Calculator({ language }: CalcProps) {
                 const text = `${l('КП', 'КП', 'Quote')}: ${l(product.ru, product.kz, product.eng)} ${dims.length}×${dims.width}×${dims.height}м — ${fmt(calc.total)} ₸`;
                 window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
               }}
-              className="w-full px-3 py-2.5 border border-gray-100 rounded-xl text-xs hover:bg-gray-50"
+              className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors"
             >
               {l('Отправить КП в WhatsApp', 'WhatsApp-қа КП жіберу', 'Send proposal via WhatsApp')}
             </button>

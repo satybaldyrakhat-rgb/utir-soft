@@ -99,29 +99,29 @@ export function ModuleBuilder({ language, onClose, editing }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[80] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between flex-shrink-0">
+        <div className="px-5 py-4 border-b border-white/60 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center"><CustomIcon name={iconName} className="w-4 h-4 text-gray-700" /></div>
+            <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center"><CustomIcon name={iconName} className="w-4 h-4 text-slate-700" /></div>
             <div>
               <div className="text-sm text-gray-900">{editing ? tt('editCustomModule') : tt('newCustomModule')}</div>
-              <div className="text-[10px] text-gray-400">{tt('customModule')}</div>
+              <div className="text-[10px] text-slate-400">{tt('customModule')}</div>
             </div>
           </div>
-          <button onClick={onClose} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center hover:bg-gray-100"><X className="w-3.5 h-3.5 text-gray-400" /></button>
+          <button onClick={onClose} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center hover:bg-white/70"><X className="w-3.5 h-3.5 text-slate-400" /></button>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {/* Basics: name + icon */}
           <section>
-            <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{tt('builderBasicInfo')}</div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-3">{tt('builderBasicInfo')}</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
               {(['ru', 'kz', 'eng'] as const).map(lng => (
                 <div key={lng}>
-                  <label className="block text-[10px] uppercase text-gray-400 mb-1">{lng}</label>
+                  <label className="block text-[10px] uppercase text-slate-400 mb-1">{lng}</label>
                   <input
                     type="text"
                     value={lng === 'ru' ? labelRu : lng === 'kz' ? labelKz : labelEng}
@@ -133,7 +133,7 @@ export function ModuleBuilder({ language, onClose, editing }: Props) {
               ))}
             </div>
             <div>
-              <label className="block text-[10px] uppercase text-gray-400 mb-2">{tt('builderIcon')}</label>
+              <label className="block text-[10px] uppercase text-slate-400 mb-2">{tt('builderIcon')}</label>
               <div className="grid grid-cols-8 sm:grid-cols-12 gap-1.5">
                 {CUSTOM_ICON_IDS.map(id => (
                   <button
@@ -141,7 +141,7 @@ export function ModuleBuilder({ language, onClose, editing }: Props) {
                     type="button"
                     onClick={() => setIconName(id)}
                     title={id}
-                    className={`aspect-square rounded-lg flex items-center justify-center transition ${iconName === id ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                    className={`aspect-square rounded-lg flex items-center justify-center transition ${iconName === id ? 'bg-gray-900 text-white' : 'bg-gray-50 text-slate-500 hover:bg-white/70'}`}
                   >
                     <CustomIcon name={id} className="w-4 h-4" />
                   </button>
@@ -153,28 +153,28 @@ export function ModuleBuilder({ language, onClose, editing }: Props) {
           {/* Fields */}
           <section>
             <div className="flex items-center justify-between mb-3">
-              <div className="text-[10px] uppercase tracking-wider text-gray-400">{tt('builderFields')}</div>
-              <button onClick={addField} className="flex items-center gap-1 text-[11px] text-gray-700 hover:text-gray-900 px-2 py-1 bg-gray-50 hover:bg-gray-100 rounded-lg">
+              <div className="text-[10px] uppercase tracking-wider text-slate-400">{tt('builderFields')}</div>
+              <button onClick={addField} className="flex items-center gap-1 text-[11px] text-slate-700 hover:text-gray-900 px-2 py-1 bg-gray-50 hover:bg-white/70 rounded-lg">
                 <Plus className="w-3 h-3" />{tt('builderAddField')}
               </button>
             </div>
             {fields.length === 0 ? (
-              <div className="text-[11px] text-gray-400 italic px-2 py-6 bg-gray-50 rounded-xl text-center">{tt('builderNoFields')}</div>
+              <div className="text-[11px] text-slate-400 italic px-2 py-6 bg-gray-50 rounded-xl text-center">{tt('builderNoFields')}</div>
             ) : (
               <div className="space-y-2">
                 {fields.map((f, idx) => (
                   <div key={f.id} className="border border-gray-100 rounded-xl p-3 space-y-2">
                     <div className="flex items-center gap-2">
-                      <GripVertical className="w-3 h-3 text-gray-300" />
-                      <span className="text-[10px] text-gray-400 tabular-nums">#{idx + 1}</span>
+                      <GripVertical className="w-3 h-3 text-slate-300" />
+                      <span className="text-[10px] text-slate-400 tabular-nums">#{idx + 1}</span>
                       <select
                         value={f.type}
                         onChange={e => updateField(f.id, { type: e.target.value as CustomFieldType })}
-                        className="px-2 py-1 bg-gray-50 rounded-lg text-[11px] focus:outline-none text-gray-700"
+                        className="px-2 py-1 bg-gray-50 rounded-lg text-[11px] focus:outline-none text-slate-700"
                       >
                         {FIELD_TYPES.map(ft => <option key={ft.value} value={ft.value}>{tt(ft.tKey)}</option>)}
                       </select>
-                      <label className="flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer ml-auto">
+                      <label className="flex items-center gap-1 text-[11px] text-slate-500 cursor-pointer ml-auto">
                         <input
                           type="checkbox"
                           checked={!!f.required}
@@ -183,7 +183,7 @@ export function ModuleBuilder({ language, onClose, editing }: Props) {
                         />
                         {tt('builderFieldRequired')}
                       </label>
-                      <button onClick={() => removeField(f.id)} className="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-500">
+                      <button onClick={() => removeField(f.id)} className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500">
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
@@ -216,14 +216,14 @@ export function ModuleBuilder({ language, onClose, editing }: Props) {
 
           {/* Permissions */}
           <section>
-            <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{tt('builderPermissions')}</div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-3">{tt('builderPermissions')}</div>
             <div className="space-y-1.5">
               {ALL_ROLES.map(r => {
                 const isAdmin = r === 'admin';
                 const granted = isAdmin ? true : !!access[r as Exclude<RoleKey, 'admin'>];
                 const label = r === 'admin' ? tt('roleAdmin') : r === 'manager' ? tt('roleManager') : tt('roleEmployee');
                 return (
-                  <label key={r} className={`flex items-center gap-2.5 p-3 border rounded-xl transition ${granted ? 'border-gray-900 bg-gray-50' : 'border-gray-100 hover:bg-gray-50'} ${isAdmin ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <label key={r} className={`flex items-center gap-2.5 p-3 border rounded-xl transition ${granted ? 'border-gray-900 bg-gray-50' : 'border-gray-100 hover:bg-white/50'} ${isAdmin ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}`}>
                     <input
                       type="checkbox"
                       checked={granted}
@@ -231,8 +231,8 @@ export function ModuleBuilder({ language, onClose, editing }: Props) {
                       onChange={() => !isAdmin && toggleRole(r as Exclude<RoleKey, 'admin'>)}
                       className="rounded"
                     />
-                    <span className="text-xs text-gray-700 flex-1">{label}</span>
-                    {granted ? <Eye className="w-3.5 h-3.5 text-emerald-500" /> : <EyeOff className="w-3.5 h-3.5 text-gray-300" />}
+                    <span className="text-xs text-slate-700 flex-1">{label}</span>
+                    {granted ? <Eye className="w-3.5 h-3.5 text-emerald-500" /> : <EyeOff className="w-3.5 h-3.5 text-slate-300" />}
                   </label>
                 );
               })}
@@ -241,11 +241,11 @@ export function ModuleBuilder({ language, onClose, editing }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-gray-50 flex items-center gap-2 flex-shrink-0">
+        <div className="px-5 py-3 border-t border-white/60 flex items-center gap-2 flex-shrink-0">
           {error && <span className="text-xs text-red-500 mr-auto">{error}</span>}
           <div className="flex-1" />
-          <button onClick={onClose} className="px-4 py-2 border border-gray-100 rounded-xl text-xs hover:bg-gray-50">{tt('cancel')}</button>
-          <button onClick={handleSave} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">{tt('builderSave')}</button>
+          <button onClick={onClose} className="px-4 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">{tt('cancel')}</button>
+          <button onClick={handleSave} className="px-4 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">{tt('builderSave')}</button>
         </div>
       </div>
     </div>

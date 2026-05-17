@@ -63,7 +63,7 @@ export function ImageMessage({ message }: BaseMessageProps) {
         className="w-full max-w-xs cursor-pointer hover:opacity-95 transition-opacity"
       />
       <div className={`px-3 py-2 ${
-        message.isUser ? 'bg-white border border-gray-100' : 'bg-blue-600 text-white'
+        message.isUser ? 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl' : 'bg-blue-600 text-white'
       }`}>
         <div className="flex items-center justify-between">
           <span className="text-xs">{message.fileName}</span>
@@ -216,10 +216,10 @@ export function CallMessage({ message, language }: BaseMessageProps) {
             {message.callStatus === 'missed' && translations.missedCall[language]}
             {message.callStatus === 'ended' && translations.callEnded[language]}
           </p>
-          <p className="text-xs text-gray-500">{message.duration}</p>
+          <p className="text-xs text-slate-500">{message.duration}</p>
         </div>
       </div>
-      <div className="flex items-center justify-end gap-1 mt-1.5 text-gray-400">
+      <div className="flex items-center justify-end gap-1 mt-1.5 text-slate-400">
         <span className="text-xs">{message.time}</span>
       </div>
     </div>

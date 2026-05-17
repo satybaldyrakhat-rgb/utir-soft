@@ -120,7 +120,7 @@ export function ClientCabinet({ session, onLogout }: { session: ClientSession; o
               </div>
               <div className="min-w-0">
                 <div className="text-sm text-gray-900">Utir Soft</div>
-                <div className="text-[10px] text-gray-500">{tl(lang, 'Кабинет клиента', 'Клиент кабинеті', 'Client cabinet')}</div>
+                <div className="text-[10px] text-slate-500">{tl(lang, 'Кабинет клиента', 'Клиент кабинеті', 'Client cabinet')}</div>
               </div>
             </div>
           </div>
@@ -130,7 +130,7 @@ export function ClientCabinet({ session, onLogout }: { session: ClientSession; o
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs shadow-inner">{initials}</div>
               <div className="min-w-0">
                 <div className="text-sm text-gray-900 truncate">{session.name}</div>
-                <div className="text-[11px] text-gray-500 truncate">{session.phone}</div>
+                <div className="text-[11px] text-slate-500 truncate">{session.phone}</div>
               </div>
             </div>
           </div>
@@ -166,7 +166,7 @@ export function ClientCabinet({ session, onLogout }: { session: ClientSession; o
                 <button
                   key={l}
                   onClick={() => setLang(l)}
-                  className={`flex-1 py-1 rounded-lg text-[10px] uppercase transition-all ${lang === l ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`flex-1 py-1 rounded-lg text-[10px] uppercase transition-all ${lang === l ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-900'}`}
                 >
                   {l}
                 </button>
@@ -174,7 +174,7 @@ export function ClientCabinet({ session, onLogout }: { session: ClientSession; o
             </div>
             <button
               onClick={onLogout}
-              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-500 hover:bg-red-50/70 hover:text-red-600 rounded-xl transition-colors"
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-500 hover:bg-red-50/70 hover:text-red-600 rounded-xl transition-colors"
             >
               <LogOut className="w-4 h-4" />
               {tl(lang, 'Выйти', 'Шығу', 'Sign out')}
@@ -199,19 +199,19 @@ export function ClientCabinet({ session, onLogout }: { session: ClientSession; o
           </div>
           <div className="flex items-center gap-1.5">
             <div className="relative hidden md:block">
-              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 placeholder={tl(lang, 'Поиск...', 'Іздеу...', 'Search...')}
                 className="w-48 pl-8 pr-3 py-1.5 text-xs bg-gray-100/80 border border-transparent rounded-lg focus:outline-none focus:bg-white focus:border-gray-200 transition-all"
               />
             </div>
-            <button className="hidden md:flex w-8 h-8 items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors relative">
+            <button className="hidden md:flex w-8 h-8 items-center justify-center text-slate-500 hover:text-gray-900 hover:bg-white/70 rounded-lg transition-colors relative">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />
             </button>
             <button
               onClick={onLogout}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               title={tl(lang, 'Выйти', 'Шығу', 'Sign out')}
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -263,7 +263,7 @@ function HomePage({
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-gray-900">{tl(lang, `Здравствуйте, ${firstName}!`, `Сәлеметсіз бе, ${firstName}!`, `Hello, ${firstName}!`)} 👋</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-slate-500 mt-1">
             {activeDeals.length > 0
               ? <>
                 {tl(lang, `У вас ${activeDeals.length} активных заказа на сумму`, `Сізде ${activeDeals.length} белсенді тапсырыс, сомасы`, `You have ${activeDeals.length} active orders worth`)}{' '}
@@ -272,7 +272,7 @@ function HomePage({
               : tl(lang, 'Активных заказов нет', 'Белсенді тапсырыс жоқ', 'No active orders')}
           </p>
         </div>
-        <button onClick={() => setPage('orders')} className="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1 transition-colors">
+        <button onClick={() => setPage('orders')} className="text-xs text-slate-500 hover:text-gray-900 flex items-center gap-1 transition-colors">
           {tl(lang, 'Все заказы', 'Барлық тапсырыс', 'All orders')} <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -284,17 +284,17 @@ function HomePage({
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs">К</div>
             <div>
               <div className="text-sm text-gray-900">{tl(lang, 'Курьер подъезжает к вам', 'Курьер жақындап келе жатыр', 'Courier is approaching')}</div>
-              <div className="text-xs text-gray-400">~12 минут · {tl(lang, 'обновлено сейчас', 'жаңартылды', 'updated now')}</div>
+              <div className="text-xs text-slate-400">~12 минут · {tl(lang, 'обновлено сейчас', 'жаңартылды', 'updated now')}</div>
             </div>
           </div>
           <div className="flex gap-2">
             <button className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-white rounded-xl text-xs hover:bg-emerald-600 transition-colors">
               <Phone className="w-3.5 h-3.5" /> {tl(lang, 'Позвонить', 'Қоңырау', 'Call')}
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 transition-colors">
+            <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors">
               <MessageCircle className="w-3.5 h-3.5" /> {tl(lang, 'Написать', 'Жазу', 'Message')}
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-2 bg-white/60 backdrop-blur-xl border border-white/60 text-gray-700 rounded-xl text-xs hover:bg-gray-50 transition-colors">
+            <button className="flex items-center gap-1.5 px-3 py-2 bg-white/60 backdrop-blur-xl border border-white/60 text-slate-700 rounded-xl text-xs hover:bg-white/50 transition-colors">
               <Share2 className="w-3.5 h-3.5" /> {tl(lang, 'Геолокация', 'Геолокация', 'Geo')}
             </button>
           </div>
@@ -350,7 +350,7 @@ function ActiveOrderCard({ lang, deal, onOpen, accent, detailed }: { lang: Lang;
     <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] overflow-hidden hover:shadow-sm transition-shadow">
       <div className="relative h-48">
         <ImageWithFallback src={img} alt={deal.product} className="w-full h-full object-cover" />
-        <span className="absolute top-3 left-3 bg-white/95 backdrop-blur px-2.5 py-1 rounded-lg text-[10px] text-gray-700">#{deal.id}</span>
+        <span className="absolute top-3 left-3 bg-white/95 backdrop-blur px-2.5 py-1 rounded-lg text-[10px] text-slate-700">#{deal.id}</span>
         <span className={`absolute top-3 right-3 ${meta.cls} text-white px-2.5 py-1 rounded-lg text-[10px]`}>
           {tl(lang, meta.ru, meta.kz, meta.eng)}
         </span>
@@ -358,10 +358,10 @@ function ActiveOrderCard({ lang, deal, onOpen, accent, detailed }: { lang: Lang;
       <div className="p-4 space-y-3">
         <div>
           <div className="text-sm text-gray-900">{deal.product}</div>
-          <div className="text-xs text-gray-400">{tl(lang, 'Готовность', 'Дайын', 'Ready')}: {deal.completionDate || deal.installationDate || '—'}</div>
+          <div className="text-xs text-slate-400">{tl(lang, 'Готовность', 'Дайын', 'Ready')}: {deal.completionDate || deal.installationDate || '—'}</div>
         </div>
         <div>
-          <div className="flex justify-between text-[11px] text-gray-500 mb-1">
+          <div className="flex justify-between text-[11px] text-slate-500 mb-1">
             <span>{Math.round(meta.progress / 100 * 6)} / 6 {tl(lang, 'этапов', 'кезең', 'stages')}</span>
             <span className="text-gray-900 tabular-nums">{meta.progress}%</span>
           </div>
@@ -370,18 +370,18 @@ function ActiveOrderCard({ lang, deal, onOpen, accent, detailed }: { lang: Lang;
           </div>
         </div>
         {detailed && (
-          <div className="space-y-2 pt-2 border-t border-gray-50">
+          <div className="space-y-2 pt-2 border-t border-white/60">
             {stages.map((s, i) => (
               <div key={i} className="flex items-start gap-2.5">
                 {s.st === 'done' ? <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
                   : s.st === 'active' ? <Loader2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5 animate-spin" />
-                  : <Clock className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" />}
+                  : <Clock className="w-4 h-4 text-slate-300 flex-shrink-0 mt-0.5" />}
                 <div className={`text-xs ${s.st === 'todo' ? 'text-gray-400' : 'text-gray-900'}`}>{s.title}</div>
               </div>
             ))}
           </div>
         )}
-        <button onClick={onOpen} className="w-full mt-2 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 flex items-center justify-center gap-1.5 transition-colors">
+        <button onClick={onOpen} className="w-full mt-2 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all flex items-center justify-center gap-1.5 transition-colors">
           {tl(lang, 'Подробнее', 'Толығырақ', 'Details')} <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -426,7 +426,7 @@ function OrdersPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
     <div className="space-y-5">
       <div>
         <h1 className="text-gray-900">{tl(lang, 'Мои заказы', 'Тапсырыстарым', 'My orders')}</h1>
-        <p className="text-sm text-gray-500 mt-1">{tl(lang, 'Все ваши заказы за всё время', 'Барлық уақыттағы тапсырыстар', 'All your orders ever')}</p>
+        <p className="text-sm text-slate-500 mt-1">{tl(lang, 'Все ваши заказы за всё время', 'Барлық уақыттағы тапсырыстар', 'All your orders ever')}</p>
       </div>
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex gap-1.5 bg-white/60 backdrop-blur-xl border border-white/60 rounded-xl p-1 flex-wrap">
@@ -434,20 +434,20 @@ function OrdersPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${filter === f.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${filter === f.id ? 'bg-gray-900 text-white' : 'text-slate-500 hover:text-gray-900'}`}
             >
               {tl(lang, f.ru, f.kz, f.eng)} <span className="opacity-60">({counts[f.id]})</span>
             </button>
           ))}
         </div>
         <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder={tl(lang, 'Поиск', 'Іздеу', 'Search')} className="w-full pl-9 pr-3 py-2 bg-white/60 backdrop-blur-xl border border-white/60 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
         </div>
       </div>
       <div className="grid md:grid-cols-2 gap-4">
         {filtered.length === 0 && (
-          <div className="md:col-span-2 bg-white/60 backdrop-blur-xl rounded-3xl border border-dashed border-gray-200 p-10 text-center text-sm text-gray-400">
+          <div className="md:col-span-2 bg-white/60 backdrop-blur-xl rounded-3xl border border-dashed border-gray-200 p-10 text-center text-sm text-slate-400">
             {tl(lang, 'Заказов нет', 'Тапсырыс жоқ', 'No orders')}
           </div>
         )}
@@ -457,28 +457,28 @@ function OrdersPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
             <div key={d.id} className="group bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] overflow-hidden hover:shadow-sm transition-all">
               <div className="relative h-40">
                 <ImageWithFallback src={imageFor(d)} alt={d.product} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                <span className="absolute top-3 left-3 bg-white/95 backdrop-blur px-2.5 py-1 rounded-lg text-[10px] text-gray-700">#{d.id}</span>
+                <span className="absolute top-3 left-3 bg-white/95 backdrop-blur px-2.5 py-1 rounded-lg text-[10px] text-slate-700">#{d.id}</span>
                 <span className={`absolute top-3 right-3 ${meta.cls} text-white px-2.5 py-1 rounded-lg text-[10px]`}>{tl(lang, meta.ru, meta.kz, meta.eng)}</span>
               </div>
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="min-w-0">
                     <div className="text-sm text-gray-900 truncate">{d.product}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">{d.date}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{d.date}</div>
                   </div>
                   <div className="text-sm text-gray-900 tabular-nums">{(d.amount / 1000).toFixed(0)}К ₸</div>
                 </div>
                 <div className="mb-3">
-                  <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+                  <div className="flex justify-between text-[10px] text-slate-400 mb-1">
                     <span>{tl(lang, 'Прогресс', 'Прогресс', 'Progress')}</span>
-                    <span className="tabular-nums text-gray-700">{meta.progress}%</span>
+                    <span className="tabular-nums text-slate-700">{meta.progress}%</span>
                   </div>
                   <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600" style={{ width: `${meta.progress}%` }} />
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button className="flex-1 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 transition-colors">{tl(lang, 'Открыть', 'Ашу', 'Open')}</button>
+                  <button className="flex-1 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors">{tl(lang, 'Открыть', 'Ашу', 'Open')}</button>
                   <button className="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-xs hover:bg-emerald-100 transition-colors">{tl(lang, 'Повторить', 'Қайталау', 'Reorder')}</button>
                 </div>
               </div>
@@ -513,22 +513,22 @@ function TrackingPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] p-3">
           <ClientCabinetMap height={520} markers={markers} route={{ from: 'courier', to: 'home' }} />
-          <div className="mt-3 flex items-center gap-3 flex-wrap text-[11px] text-gray-500">
+          <div className="mt-3 flex items-center gap-3 flex-wrap text-[11px] text-slate-500">
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-sky-500" /> {tl(lang, 'Ваш адрес', 'Сіздің мекенжай', 'Your address')}</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-gray-900" /> {tl(lang, 'Производство', 'Өндіріс', 'Production')}</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> {tl(lang, 'Бригада', 'Бригада', 'Crew')}</span>
           </div>
         </div>
         <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] p-5">
-          <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{tl(lang, 'Ваш заказ', 'Тапсырысыңыз', 'Your order')}</div>
-          <div className="text-base text-gray-900 mb-5">#{deal?.id || '—'} · {deal?.product || '—'}</div>
+          <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">{tl(lang, 'Ваш заказ', 'Тапсырысыңыз', 'Your order')}</div>
+          <div className="text-base text-slate-900 mb-5">#{deal?.id || '—'} · {deal?.product || '—'}</div>
           <div className="space-y-4 relative">
             <div className="absolute left-[7px] top-2 bottom-2 w-px bg-gray-100" />
             {TIMELINE.map((step, i) => (
               <div key={i} className="flex gap-3 relative">
                 <div className={`w-4 h-4 rounded-full mt-0.5 flex-shrink-0 ${step.done ? 'bg-emerald-500' : 'bg-white border-2 border-emerald-400'}`} />
                 <div className="flex-1">
-                  <div className="text-[11px] text-gray-400">{step.time}</div>
+                  <div className="text-[11px] text-slate-400">{step.time}</div>
                   <div className={`text-sm ${step.done ? 'text-gray-900' : 'text-emerald-700'}`}>{step.text}</div>
                 </div>
               </div>
@@ -538,7 +538,7 @@ function TrackingPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
             <button className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-500 text-white rounded-xl text-xs hover:bg-emerald-600 transition-colors">
               <Phone className="w-3.5 h-3.5" /> {tl(lang, 'Позвонить водителю', 'Жүргізушіге қоңырау', 'Call driver')}
             </button>
-            <button className="w-full flex items-center justify-center gap-2 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 transition-colors">
+            <button className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors">
               <MessageCircle className="w-3.5 h-3.5" /> {tl(lang, 'Чат с бригадой', 'Бригадамен чат', 'Chat with crew')}
             </button>
           </div>
@@ -575,23 +575,23 @@ function ChatsPage({ lang }: { lang: Lang }) {
             <button
               key={d.id}
               onClick={() => setActive(d.id)}
-              className={`w-full text-left p-4 flex items-center gap-3 border-b border-gray-50 transition-colors ${active === d.id ? 'bg-emerald-50/50' : 'hover:bg-gray-50/50'}`}
+              className={`w-full text-left p-4 flex items-center gap-3 border-b border-white/60 transition-colors ${active === d.id ? 'bg-emerald-50/50' : 'hover:bg-white/30'}`}
             >
               <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white text-xs flex-shrink-0 ${d.avatar}`}>{d.name.split(' ').map(s => s[0]).join('')}</div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-sm text-gray-900 truncate">{d.name}</div>
-                  <div className="text-[10px] text-gray-400">{d.time}</div>
+                  <div className="text-[10px] text-slate-400">{d.time}</div>
                 </div>
-                <div className="text-[11px] text-gray-400 truncate">{d.role}</div>
-                <div className="text-xs text-gray-500 truncate mt-0.5">{d.last}</div>
+                <div className="text-[11px] text-slate-400 truncate">{d.role}</div>
+                <div className="text-xs text-slate-500 truncate mt-0.5">{d.last}</div>
               </div>
               {d.unread > 0 && <div className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] flex items-center justify-center">{d.unread}</div>}
             </button>
           ))}
         </div>
         <div className="md:col-span-2 flex flex-col">
-          <div className="p-4 border-b border-gray-100 flex items-center gap-3">
+          <div className="p-4 border-b border-white/60 flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs ${cur.avatar}`}>{cur.name.split(' ').map(s => s[0]).join('')}</div>
             <div>
               <div className="text-sm text-gray-900">{cur.name}</div>
@@ -609,10 +609,10 @@ function ChatsPage({ lang }: { lang: Lang }) {
               </div>
             ))}
           </div>
-          <div className="p-3 border-t border-gray-100 flex items-center gap-2">
-            <button className="w-9 h-9 hover:bg-gray-50 rounded-xl flex items-center justify-center text-gray-400"><Paperclip className="w-4 h-4" /></button>
+          <div className="p-3 border-t border-white/60 flex items-center gap-2">
+            <button className="w-9 h-9 hover:bg-white/50 rounded-xl flex items-center justify-center text-slate-400"><Paperclip className="w-4 h-4" /></button>
             <input placeholder={tl(lang, 'Сообщение...', 'Хабарлама...', 'Message...')} className="flex-1 px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
-            <button className="w-9 h-9 hover:bg-gray-50 rounded-xl flex items-center justify-center text-gray-400"><Mic className="w-4 h-4" /></button>
+            <button className="w-9 h-9 hover:bg-white/50 rounded-xl flex items-center justify-center text-slate-400"><Mic className="w-4 h-4" /></button>
             <button className="w-9 h-9 bg-gray-900 text-white rounded-xl flex items-center justify-center hover:bg-gray-800"><Send className="w-4 h-4" /></button>
           </div>
         </div>
@@ -650,7 +650,7 @@ function PaymentsPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
           { label: tl(lang, 'К доплате', 'Қосымша төлеу', 'Outstanding'), val: owed, cls: 'text-emerald-700' },
         ].map((s, i) => (
           <div key={i} className="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] p-4">
-            <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{s.label}</div>
+            <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">{s.label}</div>
             <div className={`text-xl tabular-nums ${s.cls}`}>{(s.val / 1_000_000).toFixed(2)} млн ₸</div>
           </div>
         ))}
@@ -664,11 +664,11 @@ function PaymentsPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
       )}
 
       <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] overflow-hidden">
-        <div className="p-4 border-b border-gray-100 text-sm text-gray-900">{tl(lang, 'История платежей', 'Төлемдер тарихы', 'Payment history')}</div>
+        <div className="p-4 border-b border-white/60 text-sm text-gray-900">{tl(lang, 'История платежей', 'Төлемдер тарихы', 'Payment history')}</div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead className="bg-gray-50/50">
-              <tr className="text-left text-gray-400">
+            <thead className="bg-white/30">
+              <tr className="text-left text-slate-400">
                 <th className="px-4 py-2 font-normal">{tl(lang, 'Дата', 'Күн', 'Date')}</th>
                 <th className="px-4 py-2 font-normal">{tl(lang, 'Заказ', 'Тапсырыс', 'Order')}</th>
                 <th className="px-4 py-2 font-normal">{tl(lang, 'Сумма', 'Сома', 'Amount')}</th>
@@ -679,16 +679,16 @@ function PaymentsPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {HISTORY.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">{tl(lang, 'Платежей нет', 'Төлем жоқ', 'No payments')}</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{tl(lang, 'Платежей нет', 'Төлем жоқ', 'No payments')}</td></tr>
               )}
               {HISTORY.map((h, i) => (
-                <tr key={i} className="hover:bg-gray-50/40">
-                  <td className="px-4 py-3 text-gray-700">{h.date}</td>
+                <tr key={i} className="hover:bg-white/30">
+                  <td className="px-4 py-3 text-slate-700">{h.date}</td>
                   <td className="px-4 py-3 text-gray-900">{h.order}</td>
                   <td className="px-4 py-3 text-gray-900 tabular-nums">{(h.amount / 1000).toFixed(0)}К ₸</td>
                   <td className="px-4 py-3 text-gray-600">{h.method}</td>
                   <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] ${h.cls}`}>{tl(lang, h.status, h.status, h.status)}</span></td>
-                  <td className="px-4 py-3">{h.status === 'Оплачен' ? <button className="text-gray-400 hover:text-gray-900"><Download className="w-3.5 h-3.5" /></button> : '—'}</td>
+                  <td className="px-4 py-3">{h.status === 'Оплачен' ? <button className="text-slate-400 hover:text-gray-900"><Download className="w-3.5 h-3.5" /></button> : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -702,9 +702,9 @@ function PaymentsPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
             <div className="w-10 h-10 rounded-xl bg-emerald-50/70 backdrop-blur text-emerald-700 flex items-center justify-center"><FileText className="w-4 h-4" /></div>
             <div className="flex-1 min-w-0">
               <div className="text-xs text-gray-900 truncate">{d.type}</div>
-              <div className="text-[10px] text-gray-400">PDF · {d.size}</div>
+              <div className="text-[10px] text-slate-400">PDF · {d.size}</div>
             </div>
-            <button className="w-8 h-8 hover:bg-gray-50 rounded-lg flex items-center justify-center text-gray-400"><Download className="w-3.5 h-3.5" /></button>
+            <button className="w-8 h-8 hover:bg-white/50 rounded-lg flex items-center justify-center text-slate-400"><Download className="w-3.5 h-3.5" /></button>
           </div>
         ))}
       </div>
@@ -717,7 +717,7 @@ function ARPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
   return (
     <div className="space-y-5">
       <h1 className="text-gray-900">{tl(lang, 'AR-визуализация', 'AR-көрсету', 'AR visualization')}</h1>
-      <p className="text-sm text-gray-500">{tl(lang, 'Посмотрите как ваша мебель будет стоять до установки', 'Жиһазыңыздың орналасуын алдын ала көру', 'See how your furniture fits before installation')}</p>
+      <p className="text-sm text-slate-500">{tl(lang, 'Посмотрите как ваша мебель будет стоять до установки', 'Жиһазыңыздың орналасуын алдын ала көру', 'See how your furniture fits before installation')}</p>
 
       <div className="grid lg:grid-cols-2 gap-4">
         {deals.slice(0, 2).map((d, idx) => (
@@ -743,7 +743,7 @@ function ARPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
             <div className="p-4 space-y-3">
               <div className="text-sm text-gray-900">{d.product} · #{d.id}</div>
               <div className="flex gap-2">
-                <button className="flex-1 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 transition-colors">{tl(lang, 'Открыть AR', 'AR ашу', 'Open AR')}</button>
+                <button className="flex-1 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors">{tl(lang, 'Открыть AR', 'AR ашу', 'Open AR')}</button>
                 <button className="px-3 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-xs hover:bg-emerald-100 transition-colors flex items-center gap-1.5">
                   <Share2 className="w-3.5 h-3.5" /> {tl(lang, 'Дизайнеру', 'Дизайнерге', 'Designer')}
                 </button>
@@ -775,9 +775,9 @@ function BonusPage({ lang }: { lang: Lang }) {
     <div className="space-y-5">
       <h1 className="text-gray-900">{tl(lang, 'Бонусы и скидки', 'Бонустар мен жеңілдіктер', 'Bonus & discounts')}</h1>
       <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] p-6">
-        <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{tl(lang, 'Ваш уровень', 'Деңгейіңіз', 'Your level')}</div>
-        <div className="text-2xl text-gray-900 mb-1">VIP</div>
-        <div className="text-sm text-gray-500 mb-5">{tl(lang, 'До Премиум осталось', 'Премиумға дейін', 'To Premium')}: <span className="text-gray-900 tabular-nums">87 500 ₸</span></div>
+        <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">{tl(lang, 'Ваш уровень', 'Деңгейіңіз', 'Your level')}</div>
+        <div className="text-2xl text-slate-900 mb-1">VIP</div>
+        <div className="text-sm text-slate-500 mb-5">{tl(lang, 'До Премиум осталось', 'Премиумға дейін', 'To Premium')}: <span className="text-gray-900 tabular-nums">87 500 ₸</span></div>
         <div className="relative h-2 bg-gray-100 rounded-full mb-3">
           <div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-700" style={{ width: '62%' }} />
           <div className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-emerald-500 shadow" style={{ left: 'calc(62% - 8px)' }} />
@@ -786,7 +786,7 @@ function BonusPage({ lang }: { lang: Lang }) {
           {LEVELS.map((lv, i) => (
             <div key={i} className={`text-center p-2 rounded-xl ${lv.active ? 'bg-emerald-50 border border-emerald-200' : ''}`}>
               <div className={`text-xs ${lv.active ? 'text-emerald-700' : 'text-gray-500'}`}>{lv.name}</div>
-              <div className="text-[10px] text-gray-400 mt-0.5">{lv.range}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{lv.range}</div>
             </div>
           ))}
         </div>
@@ -804,11 +804,11 @@ function BonusPage({ lang }: { lang: Lang }) {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-gray-900">{r.title}</div>
-                {r.hint && <div className="text-[10px] text-gray-400 mt-0.5">{r.hint}</div>}
+                {r.hint && <div className="text-[10px] text-slate-400 mt-0.5">{r.hint}</div>}
                 <div className="mt-2">
                   {r.status === 'active' && <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{tl(lang, 'Активно', 'Белсенді', 'Active')}</span>}
                   {r.status === 'vip' && <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">VIP</span>}
-                  {r.status === 'locked' && <span className="text-[10px] text-gray-500 bg-gray-50 px-2 py-0.5 rounded">{tl(lang, 'Заблокировано', 'Жабық', 'Locked')}</span>}
+                  {r.status === 'locked' && <span className="text-[10px] text-slate-500 bg-gray-50 px-2 py-0.5 rounded">{tl(lang, 'Заблокировано', 'Жабық', 'Locked')}</span>}
                 </div>
               </div>
             </div>
@@ -821,14 +821,14 @@ function BonusPage({ lang }: { lang: Lang }) {
           <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><Plus className="w-4 h-4" /></div>
           <div className="flex-1">
             <div className="text-sm text-gray-900">{tl(lang, 'Пригласить друга', 'Дос шақыру', 'Invite friend')}</div>
-            <div className="text-[11px] text-gray-400">{tl(lang, 'Получи 50К бонусов', '50К бонус ал', 'Get 50K bonus')}</div>
+            <div className="text-[11px] text-slate-400">{tl(lang, 'Получи 50К бонусов', '50К бонус ал', 'Get 50K bonus')}</div>
           </div>
         </button>
         <button className="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] p-4 hover:shadow-sm transition-shadow text-left flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-50/70 backdrop-blur text-emerald-600 flex items-center justify-center"><Tag className="w-4 h-4" /></div>
           <div className="flex-1">
             <div className="text-sm text-gray-900">{tl(lang, 'Промо-код', 'Промо-код', 'Promo code')}</div>
-            <div className="text-[11px] text-gray-400">{tl(lang, 'Активировать купон', 'Купон қосу', 'Activate coupon')}</div>
+            <div className="text-[11px] text-slate-400">{tl(lang, 'Активировать купон', 'Купон қосу', 'Activate coupon')}</div>
           </div>
         </button>
       </div>
@@ -852,19 +852,19 @@ function ReviewsPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
     <div className="space-y-5">
       <h1 className="text-gray-900">{tl(lang, 'Мои отзывы', 'Пікірлерім', 'My reviews')}</h1>
       <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] overflow-hidden">
-        <div className="p-5 border-b border-gray-100">
+        <div className="p-5 border-b border-white/60">
           <div className="flex items-center gap-3">
             <ImageWithFallback src={target ? imageFor(target) : CLOSET_IMG} alt="" className="w-14 h-14 rounded-xl object-cover" />
             <div>
               <div className="text-sm text-gray-900">{tl(lang, 'Оцените заказ', 'Бағалаңыз', 'Rate order')} #{target?.id || '—'}</div>
-              <div className="text-[11px] text-gray-400">{target?.product || '—'} · {target?.date || ''}</div>
+              <div className="text-[11px] text-slate-400">{target?.product || '—'} · {target?.date || ''}</div>
             </div>
           </div>
         </div>
         <div className="p-5 space-y-4">
           {PARAMS.map((p, i) => (
             <div key={i} className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">{p}</div>
+              <div className="text-sm text-slate-700">{p}</div>
               <div className="flex gap-1">
                 {[1, 2, 3, 4, 5].map(n => (
                   <button key={n} onClick={() => setRatings(r => r.map((v, idx) => idx === i ? n : v))} className="hover:scale-110 transition-transform">
@@ -880,12 +880,12 @@ function ReviewsPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
             rows={3}
           />
           <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-emerald-300 transition-colors cursor-pointer">
-            <Camera className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-            <div className="text-xs text-gray-500">{tl(lang, 'Загрузить фото готовой мебели', 'Сурет жүктеу', 'Upload photo')}</div>
+            <Camera className="w-6 h-6 text-slate-400 mx-auto mb-2" />
+            <div className="text-xs text-slate-500">{tl(lang, 'Загрузить фото готовой мебели', 'Сурет жүктеу', 'Upload photo')}</div>
           </div>
           <div className="flex gap-2">
-            <button className="flex-1 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 transition-colors">{tl(lang, 'Опубликовать', 'Жариялау', 'Publish')}</button>
-            <button className="flex items-center gap-1.5 px-3 py-2.5 bg-white/60 backdrop-blur border border-white/60 text-gray-700 rounded-xl text-xs hover:bg-white transition-colors">
+            <button className="flex-1 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors">{tl(lang, 'Опубликовать', 'Жариялау', 'Publish')}</button>
+            <button className="flex items-center gap-1.5 px-3 py-2.5 bg-white/60 backdrop-blur border border-white/60 text-slate-700 rounded-xl text-xs hover:bg-white transition-colors">
               <Instagram className="w-3.5 h-3.5 text-emerald-600" /> Instagram
             </button>
           </div>
@@ -913,15 +913,15 @@ function SupportPage({ lang }: { lang: Lang }) {
       <div className="grid md:grid-cols-3 gap-3">
         <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] p-5 hover:shadow-sm transition-shadow">
           <div className="w-11 h-11 rounded-xl bg-emerald-50/70 backdrop-blur text-emerald-700 flex items-center justify-center mb-3"><ShieldAlert className="w-5 h-5" /></div>
-          <div className="text-sm text-gray-900 mb-1">{tl(lang, 'Гарантийный случай', 'Кепілдік', 'Warranty')}</div>
-          <div className="text-[11px] text-gray-400 mb-3">{tl(lang, 'Гарантия 24 месяца', '24 ай кепілдік', '24-month warranty')}</div>
+          <div className="text-sm text-slate-900 mb-1">{tl(lang, 'Гарантийный случай', 'Кепілдік', 'Warranty')}</div>
+          <div className="text-[11px] text-slate-400 mb-3">{tl(lang, 'Гарантия 24 месяца', '24 ай кепілдік', '24-month warranty')}</div>
           <button className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 transition-colors">{tl(lang, 'Подать заявку', 'Өтінім', 'Submit claim')}</button>
         </div>
 
         <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] p-5 hover:shadow-sm transition-shadow">
           <div className="w-11 h-11 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center mb-3"><MessageCircle className="w-5 h-5" /></div>
-          <div className="text-sm text-gray-900 mb-1">{tl(lang, 'Связаться с менеджером', 'Менеджермен байланыс', 'Contact manager')}</div>
-          <div className="text-[11px] text-gray-400 mb-3">{tl(lang, 'Среднее время ответа: 5 минут', '5 мин', 'Avg 5 min')}</div>
+          <div className="text-sm text-slate-900 mb-1">{tl(lang, 'Связаться с менеджером', 'Менеджермен байланыс', 'Contact manager')}</div>
+          <div className="text-[11px] text-slate-400 mb-3">{tl(lang, 'Среднее время ответа: 5 минут', '5 мин', 'Avg 5 min')}</div>
           <div className="grid grid-cols-3 gap-1.5">
             <button className="py-1.5 bg-emerald-500 text-white rounded-lg text-[10px] hover:bg-emerald-600 transition-colors">WhatsApp</button>
             <button className="py-1.5 bg-sky-500 text-white rounded-lg text-[10px] hover:bg-sky-600 transition-colors">Telegram</button>
@@ -931,8 +931,8 @@ function SupportPage({ lang }: { lang: Lang }) {
 
         <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[0_4px_24px_rgba(15,118,110,0.05)] p-5 hover:shadow-sm transition-shadow">
           <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3"><Sparkles className="w-5 h-5" /></div>
-          <div className="text-sm text-gray-900 mb-1">{tl(lang, 'AI-помощник', 'AI-көмекші', 'AI helper')}</div>
-          <div className="text-[11px] text-gray-400 mb-3">{tl(lang, 'Ответы 24/7', '24/7 жауап', '24/7 answers')}</div>
+          <div className="text-sm text-slate-900 mb-1">{tl(lang, 'AI-помощник', 'AI-көмекші', 'AI helper')}</div>
+          <div className="text-[11px] text-slate-400 mb-3">{tl(lang, 'Ответы 24/7', '24/7 жауап', '24/7 answers')}</div>
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('ai-assistant:open', { detail: { prompt: 'Я клиент Utir Soft. Помоги с заказом.' } }))}
             className="w-full py-2 bg-emerald-500 text-white rounded-xl text-xs hover:bg-emerald-600 transition-colors"
@@ -958,12 +958,12 @@ function SettingsPage({ lang, session, onLogout }: { lang: Lang; session: Client
           { title: tl(lang, 'Адрес доставки', 'Жеткізу мекенжайы', 'Delivery address'), val: 'г. Алматы, ул. Абая 45, кв. 12' },
           { title: tl(lang, 'Уведомления', 'Хабарландырулар', 'Notifications'), val: 'WhatsApp · SMS · Push' },
         ].map((s, i) => (
-          <div key={i} className="px-5 py-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+          <div key={i} className="px-5 py-4 flex items-center justify-between hover:bg-white/30 transition-colors">
             <div>
-              <div className="text-[11px] text-gray-400 mb-0.5">{s.title}</div>
+              <div className="text-[11px] text-slate-400 mb-0.5">{s.title}</div>
               <div className="text-sm text-gray-900">{s.val}</div>
             </div>
-            <ChevronRight className="w-4 h-4 text-gray-300" />
+            <ChevronRight className="w-4 h-4 text-slate-300" />
           </div>
         ))}
       </div>

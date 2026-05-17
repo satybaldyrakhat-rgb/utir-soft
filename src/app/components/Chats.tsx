@@ -81,7 +81,7 @@ export function Chats({ language }: ChatsProps) {
 
   const platformDot = (p: Chat['platform']) => <PlatformIcon platform={p} size="sm" />;
   const platformName = (p: Chat['platform']) => ({ whatsapp: 'WhatsApp', instagram: 'Instagram', telegram: 'Telegram', tiktok: 'TikTok' }[p]);
-  const platformBadge = (p: Chat['platform']) => ({ whatsapp: 'bg-green-50 text-green-700 border-green-200', instagram: 'bg-pink-50 text-pink-700 border-pink-200', telegram: 'bg-blue-50 text-blue-700 border-blue-200', tiktok: 'bg-gray-50 text-gray-700 border-gray-200' }[p]);
+  const platformBadge = (p: Chat['platform']) => ({ whatsapp: 'bg-green-50 text-green-700 border-green-200', instagram: 'bg-pink-50 text-pink-700 border-pink-200', telegram: 'bg-blue-50 text-blue-700 border-blue-200', tiktok: 'bg-gray-50 text-slate-700 border-gray-200' }[p]);
 
   const handleChatSelect = (chat: Chat) => { setSelectedChat(chat); setMessages(chat.messages); };
   const handleSendMessage = () => {
@@ -127,13 +127,32 @@ export function Chats({ language }: ChatsProps) {
   const currentScenario = scenariosData.find(s => s.id === scenarioModal);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)]">
+    <div
+      className="flex flex-col h-[calc(100vh-56px)] relative"
+      style={{
+        background: `
+          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
+          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
+          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
+          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
+          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+        `,
+      }}
+    >
       {/* Header */}
-      <div className="px-4 md:px-6 py-3 border-b border-gray-100 bg-white flex items-center justify-between gap-3 flex-shrink-0">
-        <div className="text-sm text-gray-900">{l('Омниканальные чаты', 'Омниканалды чаттар', 'Omnichannel Chats')}</div>
-        <div className="flex gap-1">
+      <div className="px-4 md:px-6 py-3 border-b border-white/60 bg-white/40 backdrop-blur-2xl flex items-center justify-between gap-3 flex-shrink-0">
+        <div className="text-sm text-slate-900">{l('Омниканальные чаты', 'Омниканалды чаттар', 'Omnichannel Chats')}</div>
+        <div className="flex gap-1.5 flex-wrap">
           {tabItems.map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${activeTab === t.id ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}>
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
+                activeTab === t.id
+                  ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+                  : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+              }`}
+            >
               <t.icon className="w-3.5 h-3.5" /><span className="hidden md:inline">{t.label}</span>
             </button>
           ))}
@@ -147,10 +166,10 @@ export function Chats({ language }: ChatsProps) {
           <div className="flex h-full">
             {/* Sidebar */}
             <div className={`w-full md:w-80 lg:w-96 border-r border-gray-100 bg-white flex flex-col ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
-              <div className="p-3 space-y-2 border-b border-gray-50 flex-shrink-0">
+              <div className="p-3 space-y-2 border-b border-white/60 flex-shrink-0">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
-                  <input type="text" placeholder={l('Поиск...', 'Іздеу...', 'Search...')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
+                  <input type="text" placeholder={l('Поиск...', 'Іздеу...', 'Search...')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
                 </div>
                 <div className="flex gap-1 overflow-x-auto pb-0.5">
                   <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(false); }} className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-all ${selectedPlatforms.length === 0 && !showUnreadOnly ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-400'}`}>{l('Все', 'Бәрі', 'All')} {chats.length}</button>
@@ -164,27 +183,27 @@ export function Chats({ language }: ChatsProps) {
                 {filteredChats.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full p-8 text-center">
                     <MessageCircle className="w-10 h-10 text-gray-200 mb-2" />
-                    <p className="text-xs text-gray-400">{l('Чатов не найдено', 'Чаттар табылмады', 'No chats found')}</p>
+                    <p className="text-xs text-slate-400">{l('Чатов не найдено', 'Чаттар табылмады', 'No chats found')}</p>
                   </div>
                 ) : filteredChats.map(chat => (
-                  <button key={chat.id} onClick={() => handleChatSelect(chat)} className={`w-full px-3 py-3 border-b border-gray-50 hover:bg-gray-50/50 transition-colors text-left ${selectedChat?.id === chat.id ? 'bg-gray-50' : ''}`}>
+                  <button key={chat.id} onClick={() => handleChatSelect(chat)} className={`w-full px-3 py-3 border-b border-white/60 hover:bg-white/30 transition-colors text-left ${selectedChat?.id === chat.id ? 'bg-gray-50' : ''}`}>
                     <div className="flex items-center gap-3">
                       <div className="relative flex-shrink-0">
-                        <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 text-sm">{chat.name.charAt(0)}</div>
+                        <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-slate-500 text-sm">{chat.name.charAt(0)}</div>
                         {chat.online && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-0.5">
                           <span className="text-sm text-gray-900 truncate pr-2">{chat.name}</span>
-                          <span className="text-[10px] text-gray-400 flex-shrink-0">{chat.time}</span>
+                          <span className="text-[10px] text-slate-400 flex-shrink-0">{chat.time}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <p className="text-xs text-gray-400 truncate flex-1">{chat.lastMessage}</p>
+                          <p className="text-xs text-slate-400 truncate flex-1">{chat.lastMessage}</p>
                           {chat.unreadCount && chat.unreadCount > 0 && (
                             <span className="ml-2 min-w-[18px] h-[18px] bg-gray-900 rounded-full flex items-center justify-center text-[10px] text-white px-1">{chat.unreadCount}</span>
                           )}
                         </div>
-                        <div className="mt-1 flex items-center gap-1">{platformDot(chat.platform)}<span className="text-[10px] text-gray-300">{platformName(chat.platform)}</span></div>
+                        <div className="mt-1 flex items-center gap-1">{platformDot(chat.platform)}<span className="text-[10px] text-slate-300">{platformName(chat.platform)}</span></div>
                       </div>
                     </div>
                   </button>
@@ -195,27 +214,27 @@ export function Chats({ language }: ChatsProps) {
             {/* Chat Area */}
             {selectedChat ? (
               <div className="flex-1 flex flex-col bg-white">
-                <div className="px-4 py-3 border-b border-gray-50 flex items-center gap-3 flex-shrink-0">
-                  <button onClick={() => setSelectedChat(null)} className="md:hidden p-1.5 hover:bg-gray-100 rounded-lg">
+                <div className="px-4 py-3 border-b border-white/60 flex items-center gap-3 flex-shrink-0">
+                  <button onClick={() => setSelectedChat(null)} className="md:hidden p-1.5 hover:bg-white/70 rounded-lg">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                   </button>
-                  <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 text-sm">{selectedChat.name.charAt(0)}</div>
+                  <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center text-slate-500 text-sm">{selectedChat.name.charAt(0)}</div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-gray-900 truncate">{selectedChat.name}</div>
-                    <div className="flex items-center gap-1.5 mt-0.5">{platformDot(selectedChat.platform)}<span className="text-[10px] text-gray-400">{platformName(selectedChat.platform)}</span>{selectedChat.online && <span className="text-[10px] text-green-500">• online</span>}</div>
+                    <div className="flex items-center gap-1.5 mt-0.5">{platformDot(selectedChat.platform)}<span className="text-[10px] text-slate-400">{platformName(selectedChat.platform)}</span>{selectedChat.online && <span className="text-[10px] text-green-500">• online</span>}</div>
                   </div>
                   <div className="flex items-center gap-1">
-                    {selectedChat.orderId && <button onClick={() => alert(`Заказ #${selectedChat.orderId}`)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 text-xs"><ShoppingCart className="w-3.5 h-3.5" />#{selectedChat.orderId}</button>}
-                    <button onClick={startCall} className="p-2 hover:bg-gray-50 rounded-lg"><Phone className="w-4 h-4 text-gray-400" /></button>
+                    {selectedChat.orderId && <button onClick={() => alert(`Заказ #${selectedChat.orderId}`)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-white/70 text-xs"><ShoppingCart className="w-3.5 h-3.5" />#{selectedChat.orderId}</button>}
+                    <button onClick={startCall} className="p-2 hover:bg-white/50 rounded-lg"><Phone className="w-4 h-4 text-slate-400" /></button>
                   </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 bg-gray-50/30">
                   <div className="space-y-2.5 max-w-3xl mx-auto">
                     {selectedChat.orderId && (
-                      <div className="flex justify-center my-3"><span className="bg-white px-3 py-1 rounded-full text-[10px] text-gray-400 border border-gray-100">{l('Привязан к заказу', 'Тапсырысқа байланысты', 'Linked to order')} #{selectedChat.orderId}</span></div>
+                      <div className="flex justify-center my-3"><span className="bg-white px-3 py-1 rounded-full text-[10px] text-slate-400 border border-gray-100">{l('Привязан к заказу', 'Тапсырысқа байланысты', 'Linked to order')} #{selectedChat.orderId}</span></div>
                     )}
-                    <div className="flex justify-center my-4"><span className="bg-white px-3 py-1 rounded-full text-[10px] text-gray-400 border border-gray-100">{l('Сегодня', 'Бүгін', 'Today')}</span></div>
+                    <div className="flex justify-center my-4"><span className="bg-white px-3 py-1 rounded-full text-[10px] text-slate-400 border border-gray-100">{l('Сегодня', 'Бүгін', 'Today')}</span></div>
                     {messages.map(m => (
                       <div key={m.id} className={`flex ${m.isUser ? 'justify-end' : 'justify-start'}`}>
                         <div className="max-w-[75%] md:max-w-md">
@@ -230,7 +249,7 @@ export function Chats({ language }: ChatsProps) {
                   </div>
                 </div>
 
-                <div className="p-3 border-t border-gray-50 bg-white flex-shrink-0">
+                <div className="p-3 border-t border-white/60 bg-white flex-shrink-0">
                   {isRecording && (
                     <div className="mb-2 max-w-3xl mx-auto bg-red-50 rounded-xl px-4 py-2.5 flex items-center gap-3">
                       <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
@@ -241,17 +260,17 @@ export function Chats({ language }: ChatsProps) {
                   )}
                   <div className="flex items-end gap-2 max-w-3xl mx-auto">
                     <div className="relative">
-                      <button onClick={() => setShowAttachmentMenu(!showAttachmentMenu)} className="p-2 hover:bg-gray-50 rounded-lg"><Paperclip className="w-4 h-4 text-gray-400" /></button>
+                      <button onClick={() => setShowAttachmentMenu(!showAttachmentMenu)} className="p-2 hover:bg-white/50 rounded-lg"><Paperclip className="w-4 h-4 text-slate-400" /></button>
                       {showAttachmentMenu && (
                         <div className="absolute bottom-full left-0 mb-1 bg-white rounded-xl shadow-lg border border-gray-100 p-1.5 min-w-[160px] z-10">
                           {[{ type: 'document' as const, icon: FileText, color: 'text-blue-500', label: l('Документ', 'Құжат', 'Document') }, { type: 'image' as const, icon: ImageIcon, color: 'text-green-500', label: l('Фото', 'Фото', 'Photo') }, { type: 'video' as const, icon: Film, color: 'text-purple-500', label: l('Видео', 'Видео', 'Video') }].map(a => (
-                            <button key={a.type} onClick={() => handleSendFile(a.type)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg text-xs"><a.icon className={`w-4 h-4 ${a.color}`} />{a.label}</button>
+                            <button key={a.type} onClick={() => handleSendFile(a.type)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/50 rounded-lg text-xs"><a.icon className={`w-4 h-4 ${a.color}`} />{a.label}</button>
                           ))}
                         </div>
                       )}
                     </div>
-                    <textarea value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={l('Сообщение...', 'Хабарлама...', 'Message...')} rows={1} className="flex-1 px-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none" style={{ minHeight: '38px', maxHeight: '100px' }} />
-                    <button onClick={isRecording ? stopRecording : startRecording} className={`p-2 rounded-lg transition-all ${isRecording ? 'bg-red-500 text-white' : 'hover:bg-gray-50 text-gray-400'}`}>{isRecording ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}</button>
+                    <textarea value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={l('Сообщение...', 'Хабарлама...', 'Message...')} rows={1} className="flex-1 px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none" style={{ minHeight: '38px', maxHeight: '100px' }} />
+                    <button onClick={isRecording ? stopRecording : startRecording} className={`p-2 rounded-lg transition-all ${isRecording ? 'bg-red-500 text-white' : 'hover:bg-white/50 text-gray-400'}`}>{isRecording ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}</button>
                     <button onClick={handleSendMessage} disabled={!newMessage.trim()} className={`p-2 rounded-lg transition-all ${newMessage.trim() ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-300'}`}><Send className="w-4 h-4" /></button>
                   </div>
                 </div>
@@ -259,9 +278,9 @@ export function Chats({ language }: ChatsProps) {
             ) : (
               <div className="flex-1 hidden md:flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3"><MessageCircle className="w-6 h-6 text-gray-300" /></div>
-                  <div className="text-sm text-gray-400">{l('Выберите чат', 'Чат таңдаңыз', 'Select a chat')}</div>
-                  <div className="text-xs text-gray-300 mt-1">{l('Выберите диалог слева', 'Сол жақтан таңдаңыз', 'Pick a conversation')}</div>
+                  <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3"><MessageCircle className="w-6 h-6 text-slate-300" /></div>
+                  <div className="text-sm text-slate-400">{l('Выберите чат', 'Чат таңдаңыз', 'Select a chat')}</div>
+                  <div className="text-xs text-slate-300 mt-1">{l('Выберите диалог слева', 'Сол жақтан таңдаңыз', 'Pick a conversation')}</div>
                 </div>
               </div>
             )}
@@ -275,7 +294,7 @@ export function Chats({ language }: ChatsProps) {
               {/* Sub-tabs */}
               <div className="flex gap-1.5 mb-6">
                 {([['agent', 'AI-агент'], ['scenarios', 'Сценарии Instagram']] as [typeof aiAgentSubTab, string][]).map(([id, label]) => (
-                  <button key={id} onClick={() => setAiAgentSubTab(id)} className={`px-4 py-2 rounded-xl text-xs transition-all ${aiAgentSubTab === id ? 'bg-gray-900 text-white' : 'bg-white border border-gray-100 text-gray-400 hover:text-gray-600'}`}>{label}</button>
+                  <button key={id} onClick={() => setAiAgentSubTab(id)} className={`px-4 py-2 rounded-xl text-xs transition-all ${aiAgentSubTab === id ? 'bg-gray-900 text-white' : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-400 hover:text-gray-600'}`}>{label}</button>
                 ))}
               </div>
 
@@ -283,7 +302,7 @@ export function Chats({ language }: ChatsProps) {
               {aiAgentSubTab === 'agent' && (
                 <div className="space-y-4">
                   {/* Header card */}
-                  <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between">
+                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center flex-shrink-0">
                         <Sparkles className="w-5 h-5 text-white" />
@@ -297,14 +316,14 @@ export function Chats({ language }: ChatsProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-400">Включить AI-агент</span>
+                      <span className="text-[11px] text-slate-400">Включить AI-агент</span>
                       <Toggle value={aiAgentEnabled} onChange={() => setAiAgentEnabled(!aiAgentEnabled)} />
                     </div>
                   </div>
 
                   {/* Channels */}
-                  <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                    <div className="text-[11px] text-gray-400 mb-3">Каналы работы</div>
+                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+                    <div className="text-[11px] text-slate-400 mb-3">Каналы работы</div>
                     <div className="flex gap-4">
                       {([['whatsapp', 'WhatsApp', 'bg-green-50 text-green-700'], ['instagram', 'Instagram', 'bg-pink-50 text-pink-700'], ['telegram', 'Telegram', 'bg-blue-50 text-blue-700']] as [keyof typeof aiChannels, string, string][]).map(([key, name, cls]) => (
                         <label key={key} className="flex items-center gap-2 cursor-pointer">
@@ -316,8 +335,8 @@ export function Chats({ language }: ChatsProps) {
                   </div>
 
                   {/* Tone */}
-                  <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                    <div className="text-[11px] text-gray-400 mb-3">Тон общения</div>
+                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+                    <div className="text-[11px] text-slate-400 mb-3">Тон общения</div>
                     <div className="grid grid-cols-3 gap-2">
                       {[{ id: 'professional' as const, emoji: '🎩', label: 'Профессиональный' }, { id: 'friendly' as const, emoji: '😊', label: 'Дружелюбный' }, { id: 'casual' as const, emoji: '✌️', label: 'Неформальный' }].map(t => (
                         <button key={t.id} onClick={() => setAiTone(t.id)} className={`p-3 rounded-xl border text-center transition-all ${aiTone === t.id ? 'border-gray-900 bg-gray-50' : 'border-gray-100'}`}>
@@ -329,49 +348,49 @@ export function Chats({ language }: ChatsProps) {
                   </div>
 
                   {/* Knowledge base */}
-                  <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                    <div className="text-[11px] text-gray-400 mb-3">База знаний</div>
-                    <button className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-gray-300 mb-3">
+                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+                    <div className="text-[11px] text-slate-400 mb-3">База знаний</div>
+                    <button className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-200 rounded-xl text-xs text-slate-400 hover:border-gray-300 mb-3">
                       <Plus className="w-3.5 h-3.5" />Загрузить файлы (PDF, DOCX, TXT)
                     </button>
                     <div className="space-y-1.5 mb-3">
                       {aiKnowledgeFiles.map((f, i) => (
                         <div key={i} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl">
                           <FileText className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-                          <span className="text-xs text-gray-700 flex-1">{f}</span>
-                          <button className="p-0.5 hover:bg-gray-200 rounded"><X className="w-3 h-3 text-gray-400" /></button>
+                          <span className="text-xs text-slate-700 flex-1">{f}</span>
+                          <button className="p-0.5 hover:bg-gray-200 rounded"><X className="w-3 h-3 text-slate-400" /></button>
                         </div>
                       ))}
                     </div>
                     <div>
-                      <div className="text-[11px] text-gray-400 mb-1">Дополнительные инструкции</div>
-                      <textarea value={aiInstructions} onChange={e => setAiInstructions(e.target.value)} rows={3} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none" />
-                      <div className="text-[10px] text-gray-400 mt-1">Например: Всегда уточняй размеры комнаты. При вопросе о цене — отправляй прайс. Если клиент готов к замеру — передавай менеджеру.</div>
+                      <div className="text-[11px] text-slate-400 mb-1">Дополнительные инструкции</div>
+                      <textarea value={aiInstructions} onChange={e => setAiInstructions(e.target.value)} rows={3} className="w-full px-3 py-2.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none" />
+                      <div className="text-[10px] text-slate-400 mt-1">Например: Всегда уточняй размеры комнаты. При вопросе о цене — отправляй прайс. Если клиент готов к замеру — передавай менеджеру.</div>
                     </div>
                   </div>
 
                   {/* Transfer conditions */}
-                  <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                    <div className="text-[11px] text-gray-400 mb-3">Передача менеджеру</div>
+                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+                    <div className="text-[11px] text-slate-400 mb-3">Передача менеджеру</div>
                     <div className="space-y-1">
                       {([['measurement', 'Клиент просит замер'], ['discount', 'Клиент спрашивает скидку больше 10%'], ['unknown', 'AI не знает ответ'], ['longChat', 'Клиент пишет более 5 минут']] as [keyof typeof aiTransferConditions, string][]).map(([key, label]) => (
-                        <label key={key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl cursor-pointer hover:bg-gray-50">
+                        <label key={key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl cursor-pointer hover:bg-white/50">
                           <input type="checkbox" checked={aiTransferConditions[key]} onChange={e => setAiTransferConditions({ ...aiTransferConditions, [key]: e.target.checked })} className="w-3.5 h-3.5 rounded accent-gray-900" />
-                          <span className="text-xs text-gray-700">{label}</span>
+                          <span className="text-xs text-slate-700">{label}</span>
                         </label>
                       ))}
                     </div>
-                    <div className="mt-3 p-2.5 bg-gray-50 rounded-xl text-[10px] text-gray-400">При срабатывании условия диалог переходит в раздел «Диалоги» с меткой <span className="text-orange-500">Требует внимания</span></div>
+                    <div className="mt-3 p-2.5 bg-gray-50 rounded-xl text-[10px] text-slate-400">При срабатывании условия диалог переходит в раздел «Диалоги» с меткой <span className="text-orange-500">Требует внимания</span></div>
                   </div>
 
                   {/* Stats */}
-                  <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                    <div className="text-[11px] text-gray-400 mb-3">Статистика за 30 дней</div>
+                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+                    <div className="text-[11px] text-slate-400 mb-3">Статистика за 30 дней</div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[{ label: 'Диалогов обработано', value: '1 247' }, { label: 'Передано менеджеру', value: '89' }, { label: 'Записано на замер', value: '156' }, { label: 'Конверсия', value: '12.5%' }].map((s, i) => (
-                        <div key={i} className="bg-gray-50 rounded-xl p-3 text-center">
+                        <div key={i} className="bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3 text-center">
                           <div className="text-lg text-gray-900">{s.value}</div>
-                          <div className="text-[10px] text-gray-400 mt-0.5">{s.label}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">{s.label}</div>
                         </div>
                       ))}
                     </div>
@@ -382,7 +401,7 @@ export function Chats({ language }: ChatsProps) {
               {/* ── Sub-tab 2: Сценарии Instagram ── */}
               {aiAgentSubTab === 'scenarios' && (
                 <div>
-                  <p className="text-xs text-gray-400 mb-4">Автоматические сценарии для Instagram. Нажмите на карточку для настройки.</p>
+                  <p className="text-xs text-slate-400 mb-4">Автоматические сценарии для Instagram. Нажмите на карточку для настройки.</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {scenariosData.map(sc => {
                       const isActive = activeScenarios[sc.id];
@@ -396,11 +415,11 @@ export function Chats({ language }: ChatsProps) {
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${isActive ? 'bg-green-50' : 'bg-gray-50'}`}>
                             <sc.icon className={`w-4 h-4 ${isActive ? 'text-green-600' : 'text-gray-400'}`} />
                           </div>
-                          <div className="text-sm text-gray-900 mb-1">{sc.title}</div>
-                          <div className="text-[11px] text-gray-400 mb-3">{sc.desc}</div>
+                          <div className="text-sm text-slate-900 mb-1">{sc.title}</div>
+                          <div className="text-[11px] text-slate-400 mb-3">{sc.desc}</div>
                           <button
                             onClick={e => { e.stopPropagation(); setActiveScenarios(prev => ({ ...prev, [sc.id]: !prev[sc.id] })); }}
-                            className={`px-3 py-1.5 rounded-lg text-[11px] transition-all ${isActive ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] transition-all ${isActive ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-slate-500 border border-gray-100'}`}
                           >
                             {isActive ? '✓ Включён' : 'Включить'}
                           </button>
@@ -418,16 +437,16 @@ export function Chats({ language }: ChatsProps) {
         {activeTab === 'automation' && (
           <div className="h-full overflow-y-auto flex items-center justify-center p-6">
             <div className="text-center max-w-md">
-              <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><Zap className="w-6 h-6 text-gray-400" /></div>
-              <div className="text-sm text-gray-900 mb-1">{l('Автоматизация', 'Автоматтандыру', 'Automation')}</div>
-              <p className="text-xs text-gray-400 mb-6">{l('Триггеры, сценарии и автоматические действия', 'Триггерлер, сценарийлер және автоматты әрекеттер', 'Triggers, scenarios and automatic actions')}</p>
+              <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><Zap className="w-6 h-6 text-slate-400" /></div>
+              <div className="text-sm text-slate-900 mb-1">{l('Автоматизация', 'Автоматтандыру', 'Automation')}</div>
+              <p className="text-xs text-slate-400 mb-6">{l('Триггеры, сценарии и автоматические действия', 'Триггерлер, сценарийлер және автоматты әрекеттер', 'Triggers, scenarios and automatic actions')}</p>
               <div className="grid grid-cols-3 gap-3">
                 {[{ icon: Zap, label: l('Триггеры', 'Триггерлер', 'Triggers'), hint: l('Автоматические события', 'Автоматты оқиғалар', 'Auto events') },
                   { icon: Settings, label: l('Сценарии', 'Сценарийлер', 'Scenarios'), hint: l('Цепочки действий', 'Әрекеттер тізбегі', 'Action chains') },
                   { icon: TrendingUp, label: l('Аналитика', 'Аналитика', 'Analytics'), hint: l('Отслеживание', 'Бақылау', 'Tracking') },
-                ].map((c, i) => <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4"><c.icon className="w-5 h-5 text-gray-400 mb-2" /><div className="text-xs text-gray-900 mb-0.5">{c.label}</div><div className="text-[10px] text-gray-400">{c.hint}</div></div>)}
+                ].map((c, i) => <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4"><c.icon className="w-5 h-5 text-slate-400 mb-2" /><div className="text-xs text-slate-900 mb-0.5">{c.label}</div><div className="text-[10px] text-slate-400">{c.hint}</div></div>)}
               </div>
-              <button className="mt-6 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">{l('Настроить', 'Баптау', 'Configure')}</button>
+              <button className="mt-6 px-5 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">{l('Настроить', 'Баптау', 'Configure')}</button>
             </div>
           </div>
         )}
@@ -435,32 +454,32 @@ export function Chats({ language }: ChatsProps) {
 
       {/* ===== SCENARIO MODAL ===== */}
       {scenarioModal && currentScenario && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setScenarioModal(null)}>
+        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setScenarioModal(null)}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
-            <div className="p-5 border-b border-gray-50 flex items-center justify-between">
+            <div className="p-5 border-b border-white/60 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                  <currentScenario.icon className="w-4 h-4 text-gray-500" />
+                  <currentScenario.icon className="w-4 h-4 text-slate-500" />
                 </div>
                 <span className="text-sm text-gray-900">{currentScenario.title}</span>
               </div>
-              <button onClick={() => setScenarioModal(null)} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-gray-400" /></button>
+              <button onClick={() => setScenarioModal(null)} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-400" /></button>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-[11px] text-gray-400 mb-1">Текст сообщения</label>
+                <label className="block text-[11px] text-slate-400 mb-1">Текст сообщения</label>
                 <textarea
                   value={scenarioTexts[scenarioModal] || ''}
                   onChange={e => setScenarioTexts(prev => ({ ...prev, [scenarioModal]: e.target.value }))}
                   rows={4}
-                  className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none"
+                  className="w-full px-3 py-2.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none"
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-gray-400 mb-2">Статус сценария</label>
+                <label className="block text-[11px] text-slate-400 mb-2">Статус сценария</label>
                 <button
                   onClick={() => setActiveScenarios(prev => ({ ...prev, [scenarioModal]: !prev[scenarioModal] }))}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all ${activeScenarios[scenarioModal] ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-500 border-gray-100'}`}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all ${activeScenarios[scenarioModal] ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-slate-500 border-gray-100'}`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${activeScenarios[scenarioModal] ? 'bg-green-500' : 'bg-gray-300'}`} />
                   {activeScenarios[scenarioModal] ? 'Сценарий включён' : 'Сценарий выключен'}
@@ -468,8 +487,8 @@ export function Chats({ language }: ChatsProps) {
               </div>
             </div>
             <div className="p-5 pt-0 flex gap-2">
-              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 border border-gray-100 rounded-xl text-xs hover:bg-gray-50">Отмена</button>
-              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">Сохранить</button>
+              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">Отмена</button>
+              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">Сохранить</button>
             </div>
           </div>
         </div>
@@ -477,11 +496,11 @@ export function Chats({ language }: ChatsProps) {
 
       {/* Call Modal */}
       {showCallModal && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl w-72 p-6 text-center shadow-xl">
             <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3"><Phone className={`w-6 h-6 ${isInCall ? 'text-green-500' : 'text-gray-400'}`} /></div>
-            <div className="text-sm text-gray-900 mb-1">{selectedChat?.name}</div>
-            <div className="text-xs text-gray-400 mb-4">{isInCall ? formatDuration(callDuration) : l('Вызов...', 'Қоңырау...', 'Calling...')}</div>
+            <div className="text-sm text-slate-900 mb-1">{selectedChat?.name}</div>
+            <div className="text-xs text-slate-400 mb-4">{isInCall ? formatDuration(callDuration) : l('Вызов...', 'Қоңырау...', 'Calling...')}</div>
             <button onClick={endCall} className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mx-auto hover:bg-red-600"><Phone className="w-5 h-5 text-white rotate-[135deg]" /></button>
           </div>
         </div>

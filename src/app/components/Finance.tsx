@@ -272,12 +272,12 @@ export function Finance({ language }: FinanceProps) {
     <div className="p-4 md:p-8 max-w-[1400px] space-y-6">
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <p className="text-xs text-gray-400 mb-1">{l('Финансы', 'Қаржы', 'Finance')}</p>
+          <p className="text-xs text-slate-400 mb-1">{l('Финансы', 'Қаржы', 'Finance')}</p>
           <h1 className="text-gray-900">{l('Финансы компании', 'Компания қаржысы', 'Company finance')}</h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Period chips — drive which window the report templates cover */}
-          <div className="flex items-center gap-1 bg-white border border-gray-100 rounded-xl p-1">
+          <div className="flex items-center gap-1 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl p-1">
             {([
               { id: 'month',   ru: 'Этот месяц' },
               { id: 'last',    ru: 'Прошлый' },
@@ -287,7 +287,7 @@ export function Finance({ language }: FinanceProps) {
               <button
                 key={p.id}
                 onClick={() => setPreset(p.id)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition ${period.preset === p.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                className={`px-2.5 py-1 rounded-lg text-[11px] transition ${period.preset === p.id ? 'bg-gray-900 text-white' : 'text-slate-500 hover:text-gray-900'}`}
               >{p.ru}</button>
             ))}
             {/* Custom range — two compact date inputs */}
@@ -297,7 +297,7 @@ export function Finance({ language }: FinanceProps) {
                 onChange={e => setPeriod({ ...period, from: e.target.value, preset: 'custom' })}
                 className="px-1.5 py-0.5 bg-gray-50 rounded text-[10px] focus:outline-none focus:ring-1 focus:ring-gray-200"
               />
-              <span className="text-gray-300 text-[10px]">→</span>
+              <span className="text-slate-300 text-[10px]">→</span>
               <input
                 type="date" value={period.to}
                 onChange={e => setPeriod({ ...period, to: e.target.value, preset: 'custom' })}
@@ -310,42 +310,42 @@ export function Finance({ language }: FinanceProps) {
             <button
               onClick={() => setDownloadOpen(o => !o)}
               disabled={reportBusy !== null}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-100 rounded-xl text-xs text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl text-xs text-slate-700 hover:bg-white/50 transition-colors disabled:opacity-50"
             >
               {reportBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
               {l('Скачать отчёт', 'Есепті жүктеу', 'Download report')}
-              <ChevronDown className="w-3 h-3 text-gray-400" />
+              <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
             {downloadOpen && (
-              <div className="absolute right-0 mt-1.5 w-64 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden z-10">
-                <div className="px-3 py-2 text-[10px] uppercase tracking-wide text-gray-400 border-b border-gray-50">{l('PDF-шаблоны', 'PDF үлгілері', 'PDF templates')}</div>
-                <button onClick={() => downloadReport('finance')} className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center justify-between">
+              <div className="absolute right-0 mt-1.5 w-64 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl shadow-lg overflow-hidden z-10">
+                <div className="px-3 py-2 text-[10px] uppercase tracking-wide text-slate-400 border-b border-white/60">{l('PDF-шаблоны', 'PDF үлгілері', 'PDF templates')}</div>
+                <button onClick={() => downloadReport('finance')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
                   <span>📊 {l('Финансовый отчёт', 'Қаржы есебі', 'Finance report')}</span>
-                  <span className="text-[9px] text-gray-400">с журналом</span>
+                  <span className="text-[9px] text-slate-400">с журналом</span>
                 </button>
-                <button onClick={() => downloadReport('pl')} className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center justify-between">
+                <button onClick={() => downloadReport('pl')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
                   <span>📈 {l('P&L (прибыль/убытки)', 'P&L', 'P&L statement')}</span>
-                  <span className="text-[9px] text-gray-400">бухгалтерский</span>
+                  <span className="text-[9px] text-slate-400">бухгалтерский</span>
                 </button>
-                <button onClick={() => downloadReport('aging')} className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center justify-between">
+                <button onClick={() => downloadReport('aging')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
                   <span>⏰ {l('Дебиторка (aging)', 'Дебитор', 'Aging report')}</span>
-                  <span className="text-[9px] text-gray-400">0/30/60/90+</span>
+                  <span className="text-[9px] text-slate-400">0/30/60/90+</span>
                 </button>
-                <button onClick={() => downloadReport('forecast')} className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center justify-between">
+                <button onClick={() => downloadReport('forecast')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
                   <span>🔮 {l('Прогноз cash flow', 'Cash flow болжамы', 'Cash flow forecast')}</span>
-                  <span className="text-[9px] text-gray-400">3 месяца</span>
+                  <span className="text-[9px] text-slate-400">3 месяца</span>
                 </button>
-                <div className="px-3 py-2 text-[10px] uppercase tracking-wide text-gray-400 border-y border-gray-50">{l('Таблицы', 'Кесте', 'Tables')}</div>
-                <button onClick={downloadCSV} className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center justify-between">
+                <div className="px-3 py-2 text-[10px] uppercase tracking-wide text-slate-400 border-y border-gray-50">{l('Таблицы', 'Кесте', 'Tables')}</div>
+                <button onClick={downloadCSV} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
                   <span>📥 CSV (Excel)</span>
-                  <span className="text-[9px] text-gray-400">операции</span>
+                  <span className="text-[9px] text-slate-400">операции</span>
                 </button>
               </div>
             )}
           </div>
           <button
             onClick={() => setShowInvoice(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all transition-colors"
           >
             <FileText className="w-3.5 h-3.5" />
             {l('Счёт / Акт', 'Шот / Акт', 'Invoice / Act')}
@@ -373,19 +373,19 @@ export function Finance({ language }: FinanceProps) {
       )}
 
       <div>
-        <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-2">
+        <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">
           {l('Финансовая сводка', 'Қаржы жиынтығы', 'Financial summary')}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {kpis.map((k, i) => {
             const Icon = k.icon;
             return (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-sm transition-shadow">
+              <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 hover:shadow-sm transition-shadow">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${k.iconWrap} mb-3`}>
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="text-lg text-gray-900 tabular-nums mb-1">{k.value}</div>
-                <div className="text-[11px] text-gray-400 mb-2 leading-tight">{k.label}</div>
+                <div className="text-[11px] text-slate-400 mb-2 leading-tight">{k.label}</div>
                 <div className={`text-[10px] ${k.hintCls}`}>{k.hint}</div>
               </div>
             );
@@ -393,11 +393,11 @@ export function Finance({ language }: FinanceProps) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-sm transition-shadow">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 hover:shadow-sm transition-shadow">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div>
             <div className="text-sm text-gray-900">{l('Динамика выручки', 'Түсім динамикасы', 'Revenue dynamics')}</div>
-            <div className="text-[11px] text-gray-400 mt-0.5">{l('Выручка · Расходы · Прибыль', 'Түсім · Шығын · Пайда', 'Revenue · Expenses · Profit')}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">{l('Выручка · Расходы · Прибыль', 'Түсім · Шығын · Пайда', 'Revenue · Expenses · Profit')}</div>
           </div>
           <div className="flex gap-1 bg-gray-50 rounded-lg p-1">
             {(['7d', '30d', '6m', '12m'] as const).map(r => (
@@ -405,7 +405,7 @@ export function Finance({ language }: FinanceProps) {
                 key={r}
                 onClick={() => setChartRange(r)}
                 className={`px-2.5 py-1 rounded-md text-[10px] transition-colors ${
-                  chartRange === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'
+                  chartRange === r ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-400 hover:text-gray-700'
                 }`}
               >
                 {r === '7d' ? l('7 дней', '7 күн', '7 days')
@@ -417,18 +417,18 @@ export function Finance({ language }: FinanceProps) {
           </div>
         </div>
         <MiniAreaChart data={CHART_DATA} unit={l('млн ₸', 'млн ₸', 'mln ₸')} />
-        <div className="flex items-center gap-4 mt-3 text-[10px] text-gray-500">
+        <div className="flex items-center gap-4 mt-3 text-[10px] text-slate-500">
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> {l('Выручка', 'Түсім', 'Revenue')}</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" /> {l('Расходы', 'Шығыс', 'Expenses')}</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-sky-500" /> {l('Прибыль', 'Пайда', 'Profit')}</span>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-3 overflow-x-auto">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-3 overflow-x-auto">
         <div className="flex items-start gap-6 min-w-max">
           {TAB_GROUPS.map((group, gi) => (
             <div key={gi} className="flex flex-col gap-1.5">
-              <span className="text-[10px] text-gray-400 uppercase tracking-wider pl-2">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider pl-2">
                 {l(group.titleRu, group.titleKz, group.titleEng)}
               </span>
               <div className="flex items-center gap-1">
@@ -442,7 +442,7 @@ export function Finance({ language }: FinanceProps) {
                       className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs whitespace-nowrap transition-colors ${
                         isActive
                           ? 'bg-gray-900 text-white shadow-sm'
-                          : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                          : 'text-slate-500 hover:bg-white/50 hover:text-gray-900'
                       }`}
                     >
                       <Icon className={`${isActive ? 'w-4 h-4' : 'w-3.5 h-3.5'} transition-all`} />
@@ -540,23 +540,23 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-100">
+        <div className="px-5 py-4 border-b border-white/60">
           <div className="flex items-center justify-between mb-3">
             <div>
               <div className="text-sm text-gray-900">{l('Документы для клиента', 'Клиентке құжаттар', 'Client documents')}</div>
-              <div className="text-[11px] text-gray-400">{l('PDF · с реквизитами компании', 'PDF', 'PDF · with company details')}</div>
+              <div className="text-[11px] text-slate-400">{l('PDF · с реквизитами компании', 'PDF', 'PDF · with company details')}</div>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
           </div>
           {/* Doc-kind tabs */}
           <div className="flex gap-1 bg-gray-50 rounded-xl p-1">
             <button
               onClick={() => { setDocKind('invoice'); setNumber(''); }}
-              className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'invoice' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'invoice' ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-900'}`}
             >📄 {l('Счёт на оплату', 'Шот', 'Invoice')}</button>
             <button
               onClick={() => { setDocKind('akt'); setNumber(''); }}
-              className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'akt' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'akt' ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-900'}`}
             >📋 {l('Акт выполненных работ', 'Орындалған жұмыстар актісі', 'Work act')}</button>
           </div>
         </div>
@@ -582,22 +582,22 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
 
         <div className="p-5 space-y-4">
           <div>
-            <div className="text-xs text-gray-900 mb-1">{l('Сделка', 'Мәміле', 'Deal')}</div>
+            <div className="text-xs text-slate-900 mb-1">{l('Сделка', 'Мәміле', 'Deal')}</div>
             <input
               type="text" placeholder={l('Поиск по клиенту…', 'Іздеу...', 'Search...')}
               value={query} onChange={e => setQuery(e.target.value)}
               className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200 mb-1.5"
             />
             <div className="border border-gray-100 rounded-xl max-h-48 overflow-y-auto divide-y divide-gray-50">
-              {candidates.length === 0 && <div className="px-3 py-6 text-center text-[11px] text-gray-400">{l('Нет подходящих сделок', '...', 'No matching deals')}</div>}
+              {candidates.length === 0 && <div className="px-3 py-6 text-center text-[11px] text-slate-400">{l('Нет подходящих сделок', '...', 'No matching deals')}</div>}
               {candidates.map(d => (
                 <button
                   key={d.id}
                   onClick={() => { setDealId(d.id); setNumber(''); }}
-                  className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${dealId === d.id ? 'bg-violet-50' : ''}`}
+                  className={`w-full text-left px-3 py-2 hover:bg-white/50 ${dealId === d.id ? 'bg-violet-50' : ''}`}
                 >
                   <div className="text-xs text-gray-900">{d.customerName}</div>
-                  <div className="text-[10px] text-gray-400 truncate">{d.product || '—'} · {(d.amount || 0).toLocaleString('ru-RU')} ₸</div>
+                  <div className="text-[10px] text-slate-400 truncate">{d.product || '—'} · {(d.amount || 0).toLocaleString('ru-RU')} ₸</div>
                 </button>
               ))}
             </div>
@@ -606,7 +606,7 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
           {selected && (
             <>
               <div>
-                <div className="text-xs text-gray-900 mb-1">
+                <div className="text-xs text-slate-900 mb-1">
                   {docKind === 'invoice'
                     ? l('Номер счёта', 'Шот №', 'Invoice number')
                     : l('Номер акта', 'Акт №', 'Act number')}
@@ -616,11 +616,11 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
                   placeholder={`${String(new Date().getFullYear()).slice(-2)}-${selected.id.replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase()}`}
                   className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200"
                 />
-                <div className="text-[10px] text-gray-400 mt-1">{l('Если оставить пустым — сгенерируется автоматически', '...', 'Leave empty for auto-number')}</div>
+                <div className="text-[10px] text-slate-400 mt-1">{l('Если оставить пустым — сгенерируется автоматически', '...', 'Leave empty for auto-number')}</div>
               </div>
 
-              <div className="bg-gray-50 rounded-xl p-3 text-[11px] space-y-1">
-                <div className="text-gray-500">
+              <div className="bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3 text-[11px] space-y-1">
+                <div className="text-slate-500">
                   {docKind === 'invoice'
                     ? l('В счёте будет:', 'Шотта болады:', 'Will be in invoice:')
                     : l('В акте будет:', 'Актіде болады:', 'Will be in act:')}
@@ -631,13 +631,13 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
                     ? `${l('К оплате:', 'Төлеуге:', 'Amount:')} ${(selected.amount || 0).toLocaleString('ru-RU')} ₸`
                     : `${l('Сумма работ:', 'Жұмыс сомасы:', 'Work amount:')} ${(selected.amount || 0).toLocaleString('ru-RU')} ₸`}
                 </div>
-                {requisites?.legalName && <div className="text-gray-500">от {requisites.legalName}</div>}
+                {requisites?.legalName && <div className="text-slate-500">от {requisites.legalName}</div>}
               </div>
             </>
           )}
         </div>
 
-        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
+        <div className="px-5 py-3 bg-gray-50 border-t border-white/60 flex items-center justify-end gap-2">
           <button onClick={onClose} className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
           <button
             onClick={generate}
@@ -666,8 +666,8 @@ function MiniAreaChart({ data, unit }: { data: ChartPoint[]; unit: string }) {
       <div className="h-[220px] flex items-center justify-center text-center">
         <div>
           <TrendingUp className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-          <div className="text-xs text-gray-400">Пока нет операций за выбранный период</div>
-          <div className="text-[10px] text-gray-300 mt-1">График построится автоматически когда появятся доходы и расходы</div>
+          <div className="text-xs text-slate-400">Пока нет операций за выбранный период</div>
+          <div className="text-[10px] text-slate-300 mt-1">График построится автоматически когда появятся доходы и расходы</div>
         </div>
       </div>
     );
@@ -753,14 +753,14 @@ function MiniAreaChart({ data, unit }: { data: ChartPoint[]; unit: string }) {
       </svg>
       {hover !== null && (
         <div
-          className="absolute bg-white border border-gray-100 rounded-xl shadow-sm px-3 py-2 text-[11px] pointer-events-none"
+          className="absolute bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl shadow-sm px-3 py-2 text-[11px] pointer-events-none"
           style={{
             left: `calc(${(x(hover) / w) * 100}% + 8px)`,
             top: 8,
             transform: x(hover) > w * 0.7 ? 'translateX(calc(-100% - 24px))' : undefined,
           }}
         >
-          <div className="text-gray-900 mb-1">{data[hover].m}</div>
+          <div className="text-slate-900 mb-1">{data[hover].m}</div>
           <div className="flex items-center gap-1.5 text-gray-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{data[hover].revenue} {unit}</div>
           <div className="flex items-center gap-1.5 text-gray-600"><span className="w-1.5 h-1.5 rounded-full bg-rose-500" />{data[hover].expenses} {unit}</div>
           <div className="flex items-center gap-1.5 text-gray-600"><span className="w-1.5 h-1.5 rounded-full bg-sky-500" />{data[hover].profit} {unit}</div>

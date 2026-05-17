@@ -37,23 +37,23 @@ export function TelegramBotPanel({ onClose }: Props) {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <div onClick={e => e.stopPropagation()} className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-gray-100">
+        <div className="flex items-center justify-between p-4 border-b border-white/60">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 bg-sky-50 rounded-xl flex items-center justify-center"><Bot className="w-4 h-4 text-sky-600" /></div>
             <div>
               <div className="text-sm text-gray-900">Telegram-бот Utir Soft</div>
-              <div className="text-[10px] text-gray-400">@UtirSoftBot · Онлайн</div>
+              <div className="text-[10px] text-slate-400">@UtirSoftBot · Онлайн</div>
             </div>
           </div>
-          <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
+          <button onClick={onClose}><X className="w-4 h-4 text-slate-400" /></button>
         </div>
 
-        <div className="flex gap-1 px-4 pt-3 border-b border-gray-100 overflow-x-auto">
+        <div className="flex gap-1 px-4 pt-3 border-b border-white/60 overflow-x-auto">
           {tabs.map(t => {
             const I = t.icon;
             return (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-xs whitespace-nowrap ${tab === t.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}>
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-xs whitespace-nowrap ${tab === t.id ? 'bg-gray-900 text-white' : 'text-slate-500 hover:text-gray-900'}`}>
                 <I className="w-3 h-3" /> {t.label}
               </button>
             );
@@ -64,8 +64,8 @@ export function TelegramBotPanel({ onClose }: Props) {
           {tab === 'tasks' && (
             <div className="space-y-3">
               <div className="bg-gray-50 rounded-2xl p-4">
-                <div className="text-xs text-gray-900 mb-2">Как это работает</div>
-                <ol className="text-xs text-gray-500 space-y-1.5 list-decimal pl-4">
+                <div className="text-xs text-slate-900 mb-2">Как это работает</div>
+                <ol className="text-xs text-slate-500 space-y-1.5 list-decimal pl-4">
                   <li>Сотрудник пишет /start боту</li>
                   <li>Получает задачи на день автоматически в 08:00</li>
                   <li>Отмечает статусы прямо в Telegram</li>
@@ -73,18 +73,18 @@ export function TelegramBotPanel({ onClose }: Props) {
                 </ol>
               </div>
               <div className="bg-sky-50 rounded-2xl p-3 space-y-2">
-                <div className="bg-white rounded-xl p-2.5 text-xs text-gray-700">📋 У вас X задач на сегодня</div>
-                <div className="bg-white rounded-xl p-2.5 text-xs text-gray-700">⏰ ЧЧ:ММ — Замер кухни, адрес клиента</div>
-                <div className="bg-white rounded-xl p-2.5 text-xs text-gray-700">📷 Загрузите фото после установки</div>
+                <div className="bg-white rounded-xl p-2.5 text-xs text-slate-700">📋 У вас X задач на сегодня</div>
+                <div className="bg-white rounded-xl p-2.5 text-xs text-slate-700">⏰ ЧЧ:ММ — Замер кухни, адрес клиента</div>
+                <div className="bg-white rounded-xl p-2.5 text-xs text-slate-700">📷 Загрузите фото после установки</div>
               </div>
             </div>
           )}
 
           {tab === 'clients' && (
             <div className="space-y-2.5">
-              <div className="text-[11px] text-gray-400">Переменные: {'{номер} {дата} {имя} {сумма} {время}'}</div>
+              <div className="text-[11px] text-slate-400">Переменные: {'{номер} {дата} {имя} {сумма} {время}'}</div>
               {templates.map(t => (
-                <div key={t.id} className="bg-white rounded-2xl border border-gray-100 p-3.5">
+                <div key={t.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-3.5">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <textarea value={t.text} onChange={e => setTemplates(ts => ts.map(x => x.id === t.id ? { ...x, text: e.target.value } : x))}
                       rows={2} className="flex-1 text-xs bg-gray-50 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none" />
@@ -93,10 +93,10 @@ export function TelegramBotPanel({ onClose }: Props) {
                       <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${t.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
                     </button>
                   </div>
-                  <div className="text-[10px] text-gray-400">Триггер: {t.trigger}</div>
+                  <div className="text-[10px] text-slate-400">Триггер: {t.trigger}</div>
                 </div>
               ))}
-              <button className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 border border-dashed border-gray-200 rounded-xl text-xs text-gray-500 hover:bg-gray-50">
+              <button className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 border border-dashed border-gray-200 rounded-xl text-xs text-slate-500 hover:bg-white/50">
                 <Plus className="w-3.5 h-3.5" /> Создать новый шаблон
               </button>
             </div>
@@ -105,7 +105,7 @@ export function TelegramBotPanel({ onClose }: Props) {
           {tab === 'reports' && (
             <div className="space-y-3">
               <div>
-                <label className="text-[11px] text-gray-400">Группа в Telegram</label>
+                <label className="text-[11px] text-slate-400">Группа в Telegram</label>
                 <input value={bossGroup} onChange={e => setBossGroup(e.target.value)}
                   className="w-full mt-1 px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
               </div>
@@ -115,14 +115,14 @@ export function TelegramBotPanel({ onClose }: Props) {
                   { k: 'weekly', label: 'Еженедельный отчёт ПН 09:00 — выручка, план/факт, рейтинг менеджеров' },
                   { k: 'monthly', label: 'Ежемесячный отчёт 1 числа — финансовая сводка' },
                 ].map(o => (
-                  <label key={o.k} className="flex items-center gap-2 p-2.5 bg-white border border-gray-100 rounded-xl cursor-pointer">
+                  <label key={o.k} className="flex items-center gap-2 p-2.5 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl cursor-pointer">
                     <input type="checkbox" checked={(reports as any)[o.k]} onChange={() => setReports(r => ({ ...r, [o.k]: !(r as any)[o.k] }))} />
-                    <span className="text-xs text-gray-700">{o.label}</span>
+                    <span className="text-xs text-slate-700">{o.label}</span>
                   </label>
                 ))}
               </div>
               <div>
-                <div className="text-xs text-gray-900 mb-2">Алёрты в реальном времени</div>
+                <div className="text-xs text-slate-900 mb-2">Алёрты в реальном времени</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {ALERTS.map(a => {
                     const on = activeAlerts.includes(a);
@@ -134,8 +134,8 @@ export function TelegramBotPanel({ onClose }: Props) {
                 </div>
               </div>
               <div className="bg-sky-50 rounded-2xl p-3.5">
-                <div className="text-[10px] text-gray-500 mb-1.5">Превью отчёта</div>
-                <div className="bg-white rounded-xl p-3 text-xs text-gray-700 space-y-1">
+                <div className="text-[10px] text-slate-500 mb-1.5">Превью отчёта</div>
+                <div className="bg-white rounded-xl p-3 text-xs text-slate-700 space-y-1">
                   <div>📊 Отчёт за 09.05.2026</div>
                   <div>Продажи: 4.2 млн ₸ (+12%)</div>
                   <div>Новых заявок: 8</div>
@@ -159,15 +159,15 @@ export function TelegramBotPanel({ onClose }: Props) {
                   </div>
                 ))}
               </div>
-              <label className="flex items-center gap-2 p-2.5 bg-white border border-gray-100 rounded-xl cursor-pointer">
+              <label className="flex items-center gap-2 p-2.5 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl cursor-pointer">
                 <input type="checkbox" checked={whAlerts.inbound} onChange={() => setWhAlerts(s => ({ ...s, inbound: !s.inbound }))} />
-                <span className="text-xs text-gray-700">Уведомлять при поступлении товара</span>
+                <span className="text-xs text-slate-700">Уведомлять при поступлении товара</span>
               </label>
-              <label className="flex items-center gap-2 p-2.5 bg-white border border-gray-100 rounded-xl cursor-pointer">
+              <label className="flex items-center gap-2 p-2.5 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl cursor-pointer">
                 <input type="checkbox" checked={whAlerts.supplier} onChange={() => setWhAlerts(s => ({ ...s, supplier: !s.supplier }))} />
-                <span className="text-xs text-gray-700">Запросы от производства в @UtirSoft_Warehouse</span>
+                <span className="text-xs text-slate-700">Запросы от производства в @UtirSoft_Warehouse</span>
               </label>
-              <button className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">
+              <button className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">
                 <Send className="w-3.5 h-3.5" /> Сделать заказ поставщику
               </button>
             </div>
@@ -175,9 +175,9 @@ export function TelegramBotPanel({ onClose }: Props) {
 
           {tab === 'field' && (
             <div className="space-y-3">
-              <div className="text-xs text-gray-500">Утренняя рассылка маршрута на день в 08:00</div>
+              <div className="text-xs text-slate-500">Утренняя рассылка маршрута на день в 08:00</div>
               <div className="bg-sky-50 rounded-2xl p-3.5">
-                <div className="bg-white rounded-xl p-3 text-xs text-gray-700 space-y-2">
+                <div className="bg-white rounded-xl p-3 text-xs text-slate-700 space-y-2">
                   <div>☀️ Доброе утро! Сегодня X выездов:</div>
                   <div className="pl-2 space-y-1 text-gray-600">
                     <div>ЧЧ:ММ — Замер кухни, адрес клиента, тел.</div>
@@ -191,13 +191,13 @@ export function TelegramBotPanel({ onClose }: Props) {
                   ))}
                 </div>
               </div>
-              <label className="flex items-center gap-2 p-2.5 bg-white border border-gray-100 rounded-xl cursor-pointer">
+              <label className="flex items-center gap-2 p-2.5 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl cursor-pointer">
                 <input type="checkbox" checked={fieldOpts.photo} onChange={() => setFieldOpts(s => ({ ...s, photo: !s.photo }))} />
-                <span className="text-xs text-gray-700">Загрузка фото и видео отчёта прямо из Telegram</span>
+                <span className="text-xs text-slate-700">Загрузка фото и видео отчёта прямо из Telegram</span>
               </label>
-              <label className="flex items-center gap-2 p-2.5 bg-white border border-gray-100 rounded-xl cursor-pointer">
+              <label className="flex items-center gap-2 p-2.5 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl cursor-pointer">
                 <input type="checkbox" checked={fieldOpts.geo} onChange={() => setFieldOpts(s => ({ ...s, geo: !s.geo }))} />
-                <span className="text-xs text-gray-700">Геолокация для подтверждения визита</span>
+                <span className="text-xs text-slate-700">Геолокация для подтверждения визита</span>
               </label>
             </div>
           )}

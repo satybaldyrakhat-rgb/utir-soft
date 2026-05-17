@@ -131,18 +131,18 @@ export function TeamInvitePanel({ language }: Props) {
   const archive = list.filter(i => i.usedAt || new Date(i.expiresAt).getTime() <= now);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5">
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
       <div className="flex items-center justify-between mb-1">
         <div className="text-sm text-gray-900">{l('Приглашения в команду', 'Командаға шақыру', 'Team invitations')}</div>
         <button
           onClick={() => { setShowCreate(s => !s); setError(''); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/95 text-white rounded-xl text-xs hover:bg-slate-900 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10 transition-all transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           {l('Новое приглашение', 'Жаңа шақыру', 'New invitation')}
         </button>
       </div>
-      <div className="text-[11px] text-gray-400 mb-4">
+      <div className="text-[11px] text-slate-400 mb-4">
         {l(
           'Поделитесь ссылкой с сотрудником — он зарегистрируется и попадёт в вашу команду.',
           'Сілтемені қызметкерге беріңіз — ол тіркеліп, командаңызға қосылады.',
@@ -152,17 +152,17 @@ export function TeamInvitePanel({ language }: Props) {
 
       {showCreate && (
         <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
-          <label className="block text-[11px] text-gray-500 mb-1.5">{l('Роль', 'Рөл', 'Role')}</label>
+          <label className="block text-[11px] text-slate-500 mb-1.5">{l('Роль', 'Рөл', 'Role')}</label>
           <select
             value={role}
             onChange={e => setRole(e.target.value)}
-            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 mb-3"
+            className="w-full px-3 py-2 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 mb-3"
           >
             {roleOptions.map(r => (
               <option key={r.id} value={r.id}>{labelForRole(r.id)}</option>
             ))}
           </select>
-          <label className="block text-[11px] text-gray-500 mb-1.5">
+          <label className="block text-[11px] text-slate-500 mb-1.5">
             {l('Email сотрудника (необязательно)', 'Қызметкер email (міндетті емес)', 'Teammate email (optional)')}
           </label>
           <input
@@ -170,9 +170,9 @@ export function TeamInvitePanel({ language }: Props) {
             value={inviteEmail}
             onChange={e => setInviteEmail(e.target.value)}
             placeholder="name@example.com"
-            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 mb-1"
+            className="w-full px-3 py-2 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 mb-1"
           />
-          <div className="text-[10px] text-gray-400 mb-3">
+          <div className="text-[10px] text-slate-400 mb-3">
             {l('Если заполнить — ссылка уйдёт на email автоматически. Иначе можно отправить вручную.',
                'Толтырсаңыз — сілтеме автоматты түрде email-ге жіберіледі. Әйтпесе қолмен жібересіз.',
                'Filled — the link is emailed automatically. Empty — copy and send it yourself.')}
@@ -181,7 +181,7 @@ export function TeamInvitePanel({ language }: Props) {
             <button
               onClick={createInvite}
               disabled={creating}
-              className="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs hover:bg-gray-800 transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 bg-slate-900/95 text-white rounded-xl text-xs hover:bg-slate-900 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)] ring-1 ring-white/10 transition-all transition-colors disabled:opacity-50"
             >
               {creating ? l('Создаю…', 'Жасалуда…', 'Creating…') : l('Создать ссылку', 'Сілтеме жасау', 'Create link')}
             </button>
@@ -204,11 +204,11 @@ export function TeamInvitePanel({ language }: Props) {
       )}
 
       {loading && list.length === 0 && (
-        <div className="text-xs text-gray-400 py-3">{l('Загрузка…', 'Жүктелуде…', 'Loading…')}</div>
+        <div className="text-xs text-slate-400 py-3">{l('Загрузка…', 'Жүктелуде…', 'Loading…')}</div>
       )}
 
       {!loading && pending.length === 0 && archive.length === 0 && !showCreate && (
-        <div className="text-xs text-gray-400 py-3">
+        <div className="text-xs text-slate-400 py-3">
           {l('Пока нет активных приглашений.', 'Әзірге белсенді шақыру жоқ.', 'No active invitations yet.')}
         </div>
       )}
@@ -218,10 +218,10 @@ export function TeamInvitePanel({ language }: Props) {
         <div className="space-y-2">
           {pending.map(inv => (
             <div key={inv.id} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-100">
-              <LinkIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <LinkIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-xs text-gray-900 font-mono truncate">{buildLink(inv.code)}</div>
-                <div className="text-[10px] text-gray-500 mt-0.5">
+                <div className="text-[10px] text-slate-500 mt-0.5">
                   {labelForRole(inv.role)}
                   {' · '}
                   {l('Истекает', 'Жарамдылық', 'Expires')}{' '}
@@ -235,7 +235,7 @@ export function TeamInvitePanel({ language }: Props) {
               >
                 {copiedId === inv.id
                   ? <Check className="w-4 h-4 text-emerald-600" />
-                  : <Copy className="w-4 h-4 text-gray-500" />}
+                  : <Copy className="w-4 h-4 text-slate-500" />}
               </button>
               <button
                 onClick={() => revoke(inv.id)}
@@ -252,22 +252,22 @@ export function TeamInvitePanel({ language }: Props) {
       {/* Archive */}
       {archive.length > 0 && (
         <details className="mt-3">
-          <summary className="text-[11px] text-gray-400 cursor-pointer select-none">
+          <summary className="text-[11px] text-slate-400 cursor-pointer select-none">
             {l('История', 'Тарих', 'History')} ({archive.length})
           </summary>
           <div className="mt-2 space-y-1.5">
             {archive.slice(0, 10).map(inv => (
-              <div key={inv.id} className="flex items-center justify-between gap-3 px-2 py-1.5 text-[11px] text-gray-500">
+              <div key={inv.id} className="flex items-center justify-between gap-3 px-2 py-1.5 text-[11px] text-slate-500">
                 <span className="font-mono flex-shrink-0">{inv.code}</span>
                 <span className="text-right truncate">
                   {inv.usedAt ? (
                     <>
                       {l('Использовано', 'Пайдаланылды', 'Used')}
                       {inv.usedByName && (
-                        <span className="text-gray-700"> · {inv.usedByName}</span>
+                        <span className="text-slate-700"> · {inv.usedByName}</span>
                       )}
                       {inv.usedByEmail && !inv.usedByName && (
-                        <span className="text-gray-700"> · {inv.usedByEmail}</span>
+                        <span className="text-slate-700"> · {inv.usedByEmail}</span>
                       )}
                     </>
                   ) : (
