@@ -37,6 +37,44 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
   const averageCheck = store.getAverageCheck();
   const pipeline = store.getTotalPipeline();
 
+  // Month-over-month deltas — real numbers replacing the old hardcoded
+  // «+12.5%» / «+15.3%» trends. Compares the current calendar month with
+  // the previous one across income transactions, active deals, new clients,
+  // and average check. Returns the signed % string ready for display.
+  const trends = (() => {
+    const now = new Date();
+    const thisMonthKey = now.toISOString().slice(0, 7);
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthKey = lastMonthDate.toISOString().slice(0, 7);
+    const pct = (a: number, b: number) => {
+      if (b === 0) return a === 0 ? '0%' : '+∞';
+      const d = Math.round((a - b) / b * 100);
+      return `${d >= 0 ? '+' : ''}${d}%`;
+    };
+    const sumIn = (key: string) => store.transactions
+      .filter(t => t.type === 'income' && t.status === 'completed' && (t.date || '').startsWith(key))
+      .reduce((s, t) => s + t.amount, 0);
+    const dealsInMonth = (key: string) => store.deals.filter(d => (d.date || '').startsWith(key));
+    const newClientsInMonth = (key: string) => {
+      const names = new Set<string>();
+      for (const d of dealsInMonth(key)) names.add(d.customerName);
+      return names.size;
+    };
+    const avgCheckInMonth = (key: string) => {
+      const ds = dealsInMonth(key).filter(d => d.amount > 0);
+      if (ds.length === 0) return 0;
+      return ds.reduce((s, d) => s + d.amount, 0) / ds.length;
+    };
+    const revT = sumIn(thisMonthKey);
+    const revL = sumIn(lastMonthKey);
+    return {
+      revenue:    { txt: pct(revT, revL), up: revT >= revL },
+      activeDeals: { txt: pct(dealsInMonth(thisMonthKey).length, dealsInMonth(lastMonthKey).length), up: dealsInMonth(thisMonthKey).length >= dealsInMonth(lastMonthKey).length },
+      clients:    { txt: pct(newClientsInMonth(thisMonthKey), newClientsInMonth(lastMonthKey)), up: newClientsInMonth(thisMonthKey) >= newClientsInMonth(lastMonthKey) },
+      avgCheck:   { txt: pct(avgCheckInMonth(thisMonthKey), avgCheckInMonth(lastMonthKey)), up: avgCheckInMonth(thisMonthKey) >= avgCheckInMonth(lastMonthKey) },
+    };
+  })();
+
   // Recent orders from deals (sorted by date, take 5)
   const recentOrders = [...store.deals]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -124,10 +162,10 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
       {/* Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
-          { label: l('Выручка (мес)', 'Табыс (ай)', 'Revenue (month)'), value: fmt(totalRevenue), change: '+12.5%', up: true, icon: TrendingUp, page: 'finance' },
-          { label: l('Активные заказы', 'Белсенді тапсырыстар', 'Active orders'), value: String(activeDeals), change: `+${store.deals.filter(d => d.status === 'new').length}`, up: true, icon: ShoppingBag, page: 'sales' },
-          { label: l('Всего клиентов', 'Барлық клиенттер', 'Total clients'), value: String(totalClients), change: `+${store.deals.filter(d => d.status === 'new').length}`, up: true, icon: Users, page: 'chats' },
-          { label: l('Средний чек', 'Орташа чек', 'Avg. check'), value: fmt(averageCheck), change: '+15.3%', up: true, icon: DollarSign, page: 'analytics' },
+          { label: l('Выручка (мес)', 'Табыс (ай)', 'Revenue (month)'), value: fmt(totalRevenue), change: trends.revenue.txt, up: trends.revenue.up, icon: TrendingUp, page: 'finance' },
+          { label: l('Активные заказы', 'Белсенді тапсырыстар', 'Active orders'), value: String(activeDeals), change: trends.activeDeals.txt, up: trends.activeDeals.up, icon: ShoppingBag, page: 'sales' },
+          { label: l('Всего клиентов', 'Барлық клиенттер', 'Total clients'), value: String(totalClients), change: trends.clients.txt, up: trends.clients.up, icon: Users, page: 'chats' },
+          { label: l('Средний чек', 'Орташа чек', 'Avg. check'), value: fmt(averageCheck), change: trends.avgCheck.txt, up: trends.avgCheck.up, icon: DollarSign, page: 'analytics' },
         ].map((card, i) => {
           const Icon = card.icon;
           return (

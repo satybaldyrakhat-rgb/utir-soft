@@ -1,34 +1,21 @@
-import { useState } from 'react';
-import { Package, TrendingUp, AlertTriangle, ShoppingCart, Wrench, Users, Clock, CheckCircle, Plus, X, Search, Edit2, Eye, Truck, Calendar, BarChart3, ArrowUpDown, MapPin, FileText } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Package, TrendingUp, AlertTriangle, ShoppingCart, Wrench, Users, Clock, CheckCircle, Plus, X, Search, Edit2, Eye, Truck, Calendar, BarChart3, ArrowUpDown, MapPin, FileText, Trash2, Loader2, Copy, PlayCircle, PauseCircle, Download } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { Calculator } from './Calculator';
+import { api } from '../utils/api';
 
 interface Product {
   id: string; name: string; category: string; quantity: number; unit: string; supplier: string; cost: number; status: 'instock' | 'low' | 'outofstock'; minQty: number;
 }
 
 interface ProdOrder {
-  id: number; name: string; client: string; master: string; daysLeft: number; progress: number; status: 'working' | 'done' | 'started' | 'paused'; start: string; end: string; materials: string[];
+  id: number; dealId: string; name: string; client: string; master: string;
+  daysLeft: number; progress: number; status: 'working' | 'done' | 'started' | 'paused';
+  start: string; end: string; materials: string[];
 }
 
-const mockProducts: Product[] = [
-  { id: '1', name: 'ЛДСП Egger White', category: 'Плиты', quantity: 45, unit: 'лист', supplier: 'ТОО КазДСП', cost: 18000, status: 'instock', minQty: 10 },
-  { id: '2', name: 'Фурнитура Blum Aventos', category: 'Фурнитура', quantity: 12, unit: 'шт', supplier: 'Blum KZ', cost: 45000, status: 'low', minQty: 20 },
-  { id: '3', name: 'Кромка ПВХ 2мм', category: 'Кромка', quantity: 150, unit: 'м', supplier: 'ИП Кромка Люкс', cost: 350, status: 'instock', minQty: 50 },
-  { id: '4', name: 'Столешница камень', category: 'Столешницы', quantity: 3, unit: 'шт', supplier: 'Stone Art', cost: 85000, status: 'low', minQty: 5 },
-  { id: '5', name: 'МДФ фасады глянец', category: 'Фасады', quantity: 0, unit: 'шт', supplier: 'МДФ Мастер', cost: 12000, status: 'outofstock', minQty: 15 },
-  { id: '6', name: 'Направляющие Hettich', category: 'Фурнитура', quantity: 65, unit: 'пара', supplier: 'Hettich KZ', cost: 2500, status: 'instock', minQty: 20 },
-  { id: '7', name: 'Петли Blum накладные', category: 'Фурнитура', quantity: 180, unit: 'шт', supplier: 'Blum KZ', cost: 850, status: 'instock', minQty: 50 },
-  { id: '8', name: 'ЛДСП Kronospan Дуб', category: 'Плиты', quantity: 28, unit: 'лист', supplier: 'ТОО КазДСП', cost: 22000, status: 'instock', minQty: 10 },
-  { id: '9', name: 'Ручки скоба 128мм', category: 'Фурнитура', quantity: 95, unit: 'шт', supplier: 'Hettich KZ', cost: 1200, status: 'instock', minQty: 30 },
-];
-
-const prodOrders: ProdOrder[] = [
-  { id: 1, name: 'Кухня ЖК Expo', client: 'Айгерим К.', master: 'Алихан С.', daysLeft: 5, progress: 65, status: 'working', start: '22 мар', end: '3 апр', materials: ['ЛДСП Egger', 'Blum Aventos', 'Столешница камень'] },
-  { id: 2, name: 'Шкаф-купе Алатау', client: 'Марат А.', master: 'Нұрлан М.', daysLeft: 0, progress: 100, status: 'done', start: '15 мар', end: '27 мар', materials: ['ЛДСП Kronospan', 'Hettich'] },
-  { id: 3, name: 'Гардероб Коттедж', client: 'Динара О.', master: 'Ерлан Т.', daysLeft: 8, progress: 15, status: 'started', start: '26 мар', end: '6 апр', materials: ['МДФ фасады', 'Blum', 'Кромка ПВХ'] },
-  { id: 4, name: 'Офис стол + стулья', client: 'Асет Ж.', master: 'Алихан С.', daysLeft: 12, progress: 5, status: 'paused', start: '1 апр', end: '10 апр', materials: ['ЛДСП Egger', 'Направляющие'] },
-];
+// (Stale mockProducts + prodOrders removed — store is the single source of
+// truth now; production orders are built from store.deals below.)
 
 interface WarehouseProps { language: 'kz' | 'ru' | 'eng'; }
 
@@ -47,15 +34,36 @@ export function Warehouse({ language }: WarehouseProps) {
   const products = store.products;
   const setProducts = (fn: any) => {}; // removed
 
-  // Build production orders from store deals
+  // Build production orders from store deals. Carry dealId through so the
+  // action buttons (start / pause / done) can update the corresponding deal.
   const prodOrders: ProdOrder[] = store.deals
-    .filter(d => ['production', 'assembly', 'contract', 'project-agreed'].includes(d.status))
+    .filter(d => ['production', 'assembly', 'contract', 'project-agreed', 'manufacturing', 'installation', 'measured'].includes(d.status))
     .map((d, i) => ({
-      id: i + 1, name: d.product, client: d.customerName.split(' ')[0] + ' ' + (d.customerName.split(' ')[1]?.[0] || '') + '.', 
-      master: d.measurer || 'Не назначен', daysLeft: d.completionDate ? Math.max(0, Math.ceil((new Date(d.completionDate).getTime() - Date.now()) / 86400000)) : 0,
-      progress: d.progress, status: d.progress >= 100 ? 'done' as const : d.progress > 50 ? 'working' as const : d.progress > 0 ? 'started' as const : 'paused' as const,
-      start: d.measurementDate || d.date, end: d.completionDate || '', materials: d.materials ? d.materials.split(', ').slice(0, 3) : [],
+      id: i + 1, dealId: d.id,
+      name: d.product, client: d.customerName.split(' ')[0] + ' ' + (d.customerName.split(' ')[1]?.[0] || '') + '.',
+      master: d.measurer || 'Не назначен',
+      daysLeft: d.completionDate ? Math.max(0, Math.ceil((new Date(d.completionDate).getTime() - Date.now()) / 86400000)) : 0,
+      progress: d.progress,
+      status: d.progress >= 100 ? 'done' as const : d.progress > 50 ? 'working' as const : d.progress > 0 ? 'started' as const : 'paused' as const,
+      start: d.measurementDate || d.date, end: d.completionDate || '',
+      materials: d.materials ? d.materials.split(', ').slice(0, 3) : [],
     }));
+
+  // Production order actions — update the underlying deal's progress so the
+  // status badge moves accordingly. Status mapping:
+  //   start (0%) → started   (set progress=10)
+  //   working    (10-99%)     (set progress=60)
+  //   pause      → paused     (set progress=0)
+  //   done       → done       (set progress=100, status='completed')
+  async function setOrderState(order: ProdOrder, target: 'started' | 'working' | 'paused' | 'done') {
+    const patch: any =
+      target === 'done'    ? { progress: 100, status: 'completed' } :
+      target === 'paused'  ? { progress: 0 } :
+      target === 'working' ? { progress: Math.max(60, order.progress) } :
+                              { progress: Math.max(10, order.progress) };
+    try { await store.updateDeal(order.dealId, patch); }
+    catch (e: any) { alert('Не удалось обновить заказ: ' + (e?.message || e)); }
+  }
 
   const categories = ['Все', ...new Set(store.products.map(p => p.category))];
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
@@ -171,9 +179,45 @@ export function Warehouse({ language }: WarehouseProps) {
                     <div className="flex justify-between text-[9px] mb-1"><span className="text-gray-400">{l('Прогресс', 'Прогресс', 'Progress')}</span><span className="text-gray-900">{o.progress}%</span></div>
                     <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${conf.bar} rounded-full transition-all`} style={{ width: `${o.progress}%` }} /></div>
                   </div>
+
+                  {/* Action buttons — stop propagation so they don't open
+                       the order details modal at the same time. Each one
+                       calls the underlying deal API (see setOrderState). */}
+                  <div className="flex items-center gap-1.5 mt-3" onClick={e => e.stopPropagation()}>
+                    {o.status === 'paused' && (
+                      <button onClick={() => setOrderState(o, 'started')} className="flex-1 inline-flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800">
+                        <PlayCircle className="w-3 h-3" /> {l('Старт', 'Бастау', 'Start')}
+                      </button>
+                    )}
+                    {o.status === 'started' && (
+                      <button onClick={() => setOrderState(o, 'working')} className="flex-1 inline-flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <Wrench className="w-3 h-3" /> {l('В работу', 'Жұмысқа', 'Working')}
+                      </button>
+                    )}
+                    {o.status !== 'done' && o.status !== 'paused' && (
+                      <button onClick={() => setOrderState(o, 'paused')} className="inline-flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 bg-gray-50 text-gray-700 border border-gray-100 rounded-lg hover:bg-gray-100">
+                        <PauseCircle className="w-3 h-3" /> {l('Пауза', 'Пауза', 'Pause')}
+                      </button>
+                    )}
+                    {o.status !== 'done' && (
+                      <button onClick={() => setOrderState(o, 'done')} className="flex-1 inline-flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
+                        <CheckCircle className="w-3 h-3" /> {l('Готово', 'Дайын', 'Done')}
+                      </button>
+                    )}
+                    {o.status === 'done' && (
+                      <div className="flex-1 text-center text-[10px] text-emerald-600 py-1.5">✓ {l('Заказ завершён', 'Тапсырыс аяқталды', 'Order complete')}</div>
+                    )}
+                  </div>
                 </div>
               );
             })}
+            {prodOrders.length === 0 && (
+              <div className="md:col-span-2 bg-white rounded-2xl border border-gray-100 p-10 text-center">
+                <Wrench className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                <div className="text-sm text-gray-900 mb-1">{l('Нет заказов в производстве', '...', 'No production orders')}</div>
+                <div className="text-xs text-gray-400">{l('Переведите сделку в статус «Производство» / «Сборка» — она появится здесь', '...', 'Move a deal to «Production» status to see it here')}</div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -238,272 +282,15 @@ export function Warehouse({ language }: WarehouseProps) {
 
       {/* ===== BOM (Спецификации изделий) ===== */}
       {activeView === 'bom' && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-900">{l('Шаблоны изделий', 'Бұйым шаблондары', 'Product Templates')}</div>
-            <button className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded-xl hover:bg-gray-800">{l('Создать шаблон', 'Шаблон жасау', 'Create template')}</button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[
-              { name: l('Кухня угловая', 'Бұрыштық ас үй', 'Corner Kitchen'), price: 850000, days: 21 },
-              { name: l('Кухня прямая', 'Тікелей ас үй', 'Linear Kitchen'), price: 620000, days: 14 },
-              { name: l('Шкаф-купе 3-дверный', '3 есікті шкаф-купе', 'Sliding Wardrobe (3 doors)'), price: 480000, days: 12 },
-              { name: l('Гардеробная', 'Гардероб', 'Walk-in Closet'), price: 720000, days: 18 },
-              { name: l('Прихожая', 'Дәліз', 'Hallway'), price: 320000, days: 10 },
-              { name: l('Детская кровать', 'Балалар төсегі', 'Children\'s Bed'), price: 180000, days: 7 },
-            ].map((tpl, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-sm transition-all cursor-pointer">
-                <div className="w-full h-28 bg-gray-50 rounded-xl flex items-center justify-center mb-3">
-                  <Package className="w-8 h-8 text-gray-300" />
-                </div>
-                <div className="text-sm text-gray-900 mb-1">{tpl.name}</div>
-                <div className="flex items-center justify-between text-[11px] text-gray-400">
-                  <span>{tpl.price.toLocaleString('ru-RU')} ₸</span>
-                  <span>{tpl.days} {l('дней', 'күн', 'days')}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Detailed BOM example */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="text-sm text-gray-900">{l('Пример: Кухня прямая 3м', 'Мысал: 3м тікелей ас үй', 'Example: Linear Kitchen 3m')}</div>
-                <div className="text-[11px] text-gray-400 mt-0.5">3000 × 600 × 900 мм · {l('ЛДСП Egger White', 'ЛДСП Egger White', 'Egger White MFC')}</div>
-              </div>
-              <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50">{l('Использовать в заказе', 'Тапсырыста қолдану', 'Use in order')}</button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="text-[10px] text-gray-400">
-                  <tr className="border-b border-gray-50">
-                    <th className="text-left py-2">{l('Материал', 'Материал', 'Material')}</th>
-                    <th className="text-left py-2">{l('Поставщик', 'Жеткізуші', 'Supplier')}</th>
-                    <th className="text-center py-2">{l('Кол-во', 'Саны', 'Qty')}</th>
-                    <th className="text-center py-2">{l('Ед.', 'Бірл.', 'Unit')}</th>
-                    <th className="text-right py-2">{l('Цена', 'Бағасы', 'Price')}</th>
-                    <th className="text-right py-2">{l('Итого', 'Жиыны', 'Total')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {[
-                    { mat: 'ЛДСП Egger White W980', sup: 'ТОО КазДСП', qty: 4, unit: l('лист', 'парақ', 'sheet'), price: 18000 },
-                    { mat: 'Кромка ПВХ 2мм', sup: 'ИП Кромка Люкс', qty: 22, unit: 'м', price: 350 },
-                    { mat: 'Фурнитура Blum', sup: 'Blum KZ', qty: 6, unit: l('шт', 'дана', 'pcs'), price: 4500 },
-                    { mat: 'Столешница Stone Art', sup: 'Stone Art', qty: 1, unit: l('шт', 'дана', 'pcs'), price: 85000 },
-                  ].map((r, i) => (
-                    <tr key={i}>
-                      <td className="py-2.5 text-gray-900">{r.mat}</td>
-                      <td className="py-2.5 text-gray-500">{r.sup}</td>
-                      <td className="py-2.5 text-center text-gray-700">{r.qty}</td>
-                      <td className="py-2.5 text-center text-gray-400">{r.unit}</td>
-                      <td className="py-2.5 text-right text-gray-700">{r.price.toLocaleString('ru-RU')} ₸</td>
-                      <td className="py-2.5 text-right text-gray-900">{(r.qty * r.price).toLocaleString('ru-RU')} ₸</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-4 pt-4 border-t border-gray-50 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-              <div><div className="text-[10px] text-gray-400 mb-1">{l('Материалы', 'Материалдар', 'Materials')}</div><div className="text-gray-900">182 700 ₸</div></div>
-              <div><div className="text-[10px] text-gray-400 mb-1">{l('Работа', 'Жұмыс', 'Labor')}</div><div className="text-gray-900">120 000 ₸</div></div>
-              <div><div className="text-[10px] text-gray-400 mb-1">{l('Наценка 30%', 'Үстеме 30%', 'Markup 30%')}</div><div className="text-gray-900">90 810 ₸</div></div>
-              <div><div className="text-[10px] text-gray-400 mb-1">{l('Итого клиенту', 'Клиентке жиыны', 'Client total')}</div><div className="text-gray-900">393 510 ₸</div></div>
-            </div>
-          </div>
-        </div>
+        <BomTemplates language={language} />
       )}
 
       {/* ===== Калькулятор стоимости ===== */}
       {activeView === 'calculator' && <Calculator language={language} />}
-      {false && (
-        <div className="hidden">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="text-[10px] text-gray-400 mb-2">{l('Шаг 1', '1-қадам', 'Step 1')}</div>
-              <div className="text-sm text-gray-900 mb-3">{l('Тип изделия', 'Бұйым түрі', 'Product type')}</div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {[l('Кухня', 'Ас үй', 'Kitchen'), l('Шкаф', 'Шкаф', 'Wardrobe'), l('Гардероб', 'Гардероб', 'Closet'), l('Прихожая', 'Дәліз', 'Hallway'), l('Детская', 'Балалар', 'Kids'), l('Спальня', 'Жатын', 'Bedroom'), l('Гостиная', 'Қонақ', 'Living')].map((t, i) => (
-                  <button key={i} className={`p-3 border rounded-xl text-xs hover:border-gray-300 hover:bg-gray-50 transition-all ${i === 0 ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-100 text-gray-700'}`}>{t}</button>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="text-[10px] text-gray-400 mb-2">{l('Шаг 2', '2-қадам', 'Step 2')}</div>
-              <div className="text-sm text-gray-900 mb-3">{l('Размеры (м)', 'Өлшемдері (м)', 'Dimensions (m)')}</div>
-              <div className="grid grid-cols-3 gap-3">
-                {[l('Длина', 'Ұзындығы', 'Length'), l('Ширина', 'Ені', 'Width'), l('Высота', 'Биіктігі', 'Height')].map((lbl, i) => (
-                  <div key={i}>
-                    <label className="block text-[11px] text-gray-400 mb-1">{lbl}</label>
-                    <input type="number" defaultValue={i === 0 ? 3 : i === 1 ? 0.6 : 0.9} step="0.1" className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="text-[10px] text-gray-400 mb-2">{l('Шаг 3', '3-қадам', 'Step 3')}</div>
-              <div className="text-sm text-gray-900 mb-3">{l('Материалы', 'Материалдар', 'Materials')}</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  { lbl: 'ЛДСП', opts: ['Egger White', 'Egger Wood', 'Kronospan Дуб'] },
-                  { lbl: l('Фасады', 'Фасадтар', 'Facades'), opts: ['МДФ глянец', 'МДФ матовый', 'Массив'] },
-                  { lbl: l('Фурнитура', 'Фурнитура', 'Hardware'), opts: ['Blum', 'Hettich', l('Эконом', 'Эконом', 'Economy')] },
-                  { lbl: l('Столешница', 'Үстел беті', 'Countertop'), opts: ['Stone Art', l('ЛДСП пост', 'ЛДСП пост', 'Postformed'), l('Камень', 'Тас', 'Stone')] },
-                ].map((g, i) => (
-                  <div key={i}>
-                    <label className="block text-[11px] text-gray-400 mb-1">{g.lbl}</label>
-                    <select className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200">
-                      {g.opts.map(o => <option key={o}>{o}</option>)}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="text-[10px] text-gray-400 mb-2">{l('Шаг 4', '4-қадам', 'Step 4')}</div>
-              <div className="text-sm text-gray-900 mb-3">{l('Дополнительно', 'Қосымша', 'Add-ons')}</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {[
-                  l('Подсветка LED', 'LED жарық', 'LED lighting'),
-                  l('Мягкое закрывание Blum', 'Blum жұмсақ жабылу', 'Blum soft-close'),
-                  l('Встроенная техника', 'Кіріктірілген техника', 'Built-in appliances'),
-                  l('Выдвижные ящики', 'Тартпалар', 'Pull-out drawers'),
-                ].map((opt, i) => (
-                  <label key={i} className="flex items-center gap-2 p-2.5 border border-gray-100 rounded-xl hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" className="rounded" />
-                    <span className="text-xs text-gray-700">{opt}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="text-[10px] text-gray-400 mb-2">{l('Шаг 5', '5-қадам', 'Step 5')}</div>
-              <div className="text-sm text-gray-900 mb-3">{l('Работа', 'Жұмыс', 'Services')}</div>
-              <div className="space-y-2">
-                {[
-                  { lbl: l('Замер', 'Өлшеу', 'Measurement'), price: 5000 },
-                  { lbl: l('Дизайн-проект', 'Дизайн-жоба', 'Design project'), price: 25000 },
-                  { lbl: l('Доставка', 'Жеткізу', 'Delivery'), price: 15000 },
-                  { lbl: l('Установка', 'Орнату', 'Installation'), price: 35000 },
-                ].map((s, i) => (
-                  <label key={i} className="flex items-center justify-between p-2.5 border border-gray-100 rounded-xl hover:bg-gray-50 cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" defaultChecked className="rounded" />
-                      <span className="text-xs text-gray-700">{s.lbl}</span>
-                    </div>
-                    <span className="text-xs text-gray-900">{s.price.toLocaleString('ru-RU')} ₸</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Total panel */}
-          <div className="space-y-3">
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 sticky top-4">
-              <div className="text-sm text-gray-900 mb-4">{l('Итого', 'Жиыны', 'Total')}</div>
-              <div className="space-y-2.5 mb-4">
-                <div className="flex justify-between text-xs"><span className="text-gray-500">{l('Материалы', 'Материалдар', 'Materials')}</span><span className="text-gray-900">480 000 ₸</span></div>
-                <div className="flex justify-between text-xs"><span className="text-gray-500">{l('Работа', 'Жұмыс', 'Labor')}</span><span className="text-gray-900">120 000 ₸</span></div>
-                <div className="flex justify-between text-xs"><span className="text-gray-500">{l('Наценка 30%', 'Үстеме 30%', 'Markup 30%')}</span><span className="text-gray-900">180 000 ₸</span></div>
-                <div className="border-t border-gray-100 pt-2.5 flex justify-between"><span className="text-sm text-gray-900">{l('ИТОГО', 'ЖИЫНЫ', 'TOTAL')}</span><span className="text-sm text-gray-900">780 000 ₸</span></div>
-              </div>
-              <div className="text-[11px] text-gray-400 mb-4">{l('Срок производства: 14-21 день', 'Өндіріс мерзімі: 14-21 күн', 'Production: 14-21 days')}</div>
-              <div className="space-y-2">
-                <button className="w-full px-3 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">{l('Создать заказ', 'Тапсырыс жасау', 'Create order')}</button>
-                <button className="w-full px-3 py-2.5 border border-gray-100 rounded-xl text-xs hover:bg-gray-50">{l('Сохранить как шаблон', 'Шаблон ретінде сақтау', 'Save as template')}</button>
-                <button className="w-full px-3 py-2.5 border border-gray-100 rounded-xl text-xs hover:bg-gray-50">{l('Отправить КП в WhatsApp', 'WhatsApp-қа КП жіберу', 'Send proposal via WhatsApp')}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ===== Раскрой (Nesting) ===== */}
       {activeView === 'nesting' && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-sm text-gray-900 mb-3">{l('Детали из заказа', 'Тапсырыстағы бөліктер', 'Order parts')}</div>
-            <div className="space-y-2">
-              {[
-                { name: l('Фасады', 'Фасадтар', 'Facades'), qty: 5, color: 'bg-blue-400' },
-                { name: l('Боковины', 'Бүйірлер', 'Side panels'), qty: 4, color: 'bg-purple-400' },
-                { name: l('Столешница', 'Үстел беті', 'Countertop'), qty: 1, color: 'bg-amber-400' },
-                { name: l('Полки', 'Сөрелер', 'Shelves'), qty: 6, color: 'bg-emerald-400' },
-                { name: l('Задняя стенка', 'Артқы қабырға', 'Back panel'), qty: 2, color: 'bg-rose-400' },
-              ].map((p, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs p-2 bg-gray-50 rounded-lg">
-                  <span className={`w-3 h-3 rounded ${p.color}`} />
-                  <span className="flex-1 text-gray-700">{p.name}</span>
-                  <span className="text-gray-400">×{p.qty}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm text-gray-900">{l('Лист ЛДСП 2750×1830', 'ЛДСП парағы 2750×1830', 'MFC sheet 2750×1830')}</div>
-              <span className="text-[10px] text-gray-400">{l('Лист 1 из 4', '1/4 парақ', 'Sheet 1 of 4')}</span>
-            </div>
-            <div className="aspect-[2750/1830] bg-gray-50 rounded-xl border border-gray-100 relative overflow-hidden">
-              {[
-                { x: 1, y: 1, w: 38, h: 60, c: 'bg-blue-200 border-blue-400' },
-                { x: 40, y: 1, w: 38, h: 60, c: 'bg-blue-200 border-blue-400' },
-                { x: 1, y: 62, w: 25, h: 36, c: 'bg-purple-200 border-purple-400' },
-                { x: 27, y: 62, w: 25, h: 36, c: 'bg-purple-200 border-purple-400' },
-                { x: 53, y: 62, w: 35, h: 18, c: 'bg-amber-200 border-amber-400' },
-                { x: 79, y: 1, w: 20, h: 30, c: 'bg-emerald-200 border-emerald-400' },
-                { x: 79, y: 32, w: 20, h: 30, c: 'bg-emerald-200 border-emerald-400' },
-                { x: 53, y: 81, w: 46, h: 17, c: 'bg-rose-200 border-rose-400' },
-              ].map((b, i) => (
-                <div key={i} className={`absolute border ${b.c}`}
-                  style={{ left: `${b.x}%`, top: `${b.y}%`, width: `${b.w}%`, height: `${b.h}%` }} />
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="text-sm text-gray-900 mb-3">{l('Статистика', 'Статистика', 'Stats')}</div>
-              <div className="space-y-2.5 text-xs">
-                <div className="flex justify-between"><span className="text-gray-500">{l('Использовано', 'Қолданылды', 'Used')}</span><span className="text-gray-900">87.5%</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">{l('Отходы', 'Қалдықтар', 'Waste')}</span><span className="text-amber-600">12.5%</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">{l('Листов нужно', 'Парақ керек', 'Sheets needed')}</span><span className="text-gray-900">4</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">{l('Экономия', 'Үнемдеу', 'Savings')}</span><span className="text-green-600">18 000 ₸</span></div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <button className="w-full px-3 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">{l('Оптимизировать', 'Оңтайландыру', 'Optimize')}</button>
-              <button className="w-full px-3 py-2.5 border border-gray-100 rounded-xl text-xs hover:bg-gray-50">{l('Экспорт XML/DXF', 'XML/DXF экспорты', 'Export XML/DXF')}</button>
-              <button className="w-full px-3 py-2.5 border border-gray-100 rounded-xl text-xs hover:bg-gray-50">{l('Печать карты', 'Картаны басу', 'Print map')}</button>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="text-sm text-gray-900 mb-3">{l('ЧПУ-станки', 'ЧПУ станоктары', 'CNC machines')}</div>
-              <div className="space-y-2">
-                {[
-                  { name: 'Felder K540', status: l('Работает', 'Жұмыста', 'Running'), color: 'text-green-600 bg-green-50', queue: 3 },
-                  { name: 'Holzma HPP', status: l('Простой', 'Бос тұр', 'Idle'), color: 'text-gray-500 bg-gray-50', queue: 0 },
-                  { name: 'Biesse Rover', status: l('Загружено', 'Жүктелді', 'Loaded'), color: 'text-blue-600 bg-blue-50', queue: 2 },
-                ].map((m, i) => (
-                  <div key={i} className="flex items-center justify-between p-2 border border-gray-100 rounded-lg">
-                    <div>
-                      <div className="text-xs text-gray-900">{m.name}</div>
-                      <div className="text-[10px] text-gray-400">{m.queue} {l('заданий', 'тапсырма', 'jobs')}</div>
-                    </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded ${m.color}`}>{m.status}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <NestingView language={language} prodOrders={prodOrders} deals={store.deals} />
       )}
 
       {/* ===== MODALS ===== */}
@@ -586,6 +373,507 @@ export function Warehouse({ language }: WarehouseProps) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── BomTemplates ─────────────────────────────────────────────────
+// CRUD for production «recipes». Each template has a name, default
+// dimensions, a materials table (qty × unit × price), labour cost,
+// markup %, lead time. The card grid shows everything the team has
+// saved; modal handles create/edit; «Использовать» creates a new deal
+// pre-filled with the template's product name + total price.
+interface BomMaterial { mat: string; sup: string; qty: number; unit: string; price: number }
+interface BomTemplate {
+  id?: string;
+  name: string;
+  type: string;       // kitchen / wardrobe / closet / hallway / bed / other
+  width?: number; height?: number; depth?: number;  // mm
+  materials: BomMaterial[];
+  labourCost: number;
+  markupPct: number;
+  leadDays: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  kitchen: 'Кухня', wardrobe: 'Шкаф-купе', closet: 'Гардероб',
+  hallway: 'Прихожая', bed: 'Кровать', table: 'Стол', other: 'Прочее',
+};
+const TYPE_OPTIONS: Array<{ id: string; ru: string }> = [
+  { id: 'kitchen', ru: 'Кухня' }, { id: 'wardrobe', ru: 'Шкаф-купе' },
+  { id: 'closet', ru: 'Гардероб' }, { id: 'hallway', ru: 'Прихожая' },
+  { id: 'bed', ru: 'Кровать' }, { id: 'table', ru: 'Стол' }, { id: 'other', ru: 'Прочее' },
+];
+
+// Derived totals shared by card grid + modal preview.
+function bomTotals(t: BomTemplate) {
+  const materials = t.materials.reduce((s, m) => s + (m.qty || 0) * (m.price || 0), 0);
+  const subtotal  = materials + (t.labourCost || 0);
+  const markup    = subtotal * ((t.markupPct || 0) / 100);
+  const clientTotal = subtotal + markup;
+  return { materials, labour: t.labourCost || 0, markup, clientTotal };
+}
+
+function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const store = useDataStore();
+  const [templates, setTemplates] = useState<BomTemplate[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [editing, setEditing] = useState<BomTemplate | null>(null); // null = no modal; «»  = new
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => { refresh(); }, []);
+  function refresh() {
+    api.get<BomTemplate[]>('/api/bom-templates')
+      .then(rows => { setTemplates(rows || []); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }
+
+  async function save(t: BomTemplate) {
+    setBusy(true); setError(null);
+    try {
+      if (t.id) await api.patch(`/api/bom-templates/${t.id}`, t);
+      else      await api.post('/api/bom-templates', t);
+      setEditing(null);
+      refresh();
+    } catch (e: any) { setError(String(e?.message || e)); }
+    finally { setBusy(false); }
+  }
+  async function remove(id: string) {
+    if (!confirm('Удалить шаблон?')) return;
+    setBusy(true);
+    try { await api.delete(`/api/bom-templates/${id}`); refresh(); }
+    catch (e: any) { setError(String(e?.message || e)); }
+    finally { setBusy(false); }
+  }
+  function duplicate(t: BomTemplate) {
+    const { id: _, createdAt, updatedAt, ...rest } = t;
+    setEditing({ ...rest, name: rest.name + ' (копия)' });
+  }
+  function useInOrder(t: BomTemplate) {
+    // Pre-fill a new deal from this template + jump to the Sales page so
+    // the user can finish customer details. Total price = clientTotal.
+    const totals = bomTotals(t);
+    const seed = {
+      product: t.name, amount: Math.round(totals.clientTotal),
+      furnitureType: TYPE_LABELS[t.type] || t.type,
+      completionDate: '', measurementDate: '',
+      materials: t.materials.map(m => m.mat).join(', '),
+      notes: `Из шаблона: материалы ${Math.round(totals.materials).toLocaleString('ru-RU')} ₸, работа ${Math.round(totals.labour).toLocaleString('ru-RU')} ₸, наценка ${t.markupPct}%`,
+    };
+    // Dispatch a custom event the Sales page picks up to pre-fill its
+    // «Add deal» modal. If the user is somewhere else, we still try.
+    window.dispatchEvent(new CustomEvent('sales:create-deal-from-template', { detail: seed }));
+    alert(l('Шаблон добавлен в форму создания сделки. Перейдите в «Заказы».', '...', 'Template seeded. Open Sales to finish creating the deal.'));
+  }
+
+  if (!loaded) return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-8 flex items-center justify-center text-gray-400 text-sm">
+      <Loader2 className="w-4 h-4 animate-spin mr-2" /> {l('Загружаю шаблоны…', 'Жүктеуде…', 'Loading…')}
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-2 text-xs text-rose-700 flex items-start gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">{error}</div>
+          <button onClick={() => setError(null)} className="text-rose-400">×</button>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <div className="text-sm text-gray-900">{l('Шаблоны изделий', 'Бұйым шаблондары', 'Product templates')}</div>
+          <div className="text-[11px] text-gray-400">{templates.length} {l('шаблонов', 'шаблон', 'templates')}</div>
+        </div>
+        <button
+          onClick={() => setEditing(blankTemplate())}
+          className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded-xl hover:bg-gray-800 inline-flex items-center gap-1.5"
+        >
+          <Plus className="w-3 h-3" /> {l('Создать шаблон', 'Шаблон жасау', 'Create template')}
+        </button>
+      </div>
+
+      {templates.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+          <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+          <div className="text-sm text-gray-900 mb-1">{l('Пока нет шаблонов', '...', 'No templates yet')}</div>
+          <div className="text-xs text-gray-400 mb-4">{l('Создайте первый шаблон чтобы быстро повторять типовые изделия', '...', 'Create a template to reuse common items')}</div>
+          <button onClick={() => setEditing(blankTemplate())} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 inline-flex items-center gap-1.5">
+            <Plus className="w-3 h-3" /> {l('Создать первый', '...', 'Create first')}
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {templates.map(t => {
+            const totals = bomTotals(t);
+            return (
+              <div key={t.id} className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-sm transition-all">
+                <div className="w-full h-24 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center mb-3 relative">
+                  <Package className="w-8 h-8 text-gray-300" />
+                  <span className="absolute top-2 right-2 text-[9px] px-1.5 py-0.5 bg-white/80 rounded text-gray-600">{TYPE_LABELS[t.type] || t.type}</span>
+                </div>
+                <div className="text-sm text-gray-900 mb-1 truncate" title={t.name}>{t.name}</div>
+                <div className="flex items-center justify-between text-[11px] text-gray-400 mb-2">
+                  <span>{Math.round(totals.clientTotal).toLocaleString('ru-RU')} ₸</span>
+                  <span>{t.leadDays} {l('дн', 'күн', 'd')}</span>
+                </div>
+                <div className="text-[10px] text-gray-400 mb-3">
+                  {t.materials.length} {l('материалов', 'материал', 'materials')} · {l('работа', 'жұмыс', 'labour')} {Math.round(totals.labour).toLocaleString('ru-RU')} ₸
+                </div>
+                <div className="flex gap-1.5">
+                  <button onClick={() => useInOrder(t)} className="flex-1 text-[11px] px-2.5 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800">
+                    {l('В заказ', 'Тапсырысқа', 'Use')}
+                  </button>
+                  <button onClick={() => setEditing(t)} title="Редактировать" className="w-7 h-7 hover:bg-gray-50 border border-gray-100 rounded-lg flex items-center justify-center"><Edit2 className="w-3 h-3 text-gray-500" /></button>
+                  <button onClick={() => duplicate(t)} title="Дублировать" className="w-7 h-7 hover:bg-gray-50 border border-gray-100 rounded-lg flex items-center justify-center"><Copy className="w-3 h-3 text-gray-500" /></button>
+                  <button onClick={() => t.id && remove(t.id)} title="Удалить" className="w-7 h-7 hover:bg-rose-50 border border-gray-100 rounded-lg flex items-center justify-center"><Trash2 className="w-3 h-3 text-rose-500" /></button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {editing && (
+        <BomEditorModal
+          initial={editing}
+          onClose={() => setEditing(null)}
+          onSave={save}
+          busy={busy}
+          language={language}
+        />
+      )}
+    </div>
+  );
+}
+
+function blankTemplate(): BomTemplate {
+  return {
+    name: '', type: 'kitchen',
+    width: 3000, height: 900, depth: 600,
+    materials: [{ mat: '', sup: '', qty: 1, unit: 'шт', price: 0 }],
+    labourCost: 0, markupPct: 30, leadDays: 14,
+  };
+}
+
+function BomEditorModal({ initial, onClose, onSave, busy, language }: {
+  initial: BomTemplate; onClose: () => void; onSave: (t: BomTemplate) => void; busy: boolean; language: 'kz' | 'ru' | 'eng';
+}) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [t, setT] = useState<BomTemplate>(initial);
+  const totals = useMemo(() => bomTotals(t), [t]);
+  const up = (patch: Partial<BomTemplate>) => setT(prev => ({ ...prev, ...patch }));
+  const upMat = (idx: number, patch: Partial<BomMaterial>) => setT(prev => ({
+    ...prev, materials: prev.materials.map((m, i) => i === idx ? { ...m, ...patch } : m),
+  }));
+  const addMat = () => setT(prev => ({ ...prev, materials: [...prev.materials, { mat: '', sup: '', qty: 1, unit: 'шт', price: 0 }] }));
+  const removeMat = (idx: number) => setT(prev => ({ ...prev, materials: prev.materials.filter((_, i) => i !== idx) }));
+
+  function commit() {
+    if (!t.name.trim()) { alert('Укажите название шаблона'); return; }
+    onSave({ ...t, name: t.name.trim() });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <div className="text-sm text-gray-900">{t.id ? l('Редактировать шаблон', 'Шаблонды өңдеу', 'Edit template') : l('Новый шаблон', 'Жаңа шаблон', 'New template')}</div>
+            <div className="text-[11px] text-gray-400">{l('Сохраняется на сервере для всей команды', '...', 'Saved on the server for the whole team')}</div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Header fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <div className="text-[10px] text-gray-400 mb-1">{l('Название', 'Атауы', 'Name')}</div>
+              <input value={t.name} onChange={e => up({ name: e.target.value })} placeholder='Кухня прямая 3м' className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400 mb-1">{l('Тип изделия', 'Бұйым түрі', 'Type')}</div>
+              <select value={t.type} onChange={e => up({ type: e.target.value })} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200">
+                {TYPE_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.ru}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Dimensions */}
+          <div>
+            <div className="text-[10px] text-gray-400 mb-1">{l('Размеры (мм)', 'Өлшемдер (мм)', 'Dimensions (mm)')}</div>
+            <div className="grid grid-cols-3 gap-2">
+              <input type="number" value={t.width || 0}  onChange={e => up({ width:  Number(e.target.value) })} placeholder="Длина"  className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+              <input type="number" value={t.depth || 0}  onChange={e => up({ depth:  Number(e.target.value) })} placeholder="Глубина" className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+              <input type="number" value={t.height || 0} onChange={e => up({ height: Number(e.target.value) })} placeholder="Высота"  className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+            </div>
+          </div>
+
+          {/* Materials editor */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs text-gray-900">{l('Материалы', 'Материалдар', 'Materials')}</div>
+              <button onClick={addMat} className="text-[11px] text-violet-600 hover:text-violet-800 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> {l('Добавить', 'Қосу', 'Add')}</button>
+            </div>
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              <div className="grid grid-cols-12 gap-1 px-2 py-1.5 bg-gray-50 text-[9px] text-gray-400 uppercase tracking-wide">
+                <div className="col-span-4">Материал</div>
+                <div className="col-span-3">Поставщик</div>
+                <div className="col-span-1 text-right">Кол-во</div>
+                <div className="col-span-1">Ед.</div>
+                <div className="col-span-2 text-right">Цена</div>
+                <div className="col-span-1 text-right">Итого</div>
+              </div>
+              {t.materials.map((m, i) => (
+                <div key={i} className="grid grid-cols-12 gap-1 px-2 py-1.5 border-t border-gray-50 items-center">
+                  <input value={m.mat}  onChange={e => upMat(i, { mat: e.target.value })}  placeholder="ЛДСП Egger…"   className="col-span-4 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                  <input value={m.sup}  onChange={e => upMat(i, { sup: e.target.value })}  placeholder="Поставщик"     className="col-span-3 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                  <input type="number"  value={m.qty}   onChange={e => upMat(i, { qty: Number(e.target.value) })}      className="col-span-1 px-2 py-1 bg-white rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                  <input value={m.unit} onChange={e => upMat(i, { unit: e.target.value })} placeholder="шт"             className="col-span-1 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                  <input type="number"  value={m.price} onChange={e => upMat(i, { price: Number(e.target.value) })}    className="col-span-2 px-2 py-1 bg-white rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                  <div className="col-span-1 flex items-center justify-end gap-1 text-xs text-gray-700 tabular-nums">
+                    {Math.round(m.qty * m.price).toLocaleString('ru-RU')}
+                    <button onClick={() => removeMat(i)} className="text-gray-300 hover:text-rose-500 ml-1"><X className="w-3 h-3" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Labour + markup + lead time */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <div className="text-[10px] text-gray-400 mb-1">{l('Работа (₸)', 'Жұмыс (₸)', 'Labour (₸)')}</div>
+              <input type="number" value={t.labourCost} onChange={e => up({ labourCost: Number(e.target.value) })} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400 mb-1">{l('Наценка %', 'Үстеме %', 'Markup %')}</div>
+              <input type="number" value={t.markupPct} onChange={e => up({ markupPct: Number(e.target.value) })} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400 mb-1">{l('Срок (дн)', 'Мерзім (күн)', 'Lead time (days)')}</div>
+              <input type="number" value={t.leadDays} onChange={e => up({ leadDays: Number(e.target.value) })} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+            </div>
+          </div>
+
+          {/* Computed totals */}
+          <div className="bg-gray-50 rounded-xl p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div><div className="text-[10px] text-gray-400 mb-1">Материалы</div><div className="text-gray-900 tabular-nums">{Math.round(totals.materials).toLocaleString('ru-RU')} ₸</div></div>
+            <div><div className="text-[10px] text-gray-400 mb-1">Работа</div><div className="text-gray-900 tabular-nums">{Math.round(totals.labour).toLocaleString('ru-RU')} ₸</div></div>
+            <div><div className="text-[10px] text-gray-400 mb-1">Наценка {t.markupPct}%</div><div className="text-gray-900 tabular-nums">{Math.round(totals.markup).toLocaleString('ru-RU')} ₸</div></div>
+            <div><div className="text-[10px] text-gray-400 mb-1">Итого клиенту</div><div className="text-gray-900 tabular-nums">{Math.round(totals.clientTotal).toLocaleString('ru-RU')} ₸</div></div>
+          </div>
+        </div>
+
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
+          <button onClick={commit} disabled={busy || !t.name.trim()} className="px-4 py-1.5 bg-gray-900 text-white rounded-lg text-xs disabled:opacity-50 inline-flex items-center gap-1.5">
+            {busy && <Loader2 className="w-3 h-3 animate-spin" />}
+            {l('Сохранить', 'Сақтау', 'Save')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── NestingView ─────────────────────────────────────────────────
+// Простой honest UI вместо фейковой раскладки. Берёт детали из выбранной
+// сделки в производстве (или показывает empty state), считает количество
+// листов простой формулой «общая площадь / площадь листа × коэффициент
+// отходов», даёт CSV-экспорт для импорта в Felder/Holzma софт, и
+// браузерную печать.
+//
+// Реальный nesting solver (genetic / bottom-left fill) — отдельный
+// проект, не имитируем его. Кнопка «Оптимизировать» открывает
+// info-блок про CNC-интеграцию.
+function NestingView({ language, prodOrders, deals }: {
+  language: 'kz' | 'ru' | 'eng';
+  prodOrders: ProdOrder[];
+  deals: any[];
+}) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [selectedDealId, setSelectedDealId] = useState<string>(prodOrders[0]?.dealId || '');
+  const selected = deals.find(d => d.id === selectedDealId) || prodOrders[0];
+  const [showCnc, setShowCnc] = useState(false);
+
+  // Parts — для v1 берём из строки materials сделки (через запятую),
+  // умножаем на грубое количество. В будущем можно подключить parts из
+  // BomTemplate.materials когда заказ создан из шаблона.
+  const parts = useMemo(() => {
+    if (!selected) return [];
+    const mats: string = (selected.materials || '');
+    const arr = mats.split(',').map((s: string) => s.trim()).filter(Boolean);
+    return arr.map((name, i) => ({
+      id: i, name,
+      // Простая эвристика количества — по типу строки в названии.
+      qty: /фасад|дверь|дверца/i.test(name) ? 4 : /полка/i.test(name) ? 6 : /столешница/i.test(name) ? 1 : 2,
+      sizeMm: '600×400',  // дефолтный размер — пока без точных габаритов
+    }));
+  }, [selected]);
+
+  // Лист ЛДСП 2750×1830 = 5.03 м²; деталь 0.6×0.4 = 0.24 м². 12% отходы.
+  const sheetAreaM2 = 2.75 * 1.83;
+  const partAreaM2  = 0.6 * 0.4;
+  const totalPartArea = parts.reduce((s, p) => s + p.qty * partAreaM2, 0);
+  const sheetsNeeded = Math.ceil(totalPartArea * 1.12 / sheetAreaM2);
+  const utilizationPct = sheetsNeeded > 0 ? Math.round(totalPartArea / (sheetsNeeded * sheetAreaM2) * 100) : 0;
+  const wastePct = 100 - utilizationPct;
+
+  function exportCSV() {
+    const rows: Array<Array<string | number>> = [
+      ['Деталь', 'Размер (мм)', 'Кол-во', 'Площадь (м²)'],
+      ...parts.map(p => [p.name, p.sizeMm, p.qty, (p.qty * partAreaM2).toFixed(3)]),
+      ['', '', 'Итого', totalPartArea.toFixed(3)],
+      ['', '', 'Листов', sheetsNeeded],
+    ];
+    const csv = rows.map(r => r.map(c => {
+      const s = String(c ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `raskroy-${selected?.id || 'order'}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function printMap() { window.print(); }
+
+  if (prodOrders.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+        <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+        <div className="text-sm text-gray-900 mb-1">{l('Нет активных заказов', '...', 'No active orders')}</div>
+        <div className="text-xs text-gray-400">{l('Раскрой работает на основе сделок в производстве — переведите сделку в нужный статус', '...', 'Nesting works from in-production deals')}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      {/* Order picker + parts list */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide">{l('Выберите заказ', 'Тапсырыс таңдаңыз', 'Select order')}</div>
+        <select
+          value={selectedDealId}
+          onChange={e => setSelectedDealId(e.target.value)}
+          className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200 mb-4"
+        >
+          {prodOrders.map(o => (
+            <option key={o.dealId} value={o.dealId}>{o.name} — {o.client}</option>
+          ))}
+        </select>
+
+        <div className="text-sm text-gray-900 mb-3">{l('Детали', 'Бөліктер', 'Parts')} ({parts.length})</div>
+        {parts.length === 0 ? (
+          <div className="text-[11px] text-gray-400 italic text-center py-4">
+            {l('Материалы не указаны в сделке. Заполните поле «Материалы» в карточке клиента.', '...', 'Materials not specified in the deal')}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {parts.map(p => (
+              <div key={p.id} className="flex items-center gap-2 text-xs p-2 bg-gray-50 rounded-lg">
+                <Package className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-gray-900 truncate">{p.name}</div>
+                  <div className="text-[9px] text-gray-400">{p.sizeMm} мм</div>
+                </div>
+                <span className="text-gray-500">×{p.qty}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Sheet visualisation (illustrative only — not a real solver) */}
+      <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-sm text-gray-900">{l('Лист ЛДСП 2750×1830 мм', '...', 'MFC sheet 2750×1830 mm')}</div>
+            <div className="text-[10px] text-gray-400 mt-0.5">{l('Иллюстративная раскладка — для точного нестинга нужен CNC-софт', '...', 'Illustrative — real nesting requires CNC software')}</div>
+          </div>
+          <span className="text-[10px] text-gray-400">{l('Лист 1', '1-парақ', 'Sheet 1')} / {sheetsNeeded || 1}</span>
+        </div>
+        <div className="aspect-[2750/1830] bg-gray-50 rounded-xl border border-gray-100 relative overflow-hidden">
+          {/* Render a simple grid of part rectangles — purely visual */}
+          {parts.length === 0 ? (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-300 text-xs">
+              {l('Выберите заказ с материалами', '...', 'Select an order with materials')}
+            </div>
+          ) : (
+            <div className="absolute inset-1 grid grid-cols-6 grid-rows-4 gap-0.5 p-1">
+              {Array.from({ length: Math.min(24, parts.reduce((s, p) => s + p.qty, 0)) }).map((_, i) => {
+                const colors = ['bg-blue-200 border-blue-400', 'bg-purple-200 border-purple-400', 'bg-amber-200 border-amber-400', 'bg-emerald-200 border-emerald-400', 'bg-rose-200 border-rose-400'];
+                return <div key={i} className={`border rounded ${colors[i % colors.length]}`} />;
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Stats + actions */}
+      <div className="space-y-3">
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <div className="text-sm text-gray-900 mb-3">{l('Статистика', 'Статистика', 'Stats')}</div>
+          <div className="space-y-2.5 text-xs">
+            <div className="flex justify-between"><span className="text-gray-500">Использовано</span><span className="text-gray-900">{utilizationPct}%</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Отходы</span><span className="text-amber-600">{wastePct}%</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Листов нужно</span><span className="text-gray-900">{sheetsNeeded}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Площадь деталей</span><span className="text-gray-900">{totalPartArea.toFixed(2)} м²</span></div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-50 text-[10px] text-gray-400 leading-relaxed">
+            {l('Оценка по средней детали 600×400 мм + 12% на отходы. Реальная раскладка зависит от размеров деталей и софта станка.',
+               '...', 'Estimate based on avg 600×400 part + 12% waste.')}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <button
+            onClick={() => setShowCnc(true)}
+            className="w-full px-3 py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 inline-flex items-center justify-center gap-1.5"
+          >
+            <Wrench className="w-3 h-3" /> {l('CNC-интеграция', 'CNC интеграция', 'CNC integration')}
+          </button>
+          <button
+            onClick={exportCSV}
+            disabled={parts.length === 0}
+            className="w-full px-3 py-2.5 border border-gray-100 rounded-xl text-xs hover:bg-gray-50 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+          >
+            <Download className="w-3 h-3" /> {l('Экспорт CSV (раскрой)', 'CSV экспорты', 'Export CSV')}
+          </button>
+          <button
+            onClick={printMap}
+            className="w-full px-3 py-2.5 border border-gray-100 rounded-xl text-xs hover:bg-gray-50 inline-flex items-center justify-center gap-1.5"
+          >
+            <FileText className="w-3 h-3" /> {l('Печать карты', 'Картаны басу', 'Print map')}
+          </button>
+        </div>
+
+        {showCnc && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <div className="flex items-start gap-2 mb-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-900 flex-1">
+                {l('Оптимизация раскладки', 'Раскрой оңтайландыру', 'Nesting optimisation')}
+              </div>
+              <button onClick={() => setShowCnc(false)} className="text-amber-400 hover:text-amber-700"><X className="w-3 h-3" /></button>
+            </div>
+            <div className="text-[11px] text-amber-800 leading-relaxed mb-2">
+              {l('Реальная оптимизация раскладки — это отдельный класс задач (genetic / bottom-left-fill алгоритмы). Для точного нестинга экспортируйте CSV и загрузите в софт вашего станка: Felder Maxisoft, Holzma Cadmatic, Biesse bSolid.',
+                 '...', 'Use Felder/Holzma/Biesse software for real nesting via CSV.')}
+            </div>
+            <a href="https://www.felder-group.com/" target="_blank" rel="noopener noreferrer" className="text-[11px] text-amber-700 underline">Felder Maxisoft →</a>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

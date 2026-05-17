@@ -174,6 +174,20 @@ CREATE TABLE IF NOT EXISTS ai_generations (
 );
 CREATE INDEX IF NOT EXISTS idx_ai_generations_team ON ai_generations(team_id);
 
+-- Production templates (BOM = Bill Of Materials). Teams build a catalog
+-- of standard products (kitchen, wardrobe, etc.) with materials, labour,
+-- and markup, then «Use in order» to instantiate one against a deal.
+-- data is a JSON blob with the full template shape (see BOMTemplate
+-- interface in the frontend).
+CREATE TABLE IF NOT EXISTS bom_templates (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_bom_templates_team ON bom_templates(team_id);
+
 CREATE TABLE IF NOT EXISTS tax_payments (
   id TEXT PRIMARY KEY,
   team_id TEXT NOT NULL,
@@ -1829,6 +1843,42 @@ taxesRouter.delete('/payments/:periodKey', requireRole('manager'), (req: AuthedR
 });
 
 app.use('/api/taxes', taxesRouter);
+
+// ─── BOM templates (production «recipes») ───────────────────────────
+// Reusable item catalog for the production team. Each template stores its
+// name, type (kitchen / wardrobe / ...), default dimensions, materials
+// table (qty × unit × price), labour cost, markup %, lead time days.
+// Frontend computes derived totals (materials sum, client total) — we
+// just persist what the user typed.
+const bomRouter = express.Router();
+bomRouter.use(authMiddleware);
+
+bomRouter.get('/', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  const rows = db.prepare('SELECT id, data, created_at, updated_at FROM bom_templates WHERE team_id = ? ORDER BY rowid DESC').all(req.teamId!) as any[];
+  res.json(rows.map(r => ({ id: r.id, ...JSON.parse(r.data), createdAt: r.created_at, updatedAt: r.updated_at })));
+});
+
+bomRouter.post('/', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  const id = newId('bom_');
+  const data = JSON.stringify(req.body || {});
+  db.prepare('INSERT INTO bom_templates (id, team_id, data) VALUES (?, ?, ?)').run(id, req.teamId!, data);
+  res.json({ id, ...req.body });
+});
+
+bomRouter.patch('/:id', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT data FROM bom_templates WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  const merged = { ...JSON.parse(row.data), ...req.body };
+  db.prepare("UPDATE bom_templates SET data = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(merged), req.params.id);
+  res.json({ id: req.params.id, ...merged });
+});
+
+bomRouter.delete('/:id', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  db.prepare('DELETE FROM bom_templates WHERE id = ? AND team_id = ?').run(req.params.id, req.teamId!);
+  res.json({ ok: true });
+});
+
+app.use('/api/bom-templates', bomRouter);
 
 // Map of team-wide Telegram pairings (Block F.6). Used by the team panel to
 // show which teammates have linked their account to the bot — admin sees who
