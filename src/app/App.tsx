@@ -24,8 +24,22 @@ import { t } from './utils/translations';
 import { DataProvider, useDataStore } from './utils/dataStore';
 import { api, getToken, setToken } from './utils/api';
 
+// Persist the active page across browser reloads so refreshing
+// «Финансы → Налоги» doesn't bounce the user back to Dashboard.
+const LAST_PAGE_KEY = 'utir_current_page';
+
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  // Initial value: try localStorage first; falls back to 'dashboard'.
+  // Hash-route fallback (#/sales) wins if present so deep links keep working.
+  const [currentPage, setCurrentPage] = useState<string>(() => {
+    try {
+      const hash = window.location.hash.replace(/^#\/?/, '').trim();
+      if (hash) return hash;
+      const saved = localStorage.getItem(LAST_PAGE_KEY);
+      if (saved) return saved;
+    } catch { /* localStorage blocked — use default */ }
+    return 'dashboard';
+  });
   const [language, setLanguage] = useState<'kz' | 'ru' | 'eng'>('ru');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -129,6 +143,32 @@ function AppContent() {
     return () => window.removeEventListener('app:navigate', onNavigate as EventListener);
   }, []);
 
+  // Persist the active page to localStorage on every change so a browser
+  // refresh returns the user to the same section. Also mirror it into
+  // window.location.hash so the address bar reflects where we are and
+  // the back / forward buttons work intuitively. Skipped on auth screen
+  // (currentPage is meaningless until logged in).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    try { localStorage.setItem(LAST_PAGE_KEY, currentPage); } catch { /* ignore */ }
+    try {
+      const hashTarget = `#/${currentPage}`;
+      if (window.location.hash !== hashTarget) window.history.replaceState(null, '', hashTarget);
+    } catch { /* ignore */ }
+  }, [currentPage, isAuthenticated]);
+
+  // Browser back / forward button → sync currentPage with the URL hash so
+  // navigation feels native. Without this, hitting Back wouldn't change
+  // the visible page even though the URL changed.
+  useEffect(() => {
+    const onHash = () => {
+      const hash = window.location.hash.replace(/^#\/?/, '').trim();
+      if (hash) setCurrentPage(hash);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
   // Restore session on mount
   useEffect(() => {
     const token = getToken();
@@ -171,6 +211,10 @@ function AppContent() {
     setIsAuthenticated(false);
     setCurrentUser(null);
     setCurrentPage('dashboard');
+    // Clear persisted last-page so the next user (or re-login) starts fresh
+    // on Dashboard instead of bouncing into wherever the previous user was.
+    try { localStorage.removeItem(LAST_PAGE_KEY); } catch { /* ignore */ }
+    try { window.history.replaceState(null, '', '#/dashboard'); } catch { /* ignore */ }
   };
 
   if (!authChecked) {
