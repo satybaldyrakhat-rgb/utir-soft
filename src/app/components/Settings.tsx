@@ -472,6 +472,9 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
             </button>
           </div>
 
+          {/* Banking requisites — used by invoice PDFs in Финансы */}
+          <RequisitesCard language={language} />
+
           {/* Language */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <div className="text-sm text-gray-900 mb-4">{l('Язык системы', 'Жүйе тілі', 'Language')}</div>
@@ -2298,4 +2301,98 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
 
 function nowHHMM() {
   return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ─── RequisitesCard ──────────────────────────────────────────────
+// Banking + legal requisites for the team — printed into every
+// invoice PDF generated from Финансы → «Создать счёт». Stored on
+// team_settings.company_requisites server-side; everyone on the
+// team reads, only admin writes.
+interface Requisites {
+  legalName?: string; bin?: string; address?: string;
+  bankName?: string; iban?: string; bik?: string; kbe?: string;
+  director?: string; phone?: string; email?: string;
+}
+
+function RequisitesCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [r, setR] = useState<Requisites>({});
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    api.get<Requisites>('/api/team/requisites')
+      .then(d => { setR(d || {}); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, []);
+  async function save() {
+    setSaving(true); setMsg(null);
+    try {
+      await api.put('/api/team/requisites', r);
+      setMsg(l('Сохранено ✓', 'Сақталды ✓', 'Saved ✓'));
+      setTimeout(() => setMsg(null), 2500);
+    } catch (e: any) {
+      setMsg(l('Ошибка: ', 'Қате: ', 'Error: ') + (e?.message || e));
+    } finally { setSaving(false); }
+  }
+  const up = (k: keyof Requisites, v: string) => setR(prev => ({ ...prev, [k]: v }));
+  if (!loaded) return null;
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5">
+      <div className="text-sm text-gray-900 mb-1">{l('Реквизиты для счетов', 'Шот реквизиттері', 'Invoice requisites')}</div>
+      <div className="text-[11px] text-gray-400 mb-4">
+        {l('Используются в PDF-счетах из раздела «Оплаты → Финансы → Создать счёт»',
+           'PDF-шоттарда қолданылады',
+           'Used in invoice PDFs from Payments → Finance → Create invoice')}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="md:col-span-2">
+          <div className="text-[10px] text-gray-400 mb-1">{l('Юридическое название', 'Заңды атауы', 'Legal name')}</div>
+          <input type="text" value={r.legalName || ''} onChange={e => up('legalName', e.target.value)} placeholder='ТОО «Название»' className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+        </div>
+        <div>
+          <div className="text-[10px] text-gray-400 mb-1">{l('БИН / ИИН', 'БСН / ЖСН', 'BIN / IIN')}</div>
+          <input type="text" value={r.bin || ''} onChange={e => up('bin', e.target.value)} placeholder="000000000000" maxLength={20} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+        </div>
+        <div>
+          <div className="text-[10px] text-gray-400 mb-1">{l('Директор (ФИО)', 'Директор', 'Director')}</div>
+          <input type="text" value={r.director || ''} onChange={e => up('director', e.target.value)} placeholder={l('Иванов Иван Иванович', '...', 'John Doe')} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+        </div>
+        <div className="md:col-span-2">
+          <div className="text-[10px] text-gray-400 mb-1">{l('Юридический адрес', 'Мекенжай', 'Legal address')}</div>
+          <input type="text" value={r.address || ''} onChange={e => up('address', e.target.value)} placeholder={l('г. Алматы, ул. ..., 1', '...', 'Almaty, ...')} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+        </div>
+        <div className="md:col-span-2">
+          <div className="text-[10px] text-gray-400 mb-1">{l('Банк', 'Банк', 'Bank')}</div>
+          <input type="text" value={r.bankName || ''} onChange={e => up('bankName', e.target.value)} placeholder='АО «Halyk Bank»' className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+        </div>
+        <div className="md:col-span-2">
+          <div className="text-[10px] text-gray-400 mb-1">IBAN</div>
+          <input type="text" value={r.iban || ''} onChange={e => up('iban', e.target.value.toUpperCase())} placeholder="KZ_____________________" maxLength={40} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-gray-200" />
+        </div>
+        <div>
+          <div className="text-[10px] text-gray-400 mb-1">БИК</div>
+          <input type="text" value={r.bik || ''} onChange={e => up('bik', e.target.value.toUpperCase())} placeholder="HSBKKZKX" maxLength={20} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-gray-200" />
+        </div>
+        <div>
+          <div className="text-[10px] text-gray-400 mb-1">КБЕ</div>
+          <input type="text" value={r.kbe || ''} onChange={e => up('kbe', e.target.value)} placeholder="17" maxLength={5} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-gray-200" />
+        </div>
+        <div>
+          <div className="text-[10px] text-gray-400 mb-1">{l('Телефон в счёте', 'Телефон', 'Phone')}</div>
+          <input type="text" value={r.phone || ''} onChange={e => up('phone', e.target.value)} placeholder="+7 ..." className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+        </div>
+        <div>
+          <div className="text-[10px] text-gray-400 mb-1">Email</div>
+          <input type="email" value={r.email || ''} onChange={e => up('email', e.target.value)} placeholder="info@..." className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+        </div>
+      </div>
+      <div className="flex items-center justify-between mt-4">
+        <div className="text-[11px] text-gray-500">{msg || l('Заполните чтобы счета формировались с банковскими данными', '...', 'Fill in so invoices include bank details')}</div>
+        <button onClick={save} disabled={saving} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 disabled:opacity-50">
+          {saving ? l('Сохраняю…', 'Сақталуда…', 'Saving…') : l('Сохранить', 'Сақтау', 'Save')}
+        </button>
+      </div>
+    </div>
+  );
 }

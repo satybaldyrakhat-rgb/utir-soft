@@ -50,12 +50,34 @@ export function PaymentCalendar() {
     status: t.status === 'completed' ? 'paid' : t.status === 'overdue' ? 'overdue' : 'pending',
     note: t.dealId ? `#${t.dealId}` : undefined,
   }));
-  const dealPays: Pay[] = store.deals.filter(d => d.amount > 0 && (d.progress || 0) < 100 && d.completionDate).map(d => ({
-    id: d.id, date: d.completionDate, client: d.customerName, type: 'in' as const, cat: 'income' as const,
-    amount: d.amount - (d.paidAmount || 0),
-    method: 'Доплата по сделке', status: 'pending' as const, note: d.product,
-  }));
-  const all = [...MOCK, ...txPays, ...dealPays];
+  // Generate "planned" calendar entries from active deals — both the final
+  // completion payment AND milestone dates (measurement, installation) so
+  // the calendar shows everything you might want to be reminded of, not
+  // just rows that already exist in the transactions table.
+  const dealPays: Pay[] = [];
+  for (const d of store.deals) {
+    if (!d.amount || d.status === 'rejected') continue;
+    const outstanding = d.amount - (d.paidAmount || 0);
+    if (d.completionDate && (d.progress || 0) < 100 && outstanding > 0) {
+      dealPays.push({
+        id: `dc_${d.id}`, date: d.completionDate, client: d.customerName, type: 'in', cat: 'planned',
+        amount: outstanding, method: 'Окончательная оплата', status: 'pending', note: d.product,
+      });
+    }
+    if (d.measurementDate) {
+      dealPays.push({
+        id: `dm_${d.id}`, date: d.measurementDate, client: d.customerName, type: 'in', cat: 'planned',
+        amount: 0, method: 'Замер', status: 'pending', note: d.product,
+      });
+    }
+    if (d.installationDate) {
+      dealPays.push({
+        id: `di_${d.id}`, date: d.installationDate, client: d.customerName, type: 'in', cat: 'planned',
+        amount: outstanding > 0 ? outstanding : 0, method: 'Установка / финал', status: 'pending', note: d.product,
+      });
+    }
+  }
+  const all = [...txPays, ...dealPays];
   const matchesFilter = (p: Pay) => filter === 'all' ? true : p.cat === filter;
   const visible = all.filter(matchesFilter);
 
@@ -135,27 +157,41 @@ export function PaymentCalendar() {
               const isSelected = selectedDay === day;
               const hasOverdue = pays.some(p => p.status === 'overdue');
               const cats = Array.from(new Set(pays.map(p => p.cat)));
+              const isToday = (() => {
+                const t = new Date();
+                return t.getFullYear() === month.getFullYear() && t.getMonth() === month.getMonth() && t.getDate() === day;
+              })();
               return (
                 <button
                   key={i}
                   onClick={() => setSelectedDay(day)}
-                  className={`aspect-square border rounded-lg p-1.5 text-left transition-all hover:shadow-sm ${
+                  className={`relative aspect-square border rounded-lg p-1.5 text-left transition-all hover:shadow-sm ${
                     isSelected ? 'border-gray-900 bg-gray-50' :
-                    hasOverdue ? 'border-rose-100 bg-rose-50/30' :
-                    pays.length ? 'border-gray-100 hover:border-gray-200' : 'border-gray-50'
+                    hasOverdue ? 'border-rose-200 bg-rose-50/40' :
+                    pays.length ? 'border-gray-100 hover:border-gray-300 bg-white' : 'border-gray-50'
                   }`}
                 >
-                  <div className="text-[10px] text-gray-500 mb-1">{day}</div>
+                  {/* Top row: day number + category dots cluster + today badge */}
+                  <div className="flex items-start justify-between mb-1">
+                    <div className={`text-[10px] ${isToday ? 'text-white bg-gray-900 px-1.5 py-0.5 rounded-full' : 'text-gray-500'}`}>{day}</div>
+                    {cats.length > 0 && (
+                      <div className="flex gap-0.5">
+                        {cats.slice(0, 3).map(c => (
+                          <span key={c} className={`w-1.5 h-1.5 rounded-full ${CAT_COLOR[c]}`} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   {pays.slice(0, 2).map((p, idx) => (
-                    <div key={idx} className="flex items-center gap-1 mb-0.5">
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${CAT_COLOR[p.cat]}`} />
-                      <span className={`text-[9px] truncate tabular-nums ${p.type === 'in' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    p.amount > 0 ? (
+                      <div key={idx} className={`text-[9px] truncate tabular-nums ${p.type === 'in' ? 'text-emerald-600' : 'text-rose-500'}`}>
                         {p.type === 'in' ? '+' : '−'}{(p.amount / 1000).toFixed(0)}К
-                      </span>
-                    </div>
+                      </div>
+                    ) : (
+                      <div key={idx} className="text-[9px] text-sky-600 truncate">{p.method}</div>
+                    )
                   ))}
                   {pays.length > 2 && <div className="text-[9px] text-gray-400">+{pays.length - 2}</div>}
-                  {!pays.length && cats.length === 0 && null}
                 </button>
               );
             })}

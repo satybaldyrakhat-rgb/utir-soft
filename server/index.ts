@@ -234,6 +234,10 @@ migrateColumn('team_settings', 'brand_kit', 'TEXT');
 // Client-facing AI config — JSON used by Instagram / WhatsApp webhooks when
 // auto-replying to customers. See ClientAIConfig below for the shape.
 migrateColumn('team_settings', 'client_ai', 'TEXT');
+// Company requisites — JSON { legalName, bin, iban, bik, ... } used by
+// invoice PDFs. Lives on team_settings so the whole team uses the same
+// bank details on every счёт the admin prints.
+migrateColumn('team_settings', 'company_requisites', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -1704,6 +1708,47 @@ clientAiRouter.post('/test', requireRole('admin'), async (req: AuthedRequest, re
 });
 
 app.use('/api/team/client-ai', clientAiRouter);
+
+// ─── Company requisites (for invoice PDFs) ────────────────────────
+// Stored as JSON blob on team_settings.company_requisites. All team
+// members can read (so any employee can print an invoice that has the
+// right reqs), but only admin can mutate.
+const requisitesRouter = express.Router();
+requisitesRouter.use(authMiddleware);
+const DEFAULT_REQ = {
+  legalName: '', bin: '', address: '', bankName: '',
+  iban: '', bik: '', kbe: '', director: '', phone: '', email: '',
+};
+requisitesRouter.get('/', (req: AuthedRequest, res) => {
+  try {
+    const row = db.prepare('SELECT company_requisites FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+    res.json(row?.company_requisites ? { ...DEFAULT_REQ, ...JSON.parse(row.company_requisites) } : DEFAULT_REQ);
+  } catch { res.json(DEFAULT_REQ); }
+});
+requisitesRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
+  const b = req.body || {};
+  const clean = {
+    legalName: String(b.legalName || '').slice(0, 200),
+    bin:       String(b.bin       || '').slice(0, 20),
+    address:   String(b.address   || '').slice(0, 300),
+    bankName:  String(b.bankName  || '').slice(0, 200),
+    iban:      String(b.iban      || '').slice(0, 40),
+    bik:       String(b.bik       || '').slice(0, 20),
+    kbe:       String(b.kbe       || '').slice(0, 5),
+    director:  String(b.director  || '').slice(0, 200),
+    phone:     String(b.phone     || '').slice(0, 40),
+    email:     String(b.email     || '').slice(0, 100),
+  };
+  db.prepare(`
+    INSERT INTO team_settings (team_id, company_requisites, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET
+      company_requisites = excluded.company_requisites,
+      updated_at = excluded.updated_at
+  `).run(req.teamId!, JSON.stringify(clean));
+  res.json({ ok: true, requisites: clean });
+});
+app.use('/api/team/requisites', requisitesRouter);
 
 // Map of team-wide Telegram pairings (Block F.6). Used by the team panel to
 // show which teammates have linked their account to the bot — admin sees who

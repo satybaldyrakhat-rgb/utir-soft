@@ -489,7 +489,10 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
     const billed = enriched.reduce((s, d) => s + d._amount, 0);
     const paid = enriched.reduce((s, d) => s + d._paid, 0);
     const due = billed - paid;
-    const overdue = enriched.filter(d => d._status !== 'paid' && d.date && new Date(d.date) < new Date('2026-05-09')).reduce((s, d) => s + d._due, 0);
+    // Anything still unpaid 14+ days after the deal date counts as overdue.
+    // Was hardcoded to a specific date — would silently break after that day.
+    const overdueCutoff = new Date(Date.now() - 14 * 24 * 3600 * 1000);
+    const overdue = enriched.filter(d => d._status !== 'paid' && d.date && new Date(d.date) < overdueCutoff).reduce((s, d) => s + d._due, 0);
     return { billed, paid, due, overdue };
   }, [enriched]);
 
