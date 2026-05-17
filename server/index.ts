@@ -273,6 +273,10 @@ migrateColumn('team_settings', 'company_requisites', 'TEXT');
 // Telegram bot) are NOT stored here — those live in Railway env vars
 // and we just read process.env at status-time.
 migrateColumn('team_settings', 'integrations', 'TEXT');
+// Catalogs — JSON { productTemplates: [...], materials: [...], ... }.
+// Team-wide so every employee picks from the same lists when creating
+// deals / products. Previously was per-user in localStorage only.
+migrateColumn('team_settings', 'catalogs', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -1789,6 +1793,61 @@ requisitesRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
   res.json({ ok: true, requisites: clean });
 });
 app.use('/api/team/requisites', requisitesRouter);
+
+// ─── Team catalogs (Product templates / Materials / Hardware / Addons /
+//     Furniture types) ─────────────────────────────────────────────
+// Whole JSON blob persisted on team_settings.catalogs. Everyone on the
+// team reads (so non-admin employees pick from the same list when
+// creating deals); manager-or-above writes.
+const catalogsRouter = express.Router();
+catalogsRouter.use(authMiddleware);
+const DEFAULT_CATALOGS = {
+  productTemplates: [] as string[],
+  materials:        [] as string[],
+  hardware:         [] as string[],
+  addons:           [] as string[],
+  furnitureTypes:   [] as string[],
+};
+type CatalogsShape = typeof DEFAULT_CATALOGS;
+type CatalogKey = keyof CatalogsShape;
+
+catalogsRouter.get('/', (req: AuthedRequest, res) => {
+  try {
+    const row = db.prepare('SELECT catalogs FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+    if (!row?.catalogs) return res.json(DEFAULT_CATALOGS);
+    const parsed = JSON.parse(row.catalogs);
+    // Shallow-merge with defaults so adding a new catalog key in code never
+    // exposes «undefined» to old rows.
+    res.json({ ...DEFAULT_CATALOGS, ...parsed });
+  } catch {
+    res.json(DEFAULT_CATALOGS);
+  }
+});
+
+catalogsRouter.put('/', requireRole('manager'), (req: AuthedRequest, res) => {
+  const incoming = (req.body || {}) as Partial<CatalogsShape>;
+  const clean: CatalogsShape = { ...DEFAULT_CATALOGS };
+  (Object.keys(DEFAULT_CATALOGS) as CatalogKey[]).forEach(k => {
+    const v = incoming[k];
+    if (Array.isArray(v)) {
+      // Trim + dedupe + cap at 500 items per catalog to keep JSON small.
+      const cleaned = Array.from(new Set(
+        v.filter(x => typeof x === 'string').map(x => x.trim()).filter(Boolean)
+      )).slice(0, 500);
+      clean[k] = cleaned;
+    }
+  });
+  db.prepare(`
+    INSERT INTO team_settings (team_id, catalogs, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET
+      catalogs = excluded.catalogs,
+      updated_at = excluded.updated_at
+  `).run(req.teamId!, JSON.stringify(clean));
+  res.json({ ok: true, catalogs: clean });
+});
+
+app.use('/api/team/catalogs', catalogsRouter);
 
 // ─── Tax payments (mark a tax as paid / undo) ─────────────────────
 // Stores one row per (team, period_key). period_key is built client-side

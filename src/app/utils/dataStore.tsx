@@ -561,6 +561,8 @@ interface DataStore {
   updateProfile: (updates: Partial<UserProfile>) => void;
   addCatalogItem: (key: CatalogKey, value: string) => void;
   removeCatalogItem: (key: CatalogKey, value: string) => void;
+  renameCatalogItem: (key: CatalogKey, oldValue: string, newValue: string) => void;
+  replaceCatalog:    (key: CatalogKey, items: string[]) => void;
   setRolePermission: (role: RoleKey, module: ModuleKey, level: PermissionLevel) => void;
   // Bulk replace — used by the matrix UI to commit multiple cell changes in
   // one click instead of saving on every toggle.
@@ -734,20 +736,69 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const trimmed = value.trim();
     if (!trimmed) return;
     let added = false;
+    let snapshot: UserCatalogs | null = null;
     setCatalogs(prev => {
       if (prev[key].includes(trimmed)) return prev;
       added = true;
       const next: UserCatalogs = { ...prev, [key]: [...prev[key], trimmed] };
       saveCatalogs(next);
+      snapshot = next;
       return next;
     });
-    if (added) addActivity({
-      user: 'Вы', actor: 'human',
-      action: 'Добавил в справочник',
-      target: `${key} · ${trimmed}`,
-      type: 'create',
-      page: 'catalog',
+    if (added) {
+      addActivity({
+        user: 'Вы', actor: 'human',
+        action: 'Добавил в справочник',
+        target: `${key} · ${trimmed}`,
+        type: 'create',
+        page: 'catalog',
+      });
+      // Persist the full updated payload to the backend so other teammates see it.
+      if (snapshot) api.put('/api/team/catalogs', snapshot).catch(err => console.error('[addCatalogItem]', err));
+    }
+  }, [addActivity]);
+
+  // Replace one item with another (used by inline rename). Empty newValue
+  // is equivalent to removeCatalogItem; same name → no-op.
+  const renameCatalogItem = useCallback((key: CatalogKey, oldValue: string, newValue: string) => {
+    const trimmed = newValue.trim();
+    if (!trimmed || trimmed === oldValue) return;
+    let snapshot: UserCatalogs | null = null;
+    setCatalogs(prev => {
+      if (!prev[key].includes(oldValue)) return prev;
+      // De-dupe: if new value already exists, just drop the old one.
+      const list = prev[key].filter(v => v !== oldValue);
+      const next: UserCatalogs = { ...prev, [key]: list.includes(trimmed) ? list : [...list, trimmed] };
+      saveCatalogs(next);
+      snapshot = next;
+      return next;
     });
+    addActivity({
+      user: 'Вы', actor: 'human',
+      action: 'Изменил запись справочника',
+      target: `${key}: ${oldValue} → ${trimmed}`,
+      type: 'update', page: 'catalog',
+    });
+    if (snapshot) api.put('/api/team/catalogs', snapshot).catch(err => console.error('[renameCatalogItem]', err));
+  }, [addActivity]);
+
+  // Replace the whole list for a single catalog — used by CSV import / clear-all.
+  const replaceCatalog = useCallback((key: CatalogKey, items: string[]) => {
+    const cleaned = Array.from(new Set(items.map(s => s.trim()).filter(Boolean))).slice(0, 500);
+    let snapshot: UserCatalogs | null = null;
+    setCatalogs(prev => {
+      const next: UserCatalogs = { ...prev, [key]: cleaned };
+      saveCatalogs(next);
+      snapshot = next;
+      return next;
+    });
+    addActivity({
+      user: 'Вы', actor: 'human',
+      action: cleaned.length === 0 ? 'Очистил справочник' : 'Импортировал в справочник',
+      target: `${key} (${cleaned.length})`,
+      type: cleaned.length === 0 ? 'delete' : 'update', page: 'catalog',
+    });
+    if (snapshot) api.put('/api/team/catalogs', snapshot).catch(err => console.error('[replaceCatalog]', err));
   }, [addActivity]);
 
   const updateModule = useCallback((id: string, updates: Partial<PlatformModule>) => {
@@ -899,13 +950,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const removeCatalogItem = useCallback((key: CatalogKey, value: string) => {
     let removed = false;
+    let snapshot: UserCatalogs | null = null;
     setCatalogs(prev => {
       if (!prev[key].includes(value)) return prev;
       removed = true;
       const next: UserCatalogs = { ...prev, [key]: prev[key].filter(v => v !== value) };
       saveCatalogs(next);
+      snapshot = next;
       return next;
     });
+    if (removed && snapshot) api.put('/api/team/catalogs', snapshot).catch(err => console.error('[removeCatalogItem]', err));
     if (removed) addActivity({
       user: 'Вы', actor: 'human',
       action: 'Удалил из справочника',
@@ -924,7 +978,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Matrix-gated reads (deals/products/transactions/activity) may return
       // 403 for a role whose matrix entry is 'none'. Swallow so the UI still
       // boots — the sidebar item for that module is hidden anyway.
-      const [d, e, t, p, tx, ig, al, ai, rp] = await Promise.all([
+      const [d, e, t, p, tx, ig, al, ai, rp, cat] = await Promise.all([
         api.get<Deal[]>('/api/deals').catch(() => [] as Deal[]),
         api.get<Employee[]>('/api/employees'),
         api.get<Task[]>('/api/tasks'),
@@ -934,9 +988,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
         api.get<ActivityLog[]>('/api/activity').catch(() => [] as ActivityLog[]),
         api.get<AISettings | null>('/api/ai-settings').catch(() => null),
         api.get<{ permissions?: RolePermissions; roles?: TeamRole[] } | RolePermissions | null>('/api/team-permissions').catch(() => null),
+        // Team catalogs — falls back to localStorage if backend unavailable.
+        api.get<UserCatalogs>('/api/team/catalogs').catch(() => null),
       ]);
       setDeals(d); setEmployees(e); setTasks(t); setProducts(p);
       setTransactions(tx); setIntegrations(ig); setActivityLogs(al);
+      // If backend returned catalogs, use them as the source of truth (team-wide).
+      // Local cache stays as offline fallback.
+      if (cat) {
+        const merged: UserCatalogs = { ...EMPTY_CATALOGS, ...cat };
+        setCatalogs(merged);
+        try { localStorage.setItem(CATALOGS_STORAGE_KEY, JSON.stringify(merged)); } catch {}
+      }
       // Role settings come from the backend so all teammates see the same rules.
       // Accepts both the legacy shape (flat matrix) and the new shape ({permissions, roles}).
       if (rp) {
@@ -1194,7 +1257,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     toggleIntegration, updateIntegration,
     addActivity,
     updateProfile,
-    addCatalogItem, removeCatalogItem,
+    addCatalogItem, removeCatalogItem, renameCatalogItem, replaceCatalog,
     setRolePermission,
     bulkSetRolePermissions,
     addRole, renameRole, deleteRole,

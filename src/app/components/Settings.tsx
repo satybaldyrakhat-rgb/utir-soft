@@ -6,6 +6,7 @@ import { TelegramPairing } from './TelegramPairing';
 import { TeamInvitePanel } from './TeamInvitePanel';
 import { WebhooksPanel } from './WebhooksPanel';
 import { IntegrationsPanel } from './IntegrationsPanel';
+import { CatalogsSettings } from './CatalogsSettings';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
 import { useDataStore, ALL_MODULES, ALL_ROLES, MODULE_GROUPS, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
 import { api } from '../utils/api';
@@ -67,7 +68,23 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
   const catalogs = store.catalogs;
   const aiClient = store.aiSettings.client;
   const aiAssistant = store.aiSettings.assistant;
-  const [activeTab, setActiveTab] = useState<'general' | 'employees' | 'ai-client' | 'ai-assistant' | 'modules' | 'integrations' | 'catalogs' | 'activity'>('general');
+  // Persisted active sub-tab — survives refresh. We pair this with the
+  // page-level persistence in App.tsx so refreshing on Settings → Каталоги
+  // doesn't bounce you to Settings → Общие.
+  type SettingsTab = 'general' | 'employees' | 'ai-client' | 'ai-assistant' | 'modules' | 'integrations' | 'catalogs' | 'activity';
+  const SETTINGS_TAB_KEY = 'utir_settings_tab';
+  const ALLOWED_TABS: SettingsTab[] = ['general', 'employees', 'ai-client', 'ai-assistant', 'modules', 'integrations', 'catalogs', 'activity'];
+  const [activeTab, setActiveTabRaw] = useState<SettingsTab>(() => {
+    try {
+      const saved = localStorage.getItem(SETTINGS_TAB_KEY) as SettingsTab | null;
+      if (saved && ALLOWED_TABS.includes(saved)) return saved;
+    } catch { /* localStorage blocked */ }
+    return 'general';
+  });
+  const setActiveTab = (t: SettingsTab) => {
+    setActiveTabRaw(t);
+    try { localStorage.setItem(SETTINGS_TAB_KEY, t); } catch { /* ignore */ }
+  };
   const tt = (key: Parameters<typeof t>[0]) => t(key, language);
   const [savedFlash, setSavedFlash] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
@@ -493,48 +510,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
 
       {/* ===== CATALOGS (Справочники) ===== */}
       {activeTab === 'catalogs' && (
-        <div className="space-y-5">
-          <div className="text-[11px] text-gray-400 max-w-xl">{tt('catalogsDesc')}</div>
-          {CATALOG_KEYS.map(({ key, titleKey }) => (
-            <div key={key} className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="text-sm text-gray-900 mb-3">{tt(titleKey)}</div>
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {catalogs[key].map(item => (
-                  <span key={item} className="group inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 rounded-lg text-xs text-gray-700">
-                    {item}
-                    <button
-                      onClick={() => store.removeCatalogItem(key, item)}
-                      className="text-gray-300 hover:text-red-500 transition"
-                      title={tt('delete')}
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-                {catalogs[key].length === 0 && (
-                  <span className="text-[11px] text-gray-300 italic">{tt('catalogEmpty')}</span>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={catalogDraft[key]}
-                  onChange={e => setCatalogDraft({ ...catalogDraft, [key]: e.target.value })}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitCatalogItem(key); } }}
-                  placeholder={tt('catalogAddItemHint')}
-                  className="flex-1 px-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
-                />
-                <button
-                  onClick={() => submitCatalogItem(key)}
-                  disabled={!catalogDraft[key].trim()}
-                  className="px-3 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 disabled:opacity-30 flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3" />{tt('add')}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <CatalogsSettings language={language} />
       )}
 
       {/* ===== EMPLOYEES — invite-only (no manual add until invite flow ships) ===== */}
