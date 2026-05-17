@@ -24,6 +24,10 @@ function formatValue(f: CustomFieldDef, v: any, language: 'kz' | 'ru' | 'eng'): 
   }
 }
 
+// Shared input class for the record form. Same vocabulary as the rest of
+// the glass modals across the app.
+const INPUT = 'w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all';
+
 export function CustomModulePage({ moduleId, language, onNotFound }: Props) {
   const store = useDataStore();
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
@@ -40,6 +44,8 @@ export function CustomModulePage({ moduleId, language, onNotFound }: Props) {
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<CustomRecord | null>(null);
   const [showForm, setShowForm] = useState(false);
+  // Glass confirm-delete dialog instead of native confirm()
+  const [confirmDelete, setConfirmDelete] = useState<CustomRecord | null>(null);
 
   if (!mod || !mod.custom) return null;
 
@@ -56,68 +62,98 @@ export function CustomModulePage({ moduleId, language, onNotFound }: Props) {
   const tableFields = fields.slice(0, 4);
 
   return (
-    <div className="p-4 md:p-8 max-w-[1400px]">
+    <div
+      className="min-h-full relative"
+      style={{
+        background: `
+          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
+          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
+          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
+          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
+          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+        `,
+      }}
+    >
+    <div className="p-4 md:p-8 max-w-[1400px] mx-auto relative">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 bg-gray-100 rounded-2xl flex items-center justify-center"><CustomIcon name={mod.icon} className="w-5 h-5 text-gray-700" /></div>
+          <div className="w-12 h-12 bg-white/60 ring-1 ring-white/60 rounded-2xl flex items-center justify-center backdrop-blur-xl">
+            <CustomIcon name={mod.icon} className="w-5 h-5 text-slate-700" />
+          </div>
           <div>
-            <p className="text-xs text-gray-400 mb-0.5">{tt('customModule')}</p>
-            <h1 className="text-gray-900">{mod.labels[language]}</h1>
+            <p className="text-[11px] text-slate-400 mb-0.5 tracking-widest uppercase">{tt('customModule')}</p>
+            <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight">{mod.labels[language]}</h1>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder={l('Поиск…', 'Іздеу…', 'Search…')}
-              className="pl-9 pr-3 py-2 bg-gray-50 border-0 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200"
+              className="pl-9 pr-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs focus:outline-none focus:bg-white focus:ring-slate-300 transition-all placeholder:text-slate-400"
             />
           </div>
-          <button onClick={() => { setEditing(null); setShowForm(true); }} className="flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">
+          <button
+            onClick={() => { setEditing(null); setShowForm(true); }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all"
+          >
             <Plus className="w-3.5 h-3.5" />{tt('addRecord')}
           </button>
         </div>
       </div>
 
       {fields.length === 0 ? (
-        <div className="bg-white border border-gray-100 rounded-2xl p-12 text-center text-xs text-gray-400">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
           {l('У модуля пока нет полей. Откройте Настройки → Модули и добавьте поля.',
              'Модульдің әзірге өрістері жоқ. Баптаулар → Модульдер ашып, өрістер қосыңыз.',
              'No fields yet. Open Settings → Modules and add fields.')}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white border border-gray-100 rounded-2xl p-12 text-center text-xs text-gray-400">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
           {search ? l('Ничего не найдено', 'Ештеңе табылмады', 'Nothing found') : tt('recordsEmpty')}
         </div>
       ) : (
-        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 rounded-3xl overflow-hidden shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
           {/* Header row */}
-          <div className="grid gap-3 px-4 py-2.5 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-400" style={{ gridTemplateColumns: `repeat(${tableFields.length}, minmax(0, 1fr)) 120px 100px` }}>
+          <div
+            className="grid gap-3 px-5 py-3 border-b border-white/60 bg-white/30 text-[10px] uppercase tracking-wider text-slate-500"
+            style={{ gridTemplateColumns: `repeat(${tableFields.length}, minmax(0, 1fr)) 120px 100px` }}
+          >
             {tableFields.map(f => <div key={f.id} className="truncate">{fieldLabel(f, language)}</div>)}
             <div>{tt('recordCreated')}</div>
             <div className="text-right">·</div>
           </div>
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-white/50">
             {filtered.map(r => (
-              <div key={r.id} className="grid gap-3 px-4 py-3 items-center text-xs hover:bg-gray-50/50 group" style={{ gridTemplateColumns: `repeat(${tableFields.length}, minmax(0, 1fr)) 120px 100px` }}>
+              <div
+                key={r.id}
+                className="grid gap-3 px-5 py-3 items-center text-xs hover:bg-white/40 transition-colors group"
+                style={{ gridTemplateColumns: `repeat(${tableFields.length}, minmax(0, 1fr)) 120px 100px` }}
+              >
                 {tableFields.map(f => (
-                  <div key={f.id} className="text-gray-900 truncate">{formatValue(f, r.values[f.id], language)}</div>
+                  <div key={f.id} className="text-slate-900 truncate">{formatValue(f, r.values[f.id], language)}</div>
                 ))}
-                <div className="text-[10px] text-gray-400 font-mono">{new Date(r.createdAt).toLocaleDateString(language === 'eng' ? 'en-GB' : 'ru-RU')}</div>
+                <div className="text-[10px] text-slate-500 font-mono tabular-nums">
+                  {new Date(r.createdAt).toLocaleDateString(language === 'eng' ? 'en-GB' : 'ru-RU')}
+                </div>
                 <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => { setEditing(r); setShowForm(true); }} className="p-1.5 hover:bg-gray-100 rounded-lg" title={tt('editRecord')}>
-                    <Edit2 className="w-3.5 h-3.5 text-gray-400" />
+                  <button
+                    onClick={() => { setEditing(r); setShowForm(true); }}
+                    className="p-1.5 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl transition-all"
+                    title={tt('editRecord')}
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-slate-500" />
                   </button>
                   <button
-                    onClick={() => { if (confirm(tt('deleteRecord') + '?')) store.deleteCustomRecord(moduleId, r.id); }}
-                    className="p-1.5 hover:bg-red-50 rounded-lg"
+                    onClick={() => setConfirmDelete(r)}
+                    className="p-1.5 hover:bg-rose-100/70 rounded-xl transition-colors"
                     title={tt('deleteRecord')}
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                   </button>
                 </div>
               </div>
@@ -134,6 +170,44 @@ export function CustomModulePage({ moduleId, language, onNotFound }: Props) {
           onClose={() => setShowForm(false)}
         />
       )}
+
+      {/* Glass delete confirmation */}
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-[80] flex items-center justify-center p-4"
+          onClick={() => setConfirmDelete(null)}
+        >
+          <div
+            className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-sm p-6 shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-rose-100/70 text-rose-700 ring-1 ring-white/60 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <div className="text-center text-sm text-slate-900 mb-1">{tt('deleteRecord')}?</div>
+            <div className="text-center text-[11px] text-slate-500 mb-5 leading-relaxed">
+              {l('Запись будет удалена без возможности восстановить.',
+                 'Жазба қайтарылмастан жойылады.',
+                 'The record will be removed with no way to restore.')}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="px-3 py-2.5 bg-white/70 hover:bg-white ring-1 ring-white/60 text-slate-700 rounded-2xl text-xs transition-colors"
+              >
+                {tt('cancel')}
+              </button>
+              <button
+                onClick={() => { store.deleteCustomRecord(moduleId, confirmDelete.id); setConfirmDelete(null); }}
+                className="px-3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs transition-colors shadow-[0_8px_24px_-8px_rgba(225,29,72,0.5)]"
+              >
+                {tt('deleteRecord')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
     </div>
   );
 }
@@ -177,77 +251,95 @@ function RecordForm({ mod, editing, language, onClose }: RecordFormProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-          <div className="text-sm text-gray-900">{editing ? tt('editRecord') : tt('addRecord')}</div>
-          <button onClick={onClose} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-gray-400" /></button>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[80] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between">
+          <div>
+            <div className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{mod.labels[language]}</div>
+            <div className="text-lg text-slate-900 tracking-tight">{editing ? tt('editRecord') : tt('addRecord')}</div>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center transition-colors">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {fields.length === 0 && (
-            <div className="text-[11px] text-gray-400 italic">{l('У этого модуля нет полей. Сначала добавьте поля в Настройки → Модули.', 'Бұл модульдің өрістері жоқ.', 'No fields. Add some in Settings → Modules.')}</div>
+            <div className="text-[11px] text-slate-500 italic px-3 py-3 bg-white/40 ring-1 ring-white/60 rounded-2xl backdrop-blur-xl">
+              {l('У этого модуля нет полей. Сначала добавьте поля в Настройки → Модули.', 'Бұл модульдің өрістері жоқ.', 'No fields. Add some in Settings → Modules.')}
+            </div>
           )}
           {fields.map(f => (
             <div key={f.id}>
-              <label className="block text-[11px] text-gray-400 mb-1">
-                {fieldLabel(f, language)} {f.required && <span className="text-red-400">*</span>}
+              <label className="block text-[11px] text-slate-500 mb-1.5">
+                {fieldLabel(f, language)} {f.required && <span className="text-rose-500">*</span>}
               </label>
               {f.type === 'textarea' ? (
                 <textarea
                   value={values[f.id] || ''}
                   onChange={e => { setValues(v => ({ ...v, [f.id]: e.target.value })); setError(''); }}
                   rows={3}
-                  className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none"
+                  className={`${INPUT} resize-none`}
                 />
               ) : f.type === 'number' ? (
                 <input
                   type="number"
                   value={values[f.id] ?? ''}
                   onChange={e => { setValues(v => ({ ...v, [f.id]: e.target.value === '' ? '' : Number(e.target.value) })); setError(''); }}
-                  className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+                  className={INPUT}
                 />
               ) : f.type === 'date' ? (
                 <input
                   type="date"
                   value={values[f.id] || ''}
                   onChange={e => { setValues(v => ({ ...v, [f.id]: e.target.value })); setError(''); }}
-                  className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+                  className={INPUT}
                 />
               ) : f.type === 'select' ? (
                 <select
                   value={values[f.id] || ''}
                   onChange={e => { setValues(v => ({ ...v, [f.id]: e.target.value })); setError(''); }}
-                  className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+                  className={INPUT}
                 >
                   <option value="">—</option>
                   {(f.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
               ) : f.type === 'checkbox' ? (
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer px-3 py-2.5 bg-white/40 ring-1 ring-white/60 rounded-2xl backdrop-blur-xl hover:bg-white/60 transition-colors">
                   <input
                     type="checkbox"
                     checked={!!values[f.id]}
                     onChange={e => { setValues(v => ({ ...v, [f.id]: e.target.checked })); setError(''); }}
-                    className="rounded accent-gray-900"
+                    className="rounded accent-slate-900"
                   />
-                  <span className="text-xs text-gray-600">{fieldLabel(f, language)}</span>
+                  <span className="text-xs text-slate-700">{fieldLabel(f, language)}</span>
                 </label>
               ) : (
                 <input
                   type="text"
                   value={values[f.id] || ''}
                   onChange={e => { setValues(v => ({ ...v, [f.id]: e.target.value })); setError(''); }}
-                  className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
+                  className={INPUT}
                 />
               )}
             </div>
           ))}
         </div>
-        <div className="px-5 py-3 border-t border-gray-50 flex items-center gap-2">
-          {error && <span className="text-xs text-red-500 mr-auto">{error}</span>}
+        <div className="px-6 py-4 border-t border-white/60 flex items-center gap-2">
+          {error && <span className="text-xs text-rose-600 mr-auto">{error}</span>}
           <div className="flex-1" />
-          <button onClick={onClose} className="px-4 py-2 border border-gray-100 rounded-xl text-xs hover:bg-gray-50">{tt('cancel')}</button>
-          <button onClick={handleSubmit} disabled={fields.length === 0} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 disabled:opacity-30">{tt('save')}</button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-2xl text-xs hover:bg-white transition-colors"
+          >
+            {tt('cancel')}
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={fields.length === 0}
+            className="px-4 py-2 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 disabled:opacity-30 disabled:shadow-none transition-all"
+          >
+            {tt('save')}
+          </button>
         </div>
       </div>
     </div>

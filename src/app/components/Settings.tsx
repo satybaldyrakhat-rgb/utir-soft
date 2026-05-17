@@ -364,17 +364,37 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
   const [empPhone, setEmpPhone] = useState('');
 
   return (
-    <div className="p-4 md:p-8 max-w-[1000px]">
+    <div
+      className="min-h-full relative"
+      style={{
+        background: `
+          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
+          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
+          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
+          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
+          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+        `,
+      }}
+    >
+    <div className="p-4 md:p-8 max-w-[1100px] mx-auto relative">
       {/* Header */}
-      <div className="mb-8">
-        <p className="text-xs text-gray-400 mb-1">{l('Настройки', 'Баптаулар', 'Settings')}</p>
-        <h1 className="text-gray-900">{l('Управление системой', 'Жүйені басқару', 'System')}</h1>
+      <div className="mb-7">
+        <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Настройки', 'Баптаулар', 'Settings')}</p>
+        <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight">{l('Управление системой', 'Жүйені басқару', 'System')}</h1>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — glass capsules */}
       <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1">
         {tabs.map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${activeTab === t.id ? 'bg-gray-900 text-white' : 'bg-white border border-gray-100 text-gray-400 hover:text-gray-600'}`}>
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
+              activeTab === t.id
+                ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+                : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+            }`}
+          >
             <t.icon className="w-3.5 h-3.5" />{t.label}
           </button>
         ))}
@@ -948,6 +968,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

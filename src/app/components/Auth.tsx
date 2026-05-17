@@ -304,28 +304,28 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-2xl text-gray-900 mb-1 text-center">{l('Добро пожаловать', 'Қош келдіңіз', 'Welcome')}</h1>
-            <p className="text-sm text-gray-400 mb-8 text-center max-w-[280px]">
+            <p className="text-sm text-slate-500 mb-8 text-center max-w-[280px]">
               {l('CRM-платформа для мебельного бизнеса Казахстана', 'Қазақстан жиһаз бизнесіне арналған CRM-платформа', 'CRM platform for furniture business in Kazakhstan')}
             </p>
 
             <div className="w-full space-y-2.5 mb-6">
-              <button onClick={() => { setStep('login-email'); setError(''); }} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all">
+              <button onClick={() => { setStep('login-email'); setError(''); }} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">
                 {l('Войти', 'Кіру', 'Log in')}
               </button>
-              <button onClick={() => { setStep('signup-email'); setError(''); }} className="w-full py-3 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-all">
+              <button onClick={() => { setStep('signup-email'); setError(''); }} className="w-full py-3 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-700 hover:bg-white transition-all backdrop-blur-xl">
                 {l('Создать аккаунт', 'Аккаунт жасау', 'Sign up')}
               </button>
             </div>
 
             <div className="w-full">
               <div className="flex items-center gap-3 mb-4">
-                <div className="h-px bg-gray-100 flex-1" />
-                <span className="text-[10px] text-gray-400">{l('или продолжить с', 'немесе жалғастыру', 'or continue with')}</span>
-                <div className="h-px bg-gray-100 flex-1" />
+                <div className="h-px bg-white/60 flex-1" />
+                <span className="text-[10px] text-slate-400">{l('или продолжить с', 'немесе жалғастыру', 'or continue with')}</span>
+                <div className="h-px bg-white/60 flex-1" />
               </div>
               <div className="flex gap-2">
                 {socialButtons.map(sb => (
-                  <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-100 rounded-xl text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-200 transition-all disabled:opacity-50">
+                  <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-xs text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
                     {sb.icon}
                     <span className="hidden sm:inline">{sb.label}</span>
                   </button>
@@ -348,34 +348,34 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
         return (
           <div>
             <h2 className="text-xl text-gray-900 mb-1">{l('Войти в аккаунт', 'Аккаунтқа кіру', 'Log in to your account')}</h2>
-            <p className="text-sm text-gray-400 mb-6">{l('Введите email для продолжения', 'Жалғастыру үшін email енгізіңіз', 'Enter your email to continue')}</p>
+            <p className="text-sm text-slate-500 mb-6">{l('Введите email для продолжения', 'Жалғастыру үшін email енгізіңіз', 'Enter your email to continue')}</p>
 
             <div className="space-y-4 mb-4">
               <div>
-                <label className="block text-[11px] text-gray-400 mb-1.5">Email</label>
+                <label className="block text-[11px] text-slate-500 mb-1.5">Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                  <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleEmailContinue('login')} placeholder="name@company.kz" autoFocus className="w-full pl-10 pr-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                  <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleEmailContinue('login')} placeholder="name@company.kz" autoFocus className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
                 </div>
               </div>
             </div>
 
-            <button onClick={() => handleEmailContinue('login')} disabled={isLoading || !email} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
+            <button onClick={() => handleEmailContinue('login')} disabled={isLoading || !email} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
 
-            <div className="flex items-center gap-3 mb-4"><div className="h-px bg-gray-100 flex-1" /><span className="text-[10px] text-gray-400">{l('или', 'немесе', 'or')}</span><div className="h-px bg-gray-100 flex-1" /></div>
+            <div className="flex items-center gap-3 mb-4"><div className="h-px bg-white/60 flex-1" /><span className="text-[10px] text-slate-400">{l('или', 'немесе', 'or')}</span><div className="h-px bg-white/60 flex-1" /></div>
 
             <div className="space-y-2">
               {socialButtons.map(sb => (
-                <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-2.5 border border-gray-100 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-all disabled:opacity-50">
+                <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
                   {sb.icon}
                   <span>{l('Войти через', 'Арқылы кіру', 'Continue with')} {sb.label}</span>
                 </button>
               ))}
             </div>
 
-            <p className="text-center text-xs text-gray-400 mt-6">
+            <p className="text-center text-xs text-slate-500 mt-6">
               {l('Нет аккаунта?', 'Аккаунт жоқ па?', "Don't have an account?")} <button onClick={() => { setStep('signup-email'); setError(''); }} className="text-gray-900 hover:underline">{l('Создать', 'Жасау', 'Sign up')}</button>
             </p>
           </div>
@@ -387,17 +387,17 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
           <div>
             <div className="flex items-center gap-3 mb-5">
               <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-sm text-gray-600">{email[0]?.toUpperCase()}</div>
-              <div><p className="text-sm text-gray-900">{email}</p><button onClick={goBack} className="text-[10px] text-gray-400 hover:text-gray-600">{l('Изменить', 'Өзгерту', 'Change')}</button></div>
+              <div><p className="text-sm text-gray-900">{email}</p><button onClick={goBack} className="text-[10px] text-slate-400 hover:text-gray-600">{l('Изменить', 'Өзгерту', 'Change')}</button></div>
             </div>
 
             <h2 className="text-xl text-gray-900 mb-1">{l('Введите пароль', 'Құпия сөзді енгізіңіз', 'Enter your password')}</h2>
-            <p className="text-sm text-gray-400 mb-6">{l('Для входа в Utir Soft', 'Utir Soft-қа кіру үшін', 'To log in to Utir Soft')}</p>
+            <p className="text-sm text-slate-500 mb-6">{l('Для входа в Utir Soft', 'Utir Soft-қа кіру үшін', 'To log in to Utir Soft')}</p>
 
             <div className="space-y-4 mb-2">
               <div>
-                <label className="block text-[11px] text-gray-400 mb-1.5">{l('Пароль', 'Құпия сөз', 'Password')}</label>
+                <label className="block text-[11px] text-slate-500 mb-1.5">{l('Пароль', 'Құпия сөз', 'Password')}</label>
                 <div className="relative">
-                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => { setPassword(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleLogin()} placeholder="••••••••" autoFocus className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 pr-12" />
+                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => { setPassword(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleLogin()} placeholder="••••••••" autoFocus className="w-full px-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all pr-12" />
                   <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-300 hover:text-gray-600">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
                 </div>
               </div>
@@ -406,12 +406,12 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             <div className="flex items-center justify-between mb-6">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="w-3.5 h-3.5 rounded accent-gray-900" />
-                <span className="text-xs text-gray-500">{l('Запомнить меня', 'Есте сақтау', 'Remember me')}</span>
+                <span className="text-xs text-slate-600">{l('Запомнить меня', 'Есте сақтау', 'Remember me')}</span>
               </label>
-              <button onClick={() => { setStep('forgot'); setError(''); }} className="text-xs text-gray-400 hover:text-gray-900 transition-colors">{l('Забыли пароль?', 'Құпия сөзді ұмыттыңыз ба?', 'Forgot password?')}</button>
+              <button onClick={() => { setStep('forgot'); setError(''); }} className="text-xs text-slate-500 hover:text-gray-900 transition-colors">{l('Забыли пароль?', 'Құпия сөзді ұмыттыңыз ба?', 'Forgot password?')}</button>
             </div>
 
-            <button onClick={handleLogin} disabled={isLoading || !password} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleLogin} disabled={isLoading || !password} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : l('Войти', 'Кіру', 'Log in')}
             </button>
           </div>
@@ -422,7 +422,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
         return (
           <div>
             <h2 className="text-xl text-gray-900 mb-1">{l('Создать аккаунт', 'Аккаунт жасау', 'Create your account')}</h2>
-            <p className="text-sm text-gray-400 mb-6">{l('Начните управлять бизнесом эффективно', 'Бизнесті тиімді басқара бастаңыз', 'Start managing your business efficiently')}</p>
+            <p className="text-sm text-slate-500 mb-6">{l('Начните управлять бизнесом эффективно', 'Бизнесті тиімді басқара бастаңыз', 'Start managing your business efficiently')}</p>
 
             {/* Invitation banner */}
             {invitePreview && !('error' in invitePreview) && (
@@ -466,30 +466,30 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
 
             <div className="space-y-4 mb-4">
               <div>
-                <label className="block text-[11px] text-gray-400 mb-1.5">Email</label>
+                <label className="block text-[11px] text-slate-500 mb-1.5">Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                  <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleEmailContinue('signup')} placeholder="name@company.kz" autoFocus className="w-full pl-10 pr-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                  <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleEmailContinue('signup')} placeholder="name@company.kz" autoFocus className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
                 </div>
               </div>
             </div>
 
-            <button onClick={() => handleEmailContinue('signup')} disabled={isLoading || !email} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
+            <button onClick={() => handleEmailContinue('signup')} disabled={isLoading || !email} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
 
-            <div className="flex items-center gap-3 mb-4"><div className="h-px bg-gray-100 flex-1" /><span className="text-[10px] text-gray-400">{l('или', 'немесе', 'or')}</span><div className="h-px bg-gray-100 flex-1" /></div>
+            <div className="flex items-center gap-3 mb-4"><div className="h-px bg-white/60 flex-1" /><span className="text-[10px] text-slate-400">{l('или', 'немесе', 'or')}</span><div className="h-px bg-white/60 flex-1" /></div>
 
             <div className="space-y-2">
               {socialButtons.map(sb => (
-                <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-2.5 border border-gray-100 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-all disabled:opacity-50">
+                <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
                   {sb.icon}
                   <span>{l('Продолжить через', 'Арқылы жалғастыру', 'Continue with')} {sb.label}</span>
                 </button>
               ))}
             </div>
 
-            <p className="text-center text-xs text-gray-400 mt-6">
+            <p className="text-center text-xs text-slate-500 mt-6">
               {l('Уже есть аккаунт?', 'Аккаунт бар ма?', 'Already have an account?')} <button onClick={() => { setStep('login-email'); setError(''); }} className="text-gray-900 hover:underline">{l('Войти', 'Кіру', 'Log in')}</button>
             </p>
           </div>
@@ -500,11 +500,11 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
         return (
           <div>
             <h2 className="text-xl text-gray-900 mb-1">{l('Расскажите о себе', 'Өзіңіз туралы айтыңыз', 'Tell us about yourself')}</h2>
-            <p className="text-sm text-gray-400 mb-6">{l('Мы персонализируем CRM под ваш бизнес', 'CRM-ді бизнесіңізге бейімдейміз', 'We will personalize the CRM for your business')}</p>
+            <p className="text-sm text-slate-500 mb-6">{l('Мы персонализируем CRM под ваш бизнес', 'CRM-ді бизнесіңізге бейімдейміз', 'We will personalize the CRM for your business')}</p>
 
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-[11px] text-gray-400 mb-1.5">
+                <label className="block text-[11px] text-slate-500 mb-1.5">
                   {l('Ваше имя', 'Атыңыз', 'Your Name')} <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -513,13 +513,13 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                   onChange={e => { setName(e.target.value); setError(''); }}
                   onKeyDown={e => e.key === 'Enter' && handleSignupNameContinue()}
                   autoFocus
-                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                  className="w-full px-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all"
                 />
               </div>
               {invitePreview && !('error' in invitePreview) ? (
                 /* Invited user — company is inherited from the team, show read-only. */
                 <div>
-                  <label className="block text-[11px] text-gray-400 mb-1.5">
+                  <label className="block text-[11px] text-slate-500 mb-1.5">
                     {l('Команда', 'Команда', 'Team')}
                   </label>
                   <div className="w-full px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-900">
@@ -529,7 +529,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                 </div>
               ) : (
                 <div>
-                  <label className="block text-[11px] text-gray-400 mb-1.5">
+                  <label className="block text-[11px] text-slate-500 mb-1.5">
                     {l('Название компании', 'Компания атауы', 'Company Name')} <span className="text-red-400">*</span>
                   </label>
                   <input
@@ -537,13 +537,13 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                     value={company}
                     onChange={e => { setCompany(e.target.value); setError(''); }}
                     onKeyDown={e => e.key === 'Enter' && handleSignupNameContinue()}
-                    className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                    className="w-full px-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all"
                   />
                 </div>
               )}
             </div>
 
-            <button onClick={handleSignupNameContinue} disabled={isLoading || !name.trim() || (!(invitePreview && !('error' in invitePreview)) && !company.trim())} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleSignupNameContinue} disabled={isLoading || !name.trim() || (!(invitePreview && !('error' in invitePreview)) && !company.trim())} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
@@ -554,27 +554,27 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
         return (
           <div>
             <h2 className="text-xl text-gray-900 mb-1">{l('Создайте пароль', 'Құпия сөз жасаңыз', 'Create a password')}</h2>
-            <p className="text-sm text-gray-400 mb-6">{l('Минимум 8 символов', 'Кемінде 8 таңба', 'Minimum 8 characters')}</p>
+            <p className="text-sm text-slate-500 mb-6">{l('Минимум 8 символов', 'Кемінде 8 таңба', 'Minimum 8 characters')}</p>
 
             <div className="space-y-4 mb-4">
               <div>
-                <label className="block text-[11px] text-gray-400 mb-1.5">{l('Пароль', 'Құпия сөз', 'Password')}</label>
+                <label className="block text-[11px] text-slate-500 mb-1.5">{l('Пароль', 'Құпия сөз', 'Password')}</label>
                 <div className="relative">
-                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => { setPassword(e.target.value); setError(''); }} placeholder="••••••••" autoFocus className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 pr-12" />
+                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => { setPassword(e.target.value); setError(''); }} placeholder="••••••••" autoFocus className="w-full px-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all pr-12" />
                   <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-300 hover:text-gray-600">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
                 </div>
                 {/* Strength */}
                 {password && (
                   <div className="mt-2">
                     <div className="flex gap-1 mb-1">{[1, 2, 3, 4].map(i => <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= strength.level ? strength.color : 'bg-gray-100'}`} />)}</div>
-                    <span className="text-[10px] text-gray-400">{strength.label}</span>
+                    <span className="text-[10px] text-slate-400">{strength.label}</span>
                   </div>
                 )}
               </div>
               <div>
-                <label className="block text-[11px] text-gray-400 mb-1.5">{l('Повторите пароль', 'Құпия сөзді қайталаңыз', 'Confirm Password')}</label>
+                <label className="block text-[11px] text-slate-500 mb-1.5">{l('Повторите пароль', 'Құпия сөзді қайталаңыз', 'Confirm Password')}</label>
                 <div className="relative">
-                  <input type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setError(''); }} placeholder="••••••••" className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 pr-12" />
+                  <input type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setError(''); }} placeholder="••••••••" className="w-full px-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all pr-12" />
                   <button onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-300 hover:text-gray-600">{showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
                 </div>
                 {confirmPassword && password === confirmPassword && <div className="flex items-center gap-1 mt-1"><Check className="w-3 h-3 text-green-500" /><span className="text-[10px] text-green-500">{l('Совпадает', 'Сәйкес', 'Match')}</span></div>}
@@ -588,7 +588,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                 onChange={e => { setAgreeTerms(e.target.checked); setError(''); }}
                 className="w-3.5 h-3.5 rounded accent-gray-900 mt-0.5"
               />
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-slate-600">
                 {l('Я принимаю', 'Мен қабылдаймын', 'I accept the')}{' '}
                 <a href="#/terms" target="_blank" rel="noreferrer" className="text-gray-900 hover:underline">
                   {l('условия использования', 'пайдалану шарттары', 'terms of use')}
@@ -601,7 +601,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </span>
             </label>
 
-            <button onClick={handleSignup} disabled={isLoading || !password || !confirmPassword || !agreeTerms} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleSignup} disabled={isLoading || !password || !confirmPassword || !agreeTerms} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Создать аккаунт', 'Аккаунт жасау', 'Create account')} <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
@@ -615,7 +615,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               <ShieldCheck className="w-7 h-7 text-gray-900" />
             </div>
             <h2 className="text-xl text-gray-900 mb-1">{l('Подтвердите email', 'Email-ді растаңыз', 'Verify your email')}</h2>
-            <p className="text-sm text-gray-400 mb-1">{l('Введите 6-значный код для', 'Растау үшін 6 санды кодты енгізіңіз', 'Enter the 6-digit code for')}</p>
+            <p className="text-sm text-slate-500 mb-1">{l('Введите 6-значный код для', 'Растау үшін 6 санды кодты енгізіңіз', 'Enter the 6-digit code for')}</p>
             <p className="text-sm text-gray-900 mb-5">{email}</p>
 
             {/* Dev mode banner — real email sending is OFF; surface the code right here. */}
@@ -650,12 +650,12 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             </div>
 
             {otpTimer > 0 ? (
-              <p className="text-xs text-gray-400 mb-6">{l('Отправить повторно через', 'Қайта жіберу', 'Resend in')} <span className="text-gray-900">{otpTimer}{l('с', 'с', 's')}</span></p>
+              <p className="text-xs text-slate-500 mb-6">{l('Отправить повторно через', 'Қайта жіберу', 'Resend in')} <span className="text-gray-900">{otpTimer}{l('с', 'с', 's')}</span></p>
             ) : (
               <button onClick={handleResendCode} disabled={isLoading} className="text-xs text-gray-900 hover:underline mb-6 disabled:opacity-40">{l('Отправить код повторно', 'Кодты қайта жіберу', 'Resend code')}</button>
             )}
 
-            <button onClick={handleOtpVerify} disabled={isLoading || otp.join('').length < 6} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleOtpVerify} disabled={isLoading || otp.join('').length < 6} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Подтвердить', 'Растау', 'Verify')} <Check className="w-4 h-4" /></>}
             </button>
           </div>
@@ -666,17 +666,17 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
         return (
           <div>
             <h2 className="text-xl text-gray-900 mb-1">{l('Сбросить пароль', 'Құпия сөзді қалпына келтіру', 'Reset Password')}</h2>
-            <p className="text-sm text-gray-400 mb-6">{l('Введите email и мы отправим ссылку', 'Email енгізіңіз, біз сілтеме жібереміз', 'Enter your email and we will send a link')}</p>
+            <p className="text-sm text-slate-500 mb-6">{l('Введите email и мы отправим ссылку', 'Email енгізіңіз, біз сілтеме жібереміз', 'Enter your email and we will send a link')}</p>
 
             <div className="mb-4">
-              <label className="block text-[11px] text-gray-400 mb-1.5">Email</label>
+              <label className="block text-[11px] text-slate-500 mb-1.5">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleForgotPassword()} placeholder="name@company.kz" autoFocus className="w-full pl-10 pr-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleForgotPassword()} placeholder="name@company.kz" autoFocus className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
               </div>
             </div>
 
-            <button onClick={handleForgotPassword} disabled={isLoading || !email} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handleForgotPassword} disabled={isLoading || !email} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : l('Отправить ссылку', 'Сілтеме жіберу', 'Send reset link')}
             </button>
           </div>
@@ -690,13 +690,13 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               <Check className="w-7 h-7 text-green-600" />
             </div>
             <h2 className="text-xl text-gray-900 mb-2">{l('Проверьте почту', 'Поштаңызды тексеріңіз', 'Check your email')}</h2>
-            <p className="text-sm text-gray-400 mb-1">{l('Мы отправили ссылку для сброса на', 'Біз қалпына келтіру сілтемесін жібердік', 'We sent a reset link to')}</p>
+            <p className="text-sm text-slate-500 mb-1">{l('Мы отправили ссылку для сброса на', 'Біз қалпына келтіру сілтемесін жібердік', 'We sent a reset link to')}</p>
             <p className="text-sm text-gray-900 mb-6">{email}</p>
 
-            <button onClick={() => { setStep('login-email'); setPassword(''); setError(''); }} className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm hover:bg-gray-800 transition-all">
+            <button onClick={() => { setStep('login-email'); setPassword(''); setError(''); }} className="w-full py-3 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all">
               {l('Вернуться к входу', 'Кіруге оралу', 'Back to login')}
             </button>
-            <p className="text-xs text-gray-400 mt-4">{l('Не получили? Проверьте папку спам', 'Алмадыңыз ба? Спам қалтасын тексеріңіз', "Didn't receive it? Check spam folder")}</p>
+            <p className="text-xs text-slate-500 mt-4">{l('Не получили? Проверьте папку спам', 'Алмадыңыз ба? Спам қалтасын тексеріңіз', "Didn't receive it? Check spam folder")}</p>
           </div>
         );
 
@@ -710,43 +710,55 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
   const isSignupFlow = currentSignupStep >= 0;
 
   return (
-    <div className="min-h-screen bg-white flex">
-      {/* Left side - Features (desktop only) */}
-      <div className="hidden lg:flex lg:w-[45%] xl:w-[50%] bg-gray-50 flex-col justify-between p-12">
-        <div>
+    <div
+      className="min-h-screen flex relative"
+      style={{
+        background: `
+          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.32), transparent 45%),
+          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.26), transparent 45%),
+          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.30), transparent 50%),
+          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.28), transparent 50%),
+          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+        `,
+      }}
+    >
+      {/* Left side - Features (desktop only) — glass panel */}
+      <div className="hidden lg:flex lg:w-[45%] xl:w-[50%] bg-white/30 backdrop-blur-2xl border-r border-white/60 flex-col justify-between p-12 relative overflow-hidden">
+        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-gradient-to-br from-violet-200/60 to-indigo-100/30 blur-3xl pointer-events-none" />
+        <div className="relative">
           <div className="flex items-center gap-3 mb-16">
-            <div className="w-10 h-10 rounded-md flex items-center justify-center overflow-hidden shadow-sm bg-white border border-gray-100">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden bg-white/80 ring-1 ring-white/60 backdrop-blur-xl">
               <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
             </div>
             <div>
-              <div className="text-sm text-gray-900">Utir Soft</div>
-              <div className="text-[10px] text-gray-400">{l('Платформа управления', 'Басқару платформасы', 'Management Platform')}</div>
+              <div className="text-sm text-slate-900">Utir Soft</div>
+              <div className="text-[10px] text-slate-500">{l('Платформа управления', 'Басқару платформасы', 'Management Platform')}</div>
             </div>
           </div>
 
-          <h2 className="text-3xl text-gray-900 mb-3 max-w-md leading-tight">
+          <h2 className="text-3xl text-slate-900 mb-3 max-w-md leading-tight tracking-tight">
             {l('Управляйте мебельным бизнесом в одной платформе', 'Жиһаз бизнесін бір платформада басқарыңыз', 'Manage your furniture business in one platform')}
           </h2>
-          <p className="text-sm text-gray-400 mb-12 max-w-sm">
+          <p className="text-sm text-slate-500 mb-12 max-w-sm">
             {l('От первой заявки до установки — полный контроль производства, финансов и клиентов', 'Бірінші өтінімнен орнатуға дейін — өндірісті, қаржыны және клиенттерді толық бақылау', 'From the first lead to installation — full control of production, finance and clients')}
           </p>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             {features.map((f, i) => (
-              <div key={i} className="flex items-start gap-4 p-4 bg-white rounded-2xl border border-gray-100 hover:shadow-sm transition-all">
-                <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <f.icon className="w-5 h-5 text-gray-600" />
+              <div key={i} className="flex items-start gap-4 p-4 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 rounded-3xl shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] hover:bg-white/75 transition-all">
+                <div className="w-10 h-10 bg-white/60 ring-1 ring-white/60 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <f.icon className="w-5 h-5 text-slate-700" />
                 </div>
                 <div>
-                  <div className="text-sm text-gray-900 mb-0.5">{f.label}</div>
-                  <div className="text-xs text-gray-400">{f.desc}</div>
+                  <div className="text-sm text-slate-900 mb-0.5">{f.label}</div>
+                  <div className="text-xs text-slate-500">{f.desc}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="flex items-center gap-4 text-[10px] text-gray-400">
+        <div className="relative flex items-center gap-4 text-[10px] text-slate-500">
           <span>© 2026 Utir Soft</span>
           <span>•</span>
           <span>{l('Сделано в Казахстане 🇰🇿', 'Қазақстанда жасалған 🇰🇿', 'Made in Kazakhstan 🇰🇿')}</span>
@@ -754,20 +766,26 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
       </div>
 
       {/* Right side - Auth Form */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-screen relative">
         {/* Top bar */}
         <div className="flex items-center justify-between p-4 sm:p-6 flex-shrink-0">
           <div>
             {step !== 'welcome' && (
-              <button onClick={goBack} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-900 transition-colors">
+              <button onClick={goBack} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 bg-white/50 ring-1 ring-white/60 backdrop-blur-xl px-3 py-1.5 rounded-xl transition-all">
                 <ArrowLeft className="w-3.5 h-3.5" />{l('Назад', 'Артқа', 'Back')}
               </button>
             )}
           </div>
-          {/* Language switcher */}
-          <div className="flex gap-0.5 bg-gray-50 p-0.5 rounded-lg">
+          {/* Language switcher — glass capsules */}
+          <div className="flex gap-1 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 p-1 rounded-2xl">
             {(['kz', 'ru', 'eng'] as const).map(lang => (
-              <button key={lang} onClick={() => onLanguageChange(lang)} className={`px-2.5 py-1 rounded text-[10px] transition-all ${language === lang ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}>
+              <button
+                key={lang}
+                onClick={() => onLanguageChange(lang)}
+                className={`px-2.5 py-1 rounded-xl text-[10px] transition-all ${
+                  language === lang ? 'bg-slate-900/95 text-white shadow-[0_2px_8px_-2px_rgba(15,23,42,0.4)]' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
                 {lang.toUpperCase()}
               </button>
             ))}
@@ -776,40 +794,43 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
 
         {/* Form container */}
         <div className="flex-1 flex items-center justify-center px-4 sm:px-8">
-          <div className="w-full max-w-[380px]">
+          <div className="w-full max-w-[420px]">
             {/* Mobile logo (only on welcome) */}
             {step === 'welcome' && (
               <div className="lg:hidden flex items-center justify-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-md flex items-center justify-center overflow-hidden bg-white border border-gray-100 shadow-sm">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden bg-white/70 ring-1 ring-white/60 backdrop-blur-xl">
                   <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
                 </div>
-                <span className="text-sm font-medium text-gray-900">Utir Soft</span>
+                <span className="text-sm font-medium text-slate-900">Utir Soft</span>
               </div>
             )}
 
-            {/* Signup step indicator */}
-            {isSignupFlow && (
-              <div className="flex items-center gap-1 mb-6">
-                {signupSteps.map((s, i) => (
-                  <div key={s} className={`h-1 flex-1 rounded-full transition-all ${i <= currentSignupStep ? 'bg-gray-900' : 'bg-gray-100'}`} />
-                ))}
-              </div>
-            )}
+            {/* Form card — wraps the step content in glass */}
+            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-6 sm:p-8">
+              {/* Signup step indicator */}
+              {isSignupFlow && (
+                <div className="flex items-center gap-1 mb-6">
+                  {signupSteps.map((s, i) => (
+                    <div key={s} className={`h-1 flex-1 rounded-full transition-all ${i <= currentSignupStep ? 'bg-slate-900' : 'bg-white/60 ring-1 ring-white/40'}`} />
+                  ))}
+                </div>
+              )}
 
-            {/* Error */}
-            {error && (
-              <div className="bg-red-50 text-red-600 text-xs px-4 py-2.5 rounded-xl mb-4 flex items-center gap-2">
-                <div className="w-1 h-1 bg-red-500 rounded-full flex-shrink-0" />{error}
-              </div>
-            )}
+              {/* Error */}
+              {error && (
+                <div className="bg-rose-100/70 text-rose-700 text-xs px-4 py-2.5 rounded-2xl ring-1 ring-rose-200/60 mb-4 flex items-center gap-2 backdrop-blur-xl">
+                  <div className="w-1.5 h-1.5 bg-rose-500 rounded-full flex-shrink-0" />{error}
+                </div>
+              )}
 
-            {renderStepContent()}
+              {renderStepContent()}
+            </div>
           </div>
         </div>
 
         {/* Bottom */}
         <div className="p-4 sm:p-6 flex-shrink-0">
-          <p className="text-center text-[10px] text-gray-300">
+          <p className="text-center text-[10px] text-slate-400">
             {l('Нажимая "Продолжить", вы соглашаетесь с условиями использования', 'Жалғастыруды басу арқылы сіз пайдалану шарттарымен келісесіз', 'By clicking "Continue", you agree to our terms of use')}
           </p>
         </div>
