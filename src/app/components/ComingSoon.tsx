@@ -24,10 +24,11 @@ export function ComingSoon({ title, description, onBack, language = 'ru' }: Comi
       className="min-h-full relative flex items-center justify-center p-6"
     >
       <div className="max-w-md w-full bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 text-center relative overflow-hidden">
-        {/* Decorative corner orb — themable */}
+        {/* Decorative corner orb — rounded square so it matches the
+            icon chip's shape language (was a circle, looked unrelated). */}
         <div
-          className="absolute -top-12 -right-12 w-40 h-40 rounded-full blur-2xl pointer-events-none"
-          style={{ background: 'radial-gradient(circle, var(--accent-200) 0%, transparent 70%)' }}
+          className="absolute -top-16 -right-16 w-48 h-48 rounded-3xl blur-2xl pointer-events-none"
+          style={{ background: 'linear-gradient(135deg, var(--accent-200), var(--accent-100))' }}
         />
         <div className="relative">
           <div
