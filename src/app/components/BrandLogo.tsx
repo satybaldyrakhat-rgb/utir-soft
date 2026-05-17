@@ -99,6 +99,14 @@ interface Props {
   color?: string;
   /** If true, ignore the brand colour and inherit the parent's text colour. */
   mono?: boolean;
+  /**
+   * Render as a brand-coloured rounded square with the logo filling it
+   * edge-to-edge — no extra container padding needed. Used in the
+   * Integrations panel and anywhere we want a polished «app icon» look.
+   *   SVG → background = brand colour, glyph in white, ~75% of square
+   *   PNG/JPG → image fills the square via object-cover
+   */
+  filled?: boolean;
   /** Extra Tailwind classes for the wrapper span. */
   className?: string;
   /** Optional accessible label (otherwise the slug is used). */
@@ -111,12 +119,26 @@ function rasterUrlFor(slug: string): string | undefined {
       || RASTER_MODULES[`../../assets/logos/${slug}.jpg`];
 }
 
-export function BrandLogo({ id, size = 20, color, mono, className = '', label }: Props) {
+export function BrandLogo({ id, size = 20, color, mono, filled, className = '', label }: Props) {
   const slug = SLUG_MAP[id] || id;
-  // Prefer SVG (vector, scalable, recolorable) when available.
+  const brand = BRAND_COLOR[slug];
+
+  // ─── SVG path (Simple Icons — vector, recolourable) ─────────────
   const svg = SVG_MODULES[`../../assets/logos/${slug}.svg`];
   if (svg) {
-    const finalColor = mono ? undefined : (color || BRAND_COLOR[slug] || 'currentColor');
+    if (filled) {
+      // App-icon look: brand-coloured rounded square, white glyph at ~70%.
+      const innerSize = Math.round(size * 0.7);
+      return (
+        <span
+          className={`inline-flex items-center justify-center rounded-xl ${className}`}
+          style={{ width: size, height: size, background: brand || '#111827', color: '#ffffff', lineHeight: 0 }}
+          title={label || slug}
+          dangerouslySetInnerHTML={{ __html: svg.replace('<svg ', `<svg width="${innerSize}" height="${innerSize}" `) }}
+        />
+      );
+    }
+    const finalColor = mono ? undefined : (color || brand || 'currentColor');
     return (
       <span
         className={`inline-block ${className}`}
@@ -128,10 +150,24 @@ export function BrandLogo({ id, size = 20, color, mono, className = '', label }:
       />
     );
   }
-  // Fall back to raster PNG/JPG (e.g. KZ-local brands not on Simple Icons).
-  // Colours are baked in — `mono`/`color` props are ignored here.
+
+  // ─── Raster path (PNG/JPG — KZ-local brands etc) ────────────────
   const raster = rasterUrlFor(slug);
   if (raster) {
+    if (filled) {
+      // Edge-to-edge image inside a rounded square — covers the whole
+      // tile, may crop tiny edges (object-cover) to avoid empty corners.
+      return (
+        <img
+          src={raster}
+          alt={label || slug}
+          width={size}
+          height={size}
+          className={`inline-block object-cover rounded-xl ${className}`}
+          style={{ width: size, height: size }}
+        />
+      );
+    }
     return (
       <img
         src={raster}
@@ -143,7 +179,8 @@ export function BrandLogo({ id, size = 20, color, mono, className = '', label }:
       />
     );
   }
-  // Unknown id — neutral placeholder so the layout doesn't collapse.
+
+  // ─── Unknown id — neutral placeholder ───────────────────────────
   return (
     <span
       className={`inline-flex items-center justify-center bg-gray-100 text-gray-400 rounded ${className}`}

@@ -29,12 +29,16 @@ interface IntegrationStatus {
   config?: Record<string, string>;
 }
 
-// All logos go through <BrandLogo>: SVGs from Simple Icons for global
-// brands (auto-coloured) and raster PNG/JPG for KZ-local ones (Kaspi,
-// Halyk, 1С — official files attached by the team admin).
+// All logos go through <BrandLogo filled>: full-bleed rounded square,
+// brand-coloured background, no extra container padding needed.
 function logoFor(id: string): JSX.Element {
-  if (hasBrandLogo(id)) return <BrandLogo id={id} size={26} />;
-  return <Zap className="w-5 h-5 text-gray-400" />;
+  if (hasBrandLogo(id)) return <BrandLogo id={id} size={40} filled />;
+  // Fallback for unknown ids — neutral grey rounded square.
+  return (
+    <span className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+      <Zap className="w-5 h-5 text-gray-400" />
+    </span>
+  );
 }
 
 const CAT_META: Record<IntegrationCategory, { ru: string; icon: any; cls: string }> = {
@@ -197,9 +201,10 @@ export function IntegrationsPanel({ language, canEdit }: Props) {
                 return (
                   <div key={d.id} className={`bg-white rounded-2xl border ${connected ? 'border-emerald-100' : 'border-gray-100'} p-4 hover:shadow-sm transition-all`}>
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
-                        {logoFor(d.id)}
-                      </div>
+                      {/* BrandLogo is its own rounded tile (filled mode) — no
+                          extra grey wrapper needed; would just add empty
+                          padding around the brand-coloured square. */}
+                      <div className="flex-shrink-0">{logoFor(d.id)}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-0.5">
                           <span className="text-sm text-gray-900">{d.name}</span>
@@ -371,9 +376,7 @@ function IntegrationModal({
       <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
-              {logoFor(def.id)}
-            </div>
+            <div className="flex-shrink-0">{logoFor(def.id)}</div>
             <div className="min-w-0">
               <div className="text-sm text-gray-900">{def.name}</div>
               <div className="text-[11px] text-gray-400">{def.shortDesc}</div>
