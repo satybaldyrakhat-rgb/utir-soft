@@ -174,11 +174,40 @@ export function AIDesign({ language }: AIDesignProps) {
   const [roomPhoto, setRoomPhoto] = useState<string | undefined>(undefined);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
+  // Re-encode every upload through a canvas so the resulting data URL
+  // is always JPEG (or PNG for transparency) — OpenAI's Images API
+  // rejects AVIF / HEIC which iPhones and modern browsers love to
+  // produce. Also downscales huge phone photos to a reasonable 1600px
+  // max edge so we don't blow request size limits.
   const fileToDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(file);
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('Не изображение'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const original = String(reader.result || '');
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1600;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(original); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        // PNG keeps transparency for logos/screenshots; everything else
+        // becomes JPEG (smaller + universally accepted by image APIs).
+        const isPng = file.type === 'image/png';
+        resolve(canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', 0.9));
+      };
+      img.onerror = () => reject(new Error('Не удалось прочитать изображение'));
+      img.src = original;
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
   });
   const onRoomFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];

@@ -84,7 +84,15 @@ async function genChatGPT(inp: GenInputs): Promise<GenResult> {
       endpoint = 'https://api.openai.com/v1/images/edits';
       const form = new FormData();
       const buf = Buffer.from(parts.data, 'base64');
-      form.append('image', new Blob([buf], { type: parts.mimeType }), 'room.png');
+      // OpenAI only accepts image/jpeg, image/png, image/webp. The client
+      // already re-encodes uploads via canvas so this should be safe, but
+      // if some other path produces avif/heic/gif we relabel as png so
+      // the API doesn't reject the request outright. PNG is the safest
+      // since the image bytes might genuinely be anything browser-decodable.
+      const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
+      const mimeType = ALLOWED.has(parts.mimeType) ? parts.mimeType : 'image/png';
+      const ext = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
+      form.append('image', new Blob([buf], { type: mimeType }), `room.${ext}`);
       form.append('model', 'gpt-image-1');
       form.append('prompt', inp.prompt);
       form.append('n', '1');
@@ -155,21 +163,40 @@ async function genGemini(inp: GenInputs): Promise<GenResult> {
       : ((inp.referenceImages?.length || 0) > 0 ? 'Используй изображения как референсы стиля. ' : '');
     parts.push({ text: hint + inp.prompt });
 
-    const res = await fetch(
-      // 'nano-banana-pro' = current Gemini image-preview model. Google may
-      // promote it out of preview later — switch the model id here when they do.
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${GEMINI_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: { responseModalities: ['IMAGE'] },
-        }),
-      },
-    );
-    const j: any = await res.json();
-    if (!res.ok) return { provider: 'gemini', ok: false, error: j?.error?.message || `HTTP ${res.status}` };
+    // Try the stable model first, then fall back to the preview alias and
+    // an older snapshot. Google rotates image-model names — having a few
+    // fallbacks keeps the integration alive when one of them gets
+    // deprecated/retired without us having to rush a deploy.
+    const MODEL_CANDIDATES = [
+      'gemini-2.5-flash-image',
+      'gemini-2.5-flash-image-preview',
+      'gemini-2.0-flash-exp-image-generation',
+    ];
+    let res: Response | null = null;
+    let j: any = null;
+    let lastError = '';
+    for (const model of MODEL_CANDIDATES) {
+      res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: { responseModalities: ['IMAGE'] },
+          }),
+        },
+      );
+      j = await res.json();
+      // 404 = model name retired; try the next candidate. Anything else
+      // (success or a real error like quota / safety) we surface as-is.
+      if (res.ok) break;
+      const msg = j?.error?.message || `HTTP ${res.status}`;
+      lastError = msg;
+      const isNotFound = res.status === 404 || /not found|is not supported for generateContent/i.test(msg);
+      if (!isNotFound) break;
+    }
+    if (!res || !res.ok) return { provider: 'gemini', ok: false, error: lastError || 'no model available' };
     const out = j?.candidates?.[0]?.content?.parts || [];
     for (const p of out) {
       const inline = p?.inlineData;
