@@ -86,12 +86,16 @@ const STYLES: {
   iconCls: string;
   tint: string;
 }[] = [
-  { id: 'scandi',  label: { ru: 'Скандинавский', kz: 'Скандинав',  eng: 'Scandi' },  promptRu: 'в скандинавском стиле, белые матовые фасады, дерево, мягкое естественное освещение', icon: TreePine,   iconCls: 'text-emerald-700 bg-emerald-100/70', tint: 'from-emerald-100/40 to-emerald-50/0' },
-  { id: 'minimal', label: { ru: 'Минимализм',    kz: 'Минимализм', eng: 'Minimal' }, promptRu: 'в стиле минимализм, чистые линии, монохромная палитра, скрытые ручки',             icon: SquareIcon, iconCls: 'text-slate-700    bg-slate-100/70',   tint: 'from-slate-100/40    to-slate-50/0' },
-  { id: 'loft',    label: { ru: 'Лофт',          kz: 'Лофт',       eng: 'Loft' },    promptRu: 'в стиле лофт, кирпичная кладка, открытые балки, металл, индустриальные лампы',     icon: Building2,  iconCls: 'text-amber-700    bg-amber-100/70',   tint: 'from-amber-100/40    to-amber-50/0' },
-  { id: 'classic', label: { ru: 'Классика',      kz: 'Классика',   eng: 'Classic' }, promptRu: 'в классическом стиле, лепнина, благородные материалы, тёплый свет',                 icon: Landmark,   iconCls: 'text-yellow-700   bg-yellow-100/70',  tint: 'from-yellow-100/40   to-yellow-50/0' },
-  { id: 'modern',  label: { ru: 'Модерн',        kz: 'Модерн',     eng: 'Modern' },  promptRu: 'в стиле современный модерн, акцентные геометрии, тёмный дуб, латунь',                icon: Sparkles,   iconCls: 'text-violet-700   bg-violet-100/70',  tint: 'from-violet-100/40   to-violet-50/0' },
-  { id: 'eco',     label: { ru: 'Эко',           kz: 'Эко',        eng: 'Eco' },     promptRu: 'в эко-стиле, натуральные материалы, лён, ротанг, много зелени и дневного света',    icon: Leaf,       iconCls: 'text-emerald-700  bg-emerald-100/70', tint: 'from-emerald-100/40  to-emerald-50/0' },
+  // Unified style — every style card uses the same neutral glass chip
+  // (slate icon on white/60 with white/60 ring). Was a rainbow of
+  // pastel backgrounds — user asked for visual consistency. Style
+  // differentiation now comes purely from the lucide icon itself.
+  { id: 'scandi',  label: { ru: 'Скандинавский', kz: 'Скандинав',  eng: 'Scandi' },  promptRu: 'в скандинавском стиле, белые матовые фасады, дерево, мягкое естественное освещение', icon: TreePine,   iconCls: 'text-slate-700 bg-white/60', tint: 'from-slate-100/40 to-slate-50/0' },
+  { id: 'minimal', label: { ru: 'Минимализм',    kz: 'Минимализм', eng: 'Minimal' }, promptRu: 'в стиле минимализм, чистые линии, монохромная палитра, скрытые ручки',             icon: SquareIcon, iconCls: 'text-slate-700 bg-white/60', tint: 'from-slate-100/40 to-slate-50/0' },
+  { id: 'loft',    label: { ru: 'Лофт',          kz: 'Лофт',       eng: 'Loft' },    promptRu: 'в стиле лофт, кирпичная кладка, открытые балки, металл, индустриальные лампы',     icon: Building2,  iconCls: 'text-slate-700 bg-white/60', tint: 'from-slate-100/40 to-slate-50/0' },
+  { id: 'classic', label: { ru: 'Классика',      kz: 'Классика',   eng: 'Classic' }, promptRu: 'в классическом стиле, лепнина, благородные материалы, тёплый свет',                 icon: Landmark,   iconCls: 'text-slate-700 bg-white/60', tint: 'from-slate-100/40 to-slate-50/0' },
+  { id: 'modern',  label: { ru: 'Модерн',        kz: 'Модерн',     eng: 'Modern' },  promptRu: 'в стиле современный модерн, акцентные геометрии, тёмный дуб, латунь',                icon: Sparkles,   iconCls: 'text-slate-700 bg-white/60', tint: 'from-slate-100/40 to-slate-50/0' },
+  { id: 'eco',     label: { ru: 'Эко',           kz: 'Эко',        eng: 'Eco' },     promptRu: 'в эко-стиле, натуральные материалы, лён, ротанг, много зелени и дневного света',    icon: Leaf,       iconCls: 'text-slate-700 bg-white/60', tint: 'from-slate-100/40 to-slate-50/0' },
 ];
 
 const MOODS: { id: string; label: { ru: string; kz: string; eng: string }; promptRu: string }[] = [
