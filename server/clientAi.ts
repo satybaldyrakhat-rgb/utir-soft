@@ -75,7 +75,9 @@ export interface ClientAIConfig {
   creativity: number;   // 0..1 → temperature for the call
   botName: string;      // shown in chat header + introduced in greetings
   tone: Tone;
-  // Free-form: "представься как Айгуль, менеджер фабрики мебели Utir"
+  // Free-form persona instructions — describes role/tone without picking a
+  // human name. E.g. "Я — виртуальный помощник компании, помогаю подобрать
+  // мебель". Кеping it nameless avoids fake-identity surprise for clients.
   persona: string;
   // 1–3 примера наших реальных писем клиентам — Claude мимикрирует стиль.
   writingSamples: string[];

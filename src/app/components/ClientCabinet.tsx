@@ -252,7 +252,7 @@ function HomePage({
   const markers: MapMarker[] = [
     { id: 'home', lat: CLIENT_HOME[0], lng: CLIENT_HOME[1], label: tl(lang, 'Вы здесь', 'Сіз осындасыз', 'You'), sub: 'ул. Абая 45', color: 'sky' },
     { id: 'prod', lat: PRODUCTION[0], lng: PRODUCTION[1], label: tl(lang, 'Производство', 'Өндіріс', 'Production'), sub: 'Utir Soft', color: 'gray' },
-    { id: 'courier', lat: courier.pos[0], lng: courier.pos[1], label: tl(lang, 'Алихан · курьер', 'Алихан · курьер', 'Alikhan · courier'), sub: tl(lang, '~12 минут', '~12 минут', '~12 min'), color: 'emerald', initials: 'АМ' },
+    { id: 'courier', lat: courier.pos[0], lng: courier.pos[1], label: tl(lang, 'Курьер', 'Курьер', 'Courier'), sub: tl(lang, '~12 минут', '~12 минут', '~12 min'), color: 'emerald', initials: 'К' },
   ];
 
   const mainDeal = activeDeals[0] || deals[0];
@@ -281,9 +281,9 @@ function HomePage({
         <ClientCabinetMap height={300} markers={markers} route={{ from: 'courier', to: 'home' }} center={[43.235, 76.88]} />
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs">АМ</div>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs">К</div>
             <div>
-              <div className="text-sm text-gray-900">{tl(lang, 'Алихан подъезжает к вам', 'Алихан жақындап келе жатыр', 'Alikhan is approaching')}</div>
+              <div className="text-sm text-gray-900">{tl(lang, 'Курьер подъезжает к вам', 'Курьер жақындап келе жатыр', 'Courier is approaching')}</div>
               <div className="text-xs text-gray-400">~12 минут · {tl(lang, 'обновлено сейчас', 'жаңартылды', 'updated now')}</div>
             </div>
           </div>
@@ -498,7 +498,7 @@ function TrackingPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
   const markers: MapMarker[] = [
     { id: 'home', lat: CLIENT_HOME[0], lng: CLIENT_HOME[1], label: tl(lang, 'Ваш адрес', 'Сіздің мекенжай', 'Your address'), sub: 'ул. Абая 45', color: 'sky' },
     { id: 'prod', lat: PRODUCTION[0], lng: PRODUCTION[1], label: tl(lang, 'Производство', 'Өндіріс', 'Production'), sub: 'Utir Soft', color: 'gray' },
-    { id: 'courier', lat: courier.pos[0], lng: courier.pos[1], label: tl(lang, 'Бригада', 'Бригада', 'Crew'), sub: 'Алихан · АМ', color: 'emerald', initials: 'АМ' },
+    { id: 'courier', lat: courier.pos[0], lng: courier.pos[1], label: tl(lang, 'Бригада', 'Бригада', 'Crew'), sub: tl(lang, 'В пути', 'Жолда', 'En route'), color: 'emerald', initials: 'Б' },
   ];
 
   const TIMELINE = [
@@ -550,10 +550,12 @@ function TrackingPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
 
 // ─── CHATS ───────────────────────────────────────────
 function ChatsPage({ lang }: { lang: Lang }) {
+  // Demo dialog list for the client cabinet — keep roles generic so this
+  // works for any team that hasn't filled in real staff yet.
   const DIALOGS = [
-    { id: 'm1', name: 'Айгерим М.', role: tl(lang, 'Менеджер по кухне', 'Менеджер', 'Manager'), last: tl(lang, 'Производство идёт по графику', 'Өндіріс кестеде', 'On schedule'), time: '10:42', unread: 0, avatar: 'bg-gradient-to-br from-emerald-400 to-teal-500' },
-    { id: 'm2', name: 'Алихан Б.', role: tl(lang, 'Установщик', 'Монтаж', 'Installer'), last: tl(lang, 'Завтра приеду к 14:00', 'Ертең 14:00-де', 'Tomorrow 2pm'), time: '09:15', unread: 2, avatar: 'bg-gradient-to-br from-emerald-400 to-teal-500' },
-    { id: 'm3', name: 'Сауле К.', role: tl(lang, 'Дизайнер', 'Дизайнер', 'Designer'), last: tl(lang, 'Фото 3D-проекта', '3D жоба', '3D draft'), time: tl(lang, 'вчера', 'кеше', 'yesterday'), unread: 0, avatar: 'bg-gradient-to-br from-sky-400 to-cyan-500' },
+    { id: 'm1', name: tl(lang, 'Менеджер',   'Менеджер',  'Manager'),   role: tl(lang, 'Менеджер по заказу', 'Менеджер',  'Manager'),   last: tl(lang, 'Производство идёт по графику', 'Өндіріс кестеде', 'On schedule'), time: '10:42', unread: 0, avatar: 'bg-gradient-to-br from-emerald-400 to-teal-500' },
+    { id: 'm2', name: tl(lang, 'Установщик', 'Орнатушы',  'Installer'), role: tl(lang, 'Монтаж',             'Монтаж',    'Installer'), last: tl(lang, 'Завтра приеду к 14:00',         'Ертең 14:00-де',  'Tomorrow 2pm'),  time: '09:15', unread: 2, avatar: 'bg-gradient-to-br from-emerald-400 to-teal-500' },
+    { id: 'm3', name: tl(lang, 'Дизайнер',   'Дизайнер',  'Designer'),  role: tl(lang, 'Дизайнер',           'Дизайнер',  'Designer'),  last: tl(lang, 'Фото 3D-проекта',                '3D жоба',         '3D draft'),       time: tl(lang, 'вчера', 'кеше', 'yesterday'), unread: 0, avatar: 'bg-gradient-to-br from-sky-400 to-cyan-500' },
   ];
   const [active, setActive] = useState('m1');
   const MESSAGES = [

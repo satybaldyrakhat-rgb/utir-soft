@@ -611,7 +611,9 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
         await sendMessage(chatId,
           `Здравствуйте, <b>${paired.name}</b>!\n\n` +
           `Я — AI-ассистент Utir Soft. Просто пишите мне свободным текстом, ` +
-          `например:\n\n<i>«Закрыл клиента Айгуль на пакет за 50 000 ₸, оплата завтра»</i>\n\n` +
+          `например:\n\n<i>«Закрыл нового клиента на сумму X тенге»</i>\n` +
+          `<i>«Клиент доплатил остаток»</i>\n` +
+          `<i>«Поставь задачу замерить завтра»</i>\n\n` +
           `Я разберусь и обновлю CRM. Перед сохранением присылаю краткое резюме.`,
         );
       } else {
@@ -816,7 +818,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       if (args.length < 2) {
         await sendMessage(chatId,
           `<b>Использование:</b>\n<code>/assign Имя текст задачи</code>\n<code>/assign @username текст задачи</code>\n\n` +
-          `Пример: <code>/assign Асхат позвонить клиенту Айдан</code>`,
+          `Пример: <code>/assign &lt;имя сотрудника&gt; &lt;что сделать&gt;</code>`,
         );
         return;
       }

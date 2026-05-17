@@ -73,8 +73,8 @@ export function TelegramBotPanel({ onClose }: Props) {
                 </ol>
               </div>
               <div className="bg-sky-50 rounded-2xl p-3 space-y-2">
-                <div className="bg-white rounded-xl p-2.5 text-xs text-gray-700">📋 Алихан, у вас 3 задачи на сегодня</div>
-                <div className="bg-white rounded-xl p-2.5 text-xs text-gray-700">⏰ 09:00 — Замер кухни, ул. Абая 45</div>
+                <div className="bg-white rounded-xl p-2.5 text-xs text-gray-700">📋 У вас X задач на сегодня</div>
+                <div className="bg-white rounded-xl p-2.5 text-xs text-gray-700">⏰ ЧЧ:ММ — Замер кухни, адрес клиента</div>
                 <div className="bg-white rounded-xl p-2.5 text-xs text-gray-700">📷 Загрузите фото после установки</div>
               </div>
             </div>
@@ -178,11 +178,11 @@ export function TelegramBotPanel({ onClose }: Props) {
               <div className="text-xs text-gray-500">Утренняя рассылка маршрута на день в 08:00</div>
               <div className="bg-sky-50 rounded-2xl p-3.5">
                 <div className="bg-white rounded-xl p-3 text-xs text-gray-700 space-y-2">
-                  <div>☀️ Доброе утро, Алихан! Сегодня 3 выезда:</div>
+                  <div>☀️ Доброе утро! Сегодня X выездов:</div>
                   <div className="pl-2 space-y-1 text-gray-600">
-                    <div>09:00 — Замер кухни, ул. Абая 45, Сериков А., +7 701...</div>
-                    <div>12:00 — Установка шкафа, ЖК Премиум, Иванов И.</div>
-                    <div>15:00 — Контрольный замер, мкр. Самал 2</div>
+                    <div>ЧЧ:ММ — Замер кухни, адрес клиента, тел.</div>
+                    <div>ЧЧ:ММ — Установка шкафа, адрес клиента, тел.</div>
+                    <div>ЧЧ:ММ — Контрольный замер, адрес клиента, тел.</div>
                   </div>
                 </div>
                 <div className="flex gap-1.5 flex-wrap mt-2">

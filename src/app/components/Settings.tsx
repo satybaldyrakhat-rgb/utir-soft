@@ -1882,8 +1882,8 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
               <div>
                 <div className="text-xs text-gray-900 mb-1">{l('Персона (необязательно)', 'Персона', 'Persona (optional)')}</div>
                 <div className="text-[10px] text-gray-400 mb-2">
-                  {l('Например: «Я — Айгуль, менеджер фабрики мебели Utir. Помогаю подобрать кухню под ваш интерьер»',
-                     '...', 'e.g. "I\'m Aigul, a kitchen consultant at Utir"')}
+                  {l('Например: «Помогаю подобрать мебель под ваш интерьер. Бесплатный замер по городу — обычно отвечаю в течение часа»',
+                     '...', 'e.g. "I help pick furniture for your interior. Free measurement — usually reply within an hour."')}
                 </div>
                 <textarea
                   value={cfg.persona}
@@ -2205,9 +2205,9 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                       <div>{l('Начните диалог — напишите как обычный клиент', '...', 'Start a conversation — write as a customer')}</div>
                       <div className="mt-3 flex flex-wrap gap-1.5 justify-center max-w-sm">
                         {[
-                          l('Здравствуйте! Сколько стоит кухня 3 метра?', '...', 'Hi! How much for a 3m kitchen?'),
-                          l('Можно записаться на замер на завтра?', '...', 'Can I book a measurement for tomorrow?'),
-                          l('У вас есть готовые проекты?', '...', 'Do you have ready-made designs?'),
+                          l('Здравствуйте! Подскажите, сколько примерно стоит кухня?', '...', 'Hi! How much does a kitchen cost roughly?'),
+                          l('Можно записаться на замер?', '...', 'Can I book a measurement?'),
+                          l('У вас есть примеры работ?', '...', 'Do you have past work examples?'),
                         ].map((s, i) => (
                           <button key={i} onClick={() => setChatInput(s)} className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[10px] hover:bg-gray-50">
                             {s}
@@ -2359,7 +2359,7 @@ function RequisitesCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
         </div>
         <div>
           <div className="text-[10px] text-gray-400 mb-1">{l('Директор (ФИО)', 'Директор', 'Director')}</div>
-          <input type="text" value={r.director || ''} onChange={e => up('director', e.target.value)} placeholder={l('Иванов Иван Иванович', '...', 'John Doe')} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+          <input type="text" value={r.director || ''} onChange={e => up('director', e.target.value)} placeholder={l('Фамилия Имя Отчество', 'Тегі Аты Әкесінің аты', 'Full name')} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
         </div>
         <div className="md:col-span-2">
           <div className="text-[10px] text-gray-400 mb-1">{l('Юридический адрес', 'Мекенжай', 'Legal address')}</div>

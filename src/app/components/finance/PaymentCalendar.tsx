@@ -400,7 +400,7 @@ function PaymentModal({ initialDate, editing, onClose, onSave }: {
             </div>
             <div>
               <div className="text-[10px] text-gray-400 mb-1">Сумма (₸)</div>
-              <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="100 000" className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+              <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
             </div>
           </div>
 
@@ -413,7 +413,7 @@ function PaymentModal({ initialDate, editing, onClose, onSave }: {
 
           <div>
             <div className="text-[10px] text-gray-400 mb-1">Описание (опционально)</div>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Оплата от клиента Айгуль" className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Например: оплата по заказу" className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
           </div>
 
           <div>
