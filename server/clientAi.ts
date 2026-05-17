@@ -19,21 +19,52 @@ import Database from 'better-sqlite3';
 // ─── Shape of the config saved per team ─────────────────────────────
 export type Tone = 'polite' | 'casual' | 'premium' | 'strict';
 
-export interface WorkingHours {
-  enabled: boolean;       // false = AI отвечает 24/7
-  weekdayStart: string;   // 'HH:MM' (Asia/Almaty assumed)
-  weekdayEnd: string;
-  saturdayStart?: string;
-  saturdayEnd?: string;
-  // Sunday on/off shorthand
-  sundayOff: boolean;
+// Schedule shape — one row per weekday, NextBot-style. Each day has an
+// on/off toggle and a from/to time pair. Times are in Asia/Almaty (UTC+5,
+// no DST). When `enabled` is false the schedule is ignored and the bot
+// answers 24/7.
+export type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+export interface DaySlot {
+  enabled: boolean;    // false = выходной (бот шлёт outOfHoursMessage)
+  start: string;       // 'HH:MM'
+  end:   string;       // 'HH:MM'
 }
 
-// Which AI provider answers the customer. UTIR-mix means we route through
-// the same Claude tool-capable agent the platform uses internally; the
-// other ids match aiChat.ts ChatProviderId minus 'utir-ai' (no tools for
-// outside customers — they shouldn't be able to create deals on our behalf).
-export type ClientAIModel = 'claude' | 'gpt4o' | 'gemini' | 'deepseek';
+export interface WorkingHours {
+  enabled: boolean;                         // master toggle
+  days: Record<DayKey, DaySlot>;
+}
+
+// The model the bot uses to answer customers. Values are the actual API
+// model IDs we send to each provider — keeps backend/frontend in sync and
+// makes it obvious which family a model belongs to (claude-* → Anthropic,
+// gpt-* → OpenAI, gemini-* → Google, deepseek-* → DeepSeek).
+//
+// Each family is gated by a separate env key. The frontend disables model
+// cards whose family has no key configured (see /api/ai-chat/providers).
+export type ClientAIModel =
+  | 'claude-opus-4-5' | 'claude-sonnet-4-5' | 'claude-haiku-4-5'
+  | 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4-turbo'
+  | 'gemini-2.5-pro' | 'gemini-2.5-flash'
+  | 'deepseek-chat' | 'deepseek-reasoner';
+
+export const ALL_CLIENT_AI_MODELS: ClientAIModel[] = [
+  'claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5',
+  'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo',
+  'gemini-2.5-pro', 'gemini-2.5-flash',
+  'deepseek-chat', 'deepseek-reasoner',
+];
+
+// Map a model id to its provider family. Used by callProvider() to pick
+// the right base URL, header, and request body shape.
+export function modelFamily(m: ClientAIModel): 'anthropic' | 'openai' | 'gemini' | 'deepseek' {
+  if (m.startsWith('claude'))   return 'anthropic';
+  if (m.startsWith('gpt'))      return 'openai';
+  if (m.startsWith('gemini'))   return 'gemini';
+  if (m.startsWith('deepseek')) return 'deepseek';
+  return 'anthropic';
+}
 
 export interface ClientAIConfig {
   enabled: boolean;
@@ -68,12 +99,14 @@ export interface ClientAIConfig {
   handoffMessage: string;
 }
 
+const DEFAULT_DAY: DaySlot = { enabled: true, start: '09:00', end: '20:00' };
+
 export const DEFAULT_CLIENT_AI: ClientAIConfig = {
   enabled: false,
   channels: { instagram: false, whatsapp: false },
-  aiModel: 'claude',
+  aiModel: 'claude-opus-4-5',
   creativity: 0.7,
-  botName: 'Аяна',
+  botName: '',
   tone: 'polite',
   persona: '',
   writingSamples: [],
@@ -88,9 +121,15 @@ export const DEFAULT_CLIENT_AI: ClientAIConfig = {
   blacklistTopics: ['политика', 'религия', 'конкуренты'],
   workingHours: {
     enabled: false,
-    weekdayStart: '09:00', weekdayEnd: '20:00',
-    saturdayStart: '10:00', saturdayEnd: '18:00',
-    sundayOff: true,
+    days: {
+      mon: { ...DEFAULT_DAY },
+      tue: { ...DEFAULT_DAY },
+      wed: { ...DEFAULT_DAY },
+      thu: { ...DEFAULT_DAY },
+      fri: { ...DEFAULT_DAY },
+      sat: { enabled: true,  start: '10:00', end: '18:00' },
+      sun: { enabled: false, start: '10:00', end: '18:00' },
+    },
   },
   outOfHoursMessage: 'Сейчас мы офлайн. Утром менеджер обязательно вам напишет — спасибо за терпение 🙏',
   handoffMessage: 'Передаю вас живому менеджеру — он подключится к диалогу в ближайшее время.',
@@ -104,15 +143,27 @@ export function readClientAI(db: Database.Database, teamId: string): ClientAICon
       const parsed = JSON.parse(row.client_ai);
       // Shallow merge with defaults so adding new fields in code never
       // surfaces "undefined" on old rows.
+      // Map legacy short model ids ('claude', 'gpt4o') to full versions so
+      // existing rows keep working after the migration to model-id strings.
+      const LEGACY_MODEL_MAP: Record<string, ClientAIModel> = {
+        claude:   'claude-opus-4-5',
+        gpt4o:    'gpt-4o',
+        gemini:   'gemini-2.5-pro',
+        deepseek: 'deepseek-chat',
+      };
+      const rawModel = parsed.aiModel;
+      const aiModel: ClientAIModel = (ALL_CLIENT_AI_MODELS as string[]).includes(rawModel)
+        ? rawModel
+        : (LEGACY_MODEL_MAP[rawModel] || DEFAULT_CLIENT_AI.aiModel);
       return {
         ...DEFAULT_CLIENT_AI,
         ...parsed,
-        aiModel:    (['claude', 'gpt4o', 'gemini', 'deepseek'] as const).includes(parsed.aiModel) ? parsed.aiModel : DEFAULT_CLIENT_AI.aiModel,
+        aiModel,
         creativity: typeof parsed.creativity === 'number' && parsed.creativity >= 0 && parsed.creativity <= 1 ? parsed.creativity : DEFAULT_CLIENT_AI.creativity,
-        botName:    typeof parsed.botName === 'string' && parsed.botName.trim() ? parsed.botName.slice(0, 60) : DEFAULT_CLIENT_AI.botName,
+        botName:    typeof parsed.botName === 'string' ? parsed.botName.slice(0, 60) : DEFAULT_CLIENT_AI.botName,
         channels:   { ...DEFAULT_CLIENT_AI.channels,   ...(parsed.channels   || {}) },
         scenarios:  { ...DEFAULT_CLIENT_AI.scenarios,  ...(parsed.scenarios  || {}) },
-        workingHours: { ...DEFAULT_CLIENT_AI.workingHours, ...(parsed.workingHours || {}) },
+        workingHours: mergeWorkingHours(parsed.workingHours),
         writingSamples:   Array.isArray(parsed.writingSamples)   ? parsed.writingSamples.slice(0, 5)   : DEFAULT_CLIENT_AI.writingSamples,
         handoffTriggers:  Array.isArray(parsed.handoffTriggers)  ? parsed.handoffTriggers.slice(0, 30)  : DEFAULT_CLIENT_AI.handoffTriggers,
         blacklistTopics:  Array.isArray(parsed.blacklistTopics)  ? parsed.blacklistTopics.slice(0, 30)  : DEFAULT_CLIENT_AI.blacklistTopics,
@@ -250,27 +301,27 @@ async function callProvider(model: ClientAIModel, system: string, history: TestT
   const GEMINI_KEY    = process.env.GEMINI_API_KEY    || '';
   const DEEPSEEK_KEY  = process.env.DEEPSEEK_API_KEY  || '';
 
-  if (model === 'claude') {
+  const family = modelFamily(model);
+
+  if (family === 'anthropic') {
     if (!ANTHROPIC_KEY) throw new Error('ANTHROPIC_API_KEY не задан');
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 500, system, temperature, messages: history }),
+      body: JSON.stringify({ model, max_tokens: 500, system, temperature, messages: history }),
     });
     const j: any = await res.json();
     if (!res.ok) throw new Error(j?.error?.message || `HTTP ${res.status}`);
     return (j?.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
   }
 
-  if (model === 'gpt4o') {
+  if (family === 'openai') {
     if (!OPENAI_KEY) throw new Error('OPENAI_API_KEY не задан');
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-4o',
-        max_tokens: 500,
-        temperature,
+        model, max_tokens: 500, temperature,
         messages: [{ role: 'system', content: system }, ...history],
       }),
     });
@@ -279,14 +330,13 @@ async function callProvider(model: ClientAIModel, system: string, history: TestT
     return String(j?.choices?.[0]?.message?.content || '').trim();
   }
 
-  if (model === 'gemini') {
+  if (family === 'gemini') {
     if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY не задан');
-    // Gemini wants role 'model' for assistant turns and a separate systemInstruction.
     const contents = history.map(m => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
     }));
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_KEY}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -300,15 +350,13 @@ async function callProvider(model: ClientAIModel, system: string, history: TestT
     return (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p?.text || '').join('').trim();
   }
 
-  if (model === 'deepseek') {
+  if (family === 'deepseek') {
     if (!DEEPSEEK_KEY) throw new Error('DEEPSEEK_API_KEY не задан');
     const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${DEEPSEEK_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'deepseek-chat',
-        max_tokens: 500,
-        temperature,
+        model, max_tokens: 500, temperature,
         messages: [{ role: 'system', content: system }, ...history],
       }),
     });
@@ -320,20 +368,56 @@ async function callProvider(model: ClientAIModel, system: string, history: TestT
   throw new Error(`unknown model: ${model}`);
 }
 
-// True when current time in Asia/Almaty is outside cfg.workingHours. Used by
-// /test and (eventually) the webhook handler. We compare HH:MM strings as
-// numbers to avoid Date arithmetic edge-cases.
+// Merge stored working-hours JSON with defaults. Handles:
+//   • new shape { enabled, days: { mon: {enabled,start,end}, ... } }
+//   • legacy shape { enabled, weekdayStart, weekdayEnd, saturdayStart,
+//                    saturdayEnd, sundayOff } — converted to new shape
+function mergeWorkingHours(raw: any): WorkingHours {
+  const def = DEFAULT_CLIENT_AI.workingHours;
+  if (!raw || typeof raw !== 'object') return def;
+  // New shape — just overlay each day if provided.
+  if (raw.days && typeof raw.days === 'object') {
+    const days = { ...def.days };
+    const KEYS: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    for (const k of KEYS) {
+      const d = raw.days[k];
+      if (d && typeof d === 'object') {
+        days[k] = {
+          enabled: d.enabled !== false,
+          start: typeof d.start === 'string' ? d.start : def.days[k].start,
+          end:   typeof d.end   === 'string' ? d.end   : def.days[k].end,
+        };
+      }
+    }
+    return { enabled: !!raw.enabled, days };
+  }
+  // Legacy shape — translate.
+  const wkStart = typeof raw.weekdayStart === 'string' ? raw.weekdayStart : def.days.mon.start;
+  const wkEnd   = typeof raw.weekdayEnd   === 'string' ? raw.weekdayEnd   : def.days.mon.end;
+  const satOn   = typeof raw.saturdayStart === 'string' && typeof raw.saturdayEnd === 'string';
+  return {
+    enabled: !!raw.enabled,
+    days: {
+      mon: { enabled: true, start: wkStart, end: wkEnd },
+      tue: { enabled: true, start: wkStart, end: wkEnd },
+      wed: { enabled: true, start: wkStart, end: wkEnd },
+      thu: { enabled: true, start: wkStart, end: wkEnd },
+      fri: { enabled: true, start: wkStart, end: wkEnd },
+      sat: satOn ? { enabled: true, start: raw.saturdayStart, end: raw.saturdayEnd } : { ...def.days.sat },
+      sun: { enabled: !raw.sundayOff, start: def.days.sun.start, end: def.days.sun.end },
+    },
+  };
+}
+
+// True when current time in Asia/Almaty falls outside today's schedule. The
+// day's enabled=false counts as out-of-hours (full day off).
 function isOutOfHours(h: WorkingHours): boolean {
   const now = new Date();
-  // Asia/Almaty is UTC+5 year-round (no DST).
-  const ms = now.getTime() + 5 * 60 * 60 * 1000;
+  const ms = now.getTime() + 5 * 60 * 60 * 1000;  // Asia/Almaty UTC+5
   const d = new Date(ms);
-  const dow = d.getUTCDay(); // 0=Sun … 6=Sat
+  const KEYS: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const day = h.days[KEYS[d.getUTCDay()]];
+  if (!day || !day.enabled) return true;
   const hhmm = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-  if (dow === 0) return h.sundayOff;
-  if (dow === 6) {
-    if (!h.saturdayStart || !h.saturdayEnd) return false;
-    return hhmm < h.saturdayStart || hhmm > h.saturdayEnd;
-  }
-  return hhmm < h.weekdayStart || hhmm > h.weekdayEnd;
+  return hhmm < day.start || hhmm > day.end;
 }

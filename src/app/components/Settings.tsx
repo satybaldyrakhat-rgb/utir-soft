@@ -814,146 +814,6 @@ export function Settings({ language, onLanguageChange, currentUserEmail }: Setti
           {/* NEW backend-stored config — will power Instagram/WhatsApp webhooks. */}
           <ClientAIBackendCard language={language} />
 
-          {/* Product header — green theme so it never visually mixes with the assistant */}
-          <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-100 p-5">
-            <div className="flex items-start gap-3 mb-3">
-              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                <MessageCircle className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="text-sm text-gray-900">{tt('aiClientHeader')}</div>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">{tt('aiTwoProductsBadge')}</span>
-                </div>
-                <div className="text-[11px] text-gray-500 leading-relaxed">{tt('aiClientDesc')}</div>
-              </div>
-              <Toggle value={aiClient.enabled} onChange={() => store.updateAIClient({ enabled: !aiClient.enabled })} />
-            </div>
-          </div>
-
-          {/* Personality / role prompt */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-sm text-gray-900 mb-1">{tt('aiClientPersonality')}</div>
-            <div className="text-[11px] text-gray-400 mb-3">{tt('aiClientPersonalityHint')}</div>
-            <textarea
-              value={aiClient.personality}
-              onChange={e => store.updateAIClient({ personality: e.target.value })}
-              rows={4}
-              className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none"
-            />
-          </div>
-
-          {/* Tone + Language */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <div className="text-sm text-gray-900 mb-3">{tt('aiClientTone')}</div>
-              <div className="grid grid-cols-3 gap-2">
-                {([
-                  { id: 'professional' as const, emoji: '👔', label: tt('aiTonePro') },
-                  { id: 'friendly' as const,     emoji: '😊', label: tt('aiToneFriendly') },
-                  { id: 'casual' as const,       emoji: '✌️', label: tt('aiToneCasual') },
-                ]).map(opt => (
-                  <button
-                    key={opt.id}
-                    onClick={() => store.updateAIClient({ tone: opt.id })}
-                    className={`p-3 rounded-xl border text-center transition ${aiClient.tone === opt.id ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}
-                  >
-                    <div className="text-lg mb-1">{opt.emoji}</div>
-                    <div className="text-[10px] text-gray-600">{opt.label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-900 mb-3">{tt('aiClientLang')}</div>
-              <select
-                value={aiClient.language}
-                onChange={e => store.updateAIClient({ language: e.target.value as any })}
-                className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
-              >
-                <option value="auto">{tt('aiLangAuto')}</option>
-                <option value="ru">Русский</option>
-                <option value="kz">Қазақша</option>
-                <option value="eng">English</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Connected channels — read from integrations table */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-sm text-gray-900 mb-1">{tt('aiClientChannels')}</div>
-            <div className="text-[11px] text-gray-400 mb-3">{tt('aiClientChannelsHint')}</div>
-            <div className="flex flex-wrap gap-1.5">
-              {store.integrations.filter(i => i.cat === 'msg').map(i => (
-                <span key={i.id} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs ${i.connected ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-400'}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${i.connected ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                  {i.name}
-                </span>
-              ))}
-              {store.integrations.filter(i => i.cat === 'msg').length === 0 && (
-                <span className="text-[11px] text-gray-400 italic">{l('Каналы не настроены', 'Арналар бапталмаған', 'No channels configured')}</span>
-              )}
-            </div>
-          </div>
-
-          {/* Knowledge base */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-sm text-gray-900 mb-1">{tt('aiClientKnowledge')}</div>
-            <div className="text-[11px] text-gray-400 mb-3">{tt('aiClientKnowledgeHint')}</div>
-            {aiClient.knowledgeSources.length === 0 ? (
-              <div className="bg-gray-50 rounded-xl px-3 py-4 text-center text-[11px] text-gray-400 italic">
-                {l('Пока пусто', 'Әзірге бос', 'Empty')}
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl">
-                {aiClient.knowledgeSources.map(s => (
-                  <div key={s.id} className="px-3 py-2 flex items-center justify-between text-xs">
-                    <span className="text-gray-700">{s.name}</span>
-                    <span className="text-[10px] text-gray-400">{s.type}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button
-              disabled
-              title={l('Скоро', 'Жақын арада', 'Coming soon')}
-              className="mt-3 px-3 py-2 bg-gray-100 text-gray-400 rounded-xl text-xs cursor-not-allowed inline-flex items-center gap-1.5"
-            >
-              <Plus className="w-3 h-3" />{l('Добавить источник', 'Дереккөз қосу', 'Add source')}
-              <span className="text-[9px] opacity-70">{l('скоро', 'жақын арада', 'soon')}</span>
-            </button>
-          </div>
-
-          {/* Reply templates */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-sm text-gray-900 mb-1">{tt('aiClientTemplates')}</div>
-            <div className="text-[11px] text-gray-400 mb-3">{tt('aiClientTemplatesHint')}</div>
-            <textarea
-              value={aiClient.replyTemplates.join('\n')}
-              onChange={e => store.updateAIClient({ replyTemplates: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
-              rows={4}
-              className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none"
-            />
-          </div>
-
-          {/* Hand-off to human */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-sm text-gray-900 mb-1">{tt('aiClientHandoff')}</div>
-            <div className="text-[11px] text-gray-400 mb-3">{tt('aiClientHandoffHint')}</div>
-            <input
-              type="text"
-              value={aiClient.handoffKeywords.join(', ')}
-              onChange={e => store.updateAIClient({ handoffKeywords: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-              placeholder={tt('aiClientHandoffPlaceholder')}
-              className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
-            />
-          </div>
-
-          {/* Dialog analytics placeholder */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="text-sm text-gray-900 mb-1">{tt('aiClientAnalytics')}</div>
-            <div className="text-[11px] text-gray-400">{tt('aiClientAnalyticsSoon')}</div>
-          </div>
         </div>
       )}
 
@@ -1600,10 +1460,21 @@ function BrandKitCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
 //   • 💬 Тест          — реальный чат-плейграунд для проверки настроек
 type SectionId = 'brain' | 'persona' | 'behavior' | 'hours' | 'channels' | 'test';
 
+// Model id strings = the actual API model id we send to each provider.
+// Keep this list in sync with server/clientAi.ts ALL_CLIENT_AI_MODELS.
+type ClientAIModelId =
+  | 'claude-opus-4-5' | 'claude-sonnet-4-5' | 'claude-haiku-4-5'
+  | 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4-turbo'
+  | 'gemini-2.5-pro' | 'gemini-2.5-flash'
+  | 'deepseek-chat' | 'deepseek-reasoner';
+
+type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+interface DaySlot { enabled: boolean; start: string; end: string }
+
 interface ClientAIConfigUI {
   enabled: boolean;
   channels: { instagram: boolean; whatsapp: boolean };
-  aiModel: 'claude' | 'gpt4o' | 'gemini' | 'deepseek';
+  aiModel: ClientAIModelId;
   creativity: number;
   botName: string;
   tone: 'polite' | 'casual' | 'premium' | 'strict';
@@ -1620,27 +1491,38 @@ interface ClientAIConfigUI {
   blacklistTopics: string[];
   workingHours: {
     enabled: boolean;
-    weekdayStart: string; weekdayEnd: string;
-    saturdayStart?: string; saturdayEnd?: string;
-    sundayOff: boolean;
+    days: Record<DayKey, DaySlot>;
   };
   outOfHoursMessage: string;
   handoffMessage: string;
 }
 
+const DEFAULT_DAY_UI: DaySlot = { enabled: true, start: '09:00', end: '20:00' };
+
 const DEFAULT_CLIENT_AI_UI: ClientAIConfigUI = {
   enabled: false,
   channels: { instagram: false, whatsapp: false },
-  aiModel: 'claude',
+  aiModel: 'claude-opus-4-5',
   creativity: 0.7,
-  botName: 'Аяна',
+  botName: '',
   tone: 'polite',
   persona: '',
   writingSamples: [],
   scenarios: { answerFaq: true, calculatePrice: false, bookMeasurement: true, sendCatalog: true, askForContacts: true },
   handoffTriggers: ['жалоба', 'юрист', 'возврат денег', 'позови менеджера', 'хочу с человеком'],
   blacklistTopics: ['политика', 'религия', 'конкуренты'],
-  workingHours: { enabled: false, weekdayStart: '09:00', weekdayEnd: '20:00', saturdayStart: '10:00', saturdayEnd: '18:00', sundayOff: true },
+  workingHours: {
+    enabled: false,
+    days: {
+      mon: { ...DEFAULT_DAY_UI },
+      tue: { ...DEFAULT_DAY_UI },
+      wed: { ...DEFAULT_DAY_UI },
+      thu: { ...DEFAULT_DAY_UI },
+      fri: { ...DEFAULT_DAY_UI },
+      sat: { enabled: true,  start: '10:00', end: '18:00' },
+      sun: { enabled: false, start: '10:00', end: '18:00' },
+    },
+  },
   outOfHoursMessage: 'Сейчас мы офлайн. Утром менеджер обязательно вам напишет — спасибо за терпение 🙏',
   handoffMessage: 'Передаю вас живому менеджеру — он подключится к диалогу в ближайшее время.',
 };
@@ -1655,6 +1537,13 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [section, setSection] = useState<SectionId>('brain');
+  // Which underlying providers have API keys configured on the server.
+  // Maps to chatProviderStatuses() ids — we use it to disable model cards
+  // whose family has no key (admin sees grey "needs API key" instead of
+  // a working tile that would fail on the next call).
+  const [enabledFamilies, setEnabledFamilies] = useState<{ anthropic: boolean; openai: boolean; gemini: boolean; deepseek: boolean }>({
+    anthropic: true, openai: true, gemini: true, deepseek: true,
+  });
   // Test chat state
   const [chatMessages, setChatMessages] = useState<TestMsg[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -1665,15 +1554,41 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
   useEffect(() => {
     api.get<ClientAIConfigUI>('/api/team/client-ai')
       .then(c => {
+        const mergedDays: Record<DayKey, DaySlot> = { ...DEFAULT_CLIENT_AI_UI.workingHours.days };
+        if (c.workingHours?.days) {
+          (Object.keys(mergedDays) as DayKey[]).forEach(k => {
+            const d = (c.workingHours as any).days[k];
+            if (d && typeof d === 'object') {
+              mergedDays[k] = {
+                enabled: d.enabled !== false,
+                start: typeof d.start === 'string' ? d.start : mergedDays[k].start,
+                end:   typeof d.end   === 'string' ? d.end   : mergedDays[k].end,
+              };
+            }
+          });
+        }
         setCfg({
           ...DEFAULT_CLIENT_AI_UI, ...c,
           channels:     { ...DEFAULT_CLIENT_AI_UI.channels,     ...(c.channels     || {}) },
           scenarios:    { ...DEFAULT_CLIENT_AI_UI.scenarios,    ...(c.scenarios    || {}) },
-          workingHours: { ...DEFAULT_CLIENT_AI_UI.workingHours, ...(c.workingHours || {}) },
+          workingHours: { enabled: !!c.workingHours?.enabled, days: mergedDays },
         });
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
+    // Find out which provider families are wired up (by re-using the
+    // /api/ai-chat/providers endpoint that already returns enabled flags).
+    api.get<Array<{ id: string; enabled: boolean }>>('/api/ai-chat/providers')
+      .then(rows => {
+        const by = (id: string) => !!rows.find(r => r.id === id)?.enabled;
+        setEnabledFamilies({
+          anthropic: by('claude') || by('utir-ai'),
+          openai:    by('chatgpt'),
+          gemini:    by('gemini'),
+          deepseek:  by('deepseek'),
+        });
+      })
+      .catch(() => { /* leave optimistic defaults */ });
   }, []);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages, chatSending]);
@@ -1723,7 +1638,18 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
 
   const upd = (patch: Partial<ClientAIConfigUI>) => setCfg(c => ({ ...c, ...patch }));
   const updWH = (patch: Partial<ClientAIConfigUI['workingHours']>) => setCfg(c => ({ ...c, workingHours: { ...c.workingHours, ...patch } }));
+  const updDay = (key: DayKey, patch: Partial<DaySlot>) => setCfg(c => ({
+    ...c,
+    workingHours: { ...c.workingHours, days: { ...c.workingHours.days, [key]: { ...c.workingHours.days[key], ...patch } } },
+  }));
   const updSc = (k: keyof ClientAIConfigUI['scenarios'], v: boolean) => setCfg(c => ({ ...c, scenarios: { ...c.scenarios, [k]: v } }));
+
+  // Family check — used by the model card to grey out unavailable providers.
+  const modelFamily = (id: ClientAIModelId): 'anthropic' | 'openai' | 'gemini' | 'deepseek' =>
+    id.startsWith('claude')   ? 'anthropic' :
+    id.startsWith('gpt')      ? 'openai'    :
+    id.startsWith('gemini')   ? 'gemini'    :
+    'deepseek';
 
   if (!loaded) return (
     <div className="bg-white rounded-2xl border border-gray-100 p-8 flex items-center justify-center text-gray-400 text-sm">
@@ -1740,11 +1666,44 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
     { id: 'test',     icon: Sparkles,       label: l('Тест-чат', 'Тест-чат', 'Test chat'),         sub: l('Проверь как отвечает', 'Тексеру', 'Try it live') },
   ];
 
-  const MODEL_OPTIONS: Array<{ id: ClientAIConfigUI['aiModel']; name: string; tag: string; tone: string }> = [
-    { id: 'claude',   name: 'Claude Opus 4.5', tag: 'claude-opus-4-5', tone: l('Самая внимательная к стилю и нюансам', 'Стильге мұқият', 'Best at nuance / style') },
-    { id: 'gpt4o',    name: 'GPT-4o',          tag: 'gpt-4o',          tone: l('Универсал, быстрая', 'Әмбебап',           'Versatile, fast') },
-    { id: 'gemini',   name: 'Gemini 2.5 Pro',  tag: 'gemini-2.5-pro',  tone: l('2M контекст, мультимодальная', '...',     'Multimodal, 2M ctx') },
-    { id: 'deepseek', name: 'DeepSeek V3',     tag: 'deepseek-chat',   tone: l('Дешёвая, отлично пишет на русском', '...', 'Cheap, great in RU') },
+  // Grouped model catalog. Each option lists the real provider model id we
+  // send to the API. `family` is used to grey out cards when that family's
+  // API key isn't configured on the server.
+  const MODEL_GROUPS: Array<{
+    family: 'anthropic' | 'openai' | 'gemini' | 'deepseek';
+    title: string;
+    options: Array<{ id: ClientAIModelId; name: string; tone: string; badge?: string }>;
+  }> = [
+    {
+      family: 'anthropic', title: 'Anthropic Claude',
+      options: [
+        { id: 'claude-opus-4-5',   name: 'Claude Opus 4.5',   tone: l('Самая глубокая и внимательная к стилю', 'Ең тереңі', 'Deepest / nuance'), badge: l('топ', 'топ', 'top') },
+        { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', tone: l('Баланс качества и скорости', 'Баланс',    'Balanced') },
+        { id: 'claude-haiku-4-5',  name: 'Claude Haiku 4.5',  tone: l('Самая быстрая и дешёвая',   'Тез',       'Fastest / cheap'), badge: '⚡' },
+      ],
+    },
+    {
+      family: 'openai', title: 'OpenAI GPT',
+      options: [
+        { id: 'gpt-4o',      name: 'GPT-4o',      tone: l('Универсал, мультимодальная', '...', 'Versatile') },
+        { id: 'gpt-4o-mini', name: 'GPT-4o mini', tone: l('Быстрый и дешёвый',          'Тез',  'Fast / cheap'), badge: '⚡' },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', tone: l('Стабильная для длинных диалогов', '...', 'Stable, long-ctx') },
+      ],
+    },
+    {
+      family: 'gemini', title: 'Google Gemini',
+      options: [
+        { id: 'gemini-2.5-pro',   name: 'Gemini 2.5 Pro',   tone: l('2M контекст, мультимодальная', '...', 'Multimodal, 2M ctx') },
+        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', tone: l('Скоростная, дешёвая',          'Тез',  'Fast / cheap'), badge: '⚡' },
+      ],
+    },
+    {
+      family: 'deepseek', title: 'DeepSeek',
+      options: [
+        { id: 'deepseek-chat',     name: 'DeepSeek V3',         tone: l('Дешёвая, отлично пишет на русском', '...', 'Cheap, great in RU') },
+        { id: 'deepseek-reasoner', name: 'DeepSeek R1 Reasoner', tone: l('Думает шаг за шагом, аналитика',    '...', 'Step-by-step reasoning'), badge: '🧠' },
+      ],
+    },
   ];
 
   return (
@@ -1819,24 +1778,62 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                 />
               </div>
 
-              <div>
-                <div className="text-xs text-gray-900 mb-2">{l('Нейросеть', 'AI моделі', 'AI model')}</div>
-                <div className="grid sm:grid-cols-2 gap-2">
-                  {MODEL_OPTIONS.map(m => (
-                    <button
-                      key={m.id}
-                      onClick={() => upd({ aiModel: m.id })}
-                      className={`text-left p-3 rounded-xl border transition ${cfg.aiModel === m.id ? 'border-emerald-500 bg-emerald-50/40' : 'border-gray-100 hover:bg-gray-50'}`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="text-[13px] text-gray-900">{m.name}</div>
-                        {cfg.aiModel === m.id && <Check className="w-3.5 h-3.5 text-emerald-600" />}
-                      </div>
-                      <div className="text-[10px] text-gray-500 mb-0.5">{m.tone}</div>
-                      <div className="text-[10px] font-mono text-gray-400">{m.tag}</div>
-                    </button>
-                  ))}
+              <div className="space-y-4">
+                <div>
+                  <div className="text-xs text-gray-900 mb-1">{l('Нейросеть', 'AI моделі', 'AI model')}</div>
+                  <div className="text-[10px] text-gray-400 mb-2">
+                    {l('Активны только подключённые провайдеры. Серые карточки требуют API-ключ в Railway.',
+                       'Тек қосылған провайдерлер белсенді.',
+                       'Only providers with an API key are active. Greyed-out tiles need a key in Railway.')}
+                  </div>
                 </div>
+                {MODEL_GROUPS.map(group => {
+                  const familyEnabled = enabledFamilies[group.family];
+                  return (
+                    <div key={group.family}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${familyEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                          {group.title}
+                        </div>
+                        {!familyEnabled && (
+                          <span className="text-[9px] uppercase tracking-wide text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                            {l('нужен ключ', 'кілт керек', 'needs key')}
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        {group.options.map(m => {
+                          const selected = cfg.aiModel === m.id;
+                          return (
+                            <button
+                              key={m.id}
+                              disabled={!familyEnabled}
+                              onClick={() => upd({ aiModel: m.id })}
+                              className={`text-left p-3 rounded-xl border transition ${
+                                !familyEnabled
+                                  ? 'border-gray-100 bg-gray-50/50 opacity-50 cursor-not-allowed'
+                                  : selected
+                                    ? 'border-emerald-500 bg-emerald-50/40'
+                                    : 'border-gray-100 hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1 gap-2">
+                                <div className="text-[13px] text-gray-900 flex items-center gap-1.5 min-w-0">
+                                  <span className="truncate">{m.name}</span>
+                                  {m.badge && <span className="text-[9px] px-1 py-0.5 bg-gray-100 text-gray-600 rounded">{m.badge}</span>}
+                                </div>
+                                {selected && familyEnabled && <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />}
+                              </div>
+                              <div className="text-[10px] text-gray-500 mb-0.5">{m.tone}</div>
+                              <div className="text-[10px] font-mono text-gray-400">{m.id}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               <div>
@@ -1996,49 +1993,116 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
           )}
 
           {/* — HOURS — */}
-          {section === 'hours' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between bg-gray-50 px-3 py-2.5 rounded-xl">
-                <div>
-                  <div className="text-[12px] text-gray-900">{l('Включить расписание', 'Кестені қосу', 'Enable schedule')}</div>
-                  <div className="text-[10px] text-gray-400">{l('Asia/Almaty (UTC+5)', 'Asia/Almaty', 'Asia/Almaty TZ')}</div>
-                </div>
-                <button
-                  onClick={() => updWH({ enabled: !cfg.workingHours.enabled })}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${cfg.workingHours.enabled ? 'bg-emerald-600' : 'bg-gray-200'}`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.workingHours.enabled ? 'translate-x-5' : ''}`} />
-                </button>
-              </div>
-              {cfg.workingHours.enabled && (
-                <>
-                  <div className="grid grid-cols-3 gap-2 items-center">
-                    <div className="text-[11px] text-gray-500">{l('Пн–Пт', 'Дс–Жм', 'Mon–Fri')}</div>
-                    <input type="time" value={cfg.workingHours.weekdayStart} onChange={e => updWH({ weekdayStart: e.target.value })} className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
-                    <input type="time" value={cfg.workingHours.weekdayEnd}   onChange={e => updWH({ weekdayEnd: e.target.value })}   className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 items-center">
-                    <div className="text-[11px] text-gray-500">{l('Суббота', 'Сенбі', 'Saturday')}</div>
-                    <input type="time" value={cfg.workingHours.saturdayStart || ''} onChange={e => updWH({ saturdayStart: e.target.value })} className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
-                    <input type="time" value={cfg.workingHours.saturdayEnd   || ''} onChange={e => updWH({ saturdayEnd: e.target.value })}   className="px-2 py-1.5 bg-gray-50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200" />
-                  </div>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={cfg.workingHours.sundayOff} onChange={e => updWH({ sundayOff: e.target.checked })} className="accent-emerald-500" />
-                    <span className="text-[12px] text-gray-700">{l('Воскресенье — выходной', 'Жексенбі — демалыс', 'Sunday off')}</span>
-                  </label>
+          {section === 'hours' && (() => {
+            // NextBot-style per-day grid. Each row is one weekday with a
+            // work/off toggle and a from→to time pair. Quick-actions across
+            // the top (24/7, Пн-Пт 9-18, копировать пн на всё) speed up the
+            // common cases.
+            const DAYS: Array<{ key: DayKey; label: string }> = [
+              { key: 'mon', label: l('Понедельник', 'Дүйсенбі',  'Monday') },
+              { key: 'tue', label: l('Вторник',      'Сейсенбі',  'Tuesday') },
+              { key: 'wed', label: l('Среда',        'Сәрсенбі',  'Wednesday') },
+              { key: 'thu', label: l('Четверг',      'Бейсенбі',  'Thursday') },
+              { key: 'fri', label: l('Пятница',      'Жұма',      'Friday') },
+              { key: 'sat', label: l('Суббота',      'Сенбі',     'Saturday') },
+              { key: 'sun', label: l('Воскресенье',  'Жексенбі',  'Sunday') },
+            ];
+            const applyAllDays = (slot: DaySlot) => setCfg(c => ({
+              ...c, workingHours: {
+                ...c.workingHours,
+                days: Object.fromEntries(DAYS.map(d => [d.key, { ...slot }])) as Record<DayKey, DaySlot>,
+              },
+            }));
+            const applyWeekdays = (slot: DaySlot) => setCfg(c => ({
+              ...c, workingHours: {
+                ...c.workingHours,
+                days: {
+                  ...c.workingHours.days,
+                  mon: { ...slot }, tue: { ...slot }, wed: { ...slot }, thu: { ...slot }, fri: { ...slot },
+                  sat: { ...c.workingHours.days.sat, enabled: false },
+                  sun: { ...c.workingHours.days.sun, enabled: false },
+                },
+              },
+            }));
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between bg-gray-50 px-3 py-2.5 rounded-xl">
                   <div>
-                    <div className="text-[11px] text-gray-500 mb-1">{l('Сообщение вне часов', 'Жұмыс емес сағаттардағы хабар', 'Out-of-hours message')}</div>
-                    <textarea
-                      value={cfg.outOfHoursMessage}
-                      onChange={e => upd({ outOfHoursMessage: e.target.value })}
-                      rows={2} maxLength={500}
-                      className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none"
-                    />
+                    <div className="text-[12px] text-gray-900">{l('Включить расписание', 'Кестені қосу', 'Enable schedule')}</div>
+                    <div className="text-[10px] text-gray-400">{l('Asia/Almaty (UTC+5) · вне часов отправляется фраза-заглушка', 'Asia/Almaty', 'Asia/Almaty TZ')}</div>
                   </div>
-                </>
-              )}
-            </div>
-          )}
+                  <button
+                    onClick={() => updWH({ enabled: !cfg.workingHours.enabled })}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${cfg.workingHours.enabled ? 'bg-emerald-600' : 'bg-gray-200'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.workingHours.enabled ? 'translate-x-5' : ''}`} />
+                  </button>
+                </div>
+
+                {cfg.workingHours.enabled && (
+                  <>
+                    {/* Quick presets */}
+                    <div className="flex flex-wrap gap-1.5">
+                      <button onClick={() => applyAllDays({ enabled: true, start: '00:00', end: '23:59' })}
+                        className="text-[11px] px-2.5 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg">24 / 7</button>
+                      <button onClick={() => applyWeekdays({ enabled: true, start: '09:00', end: '18:00' })}
+                        className="text-[11px] px-2.5 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg">{l('Пн–Пт 9–18', 'Дс–Жм 9–18', 'Mon–Fri 9–18')}</button>
+                      <button onClick={() => applyWeekdays({ enabled: true, start: '10:00', end: '20:00' })}
+                        className="text-[11px] px-2.5 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg">{l('Пн–Пт 10–20', 'Дс–Жм 10–20', 'Mon–Fri 10–20')}</button>
+                      <button onClick={() => applyAllDays({ ...cfg.workingHours.days.mon })}
+                        className="text-[11px] px-2.5 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg">
+                        {l('Скопировать Пн на всё', 'Барлығына көшіру', 'Copy Mon to all')}
+                      </button>
+                    </div>
+
+                    {/* Per-day grid */}
+                    <div className="bg-gray-50/50 border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-100">
+                      {DAYS.map(d => {
+                        const slot = cfg.workingHours.days[d.key];
+                        return (
+                          <div key={d.key} className={`flex items-center gap-3 px-3 py-2.5 ${slot.enabled ? 'bg-white' : 'bg-gray-50/60'}`}>
+                            <button
+                              onClick={() => updDay(d.key, { enabled: !slot.enabled })}
+                              className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${slot.enabled ? 'bg-emerald-600' : 'bg-gray-300'}`}
+                            >
+                              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${slot.enabled ? 'translate-x-4' : ''}`} />
+                            </button>
+                            <div className={`w-28 text-[12px] ${slot.enabled ? 'text-gray-800' : 'text-gray-400'}`}>{d.label}</div>
+                            <div className="flex items-center gap-1.5 flex-1">
+                              <input
+                                type="time" value={slot.start} disabled={!slot.enabled}
+                                onChange={e => updDay(d.key, { start: e.target.value })}
+                                className={`px-2 py-1 rounded-lg text-[12px] flex-1 focus:outline-none focus:ring-1 focus:ring-emerald-200 ${slot.enabled ? 'bg-gray-50' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                              />
+                              <span className="text-gray-300 text-[11px]">→</span>
+                              <input
+                                type="time" value={slot.end} disabled={!slot.enabled}
+                                onChange={e => updDay(d.key, { end: e.target.value })}
+                                className={`px-2 py-1 rounded-lg text-[12px] flex-1 focus:outline-none focus:ring-1 focus:ring-emerald-200 ${slot.enabled ? 'bg-gray-50' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                              />
+                            </div>
+                            {!slot.enabled && (
+                              <span className="text-[10px] text-gray-400 italic flex-shrink-0">{l('выходной', 'демалыс', 'off')}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] text-gray-500 mb-1">{l('Сообщение вне часов', 'Жұмыс емес сағаттардағы хабар', 'Out-of-hours message')}</div>
+                      <textarea
+                        value={cfg.outOfHoursMessage}
+                        onChange={e => upd({ outOfHoursMessage: e.target.value })}
+                        rows={2} maxLength={500}
+                        className="w-full px-3 py-2 bg-gray-50 rounded-xl text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-200 resize-none"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* — CHANNELS — */}
           {section === 'channels' && (
@@ -2113,17 +2177,24 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                 </button>
               </div>
 
-              {/* Chat surface — styled like a real messenger thread */}
+              {/* Chat surface — styled like a real messenger thread. Header is
+                  neutral (no bot name / avatar with initial) so the focus stays
+                  on the conversation, not on a placeholder identity. */}
               <div className="bg-gradient-to-b from-violet-50/30 to-white border border-violet-100 rounded-2xl flex flex-col h-[420px] overflow-hidden">
-                {/* Mock chat header so it FEELS like Insta/WhatsApp */}
                 <div className="px-4 py-2.5 bg-white border-b border-violet-50 flex items-center gap-2.5">
-                  <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center text-white text-xs">
-                    {(cfg.botName || 'A').slice(0, 1).toUpperCase()}
+                  <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] text-gray-900 truncate">{cfg.botName || 'AI'}</div>
+                    <div className="text-[13px] text-gray-900">
+                      {l('Тестовый чат с AI', 'AI-мен тест-чат', 'AI test chat')}
+                    </div>
                     <div className="text-[10px] text-emerald-600 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> online · {MODEL_OPTIONS.find(m => m.id === cfg.aiModel)?.name}
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                      {[
+                        MODEL_GROUPS.flatMap(g => g.options).find(m => m.id === cfg.aiModel)?.name || cfg.aiModel,
+                        `t°${cfg.creativity.toFixed(1)}`,
+                      ].join(' · ')}
                     </div>
                   </div>
                   {cfg.channels.whatsapp && <WhatsAppLogo className="w-4 h-4" />}

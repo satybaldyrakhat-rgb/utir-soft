@@ -13,7 +13,7 @@ import { chat as aiChat, chatProviderStatuses, type ChatProviderId, type ChatMes
 import aiTools from './aiTools.js';
 import { getPermissionLevel as getPermLevel, canRunTool } from './permissions.js';
 import { transcribeAudio, parseAudioDataUrl, isWhisperReady } from './whisper.js';
-import { readClientAI, writeClientAI, runClientAITest, DEFAULT_CLIENT_AI, type ClientAIConfig } from './clientAi.js';
+import { readClientAI, writeClientAI, runClientAITest, DEFAULT_CLIENT_AI, ALL_CLIENT_AI_MODELS, type ClientAIConfig, type DayKey } from './clientAi.js';
 import { createHmac, randomBytes } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1613,13 +1613,13 @@ clientAiRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
       instagram: !!incoming.channels?.instagram,
       whatsapp:  !!incoming.channels?.whatsapp,
     },
-    aiModel: (['claude', 'gpt4o', 'gemini', 'deepseek'] as const).includes(incoming.aiModel as any)
+    aiModel: (ALL_CLIENT_AI_MODELS as string[]).includes(incoming.aiModel as any)
       ? (incoming.aiModel as ClientAIConfig['aiModel'])
       : DEFAULT_CLIENT_AI.aiModel,
     creativity: typeof incoming.creativity === 'number' && incoming.creativity >= 0 && incoming.creativity <= 1
       ? incoming.creativity
       : DEFAULT_CLIENT_AI.creativity,
-    botName: typeof incoming.botName === 'string' && incoming.botName.trim()
+    botName: typeof incoming.botName === 'string'
       ? incoming.botName.slice(0, 60)
       : DEFAULT_CLIENT_AI.botName,
     tone: (['polite', 'casual', 'premium', 'strict'] as const).includes(incoming.tone as any)
@@ -1642,14 +1642,24 @@ clientAiRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
     blacklistTopics: Array.isArray(incoming.blacklistTopics)
       ? incoming.blacklistTopics.filter(s => typeof s === 'string').map(s => s.slice(0, 80)).slice(0, 30)
       : [],
-    workingHours: {
-      enabled: !!incoming.workingHours?.enabled,
-      weekdayStart: typeof incoming.workingHours?.weekdayStart === 'string' ? incoming.workingHours.weekdayStart : DEFAULT_CLIENT_AI.workingHours.weekdayStart,
-      weekdayEnd:   typeof incoming.workingHours?.weekdayEnd   === 'string' ? incoming.workingHours.weekdayEnd   : DEFAULT_CLIENT_AI.workingHours.weekdayEnd,
-      saturdayStart: typeof incoming.workingHours?.saturdayStart === 'string' ? incoming.workingHours.saturdayStart : DEFAULT_CLIENT_AI.workingHours.saturdayStart,
-      saturdayEnd:   typeof incoming.workingHours?.saturdayEnd   === 'string' ? incoming.workingHours.saturdayEnd   : DEFAULT_CLIENT_AI.workingHours.saturdayEnd,
-      sundayOff:    incoming.workingHours?.sundayOff !== false, // default true
-    },
+    workingHours: (() => {
+      const wh = incoming.workingHours as any;
+      const KEYS: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      const days = { ...DEFAULT_CLIENT_AI.workingHours.days };
+      if (wh?.days && typeof wh.days === 'object') {
+        for (const k of KEYS) {
+          const d = wh.days[k];
+          if (d && typeof d === 'object') {
+            days[k] = {
+              enabled: d.enabled !== false,
+              start: typeof d.start === 'string' ? d.start.slice(0, 5) : days[k].start,
+              end:   typeof d.end   === 'string' ? d.end.slice(0, 5)   : days[k].end,
+            };
+          }
+        }
+      }
+      return { enabled: !!wh?.enabled, days };
+    })(),
     outOfHoursMessage: String(incoming.outOfHoursMessage || DEFAULT_CLIENT_AI.outOfHoursMessage).slice(0, 500),
     handoffMessage:    String(incoming.handoffMessage    || DEFAULT_CLIENT_AI.handoffMessage).slice(0, 500),
   };
