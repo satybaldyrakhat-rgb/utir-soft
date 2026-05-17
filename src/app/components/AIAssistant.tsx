@@ -65,33 +65,31 @@ const contextRoles: Record<string, Record<string, string>> = {
   settings: { ru: 'AI Настройщик', kz: 'AI Баптаушы', eng: 'AI Configurator' },
 };
 
-// Greetings are intentionally generic — no product/model names baked in.
-// The model id is already visible in the header subline ('claude-opus-4-5'),
-// so the body doesn't need to repeat or self-name. Keeps the bot anonymous
-// and avoids fake-identity vibes when the admin shows the popup to staff.
-const greetings: Record<ProviderId, Record<string, string>> = {
-  'utir-ai': {
-    ru: 'Здравствуйте! Помогу управлять платформой. Опишите задачу свободным текстом — создам сделку, запишу оплату, поставлю задачу, найду клиента. Например: «Закрыл клиента X на 450 000 ₸», «Y оплатил 100 000», «Поставь задачу замерить завтра», «Что по Z?»',
-    kz: 'Сәлем! Платформаны басқаруға көмектесемін. Еркін мәтінмен жазыңыз — өзім жасап беремін.',
-    eng: 'Hi! I can run the platform for you. Just describe what happened — I\'ll create deals, log payments, add tasks, look up clients.',
-  },
-  gemini:   { ru: 'Здравствуйте! Спрашивайте, чем помочь.', kz: 'Сәлем! Қандай сұрағыңыз бар?', eng: 'Hi! How can I help?' },
-  claude:   { ru: 'Здравствуйте! Готов помочь с анализом, текстами, идеями.', kz: 'Сәлем! Талдау, мәтін, идеялар бойынша көмектесемін.', eng: 'Hi! Happy to help with analysis, drafting, ideas.' },
-  chatgpt:  { ru: 'Здравствуйте! Спрашивайте что нужно.', kz: 'Сәлем! Сұрағыңызды қойыңыз.', eng: 'Hi! Ask anything.' },
-  deepseek: { ru: 'Здравствуйте! Слушаю.', kz: 'Сәлем!', eng: 'Hi! Ready when you are.' },
+// Greeting + quick-start are intentionally identical across all five
+// providers — switching the model in the dropdown changes ONLY which
+// AI answers (visible in the header subline). Layout, copy, and example
+// prompts stay the same so the user gets a consistent surface.
+//
+// No human names anywhere — examples reference «клиента», «сделка»,
+// «задачу» so the buttons stay useful regardless of who the team
+// actually serves and don't accidentally suggest fake personalities.
+const UNIVERSAL_GREETING: Record<string, string> = {
+  ru:  'Здравствуйте! Помогу управлять платформой и отвечу на любые вопросы. Опишите задачу свободным текстом — создам сделку, запишу оплату, поставлю задачу, найду клиента.',
+  kz:  'Сәлем! Платформаны басқаруға және сұрақтарға жауап беруге көмектесемін. Тапсырманы еркін мәтінмен жазыңыз.',
+  eng: 'Hi! I can help run the platform and answer questions. Describe the task in plain words — I\'ll create deals, log payments, add tasks, look up clients.',
 };
 
-// Provider-specific helper actions shown on the empty-state. Only UTIR AI
-// gets CRM-action prompts; the rest get generic chat starters.
-function getQuickActions(providerId: ProviderId, language: 'kz' | 'ru' | 'eng'): string[] {
-  if (providerId === 'utir-ai') {
-    if (language === 'kz') return ['Айдосты 500 000 ₸-ге жаптым', 'Айгүл 200 000 ₸ төледі', 'Ертеңге өлшеу тапсырмасы', 'Кенжебек бойынша не бар?'];
-    if (language === 'eng') return ['Closed Aydos for 500 000 ₸', 'Aigul paid 200 000 ₸', 'Add task: measure tomorrow', "What's on customer Kenzhe?"];
-    return ['Закрыл Айдоса на 500 000 ₸', 'Айгуль оплатила 200 000 ₸', 'Поставь задачу замерить завтра', 'Что по Кенжебеку?'];
-  }
-  if (language === 'kz') return ['Бұл айға болжам жаса', 'Клиентке хат жаз', 'Аналитика түсіндір'];
-  if (language === 'eng') return ['Forecast this month', 'Draft a client message', 'Explain analytics'];
-  return ['Сделай прогноз на месяц', 'Составь письмо клиенту', 'Объясни аналитику'];
+const QUICK_ACTIONS: Record<string, string[]> = {
+  ru:  ['Создать новую сделку', 'Записать оплату', 'Поставить задачу', 'Найти клиента'],
+  kz:  ['Жаңа мәміле жасау',    'Төлемді жазу',  'Тапсырма қою',     'Клиентті табу'],
+  eng: ['Create new deal',      'Log a payment', 'Add a task',       'Find a client'],
+};
+
+function getGreeting(language: 'kz' | 'ru' | 'eng'): string {
+  return UNIVERSAL_GREETING[language] || UNIVERSAL_GREETING.ru;
+}
+function getQuickActions(language: 'kz' | 'ru' | 'eng'): string[] {
+  return QUICK_ACTIONS[language] || QUICK_ACTIONS.ru;
 }
 
 const now = () => new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -180,7 +178,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
         hist.push({
           id: 'greet',
           role: 'assistant',
-          content: greetings[providerId][language] || greetings[providerId].ru,
+          content: getGreeting(language),
           timestamp: now(),
         });
       }
@@ -189,7 +187,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
       setMessages([{
         id: 'greet',
         role: 'assistant',
-        content: greetings[providerId][language] || greetings[providerId].ru,
+        content: getGreeting(language),
         timestamp: now(),
       }]);
     });
@@ -268,7 +266,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
     setMessages([{
       id: 'greet',
       role: 'assistant',
-      content: greetings[providerId][language] || greetings[providerId].ru,
+      content: getGreeting(language),
       timestamp: now(),
     }]);
   }
@@ -381,14 +379,13 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
               <div className="min-w-0">
-                {/* UTIR AI is a universal platform manager (has tools to create deals,
-                    log payments, change statuses, etc.) — always label it as such,
-                    regardless of which page the popup is opened from. Other providers
-                    stay context-aware so users get a relevant role hint. */}
+                {/* Title is identical for every model — switching providers
+                    only changes WHO answers (visible in the subline as the
+                    model id), not the role the popup plays for the user. */}
                 <div className="text-sm text-gray-900 truncate">
-                  {providerId === 'utir-ai'
-                    ? (language === 'ru' ? 'AI Помощник платформы' : language === 'kz' ? 'Платформа AI көмекшісі' : 'Platform AI Assistant')
-                    : (contextRoles[context]?.[language] || 'AI')}
+                  {language === 'ru' ? 'AI Помощник платформы'
+                    : language === 'kz' ? 'Платформа AI көмекшісі'
+                    : 'Platform AI Assistant'}
                 </div>
                 <button onClick={() => setShowModelMenu(s => !s)} className="text-[10px] text-gray-400 flex items-center gap-1 hover:text-gray-700">
                   <span className={`w-1.5 h-1.5 rounded-full ${selectedProvider?.enabled ? 'bg-emerald-500' : 'bg-gray-300'}`} />
@@ -541,7 +538,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
             {messages.length === 1 && messages[0].id === 'greet' && !isTyping && (
               <div className="space-y-1.5 pt-1">
                 <p className="text-[10px] text-gray-400 px-1">Быстро начать</p>
-                {getQuickActions(providerId, language).map((text, idx) => (
+                {getQuickActions(language).map((text, idx) => (
                   <button
                     key={idx}
                     onClick={() => sendMessage(text)}
@@ -617,11 +614,11 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                 </button>
               </div>
             )}
-            {providerId === 'utir-ai' && (
-              <p className="text-[10px] text-gray-400 mt-1.5 px-1">
-                💡 Можно создавать сделки, оплаты, задачи и менять статусы — спросит подтверждение перед записью.
-              </p>
-            )}
+            {/* Same hint regardless of model — non-UTIR providers will just
+                politely redirect to UTIR AI when asked to write data. */}
+            <p className="text-[10px] text-gray-400 mt-1.5 px-1">
+              💡 Можно создавать сделки, оплаты, задачи и менять статусы — спросит подтверждение перед записью.
+            </p>
           </div>
         </div>
       )}
