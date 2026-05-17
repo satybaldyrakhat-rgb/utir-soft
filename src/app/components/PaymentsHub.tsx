@@ -1,15 +1,18 @@
-import { useState, useMemo } from 'react';
-import { Search, CreditCard, Wallet, TrendingUp, AlertCircle, CheckCircle2, Clock, Download, Filter, Sparkles, ChevronDown, Send, Zap } from 'lucide-react';
-import { useDataStore, Deal } from '../utils/dataStore';
+import { useState, useMemo, useEffect } from 'react';
+import { Search, CreditCard, Wallet, TrendingUp, AlertCircle, CheckCircle2, Clock, Download, Filter, Sparkles, ChevronDown, Send, Zap, FileText, Loader2 } from 'lucide-react';
+import { useDataStore, Deal, FinanceTransaction } from '../utils/dataStore';
 import { Finance } from './Finance';
 import { AI_MODELS } from './AIAssistant';
+import { api } from '../utils/api';
+// PDF generator is heavy (jspdf + html2canvas) — load only when needed.
+import type { PaymentDealRow } from '../utils/pdfReports';
 
 interface PaymentsHubProps { language: 'kz' | 'ru' | 'eng'; }
 
 type Section = 'deals' | 'finance';
 type StatusFilter = 'all' | 'paid' | 'partial' | 'pending';
 
-const fmt = (n: number) => n.toLocaleString('ru-RU') + ' ₸';
+const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
 const fmtShort = (n: number) => {
   if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.0', '') + ' млн';
   if (Math.abs(n) >= 1_000) return Math.round(n / 1_000) + 'К';
@@ -46,7 +49,7 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
 
       {section === 'deals' && (
         <div className="px-4 md:px-8 pb-8 max-w-[1400px] space-y-5">
-          <AIFinancePanel language={language} />
+          <AIFinancePanel language={language} variant="deals" deals={store.deals} transactions={store.transactions} />
           <DealPayments deals={store.deals} language={language} />
         </div>
       )}
@@ -54,7 +57,7 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
       {section === 'finance' && (
         <>
           <div className="px-4 md:px-8 max-w-[1400px]">
-            <AIFinancePanel language={language} variant="finance" />
+            <AIFinancePanel language={language} variant="finance" deals={store.deals} transactions={store.transactions} />
           </div>
           <div className="-mt-2">
             <Finance language={language} />
@@ -65,33 +68,277 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
   );
 }
 
-function AIFinancePanel({ language, variant = 'deals' }: { language: 'kz' | 'ru' | 'eng'; variant?: 'deals' | 'finance' }) {
+// ─── Computed insights from real data ───────────────────────────────
+// We turn store.deals + store.transactions into the same shape of cards
+// the old mock used, but every number is a live aggregate. The AI panel
+// renders these AND uses them as context when the admin asks the AI.
+
+interface Insight { kind: 'good' | 'warn' | 'bad' | 'info'; title: string; desc: string }
+
+function dealStatus(d: Deal): 'paid' | 'partial' | 'pending' {
+  const amt = d.amount || 0;
+  const paid = Math.round(amt * (d.progress || 0) / 100);
+  return paid >= amt && amt > 0 ? 'paid' : paid > 0 ? 'partial' : 'pending';
+}
+
+function computeDealInsights(deals: Deal[], language: 'kz' | 'ru' | 'eng'): Insight[] {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
-  const [model, setModel] = useState(AI_MODELS[0]);
+  const active = deals.filter(d => d.status !== 'rejected');
+  const today = new Date();
+  // Treat anything > 14 days old without full payment as overdue.
+  const overdueCutoff = new Date(today.getTime() - 14 * 24 * 3600 * 1000);
+  const enriched = active.map(d => ({
+    d,
+    amt: d.amount || 0,
+    paid: Math.round((d.amount || 0) * (d.progress || 0) / 100),
+    due: (d.amount || 0) - Math.round((d.amount || 0) * (d.progress || 0) / 100),
+    status: dealStatus(d),
+    age: d.date ? today.getTime() - new Date(d.date).getTime() : 0,
+  }));
+  const overdue = enriched.filter(e => e.status !== 'paid' && e.d.date && new Date(e.d.date) < overdueCutoff);
+  const overdueSum = overdue.reduce((s, e) => s + e.due, 0);
+  const noPrepay  = enriched.filter(e => e.paid === 0);
+  const partialBig = enriched.filter(e => e.status === 'partial').sort((a, b) => b.due - a.due);
+  const insights: Insight[] = [];
+  if (overdue.length > 0) {
+    insights.push({
+      kind: 'bad',
+      title: l(
+        `${overdue.length} ${overdue.length === 1 ? 'просроченная сделка' : 'просроченных сделок'}`,
+        `${overdue.length} мерзімі өткен мәміле`,
+        `${overdue.length} overdue deals`,
+      ),
+      desc: l(
+        `Не получено ${fmtShort(overdueSum)} ₸. Отправить напоминания?`,
+        `Алынбаған ${fmtShort(overdueSum)} ₸.`,
+        `${fmtShort(overdueSum)} ₸ unpaid. Send reminders?`,
+      ),
+    });
+  } else {
+    insights.push({ kind: 'good', title: l('Нет просрочек', 'Мерзімі өткен жоқ', 'No overdue'), desc: l('Все клиенты в графике', 'Бәрі кестеде', 'All clients on schedule') });
+  }
+  if (noPrepay.length > 0) {
+    insights.push({
+      kind: 'warn',
+      title: l(`${noPrepay.length} сделок без аванса`, `${noPrepay.length} аванссыз`, `${noPrepay.length} deals without prepayment`),
+      desc: l('Запросить 30% предоплату для старта производства', '30% алдын ала төлем сұрау', 'Request 30% prepayment'),
+    });
+  }
+  if (partialBig.length > 0) {
+    const top = partialBig[0];
+    insights.push({
+      kind: 'info',
+      title: l('Крупный остаток', 'Үлкен қалдық', 'Largest outstanding'),
+      desc: l(
+        `${top.d.customerName} — ${fmtShort(top.due)} ₸ к получению`,
+        `${top.d.customerName} — ${fmtShort(top.due)} ₸`,
+        `${top.d.customerName} owes ${fmtShort(top.due)} ₸`,
+      ),
+    });
+  }
+  return insights.slice(0, 3);
+}
+
+function computeFinanceInsights(transactions: FinanceTransaction[], language: 'kz' | 'ru' | 'eng'): Insight[] {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const done = transactions.filter(t => t.status === 'completed');
+  const income  = done.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const expense = done.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const profit  = income - expense;
+  const margin  = income > 0 ? Math.round(profit / income * 1000) / 10 : 0;
+  // This month vs last month delta
+  const now = new Date();
+  const thisMonth = now.getMonth(), thisYear = now.getFullYear();
+  const sumMonth = (m: number, y: number, type: 'income' | 'expense') =>
+    done.filter(t => {
+      if (t.type !== type || !t.date) return false;
+      const d = new Date(t.date);
+      return d.getMonth() === m && d.getFullYear() === y;
+    }).reduce((s, t) => s + t.amount, 0);
+  const incThis = sumMonth(thisMonth, thisYear, 'income');
+  const incLast = sumMonth(thisMonth === 0 ? 11 : thisMonth - 1, thisMonth === 0 ? thisYear - 1 : thisYear, 'income');
+  const incDeltaPct = incLast > 0 ? Math.round((incThis - incLast) / incLast * 100) : 0;
+  const insights: Insight[] = [];
+  insights.push({
+    kind: profit >= 0 ? 'good' : 'bad',
+    title: l(`Маржа ${margin.toFixed(1)}%`, `Маржа ${margin.toFixed(1)}%`, `Margin ${margin.toFixed(1)}%`),
+    desc: l(`Прибыль: ${fmtShort(profit)} ₸`, `Пайда: ${fmtShort(profit)} ₸`, `Profit: ${fmtShort(profit)} ₸`),
+  });
+  if (incLast > 0) {
+    insights.push({
+      kind: incDeltaPct >= 0 ? 'good' : 'warn',
+      title: l(
+        `Доход ${incDeltaPct >= 0 ? '+' : ''}${incDeltaPct}% к прошлому месяцу`,
+        `Кіріс ${incDeltaPct >= 0 ? '+' : ''}${incDeltaPct}%`,
+        `Revenue ${incDeltaPct >= 0 ? '+' : ''}${incDeltaPct}% vs last month`,
+      ),
+      desc: l(`Текущий месяц: ${fmtShort(incThis)} ₸`, `Ағымдағы ай: ${fmtShort(incThis)} ₸`, `This month: ${fmtShort(incThis)} ₸`),
+    });
+  } else if (incThis > 0) {
+    insights.push({
+      kind: 'good',
+      title: l(`Доход ${fmtShort(incThis)} ₸ за месяц`, `Айдағы кіріс ${fmtShort(incThis)} ₸`, `Income ${fmtShort(incThis)} ₸ this month`),
+      desc: l('Первые продажи месяца', 'Айдың алғашқы сатылымдары', 'First sales this month'),
+    });
+  }
+  // Top expense category
+  const expByCat = new Map<string, number>();
+  done.filter(t => t.type === 'expense').forEach(t => expByCat.set(t.category || '—', (expByCat.get(t.category || '—') || 0) + t.amount));
+  const topExp = [...expByCat.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (topExp) {
+    insights.push({
+      kind: 'info',
+      title: l(`Топ расход: ${topExp[0]}`, `Топ шығын: ${topExp[0]}`, `Top expense: ${topExp[0]}`),
+      desc: l(`${fmtShort(topExp[1])} ₸ · ${expense > 0 ? Math.round(topExp[1] / expense * 100) : 0}% от расходов`, `${fmtShort(topExp[1])} ₸`, `${fmtShort(topExp[1])} ₸`),
+    });
+  }
+  return insights.slice(0, 3);
+}
+
+// Build a compact textual summary of the team's finance state to prepend
+// to user prompts — lets the AI answer with real numbers instead of
+// generic templated replies.
+function buildFinanceContext(deals: Deal[], transactions: FinanceTransaction[]): string {
+  const active = deals.filter(d => d.status !== 'rejected');
+  const billed = active.reduce((s, d) => s + (d.amount || 0), 0);
+  const paid   = active.reduce((s, d) => s + Math.round((d.amount || 0) * (d.progress || 0) / 100), 0);
+  const due    = billed - paid;
+  const done   = transactions.filter(t => t.status === 'completed');
+  const income  = done.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const expense = done.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const profit  = income - expense;
+  const overdue = active.filter(d => {
+    if (dealStatus(d) === 'paid' || !d.date) return false;
+    return Date.now() - new Date(d.date).getTime() > 14 * 24 * 3600 * 1000;
+  });
+  const lines = [
+    '=== Финансовое состояние команды (живые данные) ===',
+    `Сделки: всего ${active.length}, к оплате ${fmt(billed)}, получено ${fmt(paid)}, остаток ${fmt(due)}.`,
+    `Просроченных сделок: ${overdue.length}.`,
+    overdue.length > 0
+      ? `Топ должников: ${overdue.slice(0, 5).map(d => `${d.customerName} (${fmt((d.amount || 0) - Math.round((d.amount || 0) * (d.progress || 0) / 100))})`).join(', ')}.`
+      : '',
+    `Финансовые операции: доходы ${fmt(income)}, расходы ${fmt(expense)}, прибыль ${fmt(profit)}.`,
+    `Маржа: ${income > 0 ? (profit / income * 100).toFixed(1) : 0}%.`,
+    '=== Используй эти цифры в ответах. ===',
+  ].filter(Boolean);
+  return lines.join('\n');
+}
+
+// ─── AI Финансист panel ────────────────────────────────────────────
+// Real insights + real chat-to-Claude with finance context injected. The
+// chat input now actually hits /api/ai-chat/message and renders the reply
+// in-line (no popup hijack — admin gets the answer right next to the
+// numbers it's about).
+
+function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
+  language: 'kz' | 'ru' | 'eng';
+  variant?: 'deals' | 'finance';
+  deals: Deal[];
+  transactions: FinanceTransaction[];
+}) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  // Default to Claude — sharpest for analytical / business reasoning.
+  const [model, setModel] = useState(AI_MODELS.find(m => m.id === 'claude') || AI_MODELS[0]);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [sending, setSending] = useState(false);
+  const [reply, setReply] = useState<string | null>(null);
+  const [askedQ, setAskedQ] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
-  const insights = variant === 'deals' ? [
-    { icon: AlertCircle, tone: 'bg-rose-50 text-rose-700 border-rose-100', title: l('3 платежа просрочены', '3 төлем мерзімі өтті', '3 payments overdue'), desc: l('Рекомендую отправить напоминания клиентам сегодня', 'Бүгін клиенттерге еске салу ұсынамын', 'Send reminders today') },
-    { icon: TrendingUp, tone: 'bg-emerald-50 text-emerald-700 border-emerald-100', title: l('+18% поступлений за неделю', 'Аптадағы +18% түсім', '+18% inflow this week'), desc: l('Лучшая неделя месяца — сохраняйте темп', 'Айдың үздік аптасы', 'Best week of the month') },
-    { icon: Zap, tone: 'bg-amber-50 text-amber-700 border-amber-100', title: l('5 сделок без аванса', '5 мәміле аванссыз', '5 deals without prepayment'), desc: l('Запросить 30% предоплату для запуска производства', '30% алдын ала төлем сұрау', 'Request 30% prepayment') },
-  ] : [
-    { icon: TrendingUp, tone: 'bg-emerald-50 text-emerald-700 border-emerald-100', title: l('Маржа выросла до 23.2%', 'Маржа 23.2%-ке өсті', 'Margin grew to 23.2%'), desc: l('+1.4 п.п. к прошлому месяцу', '+1.4 п.п. өткен айға', '+1.4 pp vs last month') },
-    { icon: AlertCircle, tone: 'bg-amber-50 text-amber-700 border-amber-100', title: l('Срок УСН через 16 дней', 'УСН мерзімі 16 күнде', 'UST due in 16 days'), desc: l('К оплате 348 000 ₸ до 25 мая', '25 мамырға дейін 348 000 ₸', '348 000 ₸ by May 25') },
-    { icon: Zap, tone: 'bg-sky-50 text-sky-700 border-sky-100', title: l('Cash flow positive', 'Cash flow оң', 'Cash flow positive'), desc: l('Резерв на 2.4 месяца расходов', '2.4 ай шығынға резерв', '2.4 months runway') },
-  ];
+  // Sync model with what's actually configured on the server (greys out
+  // tiles whose key is missing).
+  const [providerOk, setProviderOk] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    api.get<Array<{ id: string; enabled: boolean }>>('/api/ai-chat/providers')
+      .then(rows => setProviderOk(Object.fromEntries(rows.map(r => [r.id, r.enabled]))))
+      .catch(() => { /* stay optimistic */ });
+  }, []);
+
+  const insights = useMemo(
+    () => variant === 'deals' ? computeDealInsights(deals, language) : computeFinanceInsights(transactions, language),
+    [variant, deals, transactions, language],
+  );
 
   const quickActions = variant === 'deals' ? [
-    l('Отправить напоминания должникам', 'Қарыздыларға еске салу', 'Send reminders to debtors'),
-    l('Сгенерировать счёт по сделке', 'Мәмілеге шот шығару', 'Generate invoice'),
-    l('Прогноз поступлений на неделю', 'Аптаға түсім болжамы', 'Weekly inflow forecast'),
-    l('Кто платит дольше всех?', 'Ең ұзақ кім төлейді?', 'Who pays slowest?'),
+    l('Кто из клиентов должен больше всех?', 'Ең көп қарызды клиент кім?', 'Who owes the most?'),
+    l('Прогноз поступлений на эту неделю',    'Аптадағы түсім болжамы',     'Inflow forecast this week'),
+    l('Какие сделки рискуют сорваться?',      'Қандай мәмілелер тәуекелде?', 'Which deals are at risk?'),
+    l('Сделай сводку платежей за месяц',      'Айдағы төлемдер сводкасы',   'Summarize payments this month'),
   ] : [
-    l('Анализ доходов и расходов', 'Кіріс-шығын талдауы', 'Income & expense analysis'),
-    l('Рассчитать налоги за месяц', 'Айдың салығын есепте', 'Calculate monthly taxes'),
-    l('Где можно сократить расходы?', 'Шығынды қайдан қысқартуға болады?', 'Where to cut expenses?'),
-    l('Прогноз прибыли до конца квартала', 'Тоқсан соңына дейінгі пайда', 'Quarter profit forecast'),
+    l('Проанализируй доходы и расходы за месяц', 'Айдың кірісі мен шығынын талда', 'Analyze monthly P&L'),
+    l('Где я переплачиваю?',                       'Қайда артық төлеп жатырмын?',  'Where am I overspending?'),
+    l('Прогноз прибыли до конца квартала',         'Тоқсан соңына дейінгі пайда',  'Forecast profit until quarter end'),
+    l('Сколько денег осталось «в обороте»?',       'Айналымда қанша қалды?',       'How much cash is in flight?'),
   ];
+
+  async function ask(q: string) {
+    if (!q.trim() || sending) return;
+    setSending(true); setError(null); setReply(null); setAskedQ(q);
+    try {
+      // Inject live finance numbers in front of the question so the model
+      // answers with real figures, not made-up ones.
+      const context = buildFinanceContext(deals, transactions);
+      const userText = `${context}\n\nВопрос пользователя: ${q.trim()}`;
+      const provider = model.id === 'utir-ai' ? 'claude' : model.id;  // pure chat for finance
+      const res = await api.post<any>('/api/ai-chat/message', {
+        provider,
+        messages: [{ role: 'user', content: userText }],
+      });
+      if (res?.kind === 'reply') setReply(res.text);
+      else if (res?.kind === 'error') setError(res.error || 'Ошибка');
+      else setError('Не удалось получить ответ');
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function downloadPdf() {
+    setPdfBusy(true);
+    try {
+      // Look up the company name from localStorage profile (where it lives
+      // per the project rules) so the PDF header is properly branded.
+      let company = '';
+      try {
+        const p = JSON.parse(localStorage.getItem('utir_user_profile') || '{}');
+        company = p?.company || '';
+      } catch { /* ignore */ }
+      const pdf = await import('../utils/pdfReports');
+      if (variant === 'deals') {
+        const rows: PaymentDealRow[] = deals.filter(d => d.status !== 'rejected').map(d => ({
+          id: d.id,
+          customerName: d.customerName,
+          product: d.product,
+          amount: d.amount || 0,
+          paid: Math.round((d.amount || 0) * (d.progress || 0) / 100),
+          status: dealStatus(d),
+          date: d.date,
+        }));
+        await pdf.generatePaymentsPDF(rows, { company });
+      } else {
+        await pdf.generateFinancePDF(transactions.map(t => ({
+          id: t.id, type: t.type, category: t.category,
+          amount: t.amount, date: t.date, description: t.description, status: t.status,
+        })), { company });
+      }
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
+  const toneClass = (kind: Insight['kind']) =>
+    kind === 'good' ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+    : kind === 'warn' ? 'bg-amber-50 text-amber-700 border-amber-100'
+    : kind === 'bad'  ? 'bg-rose-50 text-rose-700 border-rose-100'
+    : 'bg-sky-50 text-sky-700 border-sky-100';
+  const toneIcon = (kind: Insight['kind']) =>
+    kind === 'good' ? TrendingUp : kind === 'bad' ? AlertCircle : kind === 'warn' ? Zap : Sparkles;
 
   return (
     <div className="bg-gradient-to-br from-violet-50 via-white to-sky-50 rounded-2xl border border-violet-100 overflow-hidden">
@@ -103,36 +350,57 @@ function AIFinancePanel({ language, variant = 'deals' }: { language: 'kz' | 'ru'
           <div>
             <div className="text-sm text-gray-900 flex items-center gap-1.5">
               {l('AI Финансист', 'AI Қаржыгер', 'AI CFO')}
-              <span className="text-[9px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">BETA</span>
+              <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase tracking-wide">live</span>
             </div>
-            <div className="text-[10px] text-gray-500">{l('Анализирует ваши платежи в реальном времени', 'Төлемдеріңізді нақты уақытта талдайды', 'Real-time payment analysis')}</div>
+            <div className="text-[10px] text-gray-500">{l('Анализирует ваши платежи и финансы по живым данным', 'Нақты деректер бойынша талдайды', 'Real-time analysis of live data')}</div>
           </div>
         </div>
-        <div className="relative">
-          <button onClick={() => setShowModelMenu(!showModelMenu)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] text-gray-700 hover:border-violet-200">
-            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-            {model.short}
-            <ChevronDown className="w-3 h-3 text-gray-400" />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={downloadPdf}
+            disabled={pdfBusy}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-100 rounded-lg text-[11px] text-gray-700 hover:border-violet-200 disabled:opacity-50"
+            title={l('Скачать PDF-отчёт', 'PDF жүктеу', 'Download PDF report')}
+          >
+            {pdfBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+            {l('Отчёт PDF', 'PDF есеп', 'PDF report')}
           </button>
-          {showModelMenu && (
-            <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-100 rounded-xl shadow-lg z-20 p-1">
-              {AI_MODELS.map(m => (
-                <button key={m.id} onClick={() => { setModel(m); setShowModelMenu(false); }}
-                  className={`w-full text-left px-2.5 py-2 rounded-lg hover:bg-gray-50 ${model.id === m.id ? 'bg-violet-50' : ''}`}>
-                  <div className="text-xs text-gray-900">{m.name}</div>
-                  <div className="text-[10px] text-gray-400">{m.desc}</div>
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="relative">
+            <button onClick={() => setShowModelMenu(!showModelMenu)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] text-gray-700 hover:border-violet-200">
+              <span className={`w-1.5 h-1.5 rounded-full ${providerOk[model.id] !== false ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+              {model.short}
+              <ChevronDown className="w-3 h-3 text-gray-400" />
+            </button>
+            {showModelMenu && (
+              <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-100 rounded-xl shadow-lg z-20 p-1">
+                {AI_MODELS.map(m => {
+                  const ok = providerOk[m.id] !== false;
+                  return (
+                    <button key={m.id} disabled={!ok} onClick={() => { setModel(m); setShowModelMenu(false); }}
+                      className={`w-full text-left px-2.5 py-2 rounded-lg ${!ok ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-50'} ${model.id === m.id ? 'bg-violet-50' : ''}`}>
+                      <div className="text-xs text-gray-900 flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                        {m.name}
+                      </div>
+                      <div className="text-[10px] text-gray-400">{m.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-3 gap-2.5">
-        {insights.map((ins, i) => {
-          const Icon = ins.icon;
+        {insights.length === 0 ? (
+          <div className="md:col-span-3 text-center text-[11px] text-gray-400 py-2">
+            {l('Пока недостаточно данных для инсайтов — добавьте сделки и платежи', '...', 'Not enough data yet — add deals and payments')}
+          </div>
+        ) : insights.map((ins, i) => {
+          const Icon = toneIcon(ins.kind);
           return (
-            <div key={i} className={`rounded-xl border p-3 ${ins.tone}`}>
+            <div key={i} className={`rounded-xl border p-3 ${toneClass(ins.kind)}`}>
               <Icon className="w-3.5 h-3.5 mb-1.5" />
               <div className="text-xs mb-0.5">{ins.title}</div>
               <div className="text-[10px] opacity-80">{ins.desc}</div>
@@ -143,8 +411,8 @@ function AIFinancePanel({ language, variant = 'deals' }: { language: 'kz' | 'ru'
 
       <div className="px-5 pb-3 flex items-center gap-1.5 flex-wrap">
         {quickActions.map((q, i) => (
-          <button key={i} onClick={() => setPrompt(q)}
-            className="text-[10px] px-2.5 py-1 bg-white border border-gray-100 rounded-full text-gray-600 hover:bg-violet-50 hover:border-violet-200 hover:text-violet-700 transition-colors">
+          <button key={i} onClick={() => ask(q)} disabled={sending}
+            className="text-[10px] px-2.5 py-1 bg-white border border-gray-100 rounded-full text-gray-600 hover:bg-violet-50 hover:border-violet-200 hover:text-violet-700 transition-colors disabled:opacity-50">
             {q}
           </button>
         ))}
@@ -153,14 +421,49 @@ function AIFinancePanel({ language, variant = 'deals' }: { language: 'kz' | 'ru'
       <div className="px-3 pb-3">
         <div className="bg-white border border-gray-100 rounded-xl flex items-center gap-2 px-3 py-2 focus-within:border-violet-200 focus-within:ring-1 focus-within:ring-violet-100">
           <Sparkles className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
-          <input value={prompt} onChange={e => setPrompt(e.target.value)}
+          <input
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !sending) { e.preventDefault(); ask(prompt); setPrompt(''); } }}
+            disabled={sending}
             placeholder={l('Спросите AI о финансах…', 'AI-ден қаржы туралы сұраңыз…', 'Ask AI about finance…')}
-            className="flex-1 bg-transparent text-xs focus:outline-none placeholder:text-gray-300" />
-          <button disabled={!prompt} className="w-7 h-7 bg-gray-900 disabled:bg-gray-200 text-white rounded-lg flex items-center justify-center transition-colors">
-            <Send className="w-3 h-3" />
+            className="flex-1 bg-transparent text-xs focus:outline-none placeholder:text-gray-300 disabled:opacity-50"
+          />
+          <button
+            disabled={!prompt || sending}
+            onClick={() => { ask(prompt); setPrompt(''); }}
+            className="w-7 h-7 bg-gray-900 disabled:bg-gray-200 text-white rounded-lg flex items-center justify-center transition-colors"
+          >
+            {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
           </button>
         </div>
       </div>
+
+      {/* AI reply / error surfaces */}
+      {(reply || error) && (
+        <div className="px-5 pb-4">
+          {askedQ && (
+            <div className="text-[10px] text-gray-400 mb-1.5">
+              <span className="text-gray-500">{l('Ваш вопрос:', 'Сұрағыңыз:', 'Your question:')}</span> «{askedQ}»
+            </div>
+          )}
+          {reply && (
+            <div className="bg-white border border-violet-200 rounded-xl px-4 py-3 text-[13px] text-gray-800 whitespace-pre-line leading-relaxed">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Sparkles className="w-3 h-3 text-violet-500" />
+                <span className="text-[10px] text-violet-600 uppercase tracking-wide">{model.short}</span>
+              </div>
+              {reply}
+            </div>
+          )}
+          {error && (
+            <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-[12px] text-rose-700 flex items-start gap-2">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">{error}</div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -169,6 +472,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [query, setQuery] = useState('');
+  const [exportBusy, setExportBusy] = useState<'pdf' | 'csv' | null>(null);
 
   const active = deals.filter(d => d.status !== 'rejected');
 
@@ -222,6 +526,38 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
     pending: { label: l('Ожидает', 'Күтуде', 'Pending'), cls: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' },
   };
 
+  async function exportPdf() {
+    setExportBusy('pdf');
+    try {
+      let company = '';
+      try { company = JSON.parse(localStorage.getItem('utir_user_profile') || '{}')?.company || ''; } catch {}
+      const pdf = await import('../utils/pdfReports');
+      await pdf.generatePaymentsPDF(filtered.map(d => ({
+        id: d.id, customerName: d.customerName, product: d.product,
+        amount: d._amount, paid: d._paid, status: d._status as 'paid' | 'partial' | 'pending', date: d.date,
+      })), { company });
+    } finally { setExportBusy(null); }
+  }
+  async function exportCsv() {
+    setExportBusy('csv');
+    try {
+      const pdf = await import('../utils/pdfReports');
+      const rows: Array<Array<string | number>> = [
+        ['Клиент', 'Продукт', 'Дата', 'Сумма (₸)', 'Оплачено (₸)', 'Остаток (₸)', 'Статус'],
+        ...filtered.map(d => [
+          d.customerName,
+          d.product || '',
+          d.date || '',
+          d._amount,
+          d._paid,
+          d._due,
+          STATUS_BADGE[d._status].label,
+        ]),
+      ];
+      pdf.downloadCSV(`platezhi-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+    } finally { setExportBusy(null); }
+  }
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -252,8 +588,21 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
               <input value={query} onChange={e => setQuery(e.target.value)} placeholder={l('Поиск по клиенту...', 'Клиент іздеу...', 'Search client...')}
                 className="pl-7 pr-3 py-1.5 bg-gray-50 border-0 rounded-lg text-xs w-44 focus:outline-none focus:ring-1 focus:ring-gray-200" />
             </div>
-            <button className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg text-[10px] text-gray-600">
-              <Download className="w-3 h-3" /> {l('Экспорт', 'Экспорт', 'Export')}
+            <button
+              onClick={exportPdf}
+              disabled={exportBusy !== null || filtered.length === 0}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-gray-100 hover:border-gray-200 rounded-lg text-[10px] text-gray-700 disabled:opacity-50"
+              title={l('Скачать PDF', 'PDF жүктеу', 'Download PDF')}
+            >
+              {exportBusy === 'pdf' ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />} PDF
+            </button>
+            <button
+              onClick={exportCsv}
+              disabled={exportBusy !== null || filtered.length === 0}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg text-[10px] text-gray-600 disabled:opacity-50"
+              title={l('Скачать CSV (Excel)', 'CSV жүктеу', 'Download CSV (Excel)')}
+            >
+              <Download className="w-3 h-3" /> CSV
             </button>
           </div>
         </div>
