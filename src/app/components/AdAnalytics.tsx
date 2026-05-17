@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Calendar, Search, Download, X, ArrowUpDown, Filter, ChevronRight, ArrowLeft, ToggleLeft, ToggleRight, BarChart3 } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
-import { MetaLogo } from './PlatformLogos';
+import { BrandLogo } from './BrandLogo';
 
 const creativeImages = [
   'https://images.unsplash.com/photo-1668026694348-b73c5eb5e299?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBraXRjaGVuJTIwaW50ZXJpb3IlMjBkZXNpZ258ZW58MXx8fHwxNzc1MTkxMjk2fDA&ixlib=rb-4.1.0&q=80&w=1080',
@@ -204,8 +204,8 @@ export function AdAnalytics({ language }: AdAnalyticsProps) {
     return (
       <div className="max-w-2xl mx-auto py-16 px-6">
         <div className="bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-2xl p-8 text-center">
-          <div className="w-16 h-16 bg-white ring-1 ring-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-[0_4px_12px_-4px_rgba(15,23,42,0.10)]">
-            <MetaLogo className="w-10 h-10" />
+          <div className="mx-auto mb-5 shadow-[0_4px_12px_-4px_rgba(15,23,42,0.10)] rounded-2xl">
+            <BrandLogo id="meta" size={64} filled />
           </div>
           <div className="text-lg text-slate-900 mb-2">
             {metaConnected ? 'Ждём первую синхронизацию' : 'Реклама ещё не подключена'}

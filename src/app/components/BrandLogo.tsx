@@ -182,8 +182,27 @@ export function BrandLogo({ id, size = 20, color, mono, filled, className = '', 
   const raster = rasterUrlFor(slug);
   if (raster) {
     if (filled) {
-      // Edge-to-edge image inside a rounded square — covers the whole
-      // tile, may crop tiny edges (object-cover) to avoid empty corners.
+      // For brands shipped as full-colour PNG on a transparent background
+      // (Meta etc.) we paint a white card behind the image and contain it
+      // with padding so the logo isn't cropped. Other rasters (Kaspi /
+      // Halyk where the supplied PNG already has its own coloured square)
+      // fill edge-to-edge.
+      if (isFullColor) {
+        return (
+          <span
+            className={`inline-flex items-center justify-center rounded-xl ring-1 ring-slate-200 bg-white overflow-hidden ${className}`}
+            style={{ width: size, height: size }}
+            title={label || slug}
+          >
+            <img
+              src={raster}
+              alt={label || slug}
+              className="object-contain"
+              style={{ width: Math.round(size * 0.75), height: Math.round(size * 0.75) }}
+            />
+          </span>
+        );
+      }
       return (
         <img
           src={raster}
