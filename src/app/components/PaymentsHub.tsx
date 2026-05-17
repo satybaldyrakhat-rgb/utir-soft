@@ -25,21 +25,40 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50/30">
-      <div className="px-4 md:px-8 pt-6 max-w-[1400px]">
+    <div
+      className="flex-1 overflow-y-auto relative"
+      style={{
+        background: `
+          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
+          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
+          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
+          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
+          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+        `,
+      }}
+    >
+      <div className="px-4 md:px-8 pt-6 max-w-[1400px] mx-auto relative">
         <div className="flex items-end justify-between flex-wrap gap-3 mb-5">
           <div>
-            <p className="text-xs text-gray-400 mb-1">{l('Оплаты', 'Төлемдер', 'Payments')}</p>
-            <h1 className="text-gray-900">{l('Платежи и финансы', 'Төлемдер және қаржы', 'Payments & finance')}</h1>
+            <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Оплаты', 'Төлемдер', 'Payments')}</p>
+            <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight">{l('Платежи и финансы', 'Төлемдер және қаржы', 'Payments & finance')}</h1>
           </div>
-          <div className="bg-white rounded-xl border border-gray-100 p-1 flex">
+          <div className="flex gap-1.5 flex-wrap">
             <button onClick={() => setSection('deals')}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors ${section === 'deals' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}>
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
+                section === 'deals'
+                  ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+                  : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+              }`}>
               <CreditCard className="w-3.5 h-3.5" />
               {l('Платежи по сделкам', 'Мәмілелер бойынша', 'Deal payments')}
             </button>
             <button onClick={() => setSection('finance')}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors ${section === 'finance' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}>
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${
+                section === 'finance'
+                  ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.4)]'
+                  : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+              }`}>
               <TrendingUp className="w-3.5 h-3.5" />
               {l('Финансы компании', 'Компания қаржысы', 'Company finance')}
             </button>
@@ -360,20 +379,20 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
           <button
             onClick={downloadPdf}
             disabled={pdfBusy}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-100 rounded-lg text-[11px] text-gray-700 hover:border-violet-200 disabled:opacity-50"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-lg text-[11px] text-gray-700 hover:border-violet-200 disabled:opacity-50"
             title={l('Скачать PDF-отчёт', 'PDF жүктеу', 'Download PDF report')}
           >
             {pdfBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
             {l('Отчёт PDF', 'PDF есеп', 'PDF report')}
           </button>
           <div className="relative">
-            <button onClick={() => setShowModelMenu(!showModelMenu)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] text-gray-700 hover:border-violet-200">
+            <button onClick={() => setShowModelMenu(!showModelMenu)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-lg text-[10px] text-gray-700 hover:border-violet-200">
               <span className={`w-1.5 h-1.5 rounded-full ${providerOk[model.id] !== false ? 'bg-emerald-500' : 'bg-gray-300'}`} />
               {model.short}
               <ChevronDown className="w-3 h-3 text-gray-400" />
             </button>
             {showModelMenu && (
-              <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-100 rounded-xl shadow-lg z-20 p-1">
+              <div className="absolute right-0 top-full mt-1 w-64 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl shadow-lg z-20 p-1">
                 {AI_MODELS.map(m => {
                   const ok = providerOk[m.id] !== false;
                   return (
@@ -413,14 +432,14 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
       <div className="px-5 pb-3 flex items-center gap-1.5 flex-wrap">
         {quickActions.map((q, i) => (
           <button key={i} onClick={() => ask(q)} disabled={sending}
-            className="text-[10px] px-2.5 py-1 bg-white border border-gray-100 rounded-full text-gray-600 hover:bg-violet-50 hover:border-violet-200 hover:text-violet-700 transition-colors disabled:opacity-50">
+            className="text-[10px] px-2.5 py-1 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-full text-gray-600 hover:bg-violet-50 hover:border-violet-200 hover:text-violet-700 transition-colors disabled:opacity-50">
             {q}
           </button>
         ))}
       </div>
 
       <div className="px-3 pb-3">
-        <div className="bg-white border border-gray-100 rounded-xl flex items-center gap-2 px-3 py-2 focus-within:border-violet-200 focus-within:ring-1 focus-within:ring-violet-100">
+        <div className="bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl flex items-center gap-2 px-3 py-2 focus-within:border-violet-200 focus-within:ring-1 focus-within:ring-violet-100">
           <Sparkles className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
           <input
             value={prompt}
@@ -433,7 +452,7 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
           <button
             disabled={!prompt || sending}
             onClick={() => { ask(prompt); setPrompt(''); }}
-            className="w-7 h-7 bg-gray-900 disabled:bg-gray-200 text-white rounded-lg flex items-center justify-center transition-colors"
+            className="w-8 h-8 bg-slate-900/95 disabled:bg-white/40 disabled:text-slate-400 text-white rounded-xl flex items-center justify-center transition-colors ring-1 ring-white/10 shadow-[0_4px_12px_-4px_rgba(15,23,42,0.4)] disabled:shadow-none"
           >
             {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
           </button>
@@ -536,7 +555,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
   };
 
   const kpis = [
-    { label: l('Всего к оплате', 'Барлығы төлеуге', 'Total billed'), value: fmtShort(totals.billed) + ' ₸', sub: `${enriched.length} ${l('сделок', 'мәміле', 'deals')}`, icon: Wallet, tone: 'bg-gray-50 text-gray-700' },
+    { label: l('Всего к оплате', 'Барлығы төлеуге', 'Total billed'), value: fmtShort(totals.billed) + ' ₸', sub: `${enriched.length} ${l('сделок', 'мәміле', 'deals')}`, icon: Wallet, tone: 'bg-white/60 text-slate-700 ring-1 ring-white/60' },
     { label: l('Получено', 'Алынды', 'Received'), value: fmtShort(totals.paid) + ' ₸', sub: totals.billed ? `${Math.round(totals.paid / totals.billed * 100)}% ${l('от плана', 'жоспардан', 'of plan')}` : '—', icon: CheckCircle2, tone: 'bg-emerald-50 text-emerald-700' },
     { label: l('Остаток', 'Қалдық', 'Outstanding'), value: fmtShort(totals.due) + ' ₸', sub: l('к получению', 'алуға', 'pending'), icon: Clock, tone: 'bg-amber-50 text-amber-700' },
     { label: l('Просрочено', 'Мерзімі өтті', 'Overdue'), value: fmtShort(totals.overdue) + ' ₸', sub: l('требует внимания', 'назар аудару', 'needs attention'), icon: AlertCircle, tone: 'bg-rose-50 text-rose-700' },
@@ -594,7 +613,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
         {kpis.map((k, i) => {
           const Icon = k.icon;
           return (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-sm transition-all">
+            <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 hover:shadow-sm transition-all">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="text-[10px] text-gray-400 uppercase tracking-wide">{k.label}</div>
                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${k.tone}`}><Icon className="w-3 h-3" /></div>
@@ -606,8 +625,8 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
         })}
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between gap-3 flex-wrap">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-white/60 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="text-sm text-gray-900">{l('Платежи по сделкам', 'Мәмілелер бойынша төлемдер', 'Payments by deal')}</div>
             <span className="text-[10px] text-gray-400">{filtered.length} {l('записей', 'жазба', 'records')}</span>
@@ -616,12 +635,12 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-gray-300 absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input value={query} onChange={e => setQuery(e.target.value)} placeholder={l('Поиск по клиенту...', 'Клиент іздеу...', 'Search client...')}
-                className="pl-7 pr-3 py-1.5 bg-gray-50 border-0 rounded-lg text-xs w-44 focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                className="pl-7 pr-3 py-1.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs w-44 focus:outline-none focus:ring-1 focus:ring-gray-200" />
             </div>
             <button
               onClick={exportPdf}
               disabled={exportBusy !== null || filtered.length === 0}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-gray-100 hover:border-gray-200 rounded-lg text-[10px] text-gray-700 disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl hover:border-gray-200 rounded-lg text-[10px] text-gray-700 disabled:opacity-50"
               title={l('Скачать PDF', 'PDF жүктеу', 'Download PDF')}
             >
               {exportBusy === 'pdf' ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />} PDF
@@ -629,7 +648,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
             <button
               onClick={exportCsv}
               disabled={exportBusy !== null || filtered.length === 0}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg text-[10px] text-gray-600 disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl rounded-xl text-[10px] text-slate-600 disabled:opacity-50"
               title={l('Скачать CSV (Excel)', 'CSV жүктеу', 'Download CSV (Excel)')}
             >
               <Download className="w-3 h-3" /> CSV
@@ -637,18 +656,18 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
           </div>
         </div>
 
-        <div className="px-4 py-2 border-b border-gray-50 flex items-center gap-1 overflow-x-auto">
+        <div className="px-4 py-2 border-b border-white/60 flex items-center gap-1 overflow-x-auto">
           <Filter className="w-3 h-3 text-gray-300 mr-1 flex-shrink-0" />
           {FILTERS.map(f => (
             <button key={f.id} onClick={() => setFilter(f.id)}
-              className={`px-2.5 py-1 rounded-lg text-[10px] whitespace-nowrap transition-colors flex items-center gap-1.5 ${filter === f.id ? 'bg-gray-900 text-white' : `${f.cls} hover:bg-gray-50`}`}>
+              className={`px-2.5 py-1 rounded-full text-[10px] whitespace-nowrap transition-colors flex items-center gap-1.5 ring-1 ${filter === f.id ? 'bg-slate-900/95 text-white ring-white/10 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.3)]' : `${f.cls} ring-white/40 hover:bg-white/70`}`}>
               {f[language]}
               <span className={`px-1.5 py-0.5 rounded ${filter === f.id ? 'bg-white/20' : 'bg-gray-100'} text-[9px]`}>{counts[f.id]}</span>
             </button>
           ))}
         </div>
 
-        <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-2 border-b border-gray-50 bg-gray-50/40 text-[9px] text-gray-400 uppercase tracking-wide">
+        <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-2 border-b border-white/60 bg-white/30 text-[9px] text-gray-400 uppercase tracking-wide">
           <div className="col-span-3">{l('Клиент', 'Клиент', 'Client')}</div>
           <div className="col-span-3">{l('Продукт', 'Өнім', 'Product')}</div>
           <div className="col-span-3">{l('Прогресс', 'Прогресс', 'Progress')}</div>
@@ -660,7 +679,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
           {pageRows.map(d => {
             const badge = STATUS_BADGE[d._status];
             return (
-              <div key={d.id} className="px-4 py-3 hover:bg-gray-50/50 transition-colors grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+              <div key={d.id} className="px-4 py-3 hover:bg-white/30 transition-colors grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
                 <div className="md:col-span-3 flex items-center gap-2.5 min-w-0">
                   <div className="w-8 h-8 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center text-[10px] text-gray-500 flex-shrink-0">
                     {d.customerName.slice(0, 2).toUpperCase()}
@@ -677,7 +696,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
                 <div className="md:col-span-3">
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${d._pct >= 100 ? 'bg-emerald-500' : d._pct > 0 ? 'bg-gray-900' : 'bg-amber-300'}`} style={{ width: `${Math.min(d._pct, 100)}%` }} />
+                      <div className={`h-full rounded-full transition-all ${d._pct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : d._pct > 0 ? 'bg-gradient-to-r from-sky-400 to-violet-400' : 'bg-amber-300'}`} style={{ width: `${Math.min(d._pct, 100)}%` }} />
                     </div>
                     <span className="text-[10px] text-gray-500 tabular-nums w-9 text-right">{d._pct}%</span>
                   </div>
@@ -707,7 +726,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
         </div>
 
         {filtered.length > 0 && (
-          <div className="px-4 py-2.5 bg-gray-50/40 border-t border-gray-50 flex items-center justify-between flex-wrap gap-2 text-[10px] text-gray-500">
+          <div className="px-4 py-2.5 bg-white/30 border-t border-white/60 flex items-center justify-between flex-wrap gap-2 text-[10px] text-gray-500">
             <div className="flex items-center gap-2">
               <span>
                 {l('Показано', 'Көрсетілді', 'Showing')}

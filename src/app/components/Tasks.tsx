@@ -149,12 +149,28 @@ export function Tasks({ language }: TasksProps) {
   };
 
   return (
-    <div className="p-4 md:p-8">
+    // Liquid-glass page backdrop — same vocabulary as Dashboard / AI
+    // Design / Sales. Wraps the whole page so cards / chips / modals
+    // sit on a living pastel surface instead of plain grey.
+    <div
+      className="min-h-full relative"
+      style={{
+        background: `
+          radial-gradient(900px circle at 0% 0%,   rgba(196,181,253,0.30), transparent 45%),
+          radial-gradient(800px circle at 100% 5%, rgba(252,165,165,0.24), transparent 45%),
+          radial-gradient(900px circle at 100% 70%, rgba(125,211,252,0.28), transparent 50%),
+          radial-gradient(900px circle at 0% 100%, rgba(167,243,208,0.26), transparent 50%),
+          linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)
+        `,
+      }}
+    >
+    <div className="p-4 md:p-8 relative max-w-[1400px] mx-auto">
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
         <div>
-          <h1 className="mb-1">Задачи</h1>
-          <p className="text-sm text-gray-500">Ежедневные задачи сотрудников через Telegram-бот</p>
+          <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">Задачи</p>
+          <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight mb-1">Задачи команды</h1>
+          <p className="text-sm text-slate-500">Ежедневные задачи сотрудников через Telegram-бот</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -180,7 +196,7 @@ export function Tasks({ language }: TasksProps) {
               ];
               downloadCsv(todayStampedName('tasks'), rowsToCsv(store.tasks, cols));
             }}
-            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs text-slate-600 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl transition-all"
             title="Скачать задачи в CSV"
           >
             <Download className="w-4 h-4" />
@@ -188,7 +204,7 @@ export function Tasks({ language }: TasksProps) {
           </button>
           <button
             onClick={() => setShowImport(true)}
-            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs text-slate-600 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl transition-all"
             title="Загрузить задачи из CSV"
           >
             <Upload className="w-4 h-4" />
@@ -196,7 +212,7 @@ export function Tasks({ language }: TasksProps) {
           </button>
           <button
             onClick={() => setShowNewTaskModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all"
           >
             <Plus className="w-4 h-4" />
             Новая задача
@@ -206,7 +222,7 @@ export function Tasks({ language }: TasksProps) {
 
       {/* Telegram Bot Panel — minimalist, honest empty state until Block F wires the real bot */}
       {showTelegramPanel && (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden mb-6">
           {/* Header */}
           <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -222,8 +238,8 @@ export function Tasks({ language }: TasksProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowBotSettings(true)} className="px-3 py-1.5 border border-gray-100 text-gray-700 rounded-lg text-xs hover:bg-gray-50">Настройки</button>
-              <button onClick={() => setShowTelegramPanel(false)} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center hover:bg-gray-100">
+              <button onClick={() => setShowBotSettings(true)} className="px-3 py-1.5 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-xl text-xs hover:bg-white">Настройки</button>
+              <button onClick={() => setShowTelegramPanel(false)} className="w-8 h-8 bg-white/60 ring-1 ring-white/60 rounded-2xl flex items-center justify-center hover:bg-white transition-colors">
                 <X className="w-3.5 h-3.5 text-gray-400" />
               </button>
             </div>
@@ -252,7 +268,7 @@ export function Tasks({ language }: TasksProps) {
             {/* Connected employees — empty state */}
             <section>
               <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">Подключённые сотрудники</div>
-              <div className="bg-gray-50 rounded-xl p-6 text-center">
+              <div className="bg-white/40 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-6 text-center">
                 <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-white border border-gray-100 flex items-center justify-center">
                   <Send className="w-4 h-4 text-gray-300" />
                 </div>
@@ -274,23 +290,23 @@ export function Tasks({ language }: TasksProps) {
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
           <div className="text-xs text-gray-500 mb-1">Всего на сегодня</div>
           <div className="text-2xl text-gray-900">{stats.total}</div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
           <div className="text-xs text-blue-500 mb-1">Новые</div>
           <div className="text-2xl text-gray-900">{stats.newCount}</div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
           <div className="text-xs text-yellow-500 mb-1">В работе</div>
           <div className="text-2xl text-gray-900">{stats.inProgress}</div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
           <div className="text-xs text-purple-500 mb-1">На проверке</div>
           <div className="text-2xl text-gray-900">{stats.review}</div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
           <div className="text-xs text-green-500 mb-1">Выполнено</div>
           <div className="text-2xl text-gray-900">{stats.done}</div>
           <div className="w-full h-1.5 bg-gray-100 rounded-full mt-2 overflow-hidden">
@@ -322,7 +338,7 @@ export function Tasks({ language }: TasksProps) {
           <select
             value={filterEmployee}
             onChange={e => setFilterEmployee(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+            className="px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
           >
             <option value="all">Все сотрудники</option>
             {teamEmployees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
@@ -331,7 +347,7 @@ export function Tasks({ language }: TasksProps) {
           <select
             value={filterPriority}
             onChange={e => setFilterPriority(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+            className="px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
           >
             <option value="all">Все приоритеты</option>
             <option value="urgent">Срочно</option>
@@ -348,7 +364,7 @@ export function Tasks({ language }: TasksProps) {
             placeholder="Поиск задач..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm w-56 focus:outline-none focus:ring-2 focus:ring-gray-200"
+            className="pl-9 pr-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm w-56 focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
           />
         </div>
       </div>
@@ -384,10 +400,10 @@ export function Tasks({ language }: TasksProps) {
 
       {/* LIST VIEW */}
       {viewMode === 'list' && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50/50">
+              <tr className="border-b border-white/60 bg-white/30">
                 <th className="px-4 py-3 text-left text-xs text-gray-500">Задача</th>
                 <th className="px-3 py-3 text-left text-xs text-gray-500">Категория</th>
                 <th className="px-3 py-3 text-left text-xs text-gray-500">Исполнитель</th>
@@ -401,7 +417,7 @@ export function Tasks({ language }: TasksProps) {
               {filteredTasks.map(task => {
                 const pr = priorityConfig[task.priority];
                 return (
-                  <tr key={task.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => setSelectedTask(task)}>
+                  <tr key={task.id} className="hover:bg-white/30 transition-colors cursor-pointer" onClick={() => setSelectedTask(task)}>
                     <td className="px-4 py-3">
                       <div className="text-gray-900">{task.title}</div>
                       <div className="text-xs text-gray-400 truncate max-w-[250px]">{task.description}</div>
@@ -452,7 +468,7 @@ export function Tasks({ language }: TasksProps) {
       {viewMode === 'employees' && (
         <div className="space-y-4">
           {teamEmployees.length === 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+            <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-8 text-center">
               <div className="text-sm text-gray-500 mb-1">Пока никого в команде</div>
               <div className="text-xs text-gray-400">Добавьте сотрудников в Настройках → Команда — они появятся здесь со своими задачами.</div>
             </div>
@@ -462,10 +478,10 @@ export function Tasks({ language }: TasksProps) {
             const empDone = empTasks.filter(t => t.status === 'done').length;
             const isExpanded = expandedEmployee === emp.id;
             return (
-              <div key={emp.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div key={emp.id} className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl overflow-hidden">
                 <button
                   onClick={() => setExpandedEmployee(isExpanded ? null : emp.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50/50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 hover:bg-white/30 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-sm text-gray-600">{emp.avatar}</div>
@@ -486,7 +502,7 @@ export function Tasks({ language }: TasksProps) {
                   </div>
                 </button>
                 {isExpanded && (
-                  <div className="border-t border-gray-100 p-4 space-y-2">
+                  <div className="border-t border-white/60 p-4 space-y-2">
                     {empTasks.length === 0 && <div className="text-sm text-gray-400 text-center py-4">Нет задач</div>}
                     {empTasks.map(task => {
                       const statusCol = columns.find(c => c.id === task.status)!;
@@ -494,7 +510,7 @@ export function Tasks({ language }: TasksProps) {
                       return (
                         <div
                           key={task.id}
-                          className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                          className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-white/50 transition-colors cursor-pointer"
                           onClick={() => setSelectedTask(task)}
                         >
                           <div className="flex items-center gap-3">
@@ -601,6 +617,7 @@ export function Tasks({ language }: TasksProps) {
         />
       )}
     </div>
+    </div>
   );
 }
 
@@ -613,7 +630,7 @@ function TaskCard({ task, onClick, onMove }: { task: Task; onClick: () => void; 
 
   return (
     <div
-      className="bg-white rounded-xl border border-gray-200 p-3 hover:shadow-md transition-shadow cursor-pointer group"
+      className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-3 hover:shadow-md transition-shadow cursor-pointer group"
       onClick={onClick}
     >
       <div className="flex items-start justify-between mb-2">
@@ -685,9 +702,9 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]" onClick={e => e.stopPropagation()}>
+        <div className="p-5 border-b border-white/60 flex items-center justify-between">
           <h2 className="text-gray-900">Новая задача</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
@@ -699,7 +716,7 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Например: Замер кухни — ул. Абая"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200"
+              className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
             />
           </div>
           <div>
@@ -709,20 +726,20 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
               onChange={e => setDescription(e.target.value)}
               rows={3}
               placeholder="Подробности задачи..."
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 resize-none"
+              className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all resize-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Исполнитель</label>
-              <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200">
+              <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
                 <option value="">Не назначен</option>
                 {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Приоритет</label>
-              <select value={priority} onChange={e => setPriority(e.target.value as Task['priority'])} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200">
+              <select value={priority} onChange={e => setPriority(e.target.value as Task['priority'])} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
                 <option value="low">Низкий</option>
                 <option value="medium">Средний</option>
                 <option value="high">Высокий</option>
@@ -732,14 +749,14 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Категория</label>
-            <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200">
+            <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
               {Object.keys(categoryColors).map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <button
             onClick={handleSubmit}
             disabled={!title.trim()}
-            className="w-full py-2.5 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2.5 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Создать задачу
           </button>
@@ -818,10 +835,10 @@ function TaskDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-5 border-b border-gray-100">
+        <div className="p-5 border-b border-white/60">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -858,7 +875,7 @@ function TaskDetailModal({
               onChange={e => setDescription(e.target.value)}
               rows={3}
               placeholder="Подробности задачи…"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 resize-none"
+              className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all resize-none"
             />
           </div>
 
@@ -869,7 +886,7 @@ function TaskDetailModal({
               <select
                 value={assigneeId}
                 onChange={e => setAssigneeId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+                className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
               >
                 {/* Keep current assignee even if it's not in the store list (e.g. placeholder ids). */}
                 {!storeEmployees.find(e => e.id === assigneeId) && (
@@ -885,7 +902,7 @@ function TaskDetailModal({
               <select
                 value={priority}
                 onChange={e => setPriority(e.target.value as Task['priority'])}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+                className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
               >
                 <option value="low">Низкий</option>
                 <option value="medium">Средний</option>
@@ -902,7 +919,7 @@ function TaskDetailModal({
               <select
                 value={category}
                 onChange={e => setCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+                className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
               >
                 {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -913,7 +930,7 @@ function TaskDetailModal({
                 type="date"
                 value={dueDate}
                 onChange={e => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+                className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
               />
             </div>
           </div>
@@ -987,19 +1004,19 @@ function TaskDetailModal({
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
+          <div className="flex flex-col gap-2 pt-2 border-t border-white/60">
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
                 disabled={!dirty || !title.trim()}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900/95 text-white rounded-2xl text-sm hover:bg-slate-900 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Check className="w-4 h-4" />
                 Сохранить
               </button>
               <button
                 onClick={onClose}
-                className="px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                className="px-4 py-2.5 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-2xl text-sm hover:bg-white transition-colors"
               >
                 Отмена
               </button>
