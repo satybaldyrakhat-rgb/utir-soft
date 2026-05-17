@@ -16,6 +16,7 @@ import {
   Sparkles, Loader2, Download, Check, X, Bot, History, Wand2,
   CookingPot, BedDouble, Sofa, Bath, Baby, DoorOpen, Link as LinkIcon, Search,
   TreePine, Square as SquareIcon, Building2, Landmark, Leaf, Camera,
+  Trash2, RefreshCw, Pencil, Copy, Maximize2, User,
 } from 'lucide-react';
 import { api } from '../utils/api';
 import { useDataStore } from '../utils/dataStore';
@@ -224,6 +225,33 @@ export function AIDesign({ language }: AIDesignProps) {
   const [freeMode, setFreeMode] = useState(false);
   const [freePrompt, setFreePrompt] = useState('');
 
+  // ─── Lightbox + per-card action state ──────────────────────────
+  // The lightbox is a unified viewer for both results AND history entries —
+  // anything with an image. It lets the user see the full image and act on
+  // it: download / regenerate / edit-in-wizard / copy prompt / delete /
+  // attach to a deal. `viewing` holds the focused entry.
+  interface ViewItem {
+    id?: string;
+    provider: ProviderId;
+    imageUrl?: string | null;
+    enhancedPrompt?: string | null;
+    prompt?: string;          // original user prompt (history only)
+    userName?: string;
+    createdAt?: string;
+  }
+  const [viewing, setViewing] = useState<ViewItem | null>(null);
+
+  // Confirm dialog for delete (history entries only — admin-gated server-side).
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Small flash toast for actions that don't open another modal
+  // (copy prompt, deleted, etc.).
+  const [flash, setFlash] = useState('');
+  const showFlash = (msg: string) => {
+    setFlash(msg);
+    setTimeout(() => setFlash(''), 2200);
+  };
+
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<GenResult[]>([]);
   const [error, setError] = useState('');
@@ -308,6 +336,89 @@ export function AIDesign({ language }: AIDesignProps) {
     setRoomId(''); setStyleId(''); setMoodIds([]); setExtraText(''); setResults([]);
     setRoomPhoto(undefined); setReferenceImages([]);
   };
+
+  // ─── Per-image actions ───────────────────────────────────────────
+  // 'Переделать' — fire /generate again with the original prompt and the
+  // SAME provider that produced the image. Closes the lightbox so the user
+  // sees the spinner near the «Сгенерировать» button.
+  const regenerate = async (item: ViewItem) => {
+    if (!item.prompt && !item.enhancedPrompt) {
+      showFlash(l('Нет prompt — нечего повторить', 'Prompt жоқ', 'No prompt to retry'));
+      return;
+    }
+    const text = item.prompt || item.enhancedPrompt || '';
+    setFreeMode(true);
+    setFreePrompt(text);
+    setSelectedProvider(item.provider);
+    setViewing(null);
+    setError(''); setResults([]);
+    setGenerating(true);
+    try {
+      const res = await api.post<{ provider: ProviderId; prompt: string; results: GenResult[] }>('/api/ai-design/generate', {
+        provider: item.provider,
+        prompt: text,
+      });
+      setResults(res.results || []);
+      void reloadAll();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e: any) {
+      setError(String(e?.message || 'generation failed'));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // 'Изменить' — load the prompt back into the wizard (free-prompt mode)
+  // and scroll up so the user can tweak words and re-generate manually.
+  const editInWizard = (item: ViewItem) => {
+    const text = item.prompt || item.enhancedPrompt || '';
+    if (!text) { showFlash(l('Нет prompt — нечего менять', 'Prompt жоқ', 'No prompt')); return; }
+    setFreeMode(true);
+    setFreePrompt(text);
+    setSelectedProvider(item.provider);
+    setViewing(null);
+    setError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showFlash(l('Prompt загружен — поправьте и нажмите «Сгенерировать»',
+                'Prompt жүктелді — өзгертіп, «Генерациялау» басыңыз',
+                'Prompt loaded — tweak and hit Generate'));
+  };
+
+  // Copy prompt to clipboard. Falls back to a hidden textarea on browsers
+  // without navigator.clipboard (older Safari on KZ market).
+  const copyPrompt = async (text: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); try { document.execCommand('copy'); } catch { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+    showFlash(l('Prompt скопирован', 'Prompt көшірілді', 'Prompt copied'));
+  };
+
+  // Delete a history entry. Server is admin-gated; the UI also hides the
+  // button for non-admins. Optimistic update so the grid feels snappy.
+  const deleteEntry = async (id: string) => {
+    setHistory(prev => prev.filter(h => h.id !== id));
+    setResults(prev => prev.filter(r => r.id !== id));
+    if (viewing?.id === id) setViewing(null);
+    setConfirmDeleteId(null);
+    try {
+      await api.delete(`/api/ai-design/${encodeURIComponent(id)}`);
+      showFlash(l('Удалено', 'Жойылды', 'Deleted'));
+    } catch (e: any) {
+      // Rollback by re-fetching history on failure.
+      showFlash(l('Не удалось удалить — попробуйте ещё раз', 'Жою сәтсіз', 'Failed to delete'));
+      void reloadAll();
+    }
+  };
+
+  // Whether the current user can delete server-side. The /quotas endpoint
+  // returns the role on `usage.role` — we mirror that here.
+  const isAdmin = usage?.role === 'admin';
 
   return (
     // Liquid-glass page backdrop. Same vocabulary as Dashboard: soft
@@ -674,41 +785,75 @@ export function AIDesign({ language }: AIDesignProps) {
             <div className="text-sm text-slate-700 mb-3">{l('Результат', 'Нәтиже', 'Result')}</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {results.map((r, i) => (
-                <div key={r.id || i} className={`${GLASS} overflow-hidden`}>
+                <div key={r.id || i} className={`${GLASS} overflow-hidden group/card`}>
                   {r.ok && (r.imageUrl || r.imageDataUrl) ? (
                     <>
-                      <div className="aspect-square bg-white/30">
-                        <img src={r.imageUrl || r.imageDataUrl} alt="" className="w-full h-full object-cover" />
-                      </div>
+                      {/* Image — click anywhere to open the lightbox with
+                          the full action toolbar (regenerate / edit / delete /
+                          attach). */}
+                      <button
+                        type="button"
+                        onClick={() => setViewing({
+                          id: r.id,
+                          provider: r.provider,
+                          imageUrl: r.imageUrl || r.imageDataUrl,
+                          enhancedPrompt: r.enhancedPrompt,
+                          prompt: finalPrompt,
+                        })}
+                        className="block w-full aspect-square bg-white/30 relative overflow-hidden"
+                      >
+                        <img src={r.imageUrl || r.imageDataUrl} alt="" className="w-full h-full object-cover transition-transform group-hover/card:scale-[1.02]" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none" />
+                        <div className="absolute top-2 right-2 w-8 h-8 bg-slate-900/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
+                          <Maximize2 className="w-3.5 h-3.5" />
+                        </div>
+                      </button>
                       <div className="p-3">
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center justify-between mb-2">
                           <div className="text-xs text-slate-900 flex items-center gap-1.5">
                             <span className={`w-4 h-4 rounded ${PROVIDER_VISUAL[r.provider].bg} flex items-center justify-center overflow-hidden ring-1 ring-white/40`}>
                               {PROVIDER_VISUAL[r.provider].icon('w-2.5 h-2.5')}
                             </span>
                             <span>{r.provider}</span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            {r.id && (
-                              <button
-                                onClick={() => setAttachingId(r.id!)}
-                                className="p-1.5 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl text-slate-400 hover:text-slate-700 transition-all"
-                                title={l('Прикрепить к сделке', 'Мәмілеге қосу', 'Attach to deal')}
-                              >
-                                <LinkIcon className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <a
-                              href={r.imageUrl || r.imageDataUrl}
-                              download={`utir-design-${r.provider}.png`}
-                              className="p-1.5 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl text-slate-400 hover:text-slate-700 transition-all"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </a>
-                          </div>
+                        </div>
+                        {/* Action toolbar — always visible on result cards so
+                            the user knows what they can do without hunting. */}
+                        <div className="flex items-center gap-1 -mx-1">
+                          <ActionBtn
+                            icon={RefreshCw}
+                            label={l('Переделать', 'Қайта жасау', 'Regenerate')}
+                            onClick={() => regenerate({ id: r.id, provider: r.provider, prompt: finalPrompt, imageUrl: r.imageUrl || r.imageDataUrl, enhancedPrompt: r.enhancedPrompt })}
+                          />
+                          <ActionBtn
+                            icon={Pencil}
+                            label={l('Изменить', 'Өңдеу', 'Edit')}
+                            onClick={() => editInWizard({ id: r.id, provider: r.provider, prompt: finalPrompt, imageUrl: r.imageUrl || r.imageDataUrl, enhancedPrompt: r.enhancedPrompt })}
+                          />
+                          <ActionBtn
+                            icon={Download}
+                            label={l('Скачать', 'Жүктеу', 'Download')}
+                            href={r.imageUrl || r.imageDataUrl}
+                            download={`utir-design-${r.provider}.png`}
+                          />
+                          {r.id && (
+                            <ActionBtn
+                              icon={LinkIcon}
+                              label={l('К сделке', 'Мәмілеге', 'Attach')}
+                              onClick={() => setAttachingId(r.id!)}
+                            />
+                          )}
+                          {r.id && isAdmin && (
+                            <ActionBtn
+                              icon={Trash2}
+                              label={l('Удалить', 'Жою', 'Delete')}
+                              danger
+                              onClick={() => setConfirmDeleteId(r.id!)}
+                            />
+                          )}
                         </div>
                         {r.enhancedPrompt && (
-                          <details className="text-[10px] text-slate-500 mt-1">
+                          <details className="text-[10px] text-slate-500 mt-2">
                             <summary className="cursor-pointer flex items-center gap-1 hover:text-slate-700"><Wand2 className="w-2.5 h-2.5" /> {l('Улучшенный prompt', 'Жақсартылған prompt', 'Enhanced prompt')}</summary>
                             <div className="mt-1 leading-relaxed">{r.enhancedPrompt}</div>
                           </details>
@@ -744,21 +889,32 @@ export function AIDesign({ language }: AIDesignProps) {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {history.map(h => (
-                <div key={h.id} className={`${GLASS} ${GLASS_HOVER} overflow-hidden group`}>
-                  <div className="aspect-square bg-white/30 relative">
+                <div key={h.id} className={`${GLASS} ${GLASS_HOVER} overflow-hidden group/card`}>
+                  <button
+                    type="button"
+                    onClick={() => h.imageUrl && setViewing({
+                      id: h.id,
+                      provider: h.provider,
+                      imageUrl: h.imageUrl,
+                      enhancedPrompt: h.enhancedPrompt,
+                      prompt: h.prompt,
+                      userName: h.userName,
+                      createdAt: h.createdAt,
+                    })}
+                    className="block w-full aspect-square bg-white/30 relative overflow-hidden"
+                  >
                     {h.imageUrl ? (
-                      <img src={h.imageUrl} alt={h.prompt} className="w-full h-full object-cover" />
+                      <>
+                        <img src={h.imageUrl} alt={h.prompt} className="w-full h-full object-cover transition-transform group-hover/card:scale-[1.02]" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none" />
+                        <div className="absolute top-2 right-2 w-8 h-8 bg-slate-900/60 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity ring-1 ring-white/20">
+                          <Maximize2 className="w-3.5 h-3.5" />
+                        </div>
+                      </>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-300"><Bot className="w-8 h-8" /></div>
                     )}
-                    <button
-                      onClick={() => setAttachingId(h.id)}
-                      className="absolute top-2 right-2 w-8 h-8 bg-slate-900/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-slate-900/90 transition-all ring-1 ring-white/20"
-                      title={l('Прикрепить к сделке', 'Мәмілеге қосу', 'Attach to deal')}
-                    >
-                      <LinkIcon className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  </button>
                   <div className="p-3">
                     <div className="text-[10px] text-slate-500 flex items-center justify-between mb-1.5">
                       <span className="flex items-center gap-1">
@@ -770,7 +926,15 @@ export function AIDesign({ language }: AIDesignProps) {
                       <span>{new Date(h.createdAt).toLocaleDateString(language === 'eng' ? 'en-GB' : 'ru-RU', { day: '2-digit', month: '2-digit' })}</span>
                     </div>
                     <div className="text-[11px] text-slate-700 line-clamp-2 leading-snug" title={h.prompt}>{h.prompt}</div>
-                    <div className="text-[10px] text-slate-400 mt-1">{h.userName}</div>
+                    <div className="text-[10px] text-slate-400 mt-1 mb-2">{h.userName}</div>
+                    {/* Compact action row — same set as result cards */}
+                    <div className="flex items-center gap-1 -mx-1">
+                      <ActionBtn icon={RefreshCw} label={l('Переделать', 'Қайта', 'Retry')} onClick={() => regenerate({ id: h.id, provider: h.provider, prompt: h.prompt, imageUrl: h.imageUrl, enhancedPrompt: h.enhancedPrompt })} />
+                      <ActionBtn icon={Pencil}    label={l('Изменить', 'Өңдеу', 'Edit')}   onClick={() => editInWizard({ id: h.id, provider: h.provider, prompt: h.prompt, imageUrl: h.imageUrl, enhancedPrompt: h.enhancedPrompt })} />
+                      {h.imageUrl && <ActionBtn icon={Download} label={l('Скачать', 'Жүктеу', 'Save')} href={h.imageUrl} download={`utir-design-${h.provider}.png`} />}
+                      <ActionBtn icon={LinkIcon}  label={l('К сделке', 'Мәмілеге', 'Attach')} onClick={() => setAttachingId(h.id)} />
+                      {isAdmin && <ActionBtn icon={Trash2} label={l('Удалить', 'Жою', 'Delete')} danger onClick={() => setConfirmDeleteId(h.id)} />}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -849,6 +1013,169 @@ export function AIDesign({ language }: AIDesignProps) {
           </div>
         )}
 
+        {/* ─── Lightbox — full image + every per-image action ──── */}
+        {viewing && viewing.imageUrl && (
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            onClick={() => setViewing(null)}
+          >
+            <div
+              className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-5xl max-h-[92vh] flex flex-col md:flex-row overflow-hidden shadow-[0_24px_64px_-12px_rgba(15,23,42,0.4)]"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Image — fills the left side, scales contained */}
+              <div className="md:flex-1 bg-slate-50/60 flex items-center justify-center p-3 md:p-5 min-h-[40vh]">
+                <img src={viewing.imageUrl} alt="" className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-[0_12px_40px_-12px_rgba(15,23,42,0.25)]" />
+              </div>
+              {/* Side panel */}
+              <div className="md:w-[320px] flex flex-col border-l border-white/60">
+                <div className="p-5 border-b border-white/60 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1">{l('Концепт', 'Концепт', 'Concept')}</div>
+                    <div className="flex items-center gap-2">
+                      <span className={`w-5 h-5 rounded-lg ${PROVIDER_VISUAL[viewing.provider].bg} flex items-center justify-center overflow-hidden ring-1 ring-white/40`}>
+                        {PROVIDER_VISUAL[viewing.provider].icon('w-3 h-3')}
+                      </span>
+                      <span className="text-sm text-slate-900 truncate">{PROVIDER_VISUAL[viewing.provider].sub}</span>
+                    </div>
+                    {(viewing.userName || viewing.createdAt) && (
+                      <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-2 flex-wrap">
+                        {viewing.userName && (
+                          <span className="flex items-center gap-1">
+                            <User className="w-2.5 h-2.5" /> {viewing.userName}
+                          </span>
+                        )}
+                        {viewing.createdAt && (
+                          <span>{new Date(viewing.createdAt).toLocaleString(language === 'eng' ? 'en-GB' : 'ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setViewing(null)}
+                    className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center transition-colors flex-shrink-0"
+                  >
+                    <X className="w-4 h-4 text-slate-500" />
+                  </button>
+                </div>
+
+                {/* Prompt detail */}
+                <div className="p-5 border-b border-white/60 flex-1 overflow-y-auto">
+                  {viewing.prompt && (
+                    <div className="mb-4">
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>Prompt</span>
+                        <button
+                          onClick={() => copyPrompt(viewing.prompt || '')}
+                          className="flex items-center gap-1 normal-case tracking-normal text-slate-600 hover:text-slate-900"
+                        >
+                          <Copy className="w-3 h-3" /> {l('Копировать', 'Көшіру', 'Copy')}
+                        </button>
+                      </div>
+                      <div className="text-xs text-slate-800 leading-relaxed bg-white/50 ring-1 ring-white/60 rounded-2xl p-3">
+                        {viewing.prompt}
+                      </div>
+                    </div>
+                  )}
+                  {viewing.enhancedPrompt && (
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                        <Wand2 className="w-2.5 h-2.5" /> {l('Улучшенный prompt', 'Жақсартылған', 'Enhanced')}
+                      </div>
+                      <div className="text-[11px] text-slate-600 leading-relaxed bg-violet-50/60 ring-1 ring-violet-100/60 rounded-2xl p-3">
+                        {viewing.enhancedPrompt}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action bar */}
+                <div className="p-4 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => regenerate(viewing)}
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-900/95 text-white rounded-2xl text-xs hover:bg-slate-900 transition-all shadow-[0_8px_24px_-8px_rgba(15,23,42,0.4)] ring-1 ring-white/10"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    {l('Переделать', 'Қайта жасау', 'Regenerate')}
+                  </button>
+                  <button
+                    onClick={() => editInWizard(viewing)}
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 bg-white/70 hover:bg-white ring-1 ring-white/60 text-slate-700 rounded-2xl text-xs transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    {l('Изменить', 'Өңдеу', 'Edit')}
+                  </button>
+                  <a
+                    href={viewing.imageUrl}
+                    download={`utir-design-${viewing.provider}.png`}
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 bg-white/70 hover:bg-white ring-1 ring-white/60 text-slate-700 rounded-2xl text-xs transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {l('Скачать', 'Жүктеу', 'Download')}
+                  </a>
+                  {viewing.id && (
+                    <button
+                      onClick={() => { const id = viewing.id!; setViewing(null); setAttachingId(id); }}
+                      className="flex items-center justify-center gap-2 px-3 py-2.5 bg-white/70 hover:bg-white ring-1 ring-white/60 text-slate-700 rounded-2xl text-xs transition-colors"
+                    >
+                      <LinkIcon className="w-3.5 h-3.5" />
+                      {l('К сделке', 'Мәмілеге', 'To deal')}
+                    </button>
+                  )}
+                  {viewing.id && isAdmin && (
+                    <button
+                      onClick={() => setConfirmDeleteId(viewing.id!)}
+                      className="col-span-2 flex items-center justify-center gap-2 px-3 py-2.5 bg-rose-50/80 hover:bg-rose-100/80 ring-1 ring-rose-200/60 text-rose-700 rounded-2xl text-xs transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      {l('Удалить', 'Жою', 'Delete')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Delete confirmation ─────────────────────────────── */}
+        {confirmDeleteId && (
+          <div
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-[60] flex items-center justify-center p-4"
+            onClick={() => setConfirmDeleteId(null)}
+          >
+            <div
+              className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-sm p-6 shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-rose-100/70 text-rose-700 ring-1 ring-white/60 flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div className="text-center text-sm text-slate-900 mb-1">
+                {l('Удалить концепт?', 'Концептті жою?', 'Delete concept?')}
+              </div>
+              <div className="text-center text-[11px] text-slate-500 mb-5 leading-relaxed">
+                {l('Изображение и prompt удалятся из истории команды без возможности восстановить.',
+                   'Команда тарихынан жойылады.',
+                   'The image and prompt will be removed from the team history with no way to restore.')}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="px-3 py-2.5 bg-white/70 hover:bg-white ring-1 ring-white/60 text-slate-700 rounded-2xl text-xs transition-colors"
+                >
+                  {l('Отмена', 'Бас тарту', 'Cancel')}
+                </button>
+                <button
+                  onClick={() => deleteEntry(confirmDeleteId)}
+                  className="px-3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs transition-colors shadow-[0_8px_24px_-8px_rgba(225,29,72,0.5)]"
+                >
+                  {l('Удалить', 'Жою', 'Delete')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Toast that fades after attach. */}
         {attachToast && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 bg-slate-900/90 backdrop-blur-xl text-white text-xs rounded-2xl shadow-[0_12px_32px_-8px_rgba(15,23,42,0.5)] ring-1 ring-white/10 z-50 flex items-center gap-2">
@@ -856,7 +1183,46 @@ export function AIDesign({ language }: AIDesignProps) {
             {attachToast}
           </div>
         )}
+
+        {/* Action flash toast — copy / delete / edit-loaded */}
+        {flash && (
+          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2.5 bg-slate-900/90 backdrop-blur-xl text-white text-xs rounded-2xl shadow-[0_12px_32px_-8px_rgba(15,23,42,0.5)] ring-1 ring-white/10 z-50 flex items-center gap-2 max-w-[90vw]">
+            <Sparkles className="w-3.5 h-3.5 text-violet-300" />
+            {flash}
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+// ─── ActionBtn ───────────────────────────────────────────────────────
+// Small compact button used in the per-card toolbar. Works as either a
+// <button> (onClick) or an <a> (href+download). Keeps the toolbar visually
+// uniform — same width, same hover, same icon size.
+function ActionBtn({
+  icon: Icon, label, onClick, href, download, danger,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick?: () => void;
+  href?: string;
+  download?: string;
+  danger?: boolean;
+}) {
+  const cls = `flex-1 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-xl ring-1 transition-all ${
+    danger
+      ? 'bg-rose-50/60 hover:bg-rose-100/80 ring-rose-200/60 text-rose-700'
+      : 'bg-white/50 hover:bg-white/90 ring-white/60 text-slate-600 hover:text-slate-900'
+  }`;
+  const inner = (
+    <>
+      <Icon className="w-3.5 h-3.5" />
+      <span className="text-[9px] leading-none whitespace-nowrap">{label}</span>
+    </>
+  );
+  if (href) {
+    return <a href={href} download={download} className={cls} title={label}>{inner}</a>;
+  }
+  return <button type="button" onClick={onClick} className={cls} title={label}>{inner}</button>;
 }
