@@ -712,15 +712,6 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
   return (
     <div
       className="min-h-screen flex relative"
-      style={{
-        background: `
-          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.48), transparent 45%),
-          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.32), transparent 45%),
-          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.42), transparent 50%),
-          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.52), transparent 50%),
-          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
-        `,
-      }}
     >
       {/* Left side - Features (desktop only) — glass panel */}
       <div className="hidden lg:flex lg:w-[45%] xl:w-[50%] bg-white/30 backdrop-blur-2xl border-r border-white/60 flex-col justify-between p-12 relative overflow-hidden">

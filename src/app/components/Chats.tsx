@@ -129,15 +129,6 @@ export function Chats({ language }: ChatsProps) {
   return (
     <div
       className="flex flex-col h-[calc(100vh-56px)] relative"
-      style={{
-        background: `
-          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.45), transparent 45%),
-          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.30), transparent 45%),
-          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.40), transparent 50%),
-          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.50), transparent 50%),
-          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
-        `,
-      }}
     >
       {/* Header */}
       <div className="px-4 md:px-6 py-3 border-b border-white/60 bg-white/40 backdrop-blur-2xl flex items-center justify-between gap-3 flex-shrink-0">

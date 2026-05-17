@@ -74,15 +74,7 @@ export function Booking() {
 
   if (done) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-5 relative" style={{
-        background: `
-          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.45), transparent 45%),
-          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.30), transparent 45%),
-          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.40), transparent 50%),
-          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.50), transparent 50%),
-          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
-        `,
-      }}>
+      <div className="min-h-screen flex items-center justify-center p-5 relative">
         <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 max-w-md w-full text-center">
           <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-8 h-8 text-emerald-500" />
@@ -111,15 +103,7 @@ export function Booking() {
   );
 
   return (
-    <div className="min-h-screen relative" style={{
-        background: `
-          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.45), transparent 45%),
-          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.30), transparent 45%),
-          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.40), transparent 50%),
-          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.50), transparent 50%),
-          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
-        `,
-      }}>
+    <div className="min-h-screen relative">
       <div className="bg-white border-b border-white/60 px-5 py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">

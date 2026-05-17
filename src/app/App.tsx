@@ -323,14 +323,10 @@ function AppContent() {
   };
 
   return (
-    <div
-      className="flex min-h-screen relative"
-      style={{
-        // Subtle base behind every page. Pages paint their own orb backdrops
-        // on top — this only shows through the sidebar's translucency.
-        background: 'linear-gradient(180deg, #fbfafd 0%, #f3f4f9 100%)',
-      }}
-    >
+    <div className="flex min-h-screen relative">
+      {/* Themable global page backdrop — paints once, every page renders
+          on top. Theme changes recolour orbs instantly via CSS vars. */}
+      <div className="app-backdrop" aria-hidden="true" />
       {/* Invite link held by a logged-in user — modal explaining what it's for. */}
       {heldInviteCode && (
         <div className="fixed inset-0 bg-emerald-600/40 backdrop-blur-md z-[60] flex items-center justify-center p-4" onClick={dismissHeldInvite}>
@@ -453,21 +449,33 @@ function AppContent() {
               id, icon, label, badge,
             }: { id: string; icon: React.ReactNode; label: string; badge?: React.ReactNode }) => {
               const active = currentPage === id;
+              // Solid bg-emerald-600 (themable via CSS overrides) is more
+              // robust than a gradient with --tw-gradient-from overrides,
+              // which Tailwind v4 generates differently per theme. Inline
+              // style is a safety fallback if the utility class somehow
+              // isn't themed.
               return (
                 <button
                   onClick={() => handleMenuClick(id)}
                   className={`group w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-2xl transition-all ${
                     active
-                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-[0_8px_20px_-6px_rgba(5,150,105,0.45)] ring-1 ring-white/20'
+                      ? 'bg-emerald-600 text-white shadow-[0_8px_20px_-6px_rgba(5,150,105,0.45)] ring-1 ring-white/20'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60'
                   }`}
+                  style={active ? { backgroundColor: 'var(--accent-600, #059669)', boxShadow: '0 8px 20px -6px var(--accent-shadow, rgba(5,150,105,0.45))' } : undefined}
                   title={isSidebarCollapsed ? label : ''}
                 >
-                  <span className={`flex-shrink-0 ${active ? 'text-white' : 'text-slate-500 group-hover:text-emerald-600'} transition-colors`}>
+                  <span
+                    className={`flex-shrink-0 transition-colors`}
+                    style={{ color: active ? '#ffffff' : undefined }}
+                  >
                     {icon}
                   </span>
                   {!isSidebarCollapsed && (
-                    <span className={`flex-1 flex items-center gap-1.5 text-sm ${active ? 'font-medium' : ''}`}>
+                    <span
+                      className={`flex-1 flex items-center gap-1.5 text-sm ${active ? 'font-medium' : ''}`}
+                      style={{ color: active ? '#ffffff' : undefined }}
+                    >
                       {label}
                       {badge}
                     </span>

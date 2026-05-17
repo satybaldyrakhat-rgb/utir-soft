@@ -1,25 +1,59 @@
-/* ─── Per-user accent theme overrides ────────────────────────────
-   Each theme overrides the emerald-* utility classes the app uses
-   for primary actions, active states, hover and shadows.
+/* ─── Per-user accent theme ──────────────────────────────────────
+   Each theme defines:
+     1) CSS variables on [data-theme="X"] for the accent colour and
+        the four orb tints used in page backdrops.
+     2) Overrides for the emerald-* Tailwind utility classes the app
+        uses, so existing markup automatically picks up the new
+        palette without per-component edits.
 
-   Approach: target document root via [data-theme="X"] and re-color
-   every emerald-* class we actually use in the app. Keeps Tailwind
-   utility classes (no JIT rebuild needed) while letting users pick
-   their own accent like in Telegram.
+   The global .app-backdrop element (rendered in App.tsx) reads the
+   --orb-* variables to paint themable radial gradients behind every
+   page — so changing the theme also re-tints the page background,
+   not just buttons.
 
-   Tip: when adding a new shade in code, update each block below.
+   Add a new theme by:
+     1) appending it to THEMES in src/app/utils/theme.ts
+     2) duplicating one of the blocks below and swapping the colours
 */
 
-/* ─── 50  · 100  · 200  · 500  · 600  · 700 — these are the ranges
-   the app uses for emerald (CTA bg, hover, ring, text, pastel pill).
-   The active-sidebar gradient is from-emerald-500 to-emerald-600 →
-   we override both stops via the .from-emerald-500 and .to-emerald-600
-   classes' --tw-gradient-from / --tw-gradient-to vars Tailwind sets. */
+/* ─── Defaults (emerald) ───────────────────────────────────────── */
+:root {
+  --accent-50:  #ecfdf5;
+  --accent-100: #d1fae5;
+  --accent-200: #a7f3d0;
+  --accent-500: #10b981;
+  --accent-600: #059669;
+  --accent-700: #047857;
+  --accent-shadow:    rgba(5,150,105,0.45);
+  --accent-shadow-sm: rgba(5,150,105,0.3);
+  /* Four orbs used by the global page backdrop */
+  --orb-1: rgba(167,243,208,0.45);
+  --orb-2: rgba(110,231,183,0.30);
+  --orb-3: rgba(187,247,208,0.40);
+  --orb-4: rgba(209,250,229,0.50);
+  --orb-base-from: #f9fbfa;
+  --orb-base-to:   #f0fdf4;
+}
 
-/* === DEFAULT — emerald (no override needed, but kept for parity) === */
-[data-theme="emerald"] {}
+[data-theme="emerald"] {}  /* baseline; vars above apply */
 
 /* === TEAL === */
+[data-theme="teal"] {
+  --accent-50:  #f0fdfa;
+  --accent-100: #ccfbf1;
+  --accent-200: #99f6e4;
+  --accent-500: #14b8a6;
+  --accent-600: #0d9488;
+  --accent-700: #0f766e;
+  --accent-shadow:    rgba(13,148,136,0.45);
+  --accent-shadow-sm: rgba(13,148,136,0.3);
+  --orb-1: rgba(153,246,228,0.45);
+  --orb-2: rgba(94,234,212,0.30);
+  --orb-3: rgba(204,251,241,0.45);
+  --orb-4: rgba(240,253,250,0.55);
+  --orb-base-from: #f7fbfa;
+  --orb-base-to:   #ecfdf5;
+}
 [data-theme="teal"] .bg-emerald-50    { background-color: #f0fdfa; }
 [data-theme="teal"] .bg-emerald-100   { background-color: #ccfbf1; }
 [data-theme="teal"] .bg-emerald-100\/60 { background-color: rgba(204,251,241,0.6); }
@@ -33,11 +67,25 @@
 [data-theme="teal"] .ring-emerald-100\/60 { --tw-ring-color: rgba(204,251,241,0.6); }
 [data-theme="teal"] .ring-emerald-200\/60 { --tw-ring-color: rgba(153,246,228,0.6); }
 [data-theme="teal"] .border-emerald-200\/60 { border-color: rgba(153,246,228,0.6); }
-[data-theme="teal"] .from-emerald-500 { --tw-gradient-from: #14b8a6 var(--tw-gradient-from-position); --tw-gradient-to: rgb(20 184 166 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-[data-theme="teal"] .to-emerald-600   { --tw-gradient-to: #0d9488 var(--tw-gradient-to-position); }
 [data-theme="teal"] .hover\:bg-emerald-700:hover { background-color: #0f766e; }
 
 /* === CYAN === */
+[data-theme="cyan"] {
+  --accent-50:  #ecfeff;
+  --accent-100: #cffafe;
+  --accent-200: #a5f3fc;
+  --accent-500: #06b6d4;
+  --accent-600: #0891b2;
+  --accent-700: #0e7490;
+  --accent-shadow:    rgba(8,145,178,0.45);
+  --accent-shadow-sm: rgba(8,145,178,0.3);
+  --orb-1: rgba(165,243,252,0.45);
+  --orb-2: rgba(103,232,249,0.30);
+  --orb-3: rgba(207,250,254,0.45);
+  --orb-4: rgba(236,254,255,0.55);
+  --orb-base-from: #f6fbfc;
+  --orb-base-to:   #ecfeff;
+}
 [data-theme="cyan"] .bg-emerald-50    { background-color: #ecfeff; }
 [data-theme="cyan"] .bg-emerald-100   { background-color: #cffafe; }
 [data-theme="cyan"] .bg-emerald-100\/60 { background-color: rgba(207,250,254,0.6); }
@@ -51,11 +99,25 @@
 [data-theme="cyan"] .ring-emerald-100\/60 { --tw-ring-color: rgba(207,250,254,0.6); }
 [data-theme="cyan"] .ring-emerald-200\/60 { --tw-ring-color: rgba(165,243,252,0.6); }
 [data-theme="cyan"] .border-emerald-200\/60 { border-color: rgba(165,243,252,0.6); }
-[data-theme="cyan"] .from-emerald-500 { --tw-gradient-from: #06b6d4 var(--tw-gradient-from-position); --tw-gradient-to: rgb(6 182 212 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-[data-theme="cyan"] .to-emerald-600   { --tw-gradient-to: #0891b2 var(--tw-gradient-to-position); }
 [data-theme="cyan"] .hover\:bg-emerald-700:hover { background-color: #0e7490; }
 
 /* === SKY === */
+[data-theme="sky"] {
+  --accent-50:  #f0f9ff;
+  --accent-100: #e0f2fe;
+  --accent-200: #bae6fd;
+  --accent-500: #0ea5e9;
+  --accent-600: #0284c7;
+  --accent-700: #0369a1;
+  --accent-shadow:    rgba(2,132,199,0.45);
+  --accent-shadow-sm: rgba(2,132,199,0.3);
+  --orb-1: rgba(186,230,253,0.45);
+  --orb-2: rgba(125,211,252,0.30);
+  --orb-3: rgba(224,242,254,0.45);
+  --orb-4: rgba(240,249,255,0.55);
+  --orb-base-from: #f7fafb;
+  --orb-base-to:   #f0f9ff;
+}
 [data-theme="sky"] .bg-emerald-50    { background-color: #f0f9ff; }
 [data-theme="sky"] .bg-emerald-100   { background-color: #e0f2fe; }
 [data-theme="sky"] .bg-emerald-100\/60 { background-color: rgba(224,242,254,0.6); }
@@ -69,11 +131,25 @@
 [data-theme="sky"] .ring-emerald-100\/60 { --tw-ring-color: rgba(224,242,254,0.6); }
 [data-theme="sky"] .ring-emerald-200\/60 { --tw-ring-color: rgba(186,230,253,0.6); }
 [data-theme="sky"] .border-emerald-200\/60 { border-color: rgba(186,230,253,0.6); }
-[data-theme="sky"] .from-emerald-500 { --tw-gradient-from: #0ea5e9 var(--tw-gradient-from-position); --tw-gradient-to: rgb(14 165 233 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-[data-theme="sky"] .to-emerald-600   { --tw-gradient-to: #0284c7 var(--tw-gradient-to-position); }
 [data-theme="sky"] .hover\:bg-emerald-700:hover { background-color: #0369a1; }
 
 /* === BLUE === */
+[data-theme="blue"] {
+  --accent-50:  #eff6ff;
+  --accent-100: #dbeafe;
+  --accent-200: #bfdbfe;
+  --accent-500: #3b82f6;
+  --accent-600: #2563eb;
+  --accent-700: #1d4ed8;
+  --accent-shadow:    rgba(37,99,235,0.45);
+  --accent-shadow-sm: rgba(37,99,235,0.3);
+  --orb-1: rgba(191,219,254,0.45);
+  --orb-2: rgba(147,197,253,0.30);
+  --orb-3: rgba(219,234,254,0.45);
+  --orb-4: rgba(239,246,255,0.55);
+  --orb-base-from: #f8f9fc;
+  --orb-base-to:   #eff6ff;
+}
 [data-theme="blue"] .bg-emerald-50    { background-color: #eff6ff; }
 [data-theme="blue"] .bg-emerald-100   { background-color: #dbeafe; }
 [data-theme="blue"] .bg-emerald-100\/60 { background-color: rgba(219,234,254,0.6); }
@@ -87,11 +163,25 @@
 [data-theme="blue"] .ring-emerald-100\/60 { --tw-ring-color: rgba(219,234,254,0.6); }
 [data-theme="blue"] .ring-emerald-200\/60 { --tw-ring-color: rgba(191,219,254,0.6); }
 [data-theme="blue"] .border-emerald-200\/60 { border-color: rgba(191,219,254,0.6); }
-[data-theme="blue"] .from-emerald-500 { --tw-gradient-from: #3b82f6 var(--tw-gradient-from-position); --tw-gradient-to: rgb(59 130 246 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-[data-theme="blue"] .to-emerald-600   { --tw-gradient-to: #2563eb var(--tw-gradient-to-position); }
 [data-theme="blue"] .hover\:bg-emerald-700:hover { background-color: #1d4ed8; }
 
 /* === INDIGO === */
+[data-theme="indigo"] {
+  --accent-50:  #eef2ff;
+  --accent-100: #e0e7ff;
+  --accent-200: #c7d2fe;
+  --accent-500: #6366f1;
+  --accent-600: #4f46e5;
+  --accent-700: #4338ca;
+  --accent-shadow:    rgba(79,70,229,0.45);
+  --accent-shadow-sm: rgba(79,70,229,0.3);
+  --orb-1: rgba(199,210,254,0.45);
+  --orb-2: rgba(165,180,252,0.30);
+  --orb-3: rgba(224,231,255,0.45);
+  --orb-4: rgba(238,242,255,0.55);
+  --orb-base-from: #f8f8fc;
+  --orb-base-to:   #eef2ff;
+}
 [data-theme="indigo"] .bg-emerald-50    { background-color: #eef2ff; }
 [data-theme="indigo"] .bg-emerald-100   { background-color: #e0e7ff; }
 [data-theme="indigo"] .bg-emerald-100\/60 { background-color: rgba(224,231,255,0.6); }
@@ -105,11 +195,25 @@
 [data-theme="indigo"] .ring-emerald-100\/60 { --tw-ring-color: rgba(224,231,255,0.6); }
 [data-theme="indigo"] .ring-emerald-200\/60 { --tw-ring-color: rgba(199,210,254,0.6); }
 [data-theme="indigo"] .border-emerald-200\/60 { border-color: rgba(199,210,254,0.6); }
-[data-theme="indigo"] .from-emerald-500 { --tw-gradient-from: #6366f1 var(--tw-gradient-from-position); --tw-gradient-to: rgb(99 102 241 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-[data-theme="indigo"] .to-emerald-600   { --tw-gradient-to: #4f46e5 var(--tw-gradient-to-position); }
 [data-theme="indigo"] .hover\:bg-emerald-700:hover { background-color: #4338ca; }
 
 /* === VIOLET === */
+[data-theme="violet"] {
+  --accent-50:  #f5f3ff;
+  --accent-100: #ede9fe;
+  --accent-200: #ddd6fe;
+  --accent-500: #8b5cf6;
+  --accent-600: #7c3aed;
+  --accent-700: #6d28d9;
+  --accent-shadow:    rgba(124,58,237,0.45);
+  --accent-shadow-sm: rgba(124,58,237,0.3);
+  --orb-1: rgba(221,214,254,0.45);
+  --orb-2: rgba(196,181,253,0.30);
+  --orb-3: rgba(237,233,254,0.45);
+  --orb-4: rgba(245,243,255,0.55);
+  --orb-base-from: #f9f8fc;
+  --orb-base-to:   #f5f3ff;
+}
 [data-theme="violet"] .bg-emerald-50    { background-color: #f5f3ff; }
 [data-theme="violet"] .bg-emerald-100   { background-color: #ede9fe; }
 [data-theme="violet"] .bg-emerald-100\/60 { background-color: rgba(237,233,254,0.6); }
@@ -123,11 +227,25 @@
 [data-theme="violet"] .ring-emerald-100\/60 { --tw-ring-color: rgba(237,233,254,0.6); }
 [data-theme="violet"] .ring-emerald-200\/60 { --tw-ring-color: rgba(221,214,254,0.6); }
 [data-theme="violet"] .border-emerald-200\/60 { border-color: rgba(221,214,254,0.6); }
-[data-theme="violet"] .from-emerald-500 { --tw-gradient-from: #8b5cf6 var(--tw-gradient-from-position); --tw-gradient-to: rgb(139 92 246 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-[data-theme="violet"] .to-emerald-600   { --tw-gradient-to: #7c3aed var(--tw-gradient-to-position); }
 [data-theme="violet"] .hover\:bg-emerald-700:hover { background-color: #6d28d9; }
 
 /* === ROSE === */
+[data-theme="rose"] {
+  --accent-50:  #fff1f2;
+  --accent-100: #ffe4e6;
+  --accent-200: #fecdd3;
+  --accent-500: #f43f5e;
+  --accent-600: #e11d48;
+  --accent-700: #be123c;
+  --accent-shadow:    rgba(225,29,72,0.45);
+  --accent-shadow-sm: rgba(225,29,72,0.3);
+  --orb-1: rgba(254,205,211,0.45);
+  --orb-2: rgba(253,164,175,0.30);
+  --orb-3: rgba(255,228,230,0.45);
+  --orb-4: rgba(255,241,242,0.55);
+  --orb-base-from: #fbf9f9;
+  --orb-base-to:   #fff1f2;
+}
 [data-theme="rose"] .bg-emerald-50    { background-color: #fff1f2; }
 [data-theme="rose"] .bg-emerald-100   { background-color: #ffe4e6; }
 [data-theme="rose"] .bg-emerald-100\/60 { background-color: rgba(255,228,230,0.6); }
@@ -141,11 +259,25 @@
 [data-theme="rose"] .ring-emerald-100\/60 { --tw-ring-color: rgba(255,228,230,0.6); }
 [data-theme="rose"] .ring-emerald-200\/60 { --tw-ring-color: rgba(254,205,211,0.6); }
 [data-theme="rose"] .border-emerald-200\/60 { border-color: rgba(254,205,211,0.6); }
-[data-theme="rose"] .from-emerald-500 { --tw-gradient-from: #f43f5e var(--tw-gradient-from-position); --tw-gradient-to: rgb(244 63 94 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-[data-theme="rose"] .to-emerald-600   { --tw-gradient-to: #e11d48 var(--tw-gradient-to-position); }
 [data-theme="rose"] .hover\:bg-emerald-700:hover { background-color: #be123c; }
 
 /* === ORANGE === */
+[data-theme="orange"] {
+  --accent-50:  #fff7ed;
+  --accent-100: #ffedd5;
+  --accent-200: #fed7aa;
+  --accent-500: #f97316;
+  --accent-600: #ea580c;
+  --accent-700: #c2410c;
+  --accent-shadow:    rgba(234,88,12,0.45);
+  --accent-shadow-sm: rgba(234,88,12,0.3);
+  --orb-1: rgba(254,215,170,0.45);
+  --orb-2: rgba(253,186,116,0.30);
+  --orb-3: rgba(255,237,213,0.45);
+  --orb-4: rgba(255,247,237,0.55);
+  --orb-base-from: #fbfaf8;
+  --orb-base-to:   #fff7ed;
+}
 [data-theme="orange"] .bg-emerald-50    { background-color: #fff7ed; }
 [data-theme="orange"] .bg-emerald-100   { background-color: #ffedd5; }
 [data-theme="orange"] .bg-emerald-100\/60 { background-color: rgba(255,237,213,0.6); }
@@ -159,11 +291,25 @@
 [data-theme="orange"] .ring-emerald-100\/60 { --tw-ring-color: rgba(255,237,213,0.6); }
 [data-theme="orange"] .ring-emerald-200\/60 { --tw-ring-color: rgba(254,215,170,0.6); }
 [data-theme="orange"] .border-emerald-200\/60 { border-color: rgba(254,215,170,0.6); }
-[data-theme="orange"] .from-emerald-500 { --tw-gradient-from: #f97316 var(--tw-gradient-from-position); --tw-gradient-to: rgb(249 115 22 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-[data-theme="orange"] .to-emerald-600   { --tw-gradient-to: #ea580c var(--tw-gradient-to-position); }
 [data-theme="orange"] .hover\:bg-emerald-700:hover { background-color: #c2410c; }
 
 /* === SLATE === */
+[data-theme="slate"] {
+  --accent-50:  #f8fafc;
+  --accent-100: #f1f5f9;
+  --accent-200: #e2e8f0;
+  --accent-500: #64748b;
+  --accent-600: #475569;
+  --accent-700: #334155;
+  --accent-shadow:    rgba(71,85,105,0.45);
+  --accent-shadow-sm: rgba(71,85,105,0.3);
+  --orb-1: rgba(226,232,240,0.45);
+  --orb-2: rgba(203,213,225,0.30);
+  --orb-3: rgba(241,245,249,0.45);
+  --orb-4: rgba(248,250,252,0.55);
+  --orb-base-from: #fafafa;
+  --orb-base-to:   #f8fafc;
+}
 [data-theme="slate"] .bg-emerald-50    { background-color: #f8fafc; }
 [data-theme="slate"] .bg-emerald-100   { background-color: #f1f5f9; }
 [data-theme="slate"] .bg-emerald-100\/60 { background-color: rgba(241,245,249,0.6); }
@@ -177,6 +323,56 @@
 [data-theme="slate"] .ring-emerald-100\/60 { --tw-ring-color: rgba(241,245,249,0.6); }
 [data-theme="slate"] .ring-emerald-200\/60 { --tw-ring-color: rgba(226,232,240,0.6); }
 [data-theme="slate"] .border-emerald-200\/60 { border-color: rgba(226,232,240,0.6); }
-[data-theme="slate"] .from-emerald-500 { --tw-gradient-from: #64748b var(--tw-gradient-from-position); --tw-gradient-to: rgb(100 116 139 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-[data-theme="slate"] .to-emerald-600   { --tw-gradient-to: #475569 var(--tw-gradient-to-position); }
 [data-theme="slate"] .hover\:bg-emerald-700:hover { background-color: #334155; }
+
+/* === BLACK === */
+[data-theme="black"] {
+  --accent-50:  #f8fafc;
+  --accent-100: #e2e8f0;
+  --accent-200: #cbd5e1;
+  --accent-500: #1e293b;
+  --accent-600: #0f172a;
+  --accent-700: #020617;
+  --accent-shadow:    rgba(15,23,42,0.5);
+  --accent-shadow-sm: rgba(15,23,42,0.35);
+  --orb-1: rgba(226,232,240,0.40);
+  --orb-2: rgba(203,213,225,0.25);
+  --orb-3: rgba(241,245,249,0.40);
+  --orb-4: rgba(248,250,252,0.55);
+  --orb-base-from: #fafafa;
+  --orb-base-to:   #f1f5f9;
+}
+[data-theme="black"] .bg-emerald-50    { background-color: #f8fafc; }
+[data-theme="black"] .bg-emerald-100   { background-color: #e2e8f0; }
+[data-theme="black"] .bg-emerald-100\/60 { background-color: rgba(226,232,240,0.6); }
+[data-theme="black"] .bg-emerald-100\/70 { background-color: rgba(226,232,240,0.7); }
+[data-theme="black"] .bg-emerald-100\/80 { background-color: rgba(226,232,240,0.8); }
+[data-theme="black"] .bg-emerald-500   { background-color: #1e293b; }
+[data-theme="black"] .bg-emerald-600   { background-color: #0f172a; }
+[data-theme="black"] .bg-emerald-700   { background-color: #020617; }
+[data-theme="black"] .text-emerald-600 { color: #0f172a; }
+[data-theme="black"] .text-emerald-700 { color: #020617; }
+[data-theme="black"] .ring-emerald-100\/60 { --tw-ring-color: rgba(226,232,240,0.6); }
+[data-theme="black"] .ring-emerald-200\/60 { --tw-ring-color: rgba(203,213,225,0.6); }
+[data-theme="black"] .border-emerald-200\/60 { border-color: rgba(203,213,225,0.6); }
+[data-theme="black"] .hover\:bg-emerald-700:hover { background-color: #020617; }
+
+/* ─── Global app backdrop ────────────────────────────────────────
+   One full-screen layer behind every page. Tints follow the active
+   theme via --orb-* variables. Used instead of per-page inline
+   `style={{ background: 'radial-gradient(...)' }}` so theme changes
+   instantly recolour the whole app backdrop.
+*/
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px circle at 0% 0%,    var(--orb-1), transparent 45%),
+    radial-gradient(800px circle at 100% 0%,  var(--orb-2), transparent 45%),
+    radial-gradient(900px circle at 100% 80%, var(--orb-3), transparent 50%),
+    radial-gradient(900px circle at 0% 100%,  var(--orb-4), transparent 50%),
+    linear-gradient(180deg, var(--orb-base-from) 0%, var(--orb-base-to) 100%);
+  transition: background 0.4s ease;
+}

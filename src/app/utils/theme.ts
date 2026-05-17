@@ -19,7 +19,8 @@ export type ThemeId =
   | 'violet'
   | 'rose'
   | 'orange'
-  | 'slate';
+  | 'slate'
+  | 'black';
 
 export interface ThemeDef {
   id: ThemeId;
@@ -38,6 +39,7 @@ export const THEMES: ThemeDef[] = [
   { id: 'rose',    swatch: '#f43f5e', label: { ru: 'Розовый',         kz: 'Қызғылт',          eng: 'Rose' } },
   { id: 'orange',  swatch: '#f97316', label: { ru: 'Оранжевый',       kz: 'Қызғылт сары',     eng: 'Orange' } },
   { id: 'slate',   swatch: '#475569', label: { ru: 'Графитовый',      kz: 'Графит',           eng: 'Slate' } },
+  { id: 'black',   swatch: '#0f172a', label: { ru: 'Чёрный',          kz: 'Қара',             eng: 'Black' } },
 ];
 
 const STORAGE_KEY = 'utir_user_theme';

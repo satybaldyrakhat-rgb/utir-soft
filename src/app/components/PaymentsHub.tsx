@@ -27,15 +27,6 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
   return (
     <div
       className="flex-1 overflow-y-auto relative"
-      style={{
-        background: `
-          radial-gradient(900px circle at 0% 0%,    rgba(167,243,208,0.45), transparent 45%),
-          radial-gradient(800px circle at 100% 0%,  rgba(110,231,183,0.30), transparent 45%),
-          radial-gradient(900px circle at 100% 80%, rgba(187,247,208,0.40), transparent 50%),
-          radial-gradient(900px circle at 0% 100%,  rgba(209,250,229,0.50), transparent 50%),
-          linear-gradient(180deg, #f9fbfa 0%, #f0fdf4 100%)
-        `,
-      }}
     >
       <div className="px-4 md:px-8 pt-6 max-w-[1400px] mx-auto relative">
         <div className="flex items-end justify-between flex-wrap gap-3 mb-5">
