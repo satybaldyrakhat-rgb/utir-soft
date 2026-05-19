@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History, RotateCcw, AlertTriangle, Loader2, Upload, Download, FileSpreadsheet, FileImage, Paperclip } from 'lucide-react';
+import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History, RotateCcw, AlertTriangle, Loader2, Upload, Download, FileSpreadsheet, FileImage, Paperclip, Layers, Package, ListChecks, ShoppingCart, ExternalLink, Wrench, Truck, TrendingUp } from 'lucide-react';
 import { t } from '../utils/translations';
 import { useDataStore, type Deal } from '../utils/dataStore';
 import { api } from '../utils/api';
+import { DEFAULT_STAGES_TEMPLATE, type DealStage, type ConsumedMaterial } from './Warehouse';
 
 type Lang = 'kz' | 'ru' | 'eng';
 
@@ -115,7 +116,7 @@ const formatKZT = (n: number) => `${Math.round(n).toLocaleString('ru-RU').replac
 export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: ClientOrderModalProps) {
   const store = useDataStore();
   const catalogs = store.catalogs;
-  const [activeTab, setActiveTab] = useState<'main' | 'progress' | 'chat' | 'history'>('main');
+  const [activeTab, setActiveTab] = useState<'main' | 'progress' | 'related' | 'chat' | 'history'>('main');
 
   // History state — populated by the useEffect below once 'l' is defined.
   interface HistoryEntry { id: string; userId: string; userName: string; changes: Record<string, { before: any; after: any }>; createdAt: string }
@@ -485,6 +486,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   const tabs = [
     { id: 'main'     as const, label: l('Информация', 'Ақпарат',  'Info') },
     { id: 'progress' as const, label: l('Прогресс',   'Прогресс', 'Progress') },
+    { id: 'related'  as const, label: l('Связи',      'Байланыс', 'Related') },
     { id: 'chat'     as const, label: l('Чат',        'Чат',      'Chat') },
     { id: 'history'  as const, label: l('История',    'Тарих',    'History') },
   ];
@@ -965,6 +967,13 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
             </div>
           )}
 
+          {/* RELATED TAB — 360° view: production stages, materials,
+              tasks, payments, purchases. Pulls from store + lazy-loads
+              POs via API since they live outside the store. */}
+          {activeTab === 'related' && (
+            <RelatedView deal={deal} language={language} />
+          )}
+
           {/* CHAT TAB — empty state until WhatsApp Business integration ships */}
           {activeTab === 'chat' && (
             <div className="flex flex-col items-center justify-center min-h-[400px] py-12 px-6 text-center">
@@ -1170,5 +1179,370 @@ function DesignConcepts({ deal, language }: { deal: Deal; language: 'kz' | 'ru' 
         </div>
       )}
     </section>
+  );
+}
+
+// ─── Related-data 360° view ────────────────────────────────────────
+// Aggregates everything the platform knows about this single deal:
+//   • Production stages (5-step workshop pipeline from deal.stages)
+//   • Consumed materials (deal.consumed[]) with cost subtotal
+//   • Tasks where task.linkedDealId === deal.id
+//   • Finance transactions where t.dealId === deal.id
+//   • Purchase orders that include this deal in linkedDealIds
+//
+// Tasks + finance read from the store (already loaded). Purchase orders
+// live outside the store — we lazy-fetch them once per modal open.
+// Each section also offers a deep-link to the relevant top-level module
+// so the user can drill in.
+function RelatedView({ deal, language }: { deal: Deal; language: 'kz' | 'ru' | 'eng' }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const store = useDataStore();
+  const fmt = (n: number) => `${Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ')} ₸`;
+
+  // ── Derived per-deal slices from the store ────────────────────
+  const linkedTasks = useMemo(
+    () => store.tasks.filter((t: any) => t.linkedDealId === deal.id),
+    [store.tasks, deal.id],
+  );
+  const linkedTransactions = useMemo(
+    () => store.transactions.filter((t: any) => t.dealId === deal.id),
+    [store.transactions, deal.id],
+  );
+
+  // ── Production stages from the deal blob ──────────────────────
+  const stages: DealStage[] = (deal as any).stages || [];
+  const consumed: ConsumedMaterial[] = (deal as any).consumed || [];
+  const consumedTotal = consumed.reduce((s, c) => s + c.qty * c.costPerUnit, 0);
+
+  // ── Lazy-loaded purchase orders ───────────────────────────────
+  const [pos, setPos] = useState<any[]>([]);
+  const [posLoaded, setPosLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    api.get<any[]>('/api/purchase-orders')
+      .then(rows => { if (!cancelled) { setPos(rows || []); setPosLoaded(true); } })
+      .catch(() => { if (!cancelled) setPosLoaded(true); });
+    return () => { cancelled = true; };
+  }, [deal.id]);
+  const linkedPOs = useMemo(
+    () => pos.filter(p => Array.isArray(p.linkedDealIds) && p.linkedDealIds.includes(deal.id)),
+    [pos, deal.id],
+  );
+
+  const navigate = (page: string) => {
+    window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page } }));
+  };
+
+  // Aggregate payment numbers from BOTH the deal.paidAmount field AND
+  // any income FinanceTransactions tagged to this deal — gives the
+  // user both views (total on deal + event log of who/when/how).
+  const paymentEvents = linkedTransactions.filter((t: any) => t.type === 'income');
+  const paymentEventsSum = paymentEvents.reduce((s: number, t: any) => s + (t.amount || 0), 0);
+  const remaining = Math.max(0, (deal.amount || 0) - (deal.paidAmount || 0));
+
+  return (
+    <div className="p-5 space-y-5">
+      {/* Summary band — quick read of where this deal stands across modules. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+        <div className="bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">{l('Оплата', 'Төлем', 'Payments')}</div>
+          <div className="text-sm text-slate-900 tabular-nums">{fmt(deal.paidAmount || 0)}</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">{l('остаток', 'қалдық', 'remaining')} {fmt(remaining)}</div>
+        </div>
+        <div className="bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">{l('Материалы', 'Материал', 'Materials')}</div>
+          <div className="text-sm text-slate-900 tabular-nums">{fmt(consumedTotal)}</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">{consumed.length} {l('поз.', 'поз.', 'items')}</div>
+        </div>
+        <div className="bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">{l('Задачи', 'Тапсырм.', 'Tasks')}</div>
+          <div className="text-sm text-slate-900 tabular-nums">{linkedTasks.length}</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">
+            {linkedTasks.filter((t: any) => t.status !== 'done').length} {l('активных', 'белсенді', 'open')}
+          </div>
+        </div>
+        <div className="bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">{l('Закупки', 'Сатып алу', 'Purchases')}</div>
+          <div className="text-sm text-slate-900 tabular-nums">{linkedPOs.length}</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">
+            {linkedPOs.filter(p => p.status === 'received').length} {l('получено', 'алынды', 'received')}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Производство — этапы сборки ── */}
+      <section className="bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Layers className="w-3.5 h-3.5 text-slate-500" />
+            <div className="text-sm text-slate-900">{l('Производство', 'Өндіріс', 'Production')}</div>
+          </div>
+          <button
+            onClick={() => navigate('warehouse')}
+            className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-emerald-700 px-2 py-1 rounded-lg hover:bg-white/70 transition-colors"
+          >
+            {l('Открыть', 'Ашу', 'Open')}
+            <ExternalLink className="w-3 h-3" />
+          </button>
+        </div>
+        {stages.length > 0 ? (
+          <>
+            <div className="grid grid-cols-5 gap-1.5 mb-2">
+              {DEFAULT_STAGES_TEMPLATE.map(tpl => {
+                const s = stages.find(x => x.id === tpl.id);
+                const status = s?.status || 'pending';
+                const Icon = tpl.icon;
+                return (
+                  <div
+                    key={tpl.id}
+                    className={`flex flex-col items-center gap-1 py-2 rounded-xl ring-1 ${
+                      status === 'done'        ? 'bg-emerald-100/80 text-emerald-700 ring-emerald-200/60' :
+                      status === 'in-progress' ? 'bg-amber-100/80 text-amber-700 ring-amber-200/60' :
+                                                  'bg-white/40 text-slate-400 ring-white/60'
+                    }`}
+                    title={s?.completedAt
+                      ? `${tpl[language]} · ${l('завершён', 'аяқталды', 'done')} ${new Date(s.completedAt).toLocaleDateString('ru-RU')}`
+                      : s?.startedAt
+                        ? `${tpl[language]} · ${l('в работе', 'жұмыста', 'in progress')}`
+                        : `${tpl[language]} · ${l('не начат', 'басталмаған', 'not started')}`}
+                  >
+                    <Icon className="w-3 h-3" />
+                    <span className="text-[9px] leading-tight text-center px-1">{tpl[language]}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-[10px] text-slate-400">
+              {stages.filter(s => s.status === 'done').length} / 5 {l('этапов завершено', 'кезең аяқталды', 'stages done')}
+            </div>
+          </>
+        ) : (
+          <div className="text-[11px] text-slate-500">
+            {l('Сделка ещё не дошла до производства — этапы появятся при статусе «Производство».',
+               'Мәміле әлі өндіріске жеткен жоқ — «Өндіріс» күйінде кезеңдер пайда болады.',
+               'Stages appear once status hits «Production».')}
+          </div>
+        )}
+      </section>
+
+      {/* ── Использованные материалы ── */}
+      <section className="bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Package className="w-3.5 h-3.5 text-slate-500" />
+            <div className="text-sm text-slate-900">{l('Использованные материалы', 'Қолданылған материал', 'Materials used')}</div>
+            {consumed.length > 0 && (
+              <span className="text-[10px] text-slate-400 tabular-nums">{consumed.length}</span>
+            )}
+          </div>
+          <div className="text-[11px] text-slate-700 tabular-nums">{fmt(consumedTotal)}</div>
+        </div>
+        {consumed.length > 0 ? (
+          <div className="space-y-1">
+            {consumed.map((c, i) => (
+              <div key={i} className="flex items-center justify-between text-[11px] py-1 border-b border-white/50 last:border-b-0">
+                <div className="flex-1 min-w-0">
+                  <div className="text-slate-900 truncate">{c.productName}</div>
+                  <div className="text-[10px] text-slate-400">
+                    {new Date(c.deductedAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </div>
+                </div>
+                <div className="text-slate-700 tabular-nums flex-shrink-0 ml-3">
+                  {c.qty} {c.unit} · {fmt(c.qty * c.costPerUnit)}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-[11px] text-slate-500">
+            {l('Материалы пока не списывались на эту сделку.',
+               'Бұл мәмілеге материалдар әлі жазылмаған.',
+               'No materials deducted to this deal yet.')}
+          </div>
+        )}
+      </section>
+
+      {/* ── Платежи ── */}
+      <section className="bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Banknote className="w-3.5 h-3.5 text-slate-500" />
+            <div className="text-sm text-slate-900">{l('Платежи', 'Төлемдер', 'Payments')}</div>
+          </div>
+          <button
+            onClick={() => navigate('finance')}
+            className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-emerald-700 px-2 py-1 rounded-lg hover:bg-white/70 transition-colors"
+          >
+            {l('Открыть', 'Ашу', 'Open')}
+            <ExternalLink className="w-3 h-3" />
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mb-3 text-[11px]">
+          <div className="bg-white/50 ring-1 ring-white/60 rounded-xl px-2.5 py-2">
+            <div className="text-[10px] text-slate-500">{l('Сумма договора', 'Шарт сомасы', 'Contract')}</div>
+            <div className="text-slate-900 tabular-nums">{fmt(deal.amount || 0)}</div>
+          </div>
+          <div className="bg-emerald-50/80 ring-1 ring-emerald-200/60 rounded-xl px-2.5 py-2">
+            <div className="text-[10px] text-emerald-700">{l('Оплачено', 'Төленген', 'Paid')}</div>
+            <div className="text-emerald-800 tabular-nums">{fmt(deal.paidAmount || 0)}</div>
+          </div>
+          <div className={`ring-1 rounded-xl px-2.5 py-2 ${remaining > 0 ? 'bg-amber-50/80 ring-amber-200/60' : 'bg-emerald-50/80 ring-emerald-200/60'}`}>
+            <div className={`text-[10px] ${remaining > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{l('Остаток', 'Қалдық', 'Remaining')}</div>
+            <div className={`tabular-nums ${remaining > 0 ? 'text-amber-800' : 'text-emerald-800'}`}>{fmt(remaining)}</div>
+          </div>
+        </div>
+        {paymentEvents.length > 0 ? (
+          <div className="space-y-1">
+            <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">
+              {l('Поступления из финансов', 'Қаржыдан түсімдер', 'Income events')} · {fmt(paymentEventsSum)}
+            </div>
+            {paymentEvents.slice(0, 8).map((t: any) => (
+              <div key={t.id} className="flex items-center justify-between text-[11px] py-1 border-b border-white/50 last:border-b-0">
+                <div className="flex-1 min-w-0">
+                  <div className="text-slate-900 truncate">{t.description || t.category || '—'}</div>
+                  <div className="text-[10px] text-slate-400">{t.date || '—'}</div>
+                </div>
+                <div className="text-emerald-700 tabular-nums flex-shrink-0 ml-3">+{fmt(t.amount || 0)}</div>
+              </div>
+            ))}
+            {paymentEvents.length > 8 && (
+              <div className="text-[10px] text-slate-400 italic">+ {paymentEvents.length - 8} {l('ещё', 'тағы', 'more')}</div>
+            )}
+          </div>
+        ) : (
+          <div className="text-[11px] text-slate-500">
+            {l('Отдельные платежные операции в Финансах ещё не привязаны к этой сделке.',
+               'Қаржыдағы жеке төлемдер бұл мәмілеге әлі байланыспаған.',
+               'No standalone payment events linked from Finance.')}
+          </div>
+        )}
+      </section>
+
+      {/* ── Задачи ── */}
+      <section className="bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <ListChecks className="w-3.5 h-3.5 text-slate-500" />
+            <div className="text-sm text-slate-900">{l('Задачи', 'Тапсырмалар', 'Tasks')}</div>
+            {linkedTasks.length > 0 && (
+              <span className="text-[10px] text-slate-400 tabular-nums">{linkedTasks.length}</span>
+            )}
+          </div>
+          <button
+            onClick={() => navigate('tasks')}
+            className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-emerald-700 px-2 py-1 rounded-lg hover:bg-white/70 transition-colors"
+          >
+            {l('Открыть', 'Ашу', 'Open')}
+            <ExternalLink className="w-3 h-3" />
+          </button>
+        </div>
+        {linkedTasks.length > 0 ? (
+          <div className="space-y-1.5">
+            {linkedTasks.map((t: any) => {
+              const isDone = t.status === 'done';
+              const isOverdue = !isDone && t.dueDate && new Date(t.dueDate) < new Date();
+              return (
+                <div key={t.id} className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl ring-1 ${
+                  isDone ? 'bg-emerald-50/60 ring-emerald-100/40' : isOverdue ? 'bg-rose-50/60 ring-rose-100/40' : 'bg-white/40 ring-white/60'
+                }`}>
+                  <div className={`w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    isDone ? 'bg-emerald-500 text-white' : 'bg-white/70 ring-1 ring-white/60'
+                  }`}>
+                    {isDone && <Check className="w-3 h-3" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-xs truncate ${isDone ? 'text-slate-500 line-through' : 'text-slate-900'}`}>{t.title}</div>
+                    {t.dueDate && (
+                      <div className={`text-[10px] ${isOverdue ? 'text-rose-600' : 'text-slate-400'}`}>
+                        {l('срок', 'мерзім', 'due')} {t.dueDate}
+                      </div>
+                    )}
+                  </div>
+                  {t.priority && t.priority !== 'medium' && (
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full ring-1 ring-white/40 flex-shrink-0 ${
+                      t.priority === 'urgent' ? 'bg-rose-100/70 text-rose-700' :
+                      t.priority === 'high'   ? 'bg-amber-100/70 text-amber-700' :
+                                                 'bg-emerald-100/70 text-emerald-700'
+                    }`}>
+                      {t.priority === 'urgent' ? l('срочно', 'шұғыл', 'urgent') :
+                       t.priority === 'high'   ? l('высокий', 'жоғары', 'high') :
+                                                   l('низкий', 'төмен', 'low')}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-[11px] text-slate-500">
+            {l('К сделке пока не привязано задач.', 'Мәмілеге тапсырмалар әлі тіркелмеген.', 'No tasks linked to this deal yet.')}
+          </div>
+        )}
+      </section>
+
+      {/* ── Закупки ── */}
+      <section className="bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="w-3.5 h-3.5 text-slate-500" />
+            <div className="text-sm text-slate-900">{l('Закупки', 'Сатып алулар', 'Purchases')}</div>
+            {linkedPOs.length > 0 && (
+              <span className="text-[10px] text-slate-400 tabular-nums">{linkedPOs.length}</span>
+            )}
+          </div>
+          <button
+            onClick={() => navigate('warehouse')}
+            className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-emerald-700 px-2 py-1 rounded-lg hover:bg-white/70 transition-colors"
+          >
+            {l('Открыть', 'Ашу', 'Open')}
+            <ExternalLink className="w-3 h-3" />
+          </button>
+        </div>
+        {!posLoaded ? (
+          <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            {l('Загружаю…', 'Жүктелуде…', 'Loading…')}
+          </div>
+        ) : linkedPOs.length > 0 ? (
+          <div className="space-y-1.5">
+            {linkedPOs.map((p: any) => {
+              const stat = p.status as 'draft' | 'sent' | 'received' | 'cancelled';
+              const statLabel = stat === 'draft' ? l('Черновик', 'Жоба', 'Draft')
+                              : stat === 'sent' ? l('Отправлено', 'Жіберілді', 'Sent')
+                              : stat === 'received' ? l('Получено', 'Алынды', 'Received')
+                              : l('Отменено', 'Тоқтатылды', 'Cancelled');
+              const statCls = stat === 'received' ? 'bg-emerald-100/70 text-emerald-700'
+                            : stat === 'sent'     ? 'bg-amber-100/70 text-amber-700'
+                            : stat === 'cancelled' ? 'bg-rose-100/70 text-rose-700'
+                            :                        'bg-white/60 text-slate-600';
+              return (
+                <div key={p.id} className="flex items-center gap-2.5 px-2.5 py-2 bg-white/40 ring-1 ring-white/60 rounded-xl">
+                  <Truck className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-slate-900 truncate">
+                      {(p.items || []).slice(0, 2).map((it: any) => it.name).join(', ')}
+                      {(p.items || []).length > 2 && ` + ${(p.items || []).length - 2}`}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      {p.expectedDate || p.receivedDate || '—'}
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-slate-700 tabular-nums flex-shrink-0">{fmt(p.totalCost || 0)}</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ring-1 ring-white/40 flex-shrink-0 ${statCls}`}>
+                    {statLabel}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-[11px] text-slate-500">
+            {l('К сделке не привязана ни одна закупка. Привязать можно при создании PO в разделе «Закупки».',
+               'Бұл мәмілеге сатып алу байланыспаған.',
+               'No purchase orders linked to this deal yet.')}
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
