@@ -236,10 +236,24 @@ function buildFinanceContext(deals: Deal[], transactions: FinanceTransaction[]):
 }
 
 // ─── AI Финансист panel ────────────────────────────────────────────
-// Real insights + real chat-to-Claude with finance context injected. The
-// chat input now actually hits /api/ai-chat/message and renders the reply
-// in-line (no popup hijack — admin gets the answer right next to the
-// numbers it's about).
+// Tool-capable finance agent. Routes through UTIR AI (the same agent that
+// powers Telegram + the main popup) so it can not only ANALYZE numbers but
+// also CREATE financial entries — «запиши расход на аренду 200к» triggers
+// add_finance, «X оплатил 500к» triggers log_payment, etc. Live finance
+// numbers are injected as system context on the first turn so the model
+// answers with real figures, not made-up ones.
+//
+// Conversation history is kept in-component so multi-turn dialogues work
+// (admin can answer the model's clarifying questions). Tool proposals are
+// surfaced inline with Confirm / Cancel buttons, mirroring the main popup.
+
+interface FinChatMsg {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  pendingTool?: { toolName: string; toolInput: any; summary: string };
+}
+const finMsgId = () => 'fm_' + Math.random().toString(36).slice(2, 9);
 
 function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
   language: 'kz' | 'ru' | 'eng';
@@ -248,16 +262,20 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
   transactions: FinanceTransaction[];
 }) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
-  // Default to Claude — sharpest for analytical / business reasoning.
-  const [model, setModel] = useState(AI_MODELS.find(m => m.id === 'claude') || AI_MODELS[0]);
+  // Default to UTIR AI — gives the panel tool access (add_finance,
+  // log_payment, find_client). Other providers fall back to pure text.
+  const [model, setModel] = useState(AI_MODELS.find(m => m.id === 'utir-ai') || AI_MODELS[0]);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [sending, setSending] = useState(false);
-  const [reply, setReply] = useState<string | null>(null);
-  const [askedQ, setAskedQ] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [executingId, setExecutingId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<FinChatMsg[]>([]);
+  // True after the very first turn — switches from one-shot context
+  // injection to plain follow-ups so the agent has memory.
+  const [contextSeeded, setContextSeeded] = useState(false);
 
   // Sync model with what's actually configured on the server (greys out
   // tiles whose key is missing).
@@ -280,32 +298,96 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
     l('Сделай сводку платежей за месяц',      'Айдағы төлемдер сводкасы',   'Summarize payments this month'),
   ] : [
     l('Проанализируй доходы и расходы за месяц', 'Айдың кірісі мен шығынын талда', 'Analyze monthly P&L'),
-    l('Где я переплачиваю?',                       'Қайда артық төлеп жатырмын?',  'Where am I overspending?'),
+    l('Запиши расход на аренду 200к',             'Жалдау шығыны 200к жаз',         'Record rent expense 200k'),
     l('Прогноз прибыли до конца квартала',         'Тоқсан соңына дейінгі пайда',  'Forecast profit until quarter end'),
     l('Сколько денег осталось «в обороте»?',       'Айналымда қанша қалды?',       'How much cash is in flight?'),
   ];
 
   async function ask(q: string) {
     if (!q.trim() || sending) return;
-    setSending(true); setError(null); setReply(null); setAskedQ(q);
+    setSending(true); setError(null);
+    // Inject live finance numbers on the FIRST turn so the model
+    // answers with real figures. Subsequent turns rely on conversation
+    // memory.
+    const text = q.trim();
+    const userPayload = !contextSeeded
+      ? `${buildFinanceContext(deals, transactions)}\n\nВопрос пользователя: ${text}`
+      : text;
+    const userMsg: FinChatMsg = { id: finMsgId(), role: 'user', content: text };
+    const nextMessages: FinChatMsg[] = [...messages, userMsg];
+    setMessages(nextMessages);
+    setContextSeeded(true);
     try {
-      // Inject live finance numbers in front of the question so the model
-      // answers with real figures, not made-up ones.
-      const context = buildFinanceContext(deals, transactions);
-      const userText = `${context}\n\nВопрос пользователя: ${q.trim()}`;
-      const provider = model.id === 'utir-ai' ? 'claude' : model.id;  // pure chat for finance
+      // utir-ai → tool-capable agent; everything else → pure text chat.
+      // The provider IDs already match what /api/ai-chat/message expects.
+      const provider = model.id;
+      // Build wire history. Replace the last user content with the
+      // context-augmented payload so the model sees the numbers without
+      // showing them in the visible bubble.
+      const wireHistory = nextMessages
+        .filter(m => !m.pendingTool)
+        .map((m, idx) => idx === nextMessages.length - 1
+          ? { role: m.role, content: userPayload }
+          : { role: m.role, content: m.content });
       const res = await api.post<any>('/api/ai-chat/message', {
         provider,
-        messages: [{ role: 'user', content: userText }],
+        messages: wireHistory,
       });
-      if (res?.kind === 'reply') setReply(res.text);
-      else if (res?.kind === 'error') setError(res.error || 'Ошибка');
-      else setError('Не удалось получить ответ');
+      if (res?.kind === 'tool') {
+        // UTIR AI proposed a write action. Render as a pending proposal
+        // with Confirm / Cancel buttons (mirrors AIAssistant popup).
+        setMessages(prev => [...prev, {
+          id: finMsgId(),
+          role: 'assistant',
+          content: res.summary,
+          pendingTool: { toolName: res.toolName, toolInput: res.toolInput, summary: res.summary },
+        }]);
+      } else if (res?.kind === 'reply') {
+        setMessages(prev => [...prev, { id: finMsgId(), role: 'assistant', content: res.text }]);
+      } else if (res?.kind === 'error') {
+        setError(res.error || 'Ошибка');
+      } else {
+        setError('Не удалось получить ответ');
+      }
     } catch (e: any) {
       setError(String(e?.message || e));
     } finally {
       setSending(false);
     }
+  }
+
+  async function confirmTool(msg: FinChatMsg) {
+    if (!msg.pendingTool) return;
+    setExecutingId(msg.id);
+    try {
+      const resp = await api.post<{ ok: boolean; text: string }>('/api/ai-chat/execute', {
+        provider: model.id,
+        toolName: msg.pendingTool.toolName,
+        toolInput: msg.pendingTool.toolInput,
+      });
+      // Replace the proposal with the executed result (drops buttons).
+      setMessages(prev => prev.map(m => m.id === msg.id
+        ? { ...m, content: (resp.ok ? '✅ ' : '⚠️ ') + (resp.text || ''), pendingTool: undefined }
+        : m,
+      ));
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setExecutingId(null);
+    }
+  }
+
+  function cancelTool(msg: FinChatMsg) {
+    setMessages(prev => prev.map(m => m.id === msg.id
+      ? { ...m, content: '✕ Действие отменено.', pendingTool: undefined }
+      : m,
+    ));
+  }
+
+  function clearChat() {
+    setMessages([]);
+    setContextSeeded(false);
+    setError(null);
   }
 
   async function downloadPdf() {
@@ -427,6 +509,12 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
             {q}
           </button>
         ))}
+        {messages.length > 0 && (
+          <button onClick={clearChat} disabled={sending}
+            className="text-[10px] px-2.5 py-1 ml-auto bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-full text-gray-500 hover:bg-rose-50 hover:text-rose-700 transition-colors disabled:opacity-50">
+            {l('Очистить диалог', 'Диалогты тазалау', 'Clear chat')}
+          </button>
+        )}
       </div>
 
       <div className="px-3 pb-3">
@@ -437,7 +525,7 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
             onChange={e => setPrompt(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !sending) { e.preventDefault(); ask(prompt); setPrompt(''); } }}
             disabled={sending}
-            placeholder={l('Спросите AI о финансах…', 'AI-ден қаржы туралы сұраңыз…', 'Ask AI about finance…')}
+            placeholder={l('Спросите AI о финансах или скажите что записать…', 'AI-ден сұраңыз немесе жазуды айтыңыз…', 'Ask or tell AI to record…')}
             className="flex-1 bg-transparent text-xs focus:outline-none placeholder:text-gray-300 disabled:opacity-50"
           />
           <button
@@ -450,38 +538,73 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
         </div>
       </div>
 
-      {/* AI reply / error surfaces */}
-      {(reply || error) && (
-        <div className="px-5 pb-4">
-          {askedQ && (
-            <div className="text-[10px] text-gray-400 mb-1.5">
-              <span className="text-gray-500">{l('Ваш вопрос:', 'Сұрағыңыз:', 'Your question:')}</span> «{askedQ}»
-            </div>
-          )}
-          {reply && (
-            <div className="bg-white border border-violet-200 rounded-xl px-4 py-3 text-[13px] text-gray-800 whitespace-pre-line leading-relaxed relative group">
-              <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-violet-500" />
-                  <span className="text-[10px] text-emerald-600 uppercase tracking-wide">{model.short}</span>
+      {/* Conversation transcript — user / assistant alternating bubbles,
+          with inline Confirm / Cancel buttons on tool proposals. */}
+      {(messages.length > 0 || error) && (
+        <div className="px-5 pb-4 space-y-2.5">
+          {messages.map(m => {
+            if (m.role === 'user') {
+              return (
+                <div key={m.id} className="text-[11px] text-gray-500 leading-relaxed">
+                  <span className="text-gray-400">{l('Вы:', 'Сіз:', 'You:')}</span> {m.content}
                 </div>
-                {/* Copy-to-clipboard — opacity-fade on hover so it doesn't visually fight the reply text */}
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(reply);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                  }}
-                  className="text-[10px] text-gray-400 hover:text-emerald-600 inline-flex items-center gap-1 opacity-60 hover:opacity-100 transition"
-                  title={l('Скопировать ответ', 'Көшіру', 'Copy reply')}
-                >
-                  {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                  {copied ? l('Скопировано', 'Көшірілді', 'Copied') : l('Копировать', 'Көшіру', 'Copy')}
-                </button>
+              );
+            }
+            // assistant
+            const isPending = !!m.pendingTool;
+            const isExecuting = executingId === m.id;
+            return (
+              <div key={m.id} className={`rounded-xl px-4 py-3 text-[13px] text-gray-800 whitespace-pre-line leading-relaxed border ${
+                isPending ? 'bg-amber-50/80 border-amber-200' : 'bg-white border-violet-200'
+              }`}>
+                <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className={`w-3 h-3 ${isPending ? 'text-amber-600' : 'text-violet-500'}`} />
+                    <span className={`text-[10px] uppercase tracking-wide ${isPending ? 'text-amber-700' : 'text-emerald-600'}`}>
+                      {isPending ? l('Предлагает действие', 'Әрекет ұсынады', 'Proposes action') : model.short}
+                    </span>
+                  </div>
+                  {!isPending && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(m.content);
+                        setCopied(m.id);
+                        setTimeout(() => setCopied(c => (c === m.id ? null : c)), 1500);
+                      }}
+                      className="text-[10px] text-gray-400 hover:text-emerald-600 inline-flex items-center gap-1 opacity-60 hover:opacity-100 transition"
+                      title={l('Скопировать ответ', 'Көшіру', 'Copy reply')}
+                    >
+                      {copied === m.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                      {copied === m.id ? l('Скопировано', 'Көшірілді', 'Copied') : l('Копировать', 'Көшіру', 'Copy')}
+                    </button>
+                  )}
+                </div>
+                {/* Tool proposal supports basic HTML (bold names, line breaks). */}
+                {isPending
+                  ? <div dangerouslySetInnerHTML={{ __html: m.content }} />
+                  : m.content}
+                {isPending && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={() => confirmTool(m)}
+                      disabled={isExecuting}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[11px] hover:bg-emerald-700 ring-1 ring-white/10 transition-all disabled:opacity-50"
+                    >
+                      {isExecuting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                      {isExecuting ? l('Выполняю…', 'Орындалуда…', 'Executing…') : l('Выполнить', 'Орындау', 'Confirm')}
+                    </button>
+                    <button
+                      onClick={() => cancelTool(m)}
+                      disabled={isExecuting}
+                      className="px-3 py-1.5 bg-white/70 ring-1 ring-white/60 text-slate-700 rounded-xl text-[11px] hover:bg-white transition-all disabled:opacity-50"
+                    >
+                      {l('Отмена', 'Бас тарту', 'Cancel')}
+                    </button>
+                  </div>
+                )}
               </div>
-              {reply}
-            </div>
-          )}
+            );
+          })}
           {error && (
             <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-[12px] text-rose-700 flex items-start gap-2">
               <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
@@ -677,7 +800,9 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs text-gray-900 truncate">{d.customerName}</div>
-                    <div className="text-[10px] text-gray-400 truncate">{d.id} · {d.date || '—'}</div>
+                    {/* Show only the short 6-char deal ref + creation date —
+                        the full opaque id ("Delp5cy51xwqw") was noise. */}
+                    <div className="text-[10px] text-gray-400 truncate">#{d.id.slice(-6).toUpperCase()} · {d.date || '—'}</div>
                   </div>
                 </div>
                 <div className="md:col-span-3 min-w-0">

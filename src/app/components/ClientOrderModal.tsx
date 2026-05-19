@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History, RotateCcw, AlertTriangle, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History, RotateCcw, AlertTriangle, Loader2, Upload, Download, FileSpreadsheet, FileImage, Paperclip } from 'lucide-react';
 import { t } from '../utils/translations';
 import { useDataStore, type Deal } from '../utils/dataStore';
 import { api } from '../utils/api';
@@ -42,6 +42,46 @@ const FieldSelect = ({ label, value, onChange, children }: { label: string; valu
     </select>
   </div>
 );
+
+// ─── Document attachment shape ─────────────────────────────────────
+// Stored on the deal JSON blob as deal.documents = DealDoc[]. The
+// platform already uses data URLs for uploads (see /transcribe in
+// server/index.ts) and the express.json body limit is 25 MB, so we
+// keep this pattern instead of adding multer + a file store.
+// Limit: 5 MB per file, max 10 files per deal — large enough for
+// contracts, measurement photos, and Excel quotes; small enough to
+// not bloat the SQLite blob.
+interface DealDoc {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  dataUrl: string;
+  uploadedAt: string;
+  uploadedBy?: string;
+}
+const MAX_DOC_SIZE  = 5 * 1024 * 1024;   // 5 MB
+const MAX_DOCS_PER_DEAL = 10;
+const docId = () => 'doc_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const formatBytes = (n: number) => {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(2)} MB`;
+};
+const docIcon = (type: string) => {
+  if (/^image\//.test(type)) return FileImage;
+  if (/sheet|excel|csv/i.test(type)) return FileSpreadsheet;
+  return FileText;
+};
+// File → data URL via FileReader.
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error || new Error('read failed'));
+    r.readAsDataURL(file);
+  });
+}
 
 // 6-stage status pipeline. Drives the status editor + progress bar
 // + production module visibility. Kept in sync with stageConfig
@@ -104,6 +144,12 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   // kanban drag-and-drop). Now editable inline; changes drive Production
   // module visibility, Telegram notifications, and progress derivation.
   const [status, setStatus] = useState(deal.status || 'new');
+  // Document attachments. Persisted on the deal blob alongside everything
+  // else. Max 5 MB / file, max 10 files (see MAX_DOC_* constants).
+  const [documents, setDocuments] = useState<DealDoc[]>((deal as any).documents || []);
+  const [docError, setDocError] = useState<string | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Save-state machinery — replaces silent fire-and-forget. Surfaces
   // network/permission errors instead of closing the modal blindly.
@@ -141,11 +187,12 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     setNotes(deal.notes || '');
     setPaidAmount(deal.paidAmount || 0);
     setStatus(deal.status || 'new');
+    setDocuments((deal as any).documents || []);
     setDirty(false);
   }, [deal.id, deal.phone, deal.address, deal.siteAddress, deal.source, deal.measurer,
       deal.designer, deal.foreman, deal.architect, deal.ownerId, deal.furnitureType,
       deal.materials, deal.measurementDate, deal.completionDate, deal.installationDate,
-      deal.notes, deal.paidAmount, deal.status]);
+      deal.notes, deal.paidAmount, deal.status, deal]);
 
   if (!isOpen) return null;
 
@@ -190,13 +237,30 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     notes: l('Заметки', 'Жазбалар', 'Notes'),
     paymentMethods: l('Способы оплаты', 'Төлем тәсілдері', 'Payment methods'),
   };
+  // Translates raw status codes ('measured', 'project-agreed') to the
+  // user's language. Used in the history audit trail so users don't
+  // see English/internal identifiers.
+  const STATUS_LABELS: Record<string, string> = Object.fromEntries(
+    STATUS_OPTIONS.map(o => [o.id, o[language]]),
+  );
+  // Friendly labels for the payment method keys so the history reads
+  // "Способы оплаты: Наличные, Kaspi" instead of "cash, kaspi".
+  const PAYMENT_KEY_LABEL: Record<string, string> = {
+    cash:          l('Наличные',          'Қолма-қол',       'Cash'),
+    kaspi:         l('Kaspi (перевод/QR)', 'Kaspi',           'Kaspi'),
+    halyk:         l('Halyk Bank',        'Halyk Bank',       'Halyk Bank'),
+    card_transfer: l('Перевод на карту',  'Картаға аудару',   'Card transfer'),
+    bank_transfer: l('Безнал',            'Қолма-қол емес',   'Bank transfer'),
+    installment:   l('Рассрочка',          'Бөліп төлеу',     'Installment'),
+  };
   const formatHistoryValue = (key: string, val: any): string => {
     if (val === null || val === undefined || val === '') return '—';
     if (typeof val === 'number') return val.toLocaleString('ru-RU').replace(/,/g, ' ');
-    if (typeof val === 'boolean') return val ? 'да' : 'нет';
+    if (typeof val === 'boolean') return val ? l('да', 'иә', 'yes') : l('нет', 'жоқ', 'no');
     if (key === 'ownerId') return store.getEmployeeById(val)?.name || val;
+    if (key === 'status' && typeof val === 'string') return STATUS_LABELS[val] || val;
     if (typeof val === 'object') {
-      const enabled = Object.entries(val).filter(([, v]) => v).map(([k]) => k);
+      const enabled = Object.entries(val).filter(([, v]) => v).map(([k]) => PAYMENT_KEY_LABEL[k] || k);
       return enabled.length > 0 ? enabled.join(', ') : '—';
     }
     return String(val);
@@ -253,6 +317,61 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     setPaidAmount(clamped);
   }, [deal.amount]);
 
+  // Handles document selection from the <input type="file" multiple>.
+  // Validates size + count, reads each file as a base64 data URL, then
+  // appends to the documents array. The actual persist happens on Save.
+  const handleDocsSelected = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setDocError(null);
+    const room = MAX_DOCS_PER_DEAL - documents.length;
+    if (room <= 0) {
+      setDocError(l(
+        `Лимит ${MAX_DOCS_PER_DEAL} документов — удалите ненужные.`,
+        `${MAX_DOCS_PER_DEAL} құжат шегі — артықтарын жойыңыз.`,
+        `${MAX_DOCS_PER_DEAL} doc limit — remove some first.`,
+      ));
+      return;
+    }
+    const toLoad = Array.from(files).slice(0, room);
+    setUploadingDoc(true);
+    try {
+      const loaded: DealDoc[] = [];
+      for (const f of toLoad) {
+        if (f.size > MAX_DOC_SIZE) {
+          setDocError(l(
+            `«${f.name}» больше 5 МБ — пропущен.`,
+            `«${f.name}» 5 МБ-дан үлкен — өткізілді.`,
+            `"${f.name}" exceeds 5 MB — skipped.`,
+          ));
+          continue;
+        }
+        try {
+          const dataUrl = await fileToDataUrl(f);
+          loaded.push({
+            id: docId(),
+            name: f.name,
+            size: f.size,
+            type: f.type || 'application/octet-stream',
+            dataUrl,
+            uploadedAt: new Date().toISOString(),
+          });
+        } catch {
+          setDocError(l(`Не удалось прочитать «${f.name}».`, `«${f.name}» оқу мүмкін болмады.`, `Failed to read "${f.name}".`));
+        }
+      }
+      if (loaded.length > 0) setDocuments(prev => [...prev, ...loaded]);
+    } finally {
+      setUploadingDoc(false);
+      // Reset the input so the user can re-select the same file.
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documents.length, language]);
+
+  const removeDocument = useCallback((id: string) => {
+    setDocuments(prev => prev.filter(d => d.id !== id));
+  }, []);
+
   const handleSave = async () => {
     setSaving(true); setSaveError(null);
     try {
@@ -283,7 +402,11 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         // Auto-derive progress from status so the kanban and progress
         // bar stay in sync without a separate manual edit.
         progress: STATUS_OPTIONS.find(o => o.id === status)?.progress ?? deal.progress ?? 0,
-      };
+        // Documents — base64 data URLs inside the deal blob. The Deal
+        // interface doesn't include this field yet, but the server
+        // PATCH merges arbitrary fields, so it round-trips fine.
+        documents,
+      } as any;
       await store.updateDeal(deal.id, patch);
       setDirty(false);
       onClose();
@@ -343,11 +466,12 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       notes !== (deal.notes || '') ||
       paidAmount !== (deal.paidAmount || 0) ||
       status !== (deal.status || 'new') ||
-      JSON.stringify(paymentMethods) !== JSON.stringify(deal.paymentMethods || {});
+      JSON.stringify(paymentMethods) !== JSON.stringify(deal.paymentMethods || {}) ||
+      JSON.stringify(documents.map(d => d.id).sort()) !== JSON.stringify(((deal as any).documents || []).map((d: DealDoc) => d.id).sort());
     setDirty(changed);
   }, [phone, address, siteAddress, source, measurer, designer, foreman, architect,
       ownerId, furnitureType, materials, measurementDate, completionDate,
-      installationDate, notes, paidAmount, status, paymentMethods, deal]);
+      installationDate, notes, paidAmount, status, paymentMethods, documents, deal]);
 
   // Status helpers — used by progress bar + timeline derivation.
   const sIdx = statusIndex(status);
@@ -560,13 +684,117 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                 />
               </section>
 
-              {/* ── Section: Documents (placeholder) ── */}
+              {/* ── Section: Documents ── */}
+              {/* Real file attachments stored as base64 data URLs on the
+                  deal blob. PDF contracts, photos of measurements, Excel
+                  quotes — anything the team needs to pin to the deal.
+                  Limits: 5 MB / file, 10 files / deal. */}
               <section>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Документы', 'Құжаттар', 'Documents')}</div>
-                <div className="bg-white/40 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl px-3 py-3 flex items-center gap-2 text-[11px] text-slate-500">
-                  <FileText className="w-3.5 h-3.5" />
-                  {l('Загрузка файлов появится после интеграции хранилища', 'Файлдарды жүктеу қойма интеграциясынан кейін шығады', 'File uploads will appear after storage integration')}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <Paperclip className="w-3 h-3" />
+                    {l('Документы', 'Құжаттар', 'Documents')}
+                    {documents.length > 0 && (
+                      <span className="normal-case text-slate-400 tabular-nums px-1.5 py-0.5 rounded-full bg-white/50 ring-1 ring-white/60">
+                        {documents.length}/{MAX_DOCS_PER_DEAL}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* Upload area — input is hidden; the labelled drop zone
+                    triggers it. Drag/drop also supported via the same handler. */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={e => handleDocsSelected(e.target.files)}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.webp,.heic"
+                />
+                {documents.length < MAX_DOCS_PER_DEAL && store.canWriteModule('orders') && (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={e => {
+                      e.preventDefault(); e.stopPropagation();
+                      handleDocsSelected(e.dataTransfer.files);
+                    }}
+                    className="bg-white/40 backdrop-blur-xl ring-1 ring-dashed ring-white/80 hover:ring-emerald-300 hover:bg-white/60 rounded-2xl px-4 py-5 flex flex-col items-center gap-1.5 text-center cursor-pointer transition-all"
+                  >
+                    {uploadingDoc ? (
+                      <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4 text-slate-400" />
+                    )}
+                    <div className="text-[11px] text-slate-700">
+                      {uploadingDoc
+                        ? l('Загружаю…', 'Жүктелуде…', 'Uploading…')
+                        : l('Нажмите или перетащите файлы сюда', 'Файлдарды басыңыз немесе осында сүйреңіз', 'Click or drop files here')}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      {l('PDF, Word, Excel, изображения · до 5 МБ', 'PDF, Word, Excel, суреттер · 5 МБ дейін', 'PDF, Word, Excel, images · up to 5 MB')}
+                    </div>
+                  </div>
+                )}
+
+                {docError && (
+                  <div className="mt-2 bg-amber-50/80 ring-1 ring-amber-200/60 rounded-xl px-3 py-2 text-[11px] text-amber-800 flex items-start gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">{docError}</div>
+                    <button onClick={() => setDocError(null)} className="text-amber-700 opacity-60 hover:opacity-100">×</button>
+                  </div>
+                )}
+
+                {documents.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    {documents.map(doc => {
+                      const Icon = docIcon(doc.type);
+                      const isImage = /^image\//.test(doc.type);
+                      return (
+                        <div key={doc.id} className="flex items-center gap-3 p-2.5 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl group">
+                          {/* Image thumbnail if it's a picture, otherwise icon */}
+                          {isImage ? (
+                            <a href={doc.dataUrl} target="_blank" rel="noreferrer" className="flex-shrink-0">
+                              <img src={doc.dataUrl} alt={doc.name} className="w-10 h-10 object-cover rounded-xl ring-1 ring-white/60" />
+                            </a>
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-white/70 ring-1 ring-white/60 flex items-center justify-center flex-shrink-0">
+                              <Icon className="w-4 h-4 text-slate-500" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs text-slate-900 truncate">{doc.name}</div>
+                            <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
+                              <span className="tabular-nums">{formatBytes(doc.size)}</span>
+                              <span className="text-slate-300">·</span>
+                              <span>{new Date(doc.uploadedAt).toLocaleDateString(language === 'eng' ? 'en-GB' : 'ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <a
+                              href={doc.dataUrl}
+                              download={doc.name}
+                              className="p-1.5 hover:bg-white rounded-xl transition-colors"
+                              title={l('Скачать', 'Жүктеу', 'Download')}
+                            >
+                              <Download className="w-3.5 h-3.5 text-slate-500" />
+                            </a>
+                            {store.canWriteModule('orders') && (
+                              <button
+                                onClick={() => removeDocument(doc.id)}
+                                className="p-1.5 hover:bg-rose-100/70 rounded-xl transition-colors"
+                                title={l('Удалить', 'Жою', 'Delete')}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </section>
             </div>
           )}
@@ -574,25 +802,41 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
           {/* PROGRESS TAB */}
           {activeTab === 'progress' && (
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Timeline — derives `done` from the funnel status so the
-                  check marks reflect reality, not just whether a date was
-                  entered. e.g. status='production' → measurement automatically
-                  counts as done even if the date wasn't typed. */}
+              {/* Timeline — editable date pickers. The `done` flag is
+                  derived from the funnel status so check marks reflect
+                  reality (e.g. status='production' → measurement counts
+                  as done regardless of date). Setting a date here also
+                  bumps the status forward automatically: filling
+                  measurementDate → status='measured', completionDate →
+                  'production', installationDate → 'installation'.
+                  Saving the modal persists everything. */}
               <div>
                 <div className="text-xs text-slate-900 mb-3">{l('Сроки', 'Мерзімдер', 'Timeline')}</div>
                 <div className="space-y-2">
                   {[
-                    { label: tt('timelineMeasure'),       date: measurementDate,   done: sIdx >= statusIndex('measured')     || !!measurementDate },
-                    { label: tt('timelineCompletion'),    date: completionDate,    done: sIdx >= statusIndex('installation') },
-                    { label: tt('timelineInstallation'),  date: installationDate,  done: sIdx >= statusIndex('completed')    },
+                    { label: tt('timelineMeasure'),       value: measurementDate,   set: setMeasurementDate,
+                      done: sIdx >= statusIndex('measured')     || !!measurementDate,
+                      onCommit: () => { if (sIdx < statusIndex('measured'))     setStatus('measured'); } },
+                    { label: tt('timelineCompletion'),    value: completionDate,    set: setCompletionDate,
+                      done: sIdx >= statusIndex('installation'),
+                      onCommit: () => { if (sIdx < statusIndex('production'))   setStatus('production'); } },
+                    { label: tt('timelineInstallation'),  value: installationDate,  set: setInstallationDate,
+                      done: sIdx >= statusIndex('completed'),
+                      onCommit: () => { if (sIdx < statusIndex('installation')) setStatus('installation'); } },
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl">
-                      <div className={`w-7 h-7 rounded-xl flex items-center justify-center ring-1 ring-white/60 ${item.done ? 'bg-emerald-500 text-white' : 'bg-white/60 text-slate-400'}`}>
+                      <div className={`w-7 h-7 rounded-xl flex items-center justify-center ring-1 ring-white/60 flex-shrink-0 ${item.done ? 'bg-emerald-500 text-white' : 'bg-white/60 text-slate-400'}`}>
                         {item.done ? <Check className="w-3.5 h-3.5" /> : <span className="text-[10px] tabular-nums">{i + 1}</span>}
                       </div>
-                      <div className="flex-1">
-                        <div className="text-xs text-slate-900">{item.label}</div>
-                        <div className="text-[10px] text-slate-500">{item.date || '—'}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-slate-900 mb-1">{item.label}</div>
+                        <input
+                          type="date"
+                          value={item.value}
+                          onChange={e => item.set(e.target.value)}
+                          onBlur={() => { if (item.value) item.onCommit(); }}
+                          className="w-full px-2.5 py-1.5 bg-white/70 ring-1 ring-white/60 rounded-xl text-[11px] focus:outline-none focus:bg-white focus:ring-slate-300 transition-all tabular-nums"
+                        />
                       </div>
                     </div>
                   ))}
@@ -611,6 +855,13 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                       }`}
                       style={{ width: `${currentProgress}%` }}
                     />
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+                    {l(
+                      'Заполните дату → статус автоматически продвинется. Сохраните изменения внизу.',
+                      'Күнді толтырыңыз → күй автоматты түрде ілгерілейді. Төменде сақтаңыз.',
+                      'Set a date → status auto-advances. Save below.',
+                    )}
                   </div>
                 </div>
               </div>
