@@ -454,13 +454,362 @@ const findClient: ToolDef = {
   },
 };
 
+// ─── add_product (warehouse material) ─────────────────────────────
+// Used when the company dumps its material catalog to the bot:
+// «ЛДСП белая 100 листов 8000₸ поставщик Корпус». Status is auto-set
+// from quantity (instock / low / outofstock) so the warehouse banner
+// works immediately. If the supplier name matches an existing
+// supplier row, we don't link by id — the warehouse UI joins by name.
+const addProduct: ToolDef = {
+  module: 'warehouse',
+  description:
+    'Добавить материал на склад. ВЫЗЫВАЙ когда админ говорит "заведи материал", "добавь на склад", ' +
+    '"оприходовать", "у нас есть X листов МДФ", "закупили N". Категория — Плиты / Фурнитура / ' +
+    'Кромка / Краска / Стекло / Электрика / Прочее.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      name:     { type: 'string', description: 'Название материала. Обязательно.' },
+      category: { type: 'string', description: 'Категория: Плиты, Фурнитура, Кромка, Краска, Стекло, Электрика, Прочее.' },
+      quantity: { type: 'number', description: 'Текущий остаток. 0 если ничего нет.' },
+      unit:     { type: 'string', description: 'Единица: лист, шт, м, пара, кг, и т.п.' },
+      cost:     { type: 'number', description: 'Цена за единицу в тенге.' },
+      supplier: { type: 'string', description: 'Поставщик (свободный текст, не id). Опционально.' },
+      minQty:   { type: 'number', description: 'Минимальный остаток (при котором показывать «мало»). По умолчанию 10.' },
+    },
+    required: ['name'],
+  },
+  summarize: (i) => {
+    const lines = [
+      `<b>Записываю материал:</b>`,
+      `• Название: <b>${i.name}</b>`,
+    ];
+    if (i.category)             lines.push(`• Категория: ${i.category}`);
+    if (i.quantity != null)     lines.push(`• Кол-во: ${i.quantity} ${i.unit || ''}`);
+    if (i.cost)                 lines.push(`• Цена: ${fmtKZT(i.cost)} / ${i.unit || 'ед.'}`);
+    if (i.supplier)             lines.push(`• Поставщик: ${i.supplier}`);
+    if (i.minQty != null)       lines.push(`• Мин. остаток: ${i.minQty}`);
+    return lines.join('\n');
+  },
+  execute: async (ctx, i) => {
+    const id = newId('p');
+    const qty    = Number(i.quantity) || 0;
+    const minQty = Number(i.minQty)   || 10;
+    const status =
+      qty === 0          ? 'outofstock' :
+      qty < minQty       ? 'low'         :
+                            'instock';
+    const data = {
+      id,
+      name:     i.name,
+      category: i.category || 'Прочее',
+      quantity: qty,
+      unit:     i.unit || 'шт',
+      supplier: i.supplier || '',
+      cost:     Number(i.cost) || 0,
+      minQty,
+      status,
+    };
+    ctx.db.prepare('INSERT INTO products (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, ctx.userId, ctx.teamId, JSON.stringify(data));
+    ctx.logActivity(ctx.userId, {
+      user: 'AI-ассистент', actor: 'ai',
+      action: `Добавил материал (по запросу ${ctx.userName})`,
+      target: `${i.name} · ${qty} ${i.unit || 'шт'}`,
+      type: 'create', page: 'warehouse',
+    });
+    return `Материал <b>${i.name}</b> (${qty} ${i.unit || 'шт'}) добавлен на склад. Открыть → Производство → Склад.`;
+  },
+};
+
+// ─── add_supplier ─────────────────────────────────────────────────
+const addSupplier: ToolDef = {
+  module: 'warehouse',
+  description:
+    'Добавить поставщика. ВЫЗЫВАЙ когда админ говорит "заведи поставщика", "новый поставщик", ' +
+    '"у нас работает компания X". Категория — Плиты / Фурнитура / Кромка и т.п. Условия оплаты — ' +
+    'предоплата / 50-50 / отсрочка 30 дней.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      name:          { type: 'string', description: 'Название компании-поставщика. Обязательно.' },
+      contactPerson: { type: 'string', description: 'ФИО контактного лица.' },
+      phone:         { type: 'string', description: 'Телефон.' },
+      email:         { type: 'string', description: 'Email.' },
+      address:       { type: 'string', description: 'Адрес склада или офиса поставщика.' },
+      category:      { type: 'string', description: 'Что поставляет: Плиты, Фурнитура, Кромка, Краска, и т.п.' },
+      paymentTerms:  { type: 'string', description: 'Условия оплаты: предоплата, 50/50, отсрочка 30 дней.' },
+      deliveryDays:  { type: 'number', description: 'Срок доставки в днях.' },
+      rating:        { type: 'number', description: 'Рейтинг 1-5 (по опыту работы).' },
+      notes:         { type: 'string', description: 'Заметки.' },
+    },
+    required: ['name'],
+  },
+  summarize: (i) => {
+    const lines = [`<b>Записываю поставщика:</b>`, `• Название: <b>${i.name}</b>`];
+    if (i.contactPerson) lines.push(`• Контакт: ${i.contactPerson}`);
+    if (i.phone)         lines.push(`• Телефон: ${i.phone}`);
+    if (i.email)         lines.push(`• Email: ${i.email}`);
+    if (i.address)       lines.push(`• Адрес: ${i.address}`);
+    if (i.category)      lines.push(`• Категория: ${i.category}`);
+    if (i.paymentTerms)  lines.push(`• Оплата: ${i.paymentTerms}`);
+    if (i.deliveryDays)  lines.push(`• Доставка: ${i.deliveryDays} дн.`);
+    if (i.rating)        lines.push(`• Рейтинг: ${i.rating}/5`);
+    return lines.join('\n');
+  },
+  execute: async (ctx, i) => {
+    const id = 'sup_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+    const data: any = {
+      name:          i.name,
+      contactPerson: i.contactPerson || '',
+      phone:         i.phone         || '',
+      email:         i.email         || '',
+      address:       i.address       || '',
+      category:      i.category      || '',
+      paymentTerms:  i.paymentTerms  || '',
+      deliveryDays:  Number(i.deliveryDays) || undefined,
+      rating:        Number(i.rating)       || undefined,
+      notes:         i.notes         || '',
+    };
+    ctx.db.prepare('INSERT INTO suppliers (id, team_id, data) VALUES (?, ?, ?)').run(id, ctx.teamId, JSON.stringify(data));
+    ctx.logActivity(ctx.userId, {
+      user: 'AI-ассистент', actor: 'ai',
+      action: `Добавил поставщика (по запросу ${ctx.userName})`,
+      target: i.name,
+      type: 'create', page: 'warehouse',
+    });
+    return `Поставщик <b>${i.name}</b> добавлен. Открыть → Производство → Поставщики.`;
+  },
+};
+
+// ─── add_employee ─────────────────────────────────────────────────
+// Adds an employee record (not a user account — that requires
+// invitation flow). Used to track who's on the team for assignment
+// purposes: замерщик / дизайнер / прораб / архитектор / менеджер.
+const addEmployee: ToolDef = {
+  module: 'sales', // gated under sales since employees power deal-owner assignment
+  description:
+    'Добавить сотрудника в команду. ВЫЗЫВАЙ когда админ говорит "заведи замерщика X", ' +
+    '"у нас работает дизайнер Y", "добавь прораба". Это запись о сотруднике без аккаунта — ' +
+    'её можно использовать для назначения замерщика/дизайнера в сделке.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      name:     { type: 'string', description: 'ФИО сотрудника. Обязательно.' },
+      role:     { type: 'string', description: 'Должность: Замерщик / Дизайнер / Прораб / Архитектор / Менеджер / Сборщик / Установщик.' },
+      phone:    { type: 'string', description: 'Телефон.' },
+      email:    { type: 'string', description: 'Email.' },
+      salary:   { type: 'number', description: 'Оклад в тенге (опционально).' },
+    },
+    required: ['name'],
+  },
+  summarize: (i) => {
+    const lines = [`<b>Записываю сотрудника:</b>`, `• ФИО: <b>${i.name}</b>`];
+    if (i.role)   lines.push(`• Должность: ${i.role}`);
+    if (i.phone)  lines.push(`• Телефон: ${i.phone}`);
+    if (i.email)  lines.push(`• Email: ${i.email}`);
+    if (i.salary) lines.push(`• Оклад: ${fmtKZT(i.salary)}`);
+    return lines.join('\n');
+  },
+  execute: async (ctx, i) => {
+    const id = newId('e');
+    const data = {
+      id,
+      name:     i.name,
+      role:     i.role || 'Сотрудник',
+      phone:    i.phone || '',
+      email:    i.email || '',
+      salary:   Number(i.salary) || 0,
+      hireDate: new Date().toISOString().slice(0, 10),
+    };
+    ctx.db.prepare('INSERT INTO employees (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, ctx.userId, ctx.teamId, JSON.stringify(data));
+    ctx.logActivity(ctx.userId, {
+      user: 'AI-ассистент', actor: 'ai',
+      action: `Добавил сотрудника (по запросу ${ctx.userName})`,
+      target: `${i.name}${i.role ? ' · ' + i.role : ''}`,
+      type: 'create', page: 'settings',
+    });
+    return `Сотрудник <b>${i.name}</b>${i.role ? ' (' + i.role + ')' : ''} добавлен. Открыть → Настройки → Сотрудники.`;
+  },
+};
+
+// ─── add_finance_transaction ──────────────────────────────────────
+// Manual income/expense not tied to a specific deal. Examples:
+//   «Аренда офиса 200 000 ₸ за май»
+//   «Зарплата команде 1.5 млн»
+//   «Получили возврат от поставщика 50 000»
+const addFinance: ToolDef = {
+  module: 'finance',
+  description:
+    'Записать произвольную финансовую операцию (расход или доход), не привязанную к сделке. ' +
+    'ВЫЗЫВАЙ когда админ говорит "потратили на аренду", "оплатили рекламу", "получили возврат", ' +
+    '"зарплата за май". Для оплаты по сделке — используй log_payment.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      type:        { type: 'string', enum: ['income', 'expense'], description: 'Тип: income (доход) | expense (расход).' },
+      category:    { type: 'string', description: 'Категория: Аренда, Зарплаты, Реклама, Материалы, Транспорт, Налоги, Прочее.' },
+      amount:      { type: 'number', description: 'Сумма в тенге. Обязательно.' },
+      description: { type: 'string', description: 'Краткое описание операции.' },
+      date:        { type: 'string', description: 'Дата YYYY-MM-DD. Если не указано — сегодня.' },
+    },
+    required: ['type', 'amount'],
+  },
+  summarize: (i) => {
+    const lines = [
+      `<b>Записываю ${i.type === 'income' ? 'доход' : 'расход'}:</b>`,
+      `• Сумма: <b>${fmtKZT(i.amount)}</b>`,
+    ];
+    if (i.category)    lines.push(`• Категория: ${i.category}`);
+    if (i.description) lines.push(`• Описание: ${i.description}`);
+    lines.push(`• Дата: ${i.date || 'сегодня'}`);
+    return lines.join('\n');
+  },
+  execute: async (ctx, i) => {
+    const id = newId('f');
+    const data = {
+      id,
+      type:        i.type,
+      category:    i.category || 'Прочее',
+      amount:      Number(i.amount) || 0,
+      description: i.description || '',
+      date:        i.date || new Date().toISOString().slice(0, 10),
+      createdAt:   new Date().toISOString(),
+    };
+    ctx.db.prepare('INSERT INTO transactions (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, ctx.userId, ctx.teamId, JSON.stringify(data));
+    ctx.logActivity(ctx.userId, {
+      user: 'AI-ассистент', actor: 'ai',
+      action: `Записал ${i.type === 'income' ? 'доход' : 'расход'} (по запросу ${ctx.userName})`,
+      target: `${i.category || 'Прочее'} — ${fmtKZT(i.amount)}`,
+      type: 'create', page: 'finance',
+    });
+    return `${i.type === 'income' ? 'Доход' : 'Расход'} <b>${fmtKZT(i.amount)}</b> (${i.category || 'Прочее'}) записан. Открыть → Финансы.`;
+  },
+};
+
+// ─── bulk_add_deals ───────────────────────────────────────────────
+// Bulk import path: company dumps a list of clients in one Telegram
+// message ("Айдар +7..., 500к; Мадина 800к...") — without this tool
+// the AI would propose 50 individual cards. bulk_add_deals creates
+// them all in one transaction and returns a digest.
+const bulkAddDeals: ToolDef = {
+  module: 'sales',
+  description:
+    'МАССОВО создать сделки из списка клиентов. ВЫЗЫВАЙ когда админ присылает 3+ клиентов одним ' +
+    'сообщением или говорит "вот все наши клиенты", "импортируй список". Для одного клиента — ' +
+    'используй add_deal. Каждый элемент массива — отдельная сделка с теми же полями.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      deals: {
+        type: 'array',
+        description: 'Массив сделок. Минимум 2, максимум 50.',
+        items: {
+          type: 'object',
+          properties: {
+            customerName:  { type: 'string' },
+            product:       { type: 'string' },
+            amount:        { type: 'number' },
+            paidAmount:    { type: 'number' },
+            phone:         { type: 'string' },
+            email:         { type: 'string' },
+            address:       { type: 'string' },
+            siteAddress:   { type: 'string' },
+            furnitureType: { type: 'string' },
+            materials:     { type: 'string' },
+            source:        { type: 'string' },
+            status:        { type: 'string', description: 'Статус: new / measured / project / production / installation / completed.' },
+            notes:         { type: 'string' },
+          },
+          required: ['customerName'],
+        },
+      },
+    },
+    required: ['deals'],
+  },
+  summarize: (i) => {
+    const arr: any[] = i.deals || [];
+    const total = arr.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+    const lines = [
+      `<b>Массовый импорт сделок:</b> ${arr.length}`,
+      `• Общая сумма: <b>${fmtKZT(total)}</b>`,
+      ``,
+    ];
+    arr.slice(0, 8).forEach((d, idx) => {
+      lines.push(`${idx + 1}. ${d.customerName}${d.amount ? ' — ' + fmtKZT(d.amount) : ''}${d.status ? ' · ' + d.status : ''}`);
+    });
+    if (arr.length > 8) lines.push(`… и ещё ${arr.length - 8}`);
+    return lines.join('\n');
+  },
+  execute: async (ctx, i) => {
+    const arr: any[] = i.deals || [];
+    if (arr.length === 0) throw new Error('пустой список сделок');
+    if (arr.length > 50)  throw new Error('за раз можно создать не более 50 сделок');
+    const insert = ctx.db.prepare('INSERT INTO deals (id, user_id, team_id, data) VALUES (?, ?, ?, ?)');
+    const tx = ctx.db.transaction((items: any[]) => {
+      for (const d of items) {
+        const id = newId('D');
+        const sourceLower = String(d.source || '').toLowerCase();
+        const icon =
+          sourceLower.includes('instagram') ? 'instagram' :
+          sourceLower.includes('whatsapp')  ? 'whatsapp'  :
+          sourceLower.includes('telegram')  ? 'telegram'  :
+          sourceLower.includes('tiktok')    ? 'tiktok'    :
+          sourceLower.includes('email')     ? 'email'     :
+                                              'phone';
+        const status = STATUS_MAP[d.status]?.code || 'new';
+        const data = {
+          id,
+          customerName:    d.customerName,
+          phone:           d.phone           || '',
+          email:           d.email           || '',
+          address:         d.address         || '',
+          siteAddress:     d.siteAddress     || '',
+          product:         d.product         || '',
+          furnitureType:   d.furnitureType   || '',
+          materials:       d.materials       || '',
+          amount:          Number(d.amount)     || 0,
+          paidAmount:      Number(d.paidAmount) || 0,
+          status,
+          icon,
+          priority:        'medium',
+          date:            new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
+          progress:        status === 'completed' ? 100 : status === 'installation' ? 80 : status === 'production' ? 60 : 5,
+          source:          d.source          || '',
+          measurer:        '',
+          designer:        '',
+          measurementDate: '', completionDate: '', installationDate: '',
+          paymentMethods:  {},
+          notes:           d.notes           || '',
+          workType:        'furniture',
+          createdAt:       new Date().toISOString(),
+        };
+        insert.run(id, ctx.userId, ctx.teamId, JSON.stringify(data));
+      }
+    });
+    tx(arr);
+    const total = arr.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+    ctx.logActivity(ctx.userId, {
+      user: 'AI-ассистент', actor: 'ai',
+      action: `Массовый импорт сделок (по запросу ${ctx.userName})`,
+      target: `${arr.length} шт., на сумму ${fmtKZT(total)}`,
+      type: 'create', page: 'sales',
+    });
+    return `Создано <b>${arr.length}</b> сделок на сумму <b>${fmtKZT(total)}</b>. Открыть → Заказы.`;
+  },
+};
+
 // ─── Registry + public API ────────────────────────────────────────
 const TOOLS: Record<string, ToolDef> = {
   add_deal:           addDeal,
+  bulk_add_deals:     bulkAddDeals,
   log_payment:        logPayment,
   update_deal_status: updateDealStatus,
   update_deal:        updateDeal,
   add_task:           addTask,
+  add_product:        addProduct,
+  add_supplier:       addSupplier,
+  add_employee:       addEmployee,
+  add_finance:        addFinance,
   find_client:        findClient,
 };
 
