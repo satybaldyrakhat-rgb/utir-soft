@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Package, TrendingUp, AlertTriangle, ShoppingCart, Wrench, Users, Clock, CheckCircle, Plus, X, Search, Edit2, Eye, Truck, Calendar, BarChart3, ArrowUpDown, MapPin, FileText, Trash2, Loader2, Copy, PlayCircle, PauseCircle, Download } from 'lucide-react';
+import { Package, TrendingUp, AlertTriangle, ShoppingCart, Wrench, Users, Clock, CheckCircle, Plus, X, Search, Edit2, Eye, Truck, Calendar, BarChart3, ArrowUpDown, MapPin, FileText, Trash2, Loader2, Copy, PlayCircle, Download } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { Calculator } from './Calculator';
 import { api } from '../utils/api';
@@ -139,9 +139,17 @@ export function Warehouse({ language }: WarehouseProps) {
       if (editingSupplier?.id) {
         const updated = await api.patch<Supplier>(`/api/suppliers/${editingSupplier.id}`, s);
         setSuppliers(prev => prev.map(x => x.id === editingSupplier.id ? updated : x));
+        store.addActivity({
+          user: 'Вы', action: 'Обновили поставщика', target: updated.name || s.name || '—',
+          type: 'update', page: 'warehouse',
+        });
       } else {
         const created = await api.post<Supplier>('/api/suppliers', s);
         setSuppliers(prev => [created, ...prev]);
+        store.addActivity({
+          user: 'Вы', action: 'Добавили поставщика', target: created.name || s.name || '—',
+          type: 'create', page: 'warehouse',
+        });
       }
       setShowSupplierModal(false);
       setEditingSupplier(null);
@@ -152,22 +160,38 @@ export function Warehouse({ language }: WarehouseProps) {
   }
 
   async function deleteSupplier(id: string) {
+    const sup = suppliers.find(s => s.id === id);
     if (!confirm(l('Удалить поставщика?', 'Жеткізушіні жою?', 'Delete supplier?'))) return;
     try {
       await api.delete(`/api/suppliers/${id}`);
       setSuppliers(prev => prev.filter(x => x.id !== id));
+      store.addActivity({
+        user: 'Вы', action: 'Удалили поставщика', target: sup?.name || id,
+        type: 'delete', page: 'warehouse',
+      });
       flash(l('Поставщик удалён', 'Жойылды', 'Deleted'));
     } catch { /* ignore */ }
   }
 
   async function savePo(po: Partial<PurchaseOrder>) {
     try {
+      const supName = suppliers.find(s => s.id === po.supplierId)?.name || '—';
       if (editingPo?.id) {
         const updated = await api.patch<PurchaseOrder>(`/api/purchase-orders/${editingPo.id}`, po);
         setPurchaseOrders(prev => prev.map(x => x.id === editingPo.id ? updated : x));
+        store.addActivity({
+          user: 'Вы', action: 'Обновили закупку',
+          target: `${supName} — ${Math.round(updated.totalCost || 0).toLocaleString('ru-RU')} ₸`,
+          type: 'update', page: 'warehouse',
+        });
       } else {
         const created = await api.post<PurchaseOrder>('/api/purchase-orders', { ...po, status: 'draft' });
         setPurchaseOrders(prev => [created, ...prev]);
+        store.addActivity({
+          user: 'Вы', action: 'Создали закупку',
+          target: `${supName} — ${Math.round(created.totalCost || 0).toLocaleString('ru-RU')} ₸ (${(created.items || []).length} поз.)`,
+          type: 'create', page: 'warehouse',
+        });
       }
       setShowPoModal(false);
       setEditingPo(null);
@@ -177,20 +201,65 @@ export function Warehouse({ language }: WarehouseProps) {
     }
   }
 
+  // Status transitions for a purchase order.
+  // Critical side effect: when admin moves a PO to 'received', we
+  // refill the warehouse — add each line item's qty to the matching
+  // product (by case-insensitive name) and recompute the stock status.
+  // Without this the whole PO pipeline is decorative: you "order"
+  // materials but the warehouse never sees them.
   async function updatePoStatus(id: string, status: PurchaseOrder['status']) {
+    const po = purchaseOrders.find(p => p.id === id);
     const patch: Partial<PurchaseOrder> = { status };
     if (status === 'received') patch.receivedDate = new Date().toISOString().slice(0, 10);
     try {
       const updated = await api.patch<PurchaseOrder>(`/api/purchase-orders/${id}`, patch);
       setPurchaseOrders(prev => prev.map(x => x.id === id ? updated : x));
-    } catch { /* ignore */ }
+
+      // ── Refill stock when transitioning to 'received' ──
+      if (status === 'received' && po) {
+        let refilled = 0;
+        for (const item of po.items || []) {
+          const match = store.products.find(
+            p => p.name.toLowerCase().trim() === item.name.toLowerCase().trim(),
+          );
+          if (!match) continue;
+          const nextQty = match.quantity + (item.qty || 0);
+          const nextStatus =
+            nextQty === 0                 ? 'outofstock' :
+            nextQty < (match.minQty || 0) ? 'low'        :
+                                             'instock';
+          await store.updateProduct(match.id, { quantity: nextQty, status: nextStatus as any });
+          refilled += 1;
+        }
+        const supName = suppliers.find(s => s.id === po.supplierId)?.name || '—';
+        store.addActivity({
+          user: 'Вы', action: 'Получили закупку',
+          target: `${supName} — ${Math.round(po.totalCost || 0).toLocaleString('ru-RU')} ₸ (склад пополнен на ${refilled} поз.)`,
+          type: 'update', page: 'warehouse',
+        });
+        flash(l(
+          `Закупка получена — склад пополнен (${refilled} поз.)`,
+          `Сатып алу алынды — қойма толтырылды (${refilled})`,
+          `PO received — stock refilled (${refilled} items)`,
+        ));
+      }
+    } catch (e: any) {
+      flash(l('Ошибка: ', 'Қате: ', 'Error: ') + (e?.message || e));
+    }
   }
 
   async function deletePo(id: string) {
+    const po = purchaseOrders.find(p => p.id === id);
     if (!confirm(l('Удалить закупку?', 'Сатып алуды жою?', 'Delete PO?'))) return;
     try {
       await api.delete(`/api/purchase-orders/${id}`);
       setPurchaseOrders(prev => prev.filter(x => x.id !== id));
+      const supName = suppliers.find(s => s.id === po?.supplierId)?.name || '—';
+      store.addActivity({
+        user: 'Вы', action: 'Удалили закупку',
+        target: `${supName} — ${Math.round(po?.totalCost || 0).toLocaleString('ru-RU')} ₸`,
+        type: 'delete', page: 'warehouse',
+      });
     } catch { /* ignore */ }
   }
 
@@ -315,6 +384,12 @@ export function Warehouse({ language }: WarehouseProps) {
       }
       // 2) Patch the deal with the new consumed list.
       await store.updateDeal(order.dealId, { consumed: merged } as any);
+      const totalCost = newEntries.reduce((s, e) => s + e.qty * e.costPerUnit, 0);
+      store.addActivity({
+        user: 'Вы', action: 'Списали материалы',
+        target: `${order.name} — ${newEntries.length} поз. на ${Math.round(totalCost).toLocaleString('ru-RU')} ₸`,
+        type: 'update', page: 'warehouse',
+      });
       flash(l(`Списано ${newEntries.length} позиций`, `${newEntries.length} позиция жазылды`, `Deducted ${newEntries.length} items`));
       setConsumeForOrder(null);
     } catch (e: any) {
@@ -347,11 +422,24 @@ export function Warehouse({ language }: WarehouseProps) {
     // (so users see immediate feedback when starting a new stage).
     const newProgress = Math.min(100, doneCount * 20 + (inProg > 0 ? 5 : 0));
     try {
-      await store.updateDeal(order.dealId, {
-        stages: updated,
-        progress: newProgress,
-        status: doneCount === 5 ? 'completed' : undefined,
-      } as any);
+      // Build patch without `status: undefined` — the server spreads
+      // req.body onto the stored object, so an undefined value would
+      // wipe deal.status on next reload (silent data loss).
+      const patch: any = { stages: updated, progress: newProgress };
+      if (doneCount === 5) patch.status = 'completed';
+      await store.updateDeal(order.dealId, patch);
+      // Audit trail — make stage changes searchable from the activity log
+      // alongside other deal updates.
+      const stageLabel = DEFAULT_STAGES_TEMPLATE.find(t => t.id === stageId)?.ru || stageId;
+      const newStat = updated.find(s => s.id === stageId)?.status;
+      const statLabel = newStat === 'done' ? 'завершён'
+                       : newStat === 'in-progress' ? 'в работе'
+                       : 'сброшен';
+      store.addActivity({
+        user: 'Вы', action: 'Этап производства',
+        target: `${order.name} · ${stageLabel} → ${statLabel}`,
+        type: 'update', page: 'warehouse',
+      });
     } catch (e: any) {
       alert('Не удалось обновить этап: ' + (e?.message || e));
     }
@@ -359,18 +447,40 @@ export function Warehouse({ language }: WarehouseProps) {
 
   // Production order actions — update the underlying deal's progress so the
   // status badge moves accordingly. Status mapping:
-  //   start (0%) → started   (set progress=10)
-  //   working    (10-99%)     (set progress=60)
-  //   pause      → paused     (set progress=0)
-  //   done       → done       (set progress=100, status='completed')
-  async function setOrderState(order: ProdOrder, target: 'started' | 'working' | 'paused' | 'done') {
-    const patch: any =
-      target === 'done'    ? { progress: 100, status: 'completed' } :
-      target === 'paused'  ? { progress: 0 } :
-      target === 'working' ? { progress: Math.max(60, order.progress) } :
-                              { progress: Math.max(10, order.progress) };
-    try { await store.updateDeal(order.dealId, patch); }
-    catch (e: any) { alert('Не удалось обновить заказ: ' + (e?.message || e)); }
+  //   start (0%) → started   (set progress=10 if currently 0)
+  //   working    (10-99%)     (set progress=60 if behind)
+  //   pause      → paused     (set progress=1 — preserves «started» bucket
+  //                            but flags as paused; never wipe real work)
+  //   done       → done       (set progress=100, status='completed' +
+  //                            mark every stage as done so they stay
+  //                            in sync with the deal state)
+  async function setOrderState(order: ProdOrder, target: 'started' | 'working' | 'done') {
+    let patch: any;
+    if (target === 'done') {
+      // Closing the order from outside the stage strip — also mark every
+      // stage 'done' so the chip strip / reports reflect reality.
+      const now = new Date().toISOString();
+      const allDone = (order.stages || makeDefaultStages()).map(s =>
+        s.status === 'done' ? s : { ...s, status: 'done' as StageStatus, completedAt: now },
+      );
+      patch = { progress: 100, status: 'completed', stages: allDone };
+    } else if (target === 'working') {
+      patch = { progress: Math.max(60, order.progress) };
+    } else {
+      patch = { progress: Math.max(10, order.progress) };
+    }
+    try {
+      await store.updateDeal(order.dealId, patch);
+      if (target === 'done') {
+        store.addActivity({
+          user: 'Вы', action: 'Завершили производство',
+          target: order.name,
+          type: 'update', page: 'warehouse',
+        });
+      }
+    } catch (e: any) {
+      alert('Не удалось обновить заказ: ' + (e?.message || e));
+    }
   }
 
   const categories = ['Все', ...new Set(store.products.map(p => p.category))];
@@ -564,7 +674,10 @@ export function Warehouse({ language }: WarehouseProps) {
 
                   {/* Action buttons — stop propagation so they don't open
                        the order details modal at the same time. Each one
-                       calls the underlying deal API (see setOrderState). */}
+                       calls the underlying deal API (see setOrderState).
+                       Pause was removed: we don't have a non-destructive
+                       way to represent it on the deal blob (zeroing
+                       progress used to wipe real stage work). */}
                   <div className="flex items-center gap-1.5 mt-3" onClick={e => e.stopPropagation()}>
                     {o.status === 'paused' && (
                       <button onClick={() => setOrderState(o, 'started')} className="flex-1 inline-flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800">
@@ -574,11 +687,6 @@ export function Warehouse({ language }: WarehouseProps) {
                     {o.status === 'started' && (
                       <button onClick={() => setOrderState(o, 'working')} className="flex-1 inline-flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                         <Wrench className="w-3 h-3" /> {l('В работу', 'Жұмысқа', 'Working')}
-                      </button>
-                    )}
-                    {o.status !== 'done' && o.status !== 'paused' && (
-                      <button onClick={() => setOrderState(o, 'paused')} className="inline-flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 bg-gray-50 text-slate-700 border border-gray-100 rounded-lg hover:bg-white/70">
-                        <PauseCircle className="w-3 h-3" /> {l('Пауза', 'Пауза', 'Pause')}
                       </button>
                     )}
                     {o.status !== 'done' && (
