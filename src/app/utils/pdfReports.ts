@@ -24,18 +24,48 @@ async function fetchTtfAsBase64(url: string): Promise<string> {
   return btoa(binary);
 }
 
-async function loadRobotoFonts(): Promise<{ regular: string; bold: string }> {
-  // jsdelivr serves Google's own font repo — high-availability + free.
-  // Roboto covers Cyrillic for Russian. Loaded in parallel.
-  if (!cachedRobotoBase64 || !cachedRobotoBoldBase64) {
-    const [r, b] = await Promise.all([
-      cachedRobotoBase64     ?? fetchTtfAsBase64('https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Regular.ttf'),
-      cachedRobotoBoldBase64 ?? fetchTtfAsBase64('https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Bold.ttf'),
-    ]);
-    cachedRobotoBase64 = r;
-    cachedRobotoBoldBase64 = b;
+// Try multiple CDN URLs in order. Returns the first one that fetches OK.
+// Roboto is hosted in different paths across mirrors; if one CDN removes
+// or moves the file we don't want PDFs to silently break.
+async function fetchFontWithFallback(urls: string[]): Promise<string> {
+  let lastError: any = null;
+  for (const url of urls) {
+    try {
+      return await fetchTtfAsBase64(url);
+    } catch (e) {
+      lastError = e;
+      console.warn('[pdfReports] font fetch failed, trying next mirror', url, e);
+    }
   }
-  return { regular: cachedRobotoBase64, bold: cachedRobotoBoldBase64 };
+  throw lastError || new Error('all font mirrors failed');
+}
+
+async function loadRobotoRegular(): Promise<string> {
+  if (cachedRobotoBase64) return cachedRobotoBase64;
+  cachedRobotoBase64 = await fetchFontWithFallback([
+    'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Regular.ttf',
+    'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxKKTU1Kg.ttf',
+  ]);
+  return cachedRobotoBase64;
+}
+
+// Bold is OPTIONAL — if the CDN is down we fall back to Regular registered
+// under the 'bold' weight. The PDF still renders correctly with Cyrillic;
+// table headers just won't be visually heavier. Crucial because the Bold
+// font being unavailable was crashing every PDF download with a confusing
+// «check your internet» error even when Regular loaded fine.
+async function tryLoadRobotoBold(): Promise<string | null> {
+  if (cachedRobotoBoldBase64) return cachedRobotoBoldBase64;
+  try {
+    cachedRobotoBoldBase64 = await fetchFontWithFallback([
+      'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Bold.ttf',
+      'https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc4.ttf',
+    ]);
+    return cachedRobotoBoldBase64;
+  } catch (e) {
+    console.warn('[pdfReports] Bold font unavailable, will reuse Regular for bold weight', e);
+    return null;
+  }
 }
 
 // Sentinel error so callers can branch on font-load failure (show a toast
@@ -46,23 +76,30 @@ export class PdfFontError extends Error {
 
 async function newDoc(): Promise<jsPDF> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  let regular: string;
   try {
-    const { regular, bold } = await loadRobotoFonts();
-    doc.addFileToVFS('Roboto-Regular.ttf', regular);
-    doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-    // Register Bold as a separate weight so autoTable's default bold
-    // headers stay on Roboto (instead of falling back to Helvetica,
-    // which has no Cyrillic glyphs and prints "????").
-    doc.addFileToVFS('Roboto-Bold.ttf', bold);
-    doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
-    doc.setFont('Roboto', 'normal');
+    regular = await loadRobotoRegular();
   } catch (e) {
-    // Without the Cyrillic font, jsPDF's built-in fonts only support
-    // Latin/WinAnsi — the report would print «????» where Russian letters
-    // should be. Better to fail loud and let the user retry.
-    console.warn('[pdfReports] font load failed', e);
+    // Regular IS required — without a Cyrillic font, the report would
+    // print «????» where Russian letters should be. Fail loud with a
+    // friendly message so the user knows to check connectivity.
+    console.warn('[pdfReports] Regular font load failed', e);
     throw new PdfFontError('Не удалось загрузить шрифт для PDF. Проверьте интернет и попробуйте ещё раз.');
   }
+  doc.addFileToVFS('Roboto-Regular.ttf', regular);
+  doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+  // Bold is best-effort — if the CDN doesn't have it, register Regular
+  // under the 'bold' slot too. autoTable's default bold headers then
+  // stay on Roboto (Cyrillic-safe) instead of falling back to Helvetica
+  // which would print «????» for Russian.
+  const bold = await tryLoadRobotoBold();
+  if (bold) {
+    doc.addFileToVFS('Roboto-Bold.ttf', bold);
+    doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
+  } else {
+    doc.addFont('Roboto-Regular.ttf', 'Roboto', 'bold');
+  }
+  doc.setFont('Roboto', 'normal');
   return doc;
 }
 
