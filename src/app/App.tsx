@@ -255,18 +255,7 @@ function AppContent() {
       case 'sales':
         return <SalesKanban language={language} />;
       case 'warehouse':
-        return <ComingSoon
-          language={language}
-          title={language === 'kz' ? 'Өндіріс' : language === 'eng' ? 'Production' : 'Производство'}
-          description={
-            language === 'kz'
-              ? 'Жеткізушілер, материалдар, қойма қалдықтары мен өндіріс тапсырыстары жақын арада осында пайда болады.'
-              : language === 'eng'
-              ? 'Suppliers, materials, stock balances and production orders — coming here soon.'
-              : 'Поставщики, материалы, остатки на складе и производственные заказы появятся здесь.'
-          }
-          onBack={() => setCurrentPage('dashboard')}
-        />;
+        return <Warehouse language={language} />;
       case 'finance':
         // PaymentsHub gives both «Платежи по сделкам» and «Финансы компании»
         // tabs at the top — same component we used to embed inside SalesKanban.
