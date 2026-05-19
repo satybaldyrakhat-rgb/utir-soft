@@ -63,8 +63,8 @@ export const INTEGRATION_CATALOG: IntegrationDef[] = [
   {
     id: 'openai',
     name: 'OpenAI',
-    shortDesc: 'GPT-4o, gpt-image-1, Whisper (голос)',
-    longDesc: 'GPT-4o для чата, gpt-image-1 для AI-дизайна, Whisper для распознавания голоса в Telegram-боте и AI-помощнике.',
+    shortDesc: 'GPT-4o, gpt-image-1 HD, Whisper (голос)',
+    longDesc: 'GPT-4o для чата, gpt-image-1 (1536×1024, HD-качество) для AI-дизайна, Whisper для распознавания голоса в Telegram-боте и AI-помощнике. Изображения на платном тарифе ~$0.17/шт.',
     category: 'ai',
     kind: 'env',
     envVars: ['OPENAI_API_KEY'],

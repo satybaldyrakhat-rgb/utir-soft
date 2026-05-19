@@ -58,46 +58,52 @@ function dataUrlToParts(dataUrl: string): { mimeType: string; data: string } | n
 
 export function providerStatuses(): ProviderStatus[] {
   return [
-    { id: 'chatgpt',  name: 'ChatGPT (gpt-image-1)',     enabled: !!OPENAI_KEY,    envVar: 'OPENAI_API_KEY' },
-    { id: 'gemini',   name: 'Gemini (nano-banana-pro)',     enabled: !!GEMINI_KEY,    envVar: 'GEMINI_API_KEY' },
-    { id: 'claude',   name: 'Claude Opus + nano-banana-pro', enabled: !!ANTHROPIC_KEY && (!!OPENAI_KEY || !!GEMINI_KEY), envVar: 'ANTHROPIC_API_KEY' },
-    { id: 'utir-mix', name: 'UTIR AI (всё сразу)',       enabled: !!OPENAI_KEY || !!GEMINI_KEY },
+    { id: 'chatgpt',  name: 'ChatGPT (gpt-image-1, HD)',  enabled: !!OPENAI_KEY,    envVar: 'OPENAI_API_KEY' },
+    { id: 'gemini',   name: 'Gemini (nano-banana-pro)',   enabled: !!GEMINI_KEY,    envVar: 'GEMINI_API_KEY' },
+    { id: 'claude',   name: 'Claude Opus + gpt-image-1',  enabled: !!ANTHROPIC_KEY && (!!OPENAI_KEY || !!GEMINI_KEY), envVar: 'ANTHROPIC_API_KEY' },
+    { id: 'utir-mix', name: 'UTIR AI (всё сразу)',        enabled: !!OPENAI_KEY || !!GEMINI_KEY },
   ];
 }
 
-// ─── ChatGPT (OpenAI Images) ────────────────────────────────────────
-// Text-to-image via /v1/images/generations, or image-to-image edit via
-// /v1/images/edits when a room photo is provided. References are appended
-// to the prompt as additional context (OpenAI's edit endpoint accepts only
-// one image; the others are described in text).
+// ─── ChatGPT (OpenAI Images) — gpt-image-1, highest quality ─────────
+// We use OpenAI's most recent image model (gpt-image-1, GA April 2025)
+// with the «high» quality tier — paid, ~$0.17/image at 1536x1024 but
+// produces the cleanest interior renderings. There is no gpt-image-2
+// yet (as of May 2026); when it ships we just need to change the model
+// id below.
+//
+// Defaults tuned for furniture/interior design renderings:
+//   • size       1536x1024 — landscape, matches how rooms are framed
+//   • quality    'high'    — sharpest detail, best for showing clients
+//   • format     png       — lossless; client downscales for thumbnails
 async function genChatGPT(inp: GenInputs): Promise<GenResult> {
   if (!OPENAI_KEY) {
     return { provider: 'chatgpt', ok: false, error: 'OPENAI_API_KEY не задан в Railway' };
   }
   try {
-    let body: any;
-    let endpoint: string;
+    const MODEL = 'gpt-image-1';
+    const SIZE = '1536x1024';
+    const QUALITY = 'high';
     if (inp.roomPhoto) {
-      // Use the edit endpoint with the room photo as the source. multipart/form-data.
+      // Image-to-image edit. multipart/form-data with the room photo as
+      // the base canvas and the prompt describing the transformation.
       const parts = dataUrlToParts(inp.roomPhoto);
       if (!parts) return { provider: 'chatgpt', ok: false, error: 'invalid roomPhoto data URL' };
-      endpoint = 'https://api.openai.com/v1/images/edits';
+      const endpoint = 'https://api.openai.com/v1/images/edits';
       const form = new FormData();
       const buf = Buffer.from(parts.data, 'base64');
-      // OpenAI only accepts image/jpeg, image/png, image/webp. The client
-      // already re-encodes uploads via canvas so this should be safe, but
-      // if some other path produces avif/heic/gif we relabel as png so
-      // the API doesn't reject the request outright. PNG is the safest
-      // since the image bytes might genuinely be anything browser-decodable.
+      // OpenAI accepts image/jpeg, image/png, image/webp only. Relabel
+      // anything else as png so the API doesn't reject. The client
+      // canvas re-encodes uploads, so this is a last-line safety net.
       const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
       const mimeType = ALLOWED.has(parts.mimeType) ? parts.mimeType : 'image/png';
       const ext = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
       form.append('image', new Blob([buf], { type: mimeType }), `room.${ext}`);
-      form.append('model', 'gpt-image-1');
+      form.append('model', MODEL);
       form.append('prompt', inp.prompt);
       form.append('n', '1');
-      form.append('size', '1024x1024');
-      body = form;
+      form.append('size', SIZE);
+      form.append('quality', QUALITY);
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${OPENAI_KEY}` },
@@ -112,12 +118,14 @@ async function genChatGPT(inp: GenInputs): Promise<GenResult> {
       return { provider: 'chatgpt', ok: false, error: 'no image in response' };
     }
     // Plain text-to-image.
-    endpoint = 'https://api.openai.com/v1/images/generations';
-    body = JSON.stringify({
-      model: 'gpt-image-1',
+    const endpoint = 'https://api.openai.com/v1/images/generations';
+    const body = JSON.stringify({
+      model: MODEL,
       prompt: inp.prompt,
       n: 1,
-      size: '1024x1024',
+      size: SIZE,
+      quality: QUALITY,
+      output_format: 'png',
     });
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -308,11 +316,12 @@ async function genClaude(inp: GenInputs): Promise<GenResult> {
   if (!enhanced) {
     return { provider: 'claude', ok: false, error: 'Claude не смог улучшить prompt' };
   }
-  // 'Banana skill' — Claude prefers Gemini's nano-banana-pro for the actual
-  // image generation (handles photoreal interiors well + free tier).
-  // Falls back to OpenAI gpt-image-1 only if Gemini isn't configured.
+  // Claude routes to OpenAI's gpt-image-1 (HD) when available — the paid
+  // OpenAI model produces the sharpest interior renderings. Falls back
+  // to Gemini's nano-banana-pro if OpenAI isn't configured (free tier
+  // friendly).
   const enhancedInputs: GenInputs = { ...inp, prompt: enhanced };
-  const downstream = GEMINI_KEY ? await genGemini(enhancedInputs) : await genChatGPT(enhancedInputs);
+  const downstream = OPENAI_KEY ? await genChatGPT(enhancedInputs) : await genGemini(enhancedInputs);
   return { ...downstream, provider: 'claude', enhancedPrompt: enhanced };
 }
 
