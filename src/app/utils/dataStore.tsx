@@ -541,7 +541,10 @@ interface DataStore {
   canWriteModule: (moduleKey: string) => boolean;
 
   addDeal: (deal: Omit<Deal, 'id' | 'createdAt'>) => Deal;
-  updateDeal: (id: string, updates: Partial<Deal>) => void;
+  // Returns the in-flight PATCH promise so callers can `await` and catch
+  // permission / network failures. Local state still updates optimistically
+  // before the network call so the UI feels instant.
+  updateDeal: (id: string, updates: Partial<Deal>) => Promise<void>;
   deleteDeal: (id: string) => void;
 
   addEmployee: (emp: Omit<Employee, 'id'>) => void;
@@ -1096,10 +1099,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return placeholder;
   }, [addActivity]);
 
-  const updateDeal = useCallback((id: string, updates: Partial<Deal>) => {
+  const updateDeal = useCallback(async (id: string, updates: Partial<Deal>) => {
+    // Optimistic update — UI reflects the change immediately. If the
+    // PATCH fails the caller can rollback or just refetch.
     setDeals(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
-    api.patch(`/api/deals/${id}`, updates).catch(err => console.error('[updateDeal]', err));
     addActivity({ user: 'Вы', action: 'Обновили сделку', target: `#${id}`, type: 'update', page: 'sales' });
+    try {
+      await api.patch(`/api/deals/${id}`, updates);
+    } catch (err) {
+      console.error('[updateDeal]', err);
+      // Re-throw so awaiting callers (ClientOrderModal handleSave) can
+      // surface a friendly error and keep the form open.
+      throw err;
+    }
   }, [addActivity]);
 
   const deleteDeal = useCallback((id: string) => {

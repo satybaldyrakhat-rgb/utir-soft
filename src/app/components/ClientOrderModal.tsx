@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History, RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History, RotateCcw, AlertTriangle, Loader2 } from 'lucide-react';
 import { t } from '../utils/translations';
 import { useDataStore, type Deal } from '../utils/dataStore';
 import { api } from '../utils/api';
@@ -12,6 +12,50 @@ interface ClientOrderModalProps {
   deal: Deal;
   language?: Lang;
 }
+
+// ─── Hoisted form helpers ─────────────────────────────────────────
+// Defined OUTSIDE the parent component so React doesn't rebuild them
+// on every render — the previous in-line definition caused the focus
+// to drop after every keystroke on slower devices.
+const FieldInput = ({ label, value, onChange, ...props }: { label: string; value: string; onChange: (v: string) => void } & Record<string, any>) => (
+  <div>
+    <label className="block text-[11px] text-slate-500 mb-1.5">{label}</label>
+    <input
+      type="text"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all"
+      {...props}
+    />
+  </div>
+);
+
+const FieldSelect = ({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: React.ReactNode }) => (
+  <div>
+    <label className="block text-[11px] text-slate-500 mb-1.5">{label}</label>
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
+    >
+      {children}
+    </select>
+  </div>
+);
+
+// 6-stage status pipeline. Drives the status editor + progress bar
+// + production module visibility. Kept in sync with stageConfig
+// in SalesKanban.tsx — if you add a stage there, mirror it here.
+const STATUS_OPTIONS: Array<{ id: string; ru: string; kz: string; eng: string; progress: number }> = [
+  { id: 'new',             ru: 'Новая заявка',     kz: 'Жаңа өтінім',     eng: 'New Lead',          progress: 5  },
+  { id: 'measured',        ru: 'Замер',            kz: 'Өлшем',            eng: 'Measured',         progress: 25 },
+  { id: 'project-agreed',  ru: 'Проект и договор', kz: 'Жоба және шарт',  eng: 'Project & Contract',progress: 50 },
+  { id: 'production',      ru: 'Производство',     kz: 'Өндіріс',          eng: 'Production',       progress: 70 },
+  { id: 'installation',    ru: 'Установка',        kz: 'Орнату',           eng: 'Installation',     progress: 88 },
+  { id: 'completed',       ru: 'Завершено',        kz: 'Аяқталды',         eng: 'Completed',        progress: 100 },
+  { id: 'rejected',        ru: 'Отказ',            kz: 'Бас тарту',        eng: 'Rejected',         progress: 0  },
+];
+const statusIndex = (s: string) => Math.max(0, STATUS_OPTIONS.findIndex(o => o.id === s));
 
 // Default KZ payment methods enum — used when deal.paymentMethods is empty.
 // Stored as keys so we can edit the dictionary without DB migrations.
@@ -45,6 +89,8 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   const [source, setSource] = useState(deal.source || 'Instagram');
   const [measurer, setMeasurer] = useState(deal.measurer || '');
   const [designer, setDesigner] = useState(deal.designer || '');
+  const [foreman, setForeman] = useState(deal.foreman || '');
+  const [architect, setArchitect] = useState(deal.architect || '');
   // Owner — employee responsible for the deal (used by team-metrics tab).
   const [ownerId, setOwnerId] = useState(deal.ownerId || '');
   const [furnitureType, setFurnitureType] = useState(deal.furnitureType || '');
@@ -54,7 +100,16 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   const [installationDate, setInstallationDate] = useState(deal.installationDate || '');
   const [notes, setNotes] = useState(deal.notes || '');
   const [paidAmount, setPaidAmount] = useState(deal.paidAmount || 0);
+  // Status editor — was missing entirely (status could only change via
+  // kanban drag-and-drop). Now editable inline; changes drive Production
+  // module visibility, Telegram notifications, and progress derivation.
+  const [status, setStatus] = useState(deal.status || 'new');
 
+  // Save-state machinery — replaces silent fire-and-forget. Surfaces
+  // network/permission errors instead of closing the modal blindly.
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
 
   // Payment methods: render whatever is on the deal; if none, seed default KZ enum.
   const initialPM: Record<string, boolean> = useMemo(() => {
@@ -63,6 +118,34 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     return Object.fromEntries(DEFAULT_PAYMENT_KEYS.map(k => [k, false]));
   }, [deal.id]);
   const [paymentMethods, setPaymentMethods] = useState<Record<string, boolean>>(initialPM);
+
+  // ─── Re-sync state when the underlying deal changes ───────────────
+  // Previously the initialState only ran once per mount, so a server-side
+  // update (TG status change, autoRefresh poll, another user's edit) wouldn't
+  // reflect here. Now every prop change rebuilds the form to match.
+  useEffect(() => {
+    setPhone(deal.phone || '');
+    setAddress(deal.address || '');
+    setSiteAddress(deal.siteAddress || '');
+    setSource(deal.source || 'Instagram');
+    setMeasurer(deal.measurer || '');
+    setDesigner(deal.designer || '');
+    setForeman(deal.foreman || '');
+    setArchitect(deal.architect || '');
+    setOwnerId(deal.ownerId || '');
+    setFurnitureType(deal.furnitureType || '');
+    setMaterials(deal.materials || '');
+    setMeasurementDate(deal.measurementDate || '');
+    setCompletionDate(deal.completionDate || '');
+    setInstallationDate(deal.installationDate || '');
+    setNotes(deal.notes || '');
+    setPaidAmount(deal.paidAmount || 0);
+    setStatus(deal.status || 'new');
+    setDirty(false);
+  }, [deal.id, deal.phone, deal.address, deal.siteAddress, deal.source, deal.measurer,
+      deal.designer, deal.foreman, deal.architect, deal.ownerId, deal.furnitureType,
+      deal.materials, deal.measurementDate, deal.completionDate, deal.installationDate,
+      deal.notes, deal.paidAmount, deal.status]);
 
   if (!isOpen) return null;
 
@@ -161,19 +244,76 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     setPaymentMethods(next);
   };
 
-  const handleSave = () => {
-    store.updateDeal(deal.id, {
-      workType: 'furniture',
-      phone, address,
-      siteAddress: siteAddress || undefined,
-      source, measurer, designer,
-      furnitureType, materials,
-      measurementDate, completionDate, installationDate,
-      notes, paidAmount, paymentMethods,
-      ownerId: ownerId || undefined,
-    });
-    onClose();
+  // Clamp paidAmount to deal.amount so overpayments can't silently break
+  // Finance reconciliation. If you genuinely need to record an overpayment,
+  // adjust the contract amount first.
+  const setPaidAmountClamped = useCallback((v: number) => {
+    const max = deal.amount || 0;
+    const clamped = Math.min(Math.max(0, v || 0), max);
+    setPaidAmount(clamped);
+  }, [deal.amount]);
+
+  const handleSave = async () => {
+    setSaving(true); setSaveError(null);
+    try {
+      // CRITICAL: don't hardcode workType — it would overwrite real
+      // workType values ('windows', 'construction', etc.) on every save.
+      // CRITICAL: send '' instead of `undefined` for cleared optional
+      // fields. The server merges req.body into stored data, so undefined
+      // wipes the key from JSON; '' is preserved as an explicit empty.
+      const patch: Partial<Deal> = {
+        phone,
+        address,
+        siteAddress,
+        source,
+        measurer,
+        designer,
+        foreman,
+        architect,
+        ownerId,
+        furnitureType,
+        materials,
+        measurementDate,
+        completionDate,
+        installationDate,
+        notes,
+        paidAmount,
+        paymentMethods,
+        status,
+        // Auto-derive progress from status so the kanban and progress
+        // bar stay in sync without a separate manual edit.
+        progress: STATUS_OPTIONS.find(o => o.id === status)?.progress ?? deal.progress ?? 0,
+      };
+      await store.updateDeal(deal.id, patch);
+      setDirty(false);
+      onClose();
+    } catch (e: any) {
+      setSaveError(String(e?.message || e || 'не удалось сохранить'));
+    } finally {
+      setSaving(false);
+    }
   };
+
+  // Wrap onClose with an unsaved-changes guard. Avoids silently losing
+  // edits when the user clicks the backdrop / X / ESC mid-edit.
+  const handleClose = useCallback(() => {
+    if (dirty && !confirm(l(
+      'Есть несохранённые изменения. Закрыть без сохранения?',
+      'Сақталмаған өзгерістер бар. Сақтамай жабу керек пе?',
+      'Unsaved changes. Close without saving?',
+    ))) return;
+    onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, onClose, language]);
+
+  // ESC closes the modal (with unsaved guard) — standard a11y.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleClose]);
 
   const labelForPaymentKey = (key: string) => {
     const meta = PAYMENT_KEY_META[key];
@@ -182,19 +322,36 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   };
   const iconForPaymentKey = (key: string) => PAYMENT_KEY_META[key] ?? { icon: Wallet, color: 'text-gray-500 bg-gray-100' };
 
-  const FieldInput = ({ label, value, onChange, ...props }: { label: string; value: string; onChange: (v: string) => void } & Record<string, any>) => (
-    <div>
-      <label className="block text-[11px] text-slate-500 mb-1.5">{label}</label>
-      <input type="text" value={value} onChange={e => onChange(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" {...props} />
-    </div>
-  );
+  // Auto-detect dirty: if any current value differs from the deal prop,
+  // the form is considered modified. Cheaper than wrapping every setter.
+  useEffect(() => {
+    const changed =
+      phone !== (deal.phone || '') ||
+      address !== (deal.address || '') ||
+      siteAddress !== (deal.siteAddress || '') ||
+      source !== (deal.source || 'Instagram') ||
+      measurer !== (deal.measurer || '') ||
+      designer !== (deal.designer || '') ||
+      foreman !== (deal.foreman || '') ||
+      architect !== (deal.architect || '') ||
+      ownerId !== (deal.ownerId || '') ||
+      furnitureType !== (deal.furnitureType || '') ||
+      materials !== (deal.materials || '') ||
+      measurementDate !== (deal.measurementDate || '') ||
+      completionDate !== (deal.completionDate || '') ||
+      installationDate !== (deal.installationDate || '') ||
+      notes !== (deal.notes || '') ||
+      paidAmount !== (deal.paidAmount || 0) ||
+      status !== (deal.status || 'new') ||
+      JSON.stringify(paymentMethods) !== JSON.stringify(deal.paymentMethods || {});
+    setDirty(changed);
+  }, [phone, address, siteAddress, source, measurer, designer, foreman, architect,
+      ownerId, furnitureType, materials, measurementDate, completionDate,
+      installationDate, notes, paidAmount, status, paymentMethods, deal]);
 
-  const FieldSelect = ({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: React.ReactNode }) => (
-    <div>
-      <label className="block text-[11px] text-slate-500 mb-1.5">{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">{children}</select>
-    </div>
-  );
+  // Status helpers — used by progress bar + timeline derivation.
+  const sIdx = statusIndex(status);
+  const currentProgress = STATUS_OPTIONS.find(o => o.id === status)?.progress ?? deal.progress ?? 0;
 
   const tabs = [
     { id: 'main'     as const, label: l('Информация', 'Ақпарат',  'Info') },
@@ -204,16 +361,16 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   ];
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={handleClose}>
       <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)] overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between flex-shrink-0">
           <div className="min-w-0">
             <div className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Заказ', 'Тапсырыс', 'Order')} · #{(deal.id || '').slice(-6)}</div>
             <div className="text-lg text-slate-900 tracking-tight truncate">{deal.customerName}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5 truncate">{deal.product} · <span className="tabular-nums">{deal.amount.toLocaleString('ru-RU')} ₸</span></div>
+            <div className="text-[11px] text-slate-500 mt-0.5 truncate">{deal.product} · <span className="tabular-nums">{(deal.amount || 0).toLocaleString('ru-RU')} ₸</span></div>
           </div>
-          <button onClick={onClose} className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center transition-colors flex-shrink-0">
+          <button onClick={handleClose} className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center transition-colors flex-shrink-0">
             <X className="w-4 h-4 text-slate-500" />
           </button>
         </div>
@@ -303,6 +460,39 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                 </div>
               </section>
 
+              {/* ── Section: Status ── */}
+              {/* Was missing entirely — status could only be changed via kanban
+                  drag-and-drop. Now editable inline; saving the deal also
+                  refreshes deal.progress and triggers Telegram notifications. */}
+              <section>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Статус', 'Күй', 'Status')}</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <FieldSelect
+                    label={l('Этап воронки', 'Воронка кезеңі', 'Funnel stage')}
+                    value={status}
+                    onChange={setStatus}
+                  >
+                    {STATUS_OPTIONS.map(o => (
+                      <option key={o.id} value={o.id}>{o[language]}</option>
+                    ))}
+                  </FieldSelect>
+                  <div className="flex flex-col justify-end">
+                    <div className="text-[10px] text-slate-500 mb-1.5">{l('Прогресс', 'Прогресс', 'Progress')}</div>
+                    <div className="w-full h-2 bg-white/60 rounded-full overflow-hidden ring-1 ring-white/40">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          currentProgress === 100
+                            ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                            : 'bg-gradient-to-r from-sky-400 to-violet-400'
+                        }`}
+                        style={{ width: `${currentProgress}%` }}
+                      />
+                    </div>
+                    <div className="text-[10px] text-slate-500 tabular-nums mt-1">{currentProgress}%</div>
+                  </div>
+                </div>
+              </section>
+
               {/* ── Section: Team ── */}
               <section>
                 <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Команда', 'Команда', 'Team')}</div>
@@ -319,9 +509,39 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                     .filter((e: any) => !e.removed_at)
                     .map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </FieldSelect>
+                {/* Roles below — these are free-text on the data model but the
+                    UI now suggests an employee-by-name datalist so users
+                    typically pick a real teammate. Foreman/architect are
+                    surfaced (they exist on the Deal interface but weren't
+                    editable from the card before). */}
+                <datalist id="dl-card-employees">
+                  {store.employees.filter((e: any) => !e.removed_at).map(e => <option key={e.id} value={e.name} />)}
+                </datalist>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                  <FieldInput label={tt('measurer')} value={measurer} onChange={setMeasurer} placeholder={tt('notSelected')} />
-                  <FieldInput label={tt('designer')} value={designer} onChange={setDesigner} placeholder={tt('notSelected')} />
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1.5">{tt('measurer')}</label>
+                    <input list="dl-card-employees" value={measurer} onChange={e => setMeasurer(e.target.value)}
+                      placeholder={tt('notSelected')}
+                      className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1.5">{tt('designer')}</label>
+                    <input list="dl-card-employees" value={designer} onChange={e => setDesigner(e.target.value)}
+                      placeholder={tt('notSelected')}
+                      className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1.5">{l('Прораб', 'Прораб', 'Foreman')}</label>
+                    <input list="dl-card-employees" value={foreman} onChange={e => setForeman(e.target.value)}
+                      placeholder={tt('notSelected')}
+                      className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1.5">{l('Архитектор', 'Сәулетші', 'Architect')}</label>
+                    <input list="dl-card-employees" value={architect} onChange={e => setArchitect(e.target.value)}
+                      placeholder={tt('notSelected')}
+                      className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
+                  </div>
                 </div>
               </section>
 
@@ -354,14 +574,17 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
           {/* PROGRESS TAB */}
           {activeTab === 'progress' && (
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Timeline — furniture lifecycle: Замер → Готовность → Установка */}
+              {/* Timeline — derives `done` from the funnel status so the
+                  check marks reflect reality, not just whether a date was
+                  entered. e.g. status='production' → measurement automatically
+                  counts as done even if the date wasn't typed. */}
               <div>
                 <div className="text-xs text-slate-900 mb-3">{l('Сроки', 'Мерзімдер', 'Timeline')}</div>
                 <div className="space-y-2">
                   {[
-                    { label: tt('timelineMeasure'),       date: measurementDate,   done: !!measurementDate },
-                    { label: tt('timelineCompletion'),    date: completionDate,    done: false },
-                    { label: tt('timelineInstallation'),  date: installationDate,  done: false },
+                    { label: tt('timelineMeasure'),       date: measurementDate,   done: sIdx >= statusIndex('measured')     || !!measurementDate },
+                    { label: tt('timelineCompletion'),    date: completionDate,    done: sIdx >= statusIndex('installation') },
+                    { label: tt('timelineInstallation'),  date: installationDate,  done: sIdx >= statusIndex('completed')    },
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl">
                       <div className={`w-7 h-7 rounded-xl flex items-center justify-center ring-1 ring-white/60 ${item.done ? 'bg-emerald-500 text-white' : 'bg-white/60 text-slate-400'}`}>
@@ -377,10 +600,17 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-[10px] mb-1">
                     <span className="text-slate-500">{l('Прогресс', 'Прогресс', 'Progress')}</span>
-                    <span className="text-slate-900 tabular-nums">65%</span>
+                    <span className="text-slate-900 tabular-nums">{currentProgress}%</span>
                   </div>
                   <div className="w-full h-1.5 bg-white/60 rounded-full overflow-hidden ring-1 ring-white/40">
-                    <div className="h-full bg-gradient-to-r from-sky-400 to-violet-400 rounded-full" style={{ width: '65%' }} />
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        currentProgress === 100
+                          ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                          : 'bg-gradient-to-r from-sky-400 to-violet-400'
+                      }`}
+                      style={{ width: `${currentProgress}%` }}
+                    />
                   </div>
                 </div>
               </div>
@@ -453,10 +683,15 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                       min={0}
                       max={deal.amount || undefined}
                       value={paidAmount || ''}
-                      onChange={e => setPaidAmount(Math.max(0, Number(e.target.value) || 0))}
+                      onChange={e => setPaidAmountClamped(Number(e.target.value) || 0)}
                       placeholder="0"
                       className="w-full px-3 py-2 bg-white/70 backdrop-blur-xl ring-1 ring-white/60 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
                     />
+                    {paidAmount >= (deal.amount || 0) && (deal.amount || 0) > 0 && (
+                      <div className="text-[10px] text-emerald-600 mt-1.5 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> {l('Полностью оплачено', 'Толық төленген', 'Fully paid')}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -550,18 +785,38 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-white/60 flex justify-end gap-2 flex-shrink-0">
-          <button onClick={onClose} className="px-4 py-2 bg-white/60 ring-1 ring-white/60 rounded-2xl text-xs hover:bg-white text-slate-700 transition-colors">{tt('cancel')}</button>
-          {/* Save hidden for roles with only 'view' permission on orders/sales.
-              Without this they'd hit the form, edit, click Save and get a 403. */}
-          {store.canWriteModule('orders') && (
+        <div className="px-6 py-4 border-t border-white/60 flex items-center justify-between gap-3 flex-shrink-0">
+          <div className="text-[11px] text-slate-500 flex-1 min-w-0">
+            {saveError ? (
+              <div className="flex items-center gap-1.5 text-rose-600">
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">{saveError}</span>
+              </div>
+            ) : dirty ? (
+              <span className="text-amber-700">● {l('Есть несохранённые изменения', 'Сақталмаған өзгерістер бар', 'Unsaved changes')}</span>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+              onClick={handleClose}
+              disabled={saving}
+              className="px-4 py-2 bg-white/60 ring-1 ring-white/60 rounded-2xl text-xs hover:bg-white text-slate-700 transition-colors disabled:opacity-50"
             >
-              {tt('save')}
+              {tt('cancel')}
             </button>
-          )}
+            {/* Save hidden for roles with only 'view' permission on orders/sales.
+                Without this they'd hit the form, edit, click Save and get a 403. */}
+            {store.canWriteModule('orders') && (
+              <button
+                onClick={handleSave}
+                disabled={saving || !dirty}
+                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+              >
+                {saving && <Loader2 className="w-3 h-3 animate-spin" />}
+                {saving ? l('Сохраняю…', 'Сақталуда…', 'Saving…') : tt('save')}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -589,8 +844,10 @@ function DesignConcepts({ deal, language }: { deal: Deal; language: 'kz' | 'ru' 
   }, [designIds.length]);
 
   const attached = history.filter(h => designIds.includes(h.id));
+  const canEdit = store.canWriteModule('orders');
 
   const detach = (id: string) => {
+    if (!canEdit) return; // viewers shouldn't trigger 403s
     const next = designIds.filter(x => x !== id);
     store.updateDeal(deal.id, { designIds: next });
   };
@@ -623,13 +880,15 @@ function DesignConcepts({ deal, language }: { deal: Deal; language: 'kz' | 'ru' 
               <div className="absolute bottom-1.5 left-1.5 right-1.5 px-2 py-0.5 bg-emerald-600/70 backdrop-blur-xl text-white text-[9px] rounded-full truncate ring-1 ring-white/20">
                 {c.provider}
               </div>
-              <button
-                onClick={() => detach(c.id)}
-                className="absolute top-1.5 right-1.5 w-6 h-6 bg-emerald-600/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-emerald-700/90 transition-opacity ring-1 ring-white/20"
-                title={l('Открепить', 'Ажырату', 'Detach')}
-              >
-                <X className="w-3 h-3" />
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => detach(c.id)}
+                  className="absolute top-1.5 right-1.5 w-6 h-6 bg-emerald-600/70 backdrop-blur-xl text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-emerald-700/90 transition-opacity ring-1 ring-white/20"
+                  title={l('Открепить', 'Ажырату', 'Detach')}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
           ))}
           {/* Stale ids (concept got deleted) — show placeholder so admin knows. */}

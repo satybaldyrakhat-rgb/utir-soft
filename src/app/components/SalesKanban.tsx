@@ -542,7 +542,21 @@ export function SalesKanban({ language }: SalesKanbanProps) {
         </div>
       )}
 
-      {selectedDeal && <ClientOrderModal isOpen={!!selectedDeal} onClose={() => setSelectedDeal(null)} deal={selectedDeal} language={language} />}
+      {/* Pass the LIVE deal from the store rather than the snapshot
+          captured at click-time — otherwise edits from the Telegram bot,
+          the auto-refresh poll, or another teammate wouldn't appear in
+          the open modal until the user closed and reopened it. */}
+      {selectedDeal && (() => {
+        const live = store.deals.find(d => d.id === selectedDeal.id) || selectedDeal;
+        return (
+          <ClientOrderModal
+            isOpen={true}
+            onClose={() => setSelectedDeal(null)}
+            deal={live}
+            language={language}
+          />
+        );
+      })()}
 
       {/* ─── Glass delete-confirmation dialog ─────────────────── */}
       {confirmDelete && (
