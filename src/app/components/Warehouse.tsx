@@ -12,6 +12,34 @@ interface ProdOrder {
   id: number; dealId: string; name: string; client: string; master: string;
   daysLeft: number; progress: number; status: 'working' | 'done' | 'started' | 'paused';
   start: string; end: string; materials: string[];
+  stages?: DealStage[];
+}
+
+// ─── Production stages (5-step workshop flow) ─────────────────────
+// Each in-production deal carries a `stages` array tracking the
+// workshop pipeline: cutting → edging → assembly → packaging →
+// delivery. Stored on the deal JSON blob alongside everything else,
+// so no extra table is needed.
+export type StageStatus = 'pending' | 'in-progress' | 'done';
+export interface DealStage {
+  id: 'cutting' | 'edging' | 'assembly' | 'packaging' | 'delivery';
+  status: StageStatus;
+  startedAt?: string;
+  completedAt?: string;
+  assignee?: string;
+  notes?: string;
+}
+export const DEFAULT_STAGES_TEMPLATE: { id: DealStage['id']; ru: string; kz: string; eng: string; icon: any }[] = [
+  { id: 'cutting',    ru: 'Распил',   kz: 'Кесу',     eng: 'Cutting',   icon: Wrench },
+  { id: 'edging',     ru: 'Кромка',   kz: 'Жиектеу',  eng: 'Edging',    icon: Wrench },
+  { id: 'assembly',   ru: 'Сборка',   kz: 'Жинау',    eng: 'Assembly',  icon: Wrench },
+  { id: 'packaging',  ru: 'Упаковка', kz: 'Орау',     eng: 'Packaging', icon: Package },
+  { id: 'delivery',   ru: 'Доставка', kz: 'Жеткізу',  eng: 'Delivery',  icon: Truck },
+];
+// Build a fresh `stages` array for a deal — used when a deal first
+// enters production and we haven't tracked stages before.
+function makeDefaultStages(): DealStage[] {
+  return DEFAULT_STAGES_TEMPLATE.map(s => ({ id: s.id, status: 'pending' as StageStatus }));
 }
 
 // (Stale mockProducts + prodOrders removed — store is the single source of
@@ -215,6 +243,8 @@ export function Warehouse({ language }: WarehouseProps) {
 
   // Build production orders from store deals. Carry dealId through so the
   // action buttons (start / pause / done) can update the corresponding deal.
+  // `stages` reads from the deal blob if present, else falls back to fresh
+  // defaults (all pending).
   const prodOrders: ProdOrder[] = store.deals
     .filter(d => ['production', 'assembly', 'contract', 'project-agreed', 'manufacturing', 'installation', 'measured'].includes(d.status))
     .map((d, i) => ({
@@ -226,7 +256,43 @@ export function Warehouse({ language }: WarehouseProps) {
       status: d.progress >= 100 ? 'done' as const : d.progress > 50 ? 'working' as const : d.progress > 0 ? 'started' as const : 'paused' as const,
       start: d.measurementDate || d.date, end: d.completionDate || '',
       materials: d.materials ? d.materials.split(', ').slice(0, 3) : [],
+      stages: ((d as any).stages as DealStage[] | undefined) || makeDefaultStages(),
     }));
+
+  // Cycle a stage forward: pending → in-progress → done → pending. Patches
+  // the deal blob with the updated stages array and stamps timestamps as
+  // appropriate. Also auto-bumps deal.progress proportional to completed
+  // stages so the existing progress bar stays in sync without manual edits.
+  async function cycleStage(order: ProdOrder, stageId: DealStage['id']) {
+    const current = order.stages || makeDefaultStages();
+    const now = new Date().toISOString();
+    const nextStatus = (s: StageStatus): StageStatus =>
+      s === 'pending' ? 'in-progress' : s === 'in-progress' ? 'done' : 'pending';
+    const updated = current.map(s => {
+      if (s.id !== stageId) return s;
+      const next = nextStatus(s.status);
+      return {
+        ...s,
+        status: next,
+        startedAt:  next === 'in-progress' ? now : (next === 'pending' ? undefined : s.startedAt),
+        completedAt: next === 'done'       ? now : (next === 'pending' ? undefined : s.completedAt),
+      };
+    });
+    const doneCount = updated.filter(s => s.status === 'done').length;
+    const inProg    = updated.filter(s => s.status === 'in-progress').length;
+    // Progress: completed stages * 20%, with +5% for any in-progress
+    // (so users see immediate feedback when starting a new stage).
+    const newProgress = Math.min(100, doneCount * 20 + (inProg > 0 ? 5 : 0));
+    try {
+      await store.updateDeal(order.dealId, {
+        stages: updated,
+        progress: newProgress,
+        status: doneCount === 5 ? 'completed' : undefined,
+      } as any);
+    } catch (e: any) {
+      alert('Не удалось обновить этап: ' + (e?.message || e));
+    }
+  }
 
   // Production order actions — update the underlying deal's progress so the
   // status badge moves accordingly. Status mapping:
@@ -360,6 +426,40 @@ export function Warehouse({ language }: WarehouseProps) {
                   <div>
                     <div className="flex justify-between text-[9px] mb-1"><span className="text-slate-400">{l('Прогресс', 'Прогресс', 'Progress')}</span><span className="text-gray-900">{o.progress}%</span></div>
                     <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${conf.bar} rounded-full transition-all`} style={{ width: `${o.progress}%` }} /></div>
+                  </div>
+
+                  {/* Stage chain — 5 clickable dots representing the
+                      cutting → edging → assembly → packaging → delivery
+                      workshop pipeline. Click cycles the stage:
+                          pending → in-progress → done → pending */}
+                  <div className="mt-3 grid grid-cols-5 gap-1" onClick={e => e.stopPropagation()}>
+                    {DEFAULT_STAGES_TEMPLATE.map(tpl => {
+                      const stage = (o.stages || []).find(s => s.id === tpl.id);
+                      const status = stage?.status || 'pending';
+                      const label = tpl[language];
+                      const tip = stage?.completedAt
+                        ? `${label} · ${l('завершён', 'аяқталды', 'done')} ${new Date(stage.completedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`
+                        : stage?.startedAt
+                          ? `${label} · ${l('в работе с', 'жұмыста', 'in progress since')} ${new Date(stage.startedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`
+                          : `${label} · ${l('не начат', 'басталмаған', 'not started')}`;
+                      return (
+                        <button
+                          key={tpl.id}
+                          onClick={() => cycleStage(o, tpl.id)}
+                          title={tip}
+                          className={`flex flex-col items-center gap-1 py-1.5 rounded-xl ring-1 transition-all ${
+                            status === 'done'        ? 'bg-emerald-100/80 text-emerald-700 ring-emerald-200/60' :
+                            status === 'in-progress' ? 'bg-amber-100/80 text-amber-700 ring-amber-200/60' :
+                                                       'bg-white/40 text-slate-400 ring-white/60 hover:bg-white/70'
+                          }`}
+                        >
+                          <span className="text-[10px] leading-none">
+                            {status === 'done' ? '✓' : status === 'in-progress' ? '●' : '○'}
+                          </span>
+                          <span className="text-[8px] leading-none truncate max-w-full px-1">{label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Action buttons — stop propagation so they don't open
