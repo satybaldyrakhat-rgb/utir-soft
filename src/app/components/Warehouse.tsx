@@ -13,6 +13,23 @@ interface ProdOrder {
   daysLeft: number; progress: number; status: 'working' | 'done' | 'started' | 'paused';
   start: string; end: string; materials: string[];
   stages?: DealStage[];
+  consumed?: ConsumedMaterial[];
+}
+
+// ─── Material consumption per deal ────────────────────────────────
+// When the workshop pulls material from stock onto a specific deal,
+// we record it on the deal blob. Each row carries the source product
+// id (to look up cost / category later), name (snapshot — if the
+// product gets renamed the deal still shows what was actually used),
+// qty / unit, and timestamp.
+export interface ConsumedMaterial {
+  productId: string;
+  productName: string;
+  qty: number;
+  unit: string;
+  costPerUnit: number;
+  deductedAt: string;
+  by?: string; // employee who deducted
 }
 
 // ─── Production stages (5-step workshop flow) ─────────────────────
@@ -257,7 +274,53 @@ export function Warehouse({ language }: WarehouseProps) {
       start: d.measurementDate || d.date, end: d.completionDate || '',
       materials: d.materials ? d.materials.split(', ').slice(0, 3) : [],
       stages: ((d as any).stages as DealStage[] | undefined) || makeDefaultStages(),
+      consumed: ((d as any).consumed as ConsumedMaterial[] | undefined) || [],
     }));
+
+  // ─── Material consumption ────────────────────────────────────────
+  // Single source of truth for the «Списать материалы» modal — captures
+  // which order is being acted on and a temporary picklist while the
+  // admin chooses qty per item.
+  const [consumeForOrder, setConsumeForOrder] = useState<ProdOrder | null>(null);
+
+  async function deductMaterials(order: ProdOrder, picks: { product: Product; qty: number }[]) {
+    if (picks.length === 0) return;
+    const now = new Date().toISOString();
+    const newEntries: ConsumedMaterial[] = picks
+      .filter(p => p.qty > 0)
+      .map(p => ({
+        productId:   p.product.id,
+        productName: p.product.name,
+        qty:         p.qty,
+        unit:        p.product.unit,
+        costPerUnit: p.product.cost,
+        deductedAt:  now,
+      }));
+    if (newEntries.length === 0) return;
+    // Append to existing consumption history (don't overwrite).
+    const merged = [...(order.consumed || []), ...newEntries];
+    try {
+      // 1) Deduct from each product's quantity. Cap at 0 so we don't
+      //    end up with negative stock — if the user overstates, we
+      //    write zero and flag in the activity log (future work).
+      for (const e of newEntries) {
+        const prod = store.products.find(p => p.id === e.productId);
+        if (!prod) continue;
+        const nextQty = Math.max(0, prod.quantity - e.qty);
+        const nextStatus =
+          nextQty === 0                ? 'outofstock' :
+          nextQty < (prod.minQty || 0) ? 'low'        :
+                                          'instock';
+        await store.updateProduct(prod.id, { quantity: nextQty, status: nextStatus as any });
+      }
+      // 2) Patch the deal with the new consumed list.
+      await store.updateDeal(order.dealId, { consumed: merged } as any);
+      flash(l(`Списано ${newEntries.length} позиций`, `${newEntries.length} позиция жазылды`, `Deducted ${newEntries.length} items`));
+      setConsumeForOrder(null);
+    } catch (e: any) {
+      flash(l('Ошибка: ', 'Қате: ', 'Error: ') + (e?.message || e));
+    }
+  }
 
   // Cycle a stage forward: pending → in-progress → done → pending. Patches
   // the deal blob with the updated stages array and stamps timestamps as
@@ -462,6 +525,42 @@ export function Warehouse({ language }: WarehouseProps) {
                     })}
                   </div>
 
+                  {/* Consumed materials preview — shows up after the user
+                       starts deducting stock onto this order. Compact list
+                       with running cost subtotal. */}
+                  {(o.consumed && o.consumed.length > 0) && (
+                    <div className="mt-3 bg-white/40 ring-1 ring-white/60 rounded-2xl px-3 py-2 space-y-0.5">
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1 flex items-center justify-between">
+                        <span>{l('Использовано', 'Қолданылды', 'Used')}</span>
+                        <span className="tabular-nums text-slate-700">
+                          {Math.round(o.consumed.reduce((s, c) => s + c.qty * c.costPerUnit, 0)).toLocaleString('ru-RU')} ₸
+                        </span>
+                      </div>
+                      {o.consumed.slice(0, 4).map((c, i) => (
+                        <div key={i} className="text-[11px] flex items-center justify-between gap-2">
+                          <span className="text-slate-700 truncate">{c.productName}</span>
+                          <span className="text-slate-500 tabular-nums flex-shrink-0">{c.qty} {c.unit}</span>
+                        </div>
+                      ))}
+                      {o.consumed.length > 4 && (
+                        <div className="text-[10px] text-slate-400 italic">+ {o.consumed.length - 4} {l('ещё', 'тағы', 'more')}</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Consume materials CTA — appears below the stage chain
+                       so admin can pull stock onto this order in one click. */}
+                  <div className="mt-3" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => setConsumeForOrder(o)}
+                      className="w-full inline-flex items-center justify-center gap-1.5 text-[11px] px-3 py-1.5 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-xl text-slate-700 transition-colors"
+                      title={l('Списать материалы со склада', 'Қоймадан материалдарды жазу', 'Deduct materials from stock')}
+                    >
+                      <Package className="w-3 h-3" />
+                      {l('Списать материалы', 'Материалдарды жазу', 'Deduct materials')}
+                    </button>
+                  </div>
+
                   {/* Action buttons — stop propagation so they don't open
                        the order details modal at the same time. Each one
                        calls the underlying deal API (see setOrderState). */}
@@ -652,6 +751,17 @@ export function Warehouse({ language }: WarehouseProps) {
           suppliers={suppliers}
           onClose={() => { setShowPoModal(false); setEditingPo(null); }}
           onSave={savePo}
+        />
+      )}
+
+      {/* Material consumption modal — deduct stock onto a specific order */}
+      {consumeForOrder && (
+        <ConsumeMaterialsModal
+          language={language}
+          order={consumeForOrder}
+          products={store.products}
+          onClose={() => setConsumeForOrder(null)}
+          onSave={(picks) => deductMaterials(consumeForOrder, picks)}
         />
       )}
 
@@ -1700,6 +1810,121 @@ function PoModal({
               className="px-4 py-2 bg-emerald-600 disabled:opacity-40 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
             >
               {l('Сохранить', 'Сақтау', 'Save')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Material consumption modal ──────────────────────────────────
+// «Списать материалы» picker for a specific production order. Lists
+// every stock product with a per-row qty input, plus a search box
+// since teams with 100+ SKUs need filtering. Saves all non-zero qty
+// rows in one go, then closes.
+function ConsumeMaterialsModal({
+  language, order, products, onClose, onSave,
+}: {
+  language: 'kz' | 'ru' | 'eng';
+  order: { dealId: string; name: string; client: string };
+  products: Product[];
+  onClose: () => void;
+  onSave: (picks: { product: Product; qty: number }[]) => void;
+}) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [q, setQ] = useState('');
+  const [picks, setPicks] = useState<Record<string, number>>({});
+  const filtered = products.filter(p =>
+    p.quantity > 0 && (!q.trim() || (p.name + ' ' + p.category).toLowerCase().includes(q.toLowerCase())),
+  );
+  const INPUT = 'px-2 py-1.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs focus:outline-none focus:bg-white focus:ring-slate-300 transition-all w-20 text-center';
+  const totalCost = filtered.reduce((s, p) => s + ((picks[p.id] || 0) * p.cost), 0);
+  const totalRows = Object.values(picks).filter(v => v > 0).length;
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]">
+        <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between flex-shrink-0">
+          <div className="min-w-0">
+            <div className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Расход материалов', 'Материал шығыны', 'Material consumption')}</div>
+            <div className="text-base text-slate-900 tracking-tight truncate">{order.name}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">{order.client}</div>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+
+        <div className="px-6 pt-4 pb-2 flex-shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              type="text"
+              autoFocus
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder={l('Поиск по складу...', 'Қойма іздеу...', 'Search stock...')}
+              className="w-full pl-9 pr-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-1.5">
+          {filtered.length === 0 ? (
+            <div className="text-center text-xs text-slate-400 py-10">
+              {q ? l('Не найдено', 'Табылмады', 'Not found') : l('Склад пуст — сначала добавьте материалы', 'Қойма бос — алдымен материал қосыңыз', 'Stock empty — add materials first')}
+            </div>
+          ) : filtered.map(p => {
+            const picked = picks[p.id] || 0;
+            const over = picked > p.quantity;
+            return (
+              <div key={p.id} className={`flex items-center gap-3 bg-white/40 ring-1 ring-white/60 rounded-2xl px-3 py-2 ${over ? 'ring-rose-200/80' : ''}`}>
+                <div className="w-8 h-8 bg-white/60 ring-1 ring-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Package className="w-3.5 h-3.5 text-slate-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-slate-900 truncate">{p.name}</div>
+                  <div className="text-[10px] text-slate-500 flex items-center gap-2">
+                    <span>{p.category}</span>
+                    <span>· {p.quantity} {p.unit} {l('в наличии', 'қолда', 'in stock')}</span>
+                    <span>· {p.cost.toLocaleString('ru-RU')} ₸/{p.unit}</span>
+                  </div>
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  max={p.quantity}
+                  step={0.5}
+                  value={picked || ''}
+                  placeholder="0"
+                  onChange={e => setPicks(prev => ({ ...prev, [p.id]: Number(e.target.value) || 0 }))}
+                  className={`${INPUT} flex-shrink-0`}
+                />
+                <span className="text-[10px] text-slate-500 w-8 flex-shrink-0">{p.unit}</span>
+                <div className="text-[11px] text-slate-700 tabular-nums w-20 text-right flex-shrink-0">
+                  {picked > 0 ? `${Math.round(picked * p.cost).toLocaleString('ru-RU')} ₸` : '—'}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="px-6 py-4 border-t border-white/60 flex items-center justify-between flex-shrink-0">
+          <div className="text-sm text-slate-700">
+            <span className="text-slate-500">{l('Позиций:', 'Позиция:', 'Items:')}</span> <b className="tabular-nums">{totalRows}</b>
+            <span className="ml-3 text-slate-500">{l('Сумма:', 'Сома:', 'Total:')}</span> <b className="tabular-nums">{Math.round(totalCost).toLocaleString('ru-RU')} ₸</b>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-4 py-2 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-2xl text-xs hover:bg-white transition-colors">
+              {l('Отмена', 'Бас тарту', 'Cancel')}
+            </button>
+            <button
+              onClick={() => onSave(filtered.filter(p => (picks[p.id] || 0) > 0).map(p => ({ product: p, qty: picks[p.id] })))}
+              disabled={totalRows === 0}
+              className="px-4 py-2 bg-emerald-600 disabled:opacity-40 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+            >
+              {l('Списать', 'Жазу', 'Deduct')}
             </button>
           </div>
         </div>
