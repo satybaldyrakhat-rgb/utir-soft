@@ -12,6 +12,10 @@ export interface Deal {
   phone: string;
   address: string;          // client / billing address
   siteAddress?: string;     // site / object address
+  // КЗ-стандарт: БИН/ИИН клиента — нужен для счёт-фактур, актов
+  // и НДС-операций. У физлица 12 цифр (ИИН), у юрлица тоже 12 цифр
+  // (БИН). Хранится как строка чтобы не терять ведущие нули.
+  customerBIN?: string;
   workType?: WorkTypeKey;   // user-picked classifier
   product: string;
   furnitureType: string;

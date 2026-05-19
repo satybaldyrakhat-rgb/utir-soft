@@ -144,6 +144,8 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   // kanban drag-and-drop). Now editable inline; changes drive Production
   // module visibility, Telegram notifications, and progress derivation.
   const [status, setStatus] = useState(deal.status || 'new');
+  // КЗ-стандарт: БИН/ИИН клиента — нужен для счёта и акта. 12 цифр.
+  const [customerBIN, setCustomerBIN] = useState(deal.customerBIN || '');
   // Document attachments. Persisted on the deal blob alongside everything
   // else. Max 5 MB / file, max 10 files (see MAX_DOC_* constants).
   const [documents, setDocuments] = useState<DealDoc[]>((deal as any).documents || []);
@@ -187,6 +189,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     setNotes(deal.notes || '');
     setPaidAmount(deal.paidAmount || 0);
     setStatus(deal.status || 'new');
+    setCustomerBIN(deal.customerBIN || '');
     setDocuments((deal as any).documents || []);
     setDirty(false);
   }, [deal.id, deal.phone, deal.address, deal.siteAddress, deal.source, deal.measurer,
@@ -399,6 +402,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         paidAmount,
         paymentMethods,
         status,
+        customerBIN,
         // Auto-derive progress from status so the kanban and progress
         // bar stay in sync without a separate manual edit.
         progress: STATUS_OPTIONS.find(o => o.id === status)?.progress ?? deal.progress ?? 0,
@@ -466,12 +470,13 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       notes !== (deal.notes || '') ||
       paidAmount !== (deal.paidAmount || 0) ||
       status !== (deal.status || 'new') ||
+      customerBIN !== (deal.customerBIN || '') ||
       JSON.stringify(paymentMethods) !== JSON.stringify(deal.paymentMethods || {}) ||
       JSON.stringify(documents.map(d => d.id).sort()) !== JSON.stringify(((deal as any).documents || []).map((d: DealDoc) => d.id).sort());
     setDirty(changed);
   }, [phone, address, siteAddress, source, measurer, designer, foreman, architect,
       ownerId, furnitureType, materials, measurementDate, completionDate,
-      installationDate, notes, paidAmount, status, paymentMethods, documents, deal]);
+      installationDate, notes, paidAmount, status, customerBIN, paymentMethods, documents, deal]);
 
   // Status helpers — used by progress bar + timeline derivation.
   const sIdx = statusIndex(status);
@@ -545,6 +550,17 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                   <FieldSelect label={l('Источник', 'Көзі', 'Source')} value={source} onChange={setSource}>
                     <option>Instagram</option><option>WhatsApp</option><option>Facebook</option><option>{l('Реклама', 'Жарнама', 'Ads')}</option><option>{l('Рекомендация', 'Ұсыныс', 'Referral')}</option>
                   </FieldSelect>
+                </div>
+                {/* БИН/ИИН — нужен для счёт-фактур и актов. 12 цифр. */}
+                <div className="mt-3">
+                  <FieldInput
+                    label={l('БИН / ИИН клиента', 'БИН / ЖСН', 'BIN / IIN')}
+                    value={customerBIN}
+                    onChange={(v: string) => setCustomerBIN(v.replace(/[^0-9]/g, '').slice(0, 12))}
+                    placeholder="123456789012"
+                    inputMode="numeric"
+                    maxLength={12}
+                  />
                 </div>
               </section>
 

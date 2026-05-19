@@ -7,26 +7,35 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// Cache the loaded font across all PDF generations so we don't re-fetch.
+// Cache the loaded fonts across all PDF generations so we don't re-fetch.
 let cachedRobotoBase64: string | null = null;
+let cachedRobotoBoldBase64: string | null = null;
 
-async function loadRobotoFont(): Promise<string> {
-  if (cachedRobotoBase64) return cachedRobotoBase64;
-  // Roboto Regular as a stable TTF — jsdelivr serves Google's own font
-  // repo so this is high-availability and free.
-  const url = 'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Regular.ttf';
+async function fetchTtfAsBase64(url: string): Promise<string> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error('Не удалось загрузить шрифт для PDF');
+  if (!res.ok) throw new Error('font fetch failed: HTTP ' + res.status);
   const buf = await res.arrayBuffer();
-  // ArrayBuffer → binary string → base64 (chunked to avoid call stack limits).
   let binary = '';
   const bytes = new Uint8Array(buf);
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
-  cachedRobotoBase64 = btoa(binary);
-  return cachedRobotoBase64;
+  return btoa(binary);
+}
+
+async function loadRobotoFonts(): Promise<{ regular: string; bold: string }> {
+  // jsdelivr serves Google's own font repo — high-availability + free.
+  // Roboto covers Cyrillic for Russian. Loaded in parallel.
+  if (!cachedRobotoBase64 || !cachedRobotoBoldBase64) {
+    const [r, b] = await Promise.all([
+      cachedRobotoBase64     ?? fetchTtfAsBase64('https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Regular.ttf'),
+      cachedRobotoBoldBase64 ?? fetchTtfAsBase64('https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Bold.ttf'),
+    ]);
+    cachedRobotoBase64 = r;
+    cachedRobotoBoldBase64 = b;
+  }
+  return { regular: cachedRobotoBase64, bold: cachedRobotoBoldBase64 };
 }
 
 // Sentinel error so callers can branch on font-load failure (show a toast
@@ -38,9 +47,14 @@ export class PdfFontError extends Error {
 async function newDoc(): Promise<jsPDF> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   try {
-    const fontBase64 = await loadRobotoFont();
-    doc.addFileToVFS('Roboto-Regular.ttf', fontBase64);
+    const { regular, bold } = await loadRobotoFonts();
+    doc.addFileToVFS('Roboto-Regular.ttf', regular);
     doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+    // Register Bold as a separate weight so autoTable's default bold
+    // headers stay on Roboto (instead of falling back to Helvetica,
+    // which has no Cyrillic glyphs and prints "????").
+    doc.addFileToVFS('Roboto-Bold.ttf', bold);
+    doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
     doc.setFont('Roboto', 'normal');
   } catch (e) {
     // Without the Cyrillic font, jsPDF's built-in fonts only support
@@ -174,7 +188,7 @@ export async function generatePaymentsPDF(deals: PaymentDealRow[], opts?: { comp
     head: [['Клиент', 'Продукт', 'Дата', 'Сумма', 'Оплачено', 'Остаток', 'Статус']],
     body: rows,
     styles: { font: 'Roboto', fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
-    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'normal', font: 'Roboto' },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', font: 'Roboto' },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     columnStyles: {
       3: { halign: 'right' },
@@ -183,21 +197,19 @@ export async function generatePaymentsPDF(deals: PaymentDealRow[], opts?: { comp
       6: { halign: 'center' },
     },
     margin: { left: 14, right: 14 },
-    didDrawCell: data => {
-      // Color the status cell green/amber/grey based on text.
+    // Color the status cell text green/amber/grey based on label. Using
+    // didParseCell (runs BEFORE drawing) sets the style cleanly — the
+    // previous didDrawCell-with-manual-text-draw approach left the
+    // original black text underneath the colored draw, producing a
+    // double-printed look.
+    didParseCell: data => {
       if (data.section === 'body' && data.column.index === 6) {
         const label = String(data.cell.raw);
         const colour: [number, number, number] | null =
           label === 'Оплачен'   ? [16, 185, 129] :
           label === 'Частично'  ? [245, 158, 11] :
           label === 'Ожидает'   ? [100, 116, 139] : null;
-        if (colour) {
-          doc.setTextColor(...colour);
-          doc.setFontSize(8);
-          doc.text(label, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center', baseline: 'middle' });
-          // Tell autoTable we drew it ourselves so it doesn't redraw.
-          (data.cell as any).text = [''];
-        }
+        if (colour) data.cell.styles.textColor = colour;
       }
     },
   });
@@ -281,7 +293,7 @@ export async function generateFinancePDF(transactions: FinanceTxRow[], opts?: { 
       head: [['Категория', 'Сумма', 'Доля']],
       body: incomeByCat.map(c => [c.key, KZT(c.sum), pct(c.sum, income)]),
       styles: { font: 'Roboto', fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
-      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
       margin: { left: 14, right: 14 },
@@ -299,7 +311,7 @@ export async function generateFinancePDF(transactions: FinanceTxRow[], opts?: { 
       head: [['Категория', 'Сумма', 'Доля']],
       body: expenseByCat.map(c => [c.key, KZT(c.sum), pct(c.sum, expense)]),
       styles: { font: 'Roboto', fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
-      headStyles: { fillColor: [239, 68, 68], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+      headStyles: { fillColor: [239, 68, 68], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
       margin: { left: 14, right: 14 },
@@ -327,7 +339,7 @@ export async function generateFinancePDF(transactions: FinanceTxRow[], opts?: { 
         (t.type === 'income' ? '+' : '−') + KZT(t.amount),
       ]),
       styles: { font: 'Roboto', fontSize: 7.5, cellPadding: 1.8, textColor: [30, 41, 59] },
-      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       columnStyles: { 4: { halign: 'right' } },
       margin: { left: 14, right: 14 },
@@ -394,9 +406,14 @@ export interface InvoiceDeal {
   id: string;
   customerName: string;
   customerPhone?: string;
+  customerBIN?: string;     // БИН/ИИН покупателя — обязательно для B2B
+  customerAddress?: string; // юр. адрес покупателя
   product?: string;
   amount: number;
   paidAmount?: number;
+  // VAT mode: 'with' = в т.ч. НДС 12% (КЗ-стандарт, по умолчанию),
+  //          'without' = без НДС, 'exempt' = освобождён от НДС.
+  vatMode?: 'with' | 'without' | 'exempt';
 }
 
 export async function generateInvoicePDF(deal: InvoiceDeal, requisites: CompanyRequisites = {}, opts?: { invoiceNumber?: string }) {
@@ -434,11 +451,28 @@ export async function generateInvoicePDF(deal: InvoiceDeal, requisites: CompanyR
   doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
   doc.text(deal.customerName, 14, y);   y += 4.5;
-  if (deal.customerPhone) { doc.text(`Телефон: ${deal.customerPhone}`, 14, y); y += 4.5; }
+  // КЗ-стандарт: БИН/ИИН покупателя обязателен для B2B счетов и нужен
+  // для оформления НДС-операций. Если пустой — на бланке остаётся
+  // подсказка с пустой строкой для ручного заполнения.
+  if (deal.customerBIN) {
+    doc.text(`БИН/ИИН: ${deal.customerBIN}`, 14, y); y += 4.5;
+  } else {
+    doc.setTextColor(180, 180, 180);
+    doc.text('БИН/ИИН: ___________________', 14, y); y += 4.5;
+    doc.setTextColor(15, 23, 42);
+  }
+  if (deal.customerAddress) { doc.text(`Адрес: ${deal.customerAddress}`, 14, y); y += 4.5; }
+  if (deal.customerPhone)   { doc.text(`Телефон: ${deal.customerPhone}`, 14, y); y += 4.5; }
   y += 4;
 
   // ─── Line items table ─────────────────────────────────────────
   const remaining = Math.max(0, deal.amount - (deal.paidAmount || 0));
+  // НДС-расчёт. KZ-стандарт: ставка 12%, выделяется ИЗ суммы (включая),
+  // если сделка с НДС. vatMode = 'without' → НДС = 0, всё чистая база.
+  // vatMode = 'exempt' → показываем «без НДС» отдельной строкой.
+  const vatMode = deal.vatMode || 'with';
+  const vatAmount  = vatMode === 'with' ? Math.round(deal.amount * 12 / 112) : 0;
+  const netAmount  = deal.amount - vatAmount;
   autoTable(doc, {
     startY: y,
     head: [['№', 'Наименование', 'Кол-во', 'Цена', 'Сумма']],
@@ -446,7 +480,7 @@ export async function generateInvoicePDF(deal: InvoiceDeal, requisites: CompanyR
       ['1', deal.product || `Заказ ${deal.id}`, '1', KZT(deal.amount), KZT(deal.amount)],
     ],
     styles: { font: 'Roboto', fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
-    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
     columnStyles: {
       0: { halign: 'center', cellWidth: 12 },
       2: { halign: 'center', cellWidth: 20 },
@@ -462,14 +496,20 @@ export async function generateInvoicePDF(deal: InvoiceDeal, requisites: CompanyR
   doc.setFontSize(9);
   doc.setTextColor(120, 120, 120);
   const label = (text: string, val: string, bold = false) => {
-    doc.setTextColor(120, 120, 120); doc.text(text, rightX - 60, y);
+    doc.setTextColor(120, 120, 120); doc.text(text, rightX - 70, y);
     if (bold) doc.setFontSize(11);
     doc.setTextColor(15, 23, 42);
     doc.text(val, rightX, y, { align: 'right' });
     if (bold) doc.setFontSize(9);
     y += 5.5;
   };
-  label('Всего к оплате:', KZT(deal.amount));
+  label('Сумма без НДС:', KZT(netAmount));
+  if (vatMode === 'with') {
+    label('в т.ч. НДС 12%:', KZT(vatAmount));
+  } else if (vatMode === 'exempt') {
+    label('НДС:', 'Без НДС');
+  }
+  label('Всего к оплате:', KZT(deal.amount), true);
   if (deal.paidAmount && deal.paidAmount > 0) label('Уже оплачено:', KZT(deal.paidAmount));
   if (remaining !== deal.amount) label('Остаток к оплате:', KZT(remaining), true);
 
@@ -488,21 +528,23 @@ export async function generateInvoicePDF(deal: InvoiceDeal, requisites: CompanyR
   y += 16;
 
   // ─── Director signature line ──────────────────────────────────
-  doc.setDrawColor(180, 180, 180);
-  doc.line(14, y + 8, 90, y + 8);
-  doc.setFontSize(8); doc.setTextColor(120, 120, 120);
-  doc.text('Директор / подпись', 14, y + 12);
+  // Name above the line, "Директор / подпись · дата" caption below.
   if (requisites.director) {
-    doc.setFontSize(9); doc.setTextColor(15, 23, 42);
-    doc.text(requisites.director, 14, y + 6);
+    doc.setFontSize(9); doc.setTextColor(80, 80, 80);
+    doc.text(requisites.director, 14, y + 4);
   }
-  // М.П. on the right
+  doc.setDrawColor(180, 180, 180);
+  doc.line(14, y + 10, 90, y + 10);
+  doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+  doc.text('Директор / подпись · дата', 14, y + 14);
+  // М.П. circle moved up + smaller so it doesn't bleed into the
+  // signature underline.
   doc.setDrawColor(200, 200, 200);
   doc.setLineDashPattern([1, 1], 0);
-  doc.circle(pageW - 35, y + 4, 14);
+  doc.circle(pageW - 30, y + 6, 10);
   doc.setLineDashPattern([], 0);
   doc.setFontSize(8); doc.setTextColor(180, 180, 180);
-  doc.text('М. П.', pageW - 38, y + 5);
+  doc.text('М.П.', pageW - 34, y + 7);
 
   drawFooter(doc);
   doc.save(`schet-${num}-${todayStamp()}.pdf`);
@@ -629,7 +671,7 @@ export async function generateAgingPDF(deals: AgingDealRow[], opts?: { company?:
     head: [['Клиент', 'Продукт', 'Просрочка', 'Корзина', 'К получению']],
     body: rows,
     styles: { font: 'Roboto', fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
-    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     columnStyles: { 2: { halign: 'right' }, 3: { halign: 'center' }, 4: { halign: 'right' } },
     margin: { left: 14, right: 14 },
@@ -644,7 +686,17 @@ export async function generateAgingPDF(deals: AgingDealRow[], opts?: { company?:
 // breakdown, COGS, gross profit, opex, net profit + margins. Distinct
 // from generateFinancePDF (which is more of an operations log) — P&L
 // is the formal report you'd hand to an accountant.
-export async function generatePLPDF(transactions: FinanceTxRow[], opts: { period: { from: Date; to: Date }; company?: string }) {
+// Category keywords used to split expense categories into COGS (direct
+// costs of producing the goods/services) vs OPEX (overhead). Tuned for
+// the furniture / construction business that's our primary user.
+const COGS_KEYWORDS = ['материал', 'фурнитур', 'распил', 'кромк', 'плит', 'мдф', 'лдсп',
+                       'комплектующ', 'себестоимост', 'закупк', 'cogs', 'cost of goods'];
+function isCOGS(category: string): boolean {
+  const low = (category || '').toLowerCase();
+  return COGS_KEYWORDS.some(k => low.includes(k));
+}
+
+export async function generatePLPDF(transactions: FinanceTxRow[], opts: { period: { from: Date; to: Date }; company?: string; taxRate?: number }) {
   const doc = await newDoc();
   drawHeader(
     doc, 'Отчёт о прибылях и убытках',
@@ -654,27 +706,57 @@ export async function generatePLPDF(transactions: FinanceTxRow[], opts: { period
 
   const scoped = filterByPeriod(transactions, opts.period).filter(t => t.status === 'completed');
   const revenueByCat = groupSum(scoped.filter(t => t.type === 'income'),  t => t.category, t => t.amount);
-  const expenseByCat = groupSum(scoped.filter(t => t.type === 'expense'), t => t.category, t => t.amount);
-  const revenue = revenueByCat.reduce((s, c) => s + c.sum, 0);
-  const expense = expenseByCat.reduce((s, c) => s + c.sum, 0);
-  const profit  = revenue - expense;
-  const margin  = revenue > 0 ? (profit / revenue * 100) : 0;
+  const allExpenses  = scoped.filter(t => t.type === 'expense');
+  // Split expenses into COGS (direct cost of sales) vs OPEX (overhead).
+  // The split lets us show Gross Profit + EBIT — the classic KZ P&L
+  // structure that an accountant expects.
+  const cogsByCat   = groupSum(allExpenses.filter(t => isCOGS(t.category)),  t => t.category, t => t.amount);
+  const opexByCat   = groupSum(allExpenses.filter(t => !isCOGS(t.category)), t => t.category, t => t.amount);
+  const revenue     = revenueByCat.reduce((s, c) => s + c.sum, 0);
+  const cogs        = cogsByCat.reduce((s, c) => s + c.sum, 0);
+  const opex        = opexByCat.reduce((s, c) => s + c.sum, 0);
+  const grossProfit = revenue - cogs;
+  const ebit        = grossProfit - opex;
+  // KZ default КПН (corporate income tax) is 20%. Override via opts.taxRate.
+  const taxRate     = opts.taxRate ?? 0.20;
+  const tax         = ebit > 0 ? Math.round(ebit * taxRate) : 0;
+  const netProfit   = ebit - tax;
+  const grossMargin = revenue > 0 ? (grossProfit / revenue * 100) : 0;
+  const netMargin   = revenue > 0 ? (netProfit  / revenue * 100) : 0;
 
   let y = 38;
   y = drawKpiCards(doc, y, [
-    { label: 'Выручка', value: KZT(revenue), accent: [16, 185, 129] },
-    { label: 'Расходы', value: KZT(expense), accent: [239, 68, 68] },
-    { label: 'Прибыль', value: KZT(profit),  sub: `маржа ${margin.toFixed(1)}%`, accent: [99, 102, 241] },
+    { label: 'Выручка',         value: KZT(revenue),    accent: [16, 185, 129] },
+    { label: 'Валовая прибыль', value: KZT(grossProfit), sub: `маржа ${grossMargin.toFixed(1)}%`, accent: [99, 102, 241] },
+    { label: 'EBIT',            value: KZT(ebit),       accent: [99, 102, 241] },
+    { label: 'Чистая прибыль',  value: KZT(netProfit),  sub: `маржа ${netMargin.toFixed(1)}%`,   accent: netProfit >= 0 ? [16, 185, 129] : [239, 68, 68] },
   ]);
 
-  // P&L statement table — classic accountant layout
+  // P&L statement table — classic KZ-accountant layout:
+  //   Выручка
+  //     - COGS (себестоимость)
+  //   = Валовая прибыль
+  //     - OPEX (операционные расходы)
+  //   = EBIT (операционная прибыль)
+  //     - КПН (corporate tax)
+  //   = Чистая прибыль
   const rows: Array<[string, string]> = [];
   rows.push(['ВЫРУЧКА', KZT(revenue)]);
   revenueByCat.forEach(c => rows.push([`  ${c.key}`, KZT(c.sum)]));
-  rows.push(['РАСХОДЫ', KZT(expense)]);
-  expenseByCat.forEach(c => rows.push([`  ${c.key}`, KZT(c.sum)]));
-  rows.push(['ПРИБЫЛЬ ДО НАЛОГОВ', KZT(profit)]);
-  rows.push(['МАРЖА', `${margin.toFixed(1)} %`]);
+  if (cogsByCat.length > 0) {
+    rows.push(['СЕБЕСТОИМОСТЬ (COGS)', `(${KZT(cogs)})`]);
+    cogsByCat.forEach(c => rows.push([`  ${c.key}`, `(${KZT(c.sum)})`]));
+  }
+  rows.push(['ВАЛОВАЯ ПРИБЫЛЬ', KZT(grossProfit)]);
+  rows.push([`  Валовая маржа`, `${grossMargin.toFixed(1)} %`]);
+  if (opexByCat.length > 0) {
+    rows.push(['ОПЕРАЦИОННЫЕ РАСХОДЫ (OPEX)', `(${KZT(opex)})`]);
+    opexByCat.forEach(c => rows.push([`  ${c.key}`, `(${KZT(c.sum)})`]));
+  }
+  rows.push(['ПРИБЫЛЬ ДО НАЛОГА (EBIT)', KZT(ebit)]);
+  rows.push([`КПН ${(taxRate * 100).toFixed(0)} %`, `(${KZT(tax)})`]);
+  rows.push(['ЧИСТАЯ ПРИБЫЛЬ', KZT(netProfit)]);
+  rows.push([`  Чистая маржа`, `${netMargin.toFixed(1)} %`]);
 
   autoTable(doc, {
     startY: y,
@@ -685,10 +767,19 @@ export async function generatePLPDF(transactions: FinanceTxRow[], opts: { period
       1: { halign: 'right' },
     },
     didParseCell: data => {
-      const txt = String(data.cell.raw);
-      if (/^(ВЫРУЧКА|РАСХОДЫ|ПРИБЫЛЬ|МАРЖА)/.test(txt)) {
+      // Color header rows for the major P&L lines. Match on row index
+      // (column 0) so both cells in the row get the styling.
+      if (data.section !== 'body') return;
+      const rowText = String((data.row.raw as any[])?.[0] ?? '');
+      if (/^(ВЫРУЧКА|СЕБЕСТОИМОСТЬ|ВАЛОВАЯ ПРИБЫЛЬ|ОПЕРАЦИОННЫЕ|ПРИБЫЛЬ ДО НАЛОГА|ЧИСТАЯ ПРИБЫЛЬ|КПН)/.test(rowText)) {
         data.cell.styles.fillColor = [241, 245, 249];
         data.cell.styles.textColor = [15, 23, 42];
+        data.cell.styles.fontStyle = 'bold';
+      }
+      // Highlight the final net-profit line emphatically.
+      if (/^ЧИСТАЯ ПРИБЫЛЬ/.test(rowText)) {
+        data.cell.styles.fillColor = netProfit >= 0 ? [220, 252, 231] : [254, 226, 226];
+        data.cell.styles.textColor = netProfit >= 0 ? [4, 120, 87] : [153, 27, 27];
       }
     },
     margin: { left: 14, right: 14 },
@@ -705,6 +796,8 @@ export async function generatePLPDF(transactions: FinanceTxRow[], opts: { period
 export interface ActDeal {
   id: string;
   customerName: string;
+  customerBIN?: string;     // БИН/ИИН заказчика — обязательно для KZ
+  customerAddress?: string;
   product?: string;
   amount: number;
   // Optional override of the act date; defaults to today.
@@ -735,7 +828,17 @@ export async function generateActPDF(deal: ActDeal, requisites: CompanyRequisite
   doc.setFontSize(10); doc.setTextColor(120, 120, 120);
   doc.text('Заказчик', 14, y); y += 5;
   doc.setFontSize(9);  doc.setTextColor(15, 23, 42);
-  doc.text(deal.customerName, 14, y); y += 6;
+  doc.text(deal.customerName, 14, y); y += 4.5;
+  // КЗ-стандарт: БИН/ИИН заказчика обязателен для оформления акта.
+  if (deal.customerBIN) {
+    doc.text(`БИН/ИИН: ${deal.customerBIN}`, 14, y); y += 4.5;
+  } else {
+    doc.setTextColor(180, 180, 180);
+    doc.text('БИН/ИИН: ___________________', 14, y); y += 4.5;
+    doc.setTextColor(15, 23, 42);
+  }
+  if (deal.customerAddress) { doc.text(`Адрес: ${deal.customerAddress}`, 14, y); y += 4.5; }
+  y += 2;
 
   // Body paragraph (formal КЗ language)
   doc.setFontSize(9.5); doc.setTextColor(15, 23, 42);
@@ -753,7 +856,7 @@ export async function generateActPDF(deal: ActDeal, requisites: CompanyRequisite
       ['1', deal.product || `Работы по заказу ${deal.id}`, '1', KZT(deal.amount), KZT(deal.amount)],
     ],
     styles: { font: 'Roboto', fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
-    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
     columnStyles: {
       0: { halign: 'center', cellWidth: 12 },
       2: { halign: 'center', cellWidth: 20 },
@@ -781,23 +884,34 @@ export async function generateActPDF(deal: ActDeal, requisites: CompanyRequisite
   );
   y += 16;
 
-  // Two signature blocks side by side
+  // Two signature blocks side by side. М.П. circle was overlapping
+  // the signature underline at y+14 (radius 12 centered at y+10 → bottom
+  // at y+22). Fixed by placing the circle ABOVE the signature line and
+  // making it smaller so it doesn't crowd the «подпись» caption.
   const halfW = (pageW - 28 - 10) / 2;
   const drawSignBlock = (x: number, label: string, name?: string) => {
+    // Header label
     doc.setFontSize(9); doc.setTextColor(15, 23, 42);
     doc.text(label, x, y);
+    // Name above the line (if known) — fills the role «who is signing»
+    if (name) {
+      doc.setFontSize(9); doc.setTextColor(80, 80, 80);
+      doc.text(name, x, y + 8, { maxWidth: halfW - 8 });
+    }
+    // Signature underline — visible separator for the actual signature
     doc.setDrawColor(180, 180, 180);
-    doc.line(x, y + 14, x + halfW - 32, y + 14);
-    doc.setFontSize(8); doc.setTextColor(120, 120, 120);
-    doc.text('подпись', x, y + 18);
-    if (name) { doc.setFontSize(9); doc.setTextColor(15, 23, 42); doc.text(name, x, y + 8); }
-    // М.П. dashed circle
+    doc.line(x, y + 18, x + halfW - 8, y + 18);
+    // Caption under the line
+    doc.setFontSize(7.5); doc.setTextColor(120, 120, 120);
+    doc.text('подпись · дата', x, y + 22);
+    // М.П. dashed circle on the right edge — placed in the row ABOVE
+    // the signature line so it doesn't intersect.
     doc.setDrawColor(200, 200, 200);
     doc.setLineDashPattern([1, 1], 0);
-    doc.circle(x + halfW - 14, y + 10, 12);
+    doc.circle(x + halfW - 14, y + 6, 8);
     doc.setLineDashPattern([], 0);
     doc.setFontSize(7); doc.setTextColor(180, 180, 180);
-    doc.text('М.П.', x + halfW - 17, y + 11);
+    doc.text('М.П.', x + halfW - 16, y + 7);
   };
   drawSignBlock(14, 'Сдал / Исполнитель:', requisites.director);
   drawSignBlock(14 + halfW + 10, 'Принял / Заказчик:', deal.customerName);
@@ -886,7 +1000,7 @@ export async function generateCashFlowForecastPDF(
     head: [['Месяц', 'Приход', 'Расход', 'Чистый поток', 'Остаток']],
     body: rows,
     styles: { font: 'Roboto', fontSize: 9, cellPadding: 2.5, textColor: [30, 41, 59] },
-    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
     margin: { left: 14, right: 14 },
@@ -904,9 +1018,35 @@ export async function generateCashFlowForecastPDF(
         .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
         .map(x => [x.date, x.customerName, (x.product || '—').slice(0, 50), KZT(x.expectedAmount)]),
       styles: { font: 'Roboto', fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
-      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       columnStyles: { 3: { halign: 'right' } },
+      foot: [['', '', 'Итого', KZT(totalIn)]],
+      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], font: 'Roboto', fontStyle: 'bold' },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+  }
+
+  // Outflows detail — symmetric to inflows so the user sees what the
+  // expected расход consists of. Was missing entirely before, making
+  // the forecast asymmetric and hard to audit.
+  if (outflows.length > 0) {
+    if (y > 220) { doc.addPage(); y = 20; }
+    doc.setFontSize(11); doc.setTextColor(15, 23, 42);
+    doc.text('Ожидаемые расходы', 14, y);
+    autoTable(doc, {
+      startY: y + 2,
+      head: [['Дата', 'Категория', 'Описание', 'Сумма']],
+      body: outflows
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+        .map(x => [x.date, x.category, (x.description || '—').slice(0, 50), KZT(x.expectedAmount)]),
+      styles: { font: 'Roboto', fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
+      headStyles: { fillColor: [239, 68, 68], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: { 3: { halign: 'right' } },
+      foot: [['', '', 'Итого', KZT(totalOut)]],
+      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], font: 'Roboto', fontStyle: 'bold' },
       margin: { left: 14, right: 14 },
     });
   }
@@ -956,7 +1096,7 @@ export async function generateTaxReportPDF(opts: {
       r.paid ? 'Оплачен' : 'К оплате',
     ]),
     styles: { font: 'Roboto', fontSize: 8, cellPadding: 2.5, textColor: [30, 41, 59] },
-    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     columnStyles: {
       3: { halign: 'right' },
@@ -964,17 +1104,26 @@ export async function generateTaxReportPDF(opts: {
       6: { halign: 'center' },
     },
     margin: { left: 14, right: 14 },
-    didDrawCell: data => {
+    // Same fix as in generatePaymentsPDF — didParseCell colors the
+    // status text natively instead of drawing manually after autoTable
+    // has already painted the cell.
+    didParseCell: data => {
       if (data.section === 'body' && data.column.index === 6) {
         const txt = String(data.cell.raw);
-        const colour: [number, number, number] = txt === 'Оплачен' ? [16, 185, 129] : [245, 158, 11];
-        doc.setTextColor(...colour);
-        doc.setFontSize(8);
-        doc.text(txt, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center', baseline: 'middle' });
-        (data.cell as any).text = [''];
+        data.cell.styles.textColor = txt === 'Оплачен' ? [16, 185, 129] : [245, 158, 11];
       }
     },
   });
+
+  // Totals row outside the table so the user sees the big "К оплате"
+  // number prominently after the detail list.
+  const finalY = (doc as any).lastAutoTable.finalY + 4;
+  doc.setFillColor(241, 245, 249);
+  doc.rect(14, finalY, doc.internal.pageSize.getWidth() - 28, 10, 'F');
+  doc.setFontSize(10);
+  doc.setTextColor(15, 23, 42);
+  doc.text('ИТОГО к уплате:', 18, finalY + 6);
+  doc.text(KZT(due), doc.internal.pageSize.getWidth() - 18, finalY + 6, { align: 'right' });
 
   drawFooter(doc);
   doc.save(`nalogi-${todayStamp()}.pdf`);
@@ -1027,11 +1176,11 @@ export async function generateVATReportPDF(opts: {
         .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
         .map(x => [x.date, x.counterparty.slice(0, 60), KZT(x.amount), KZT(x.vat)]),
       styles: { font: 'Roboto', fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
-      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } },
       foot: [['Итого', '', KZT(outGross), KZT(outVat)]],
-      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], font: 'Roboto', fontStyle: 'normal' },
+      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], font: 'Roboto', fontStyle: 'bold' },
       margin: { left: 14, right: 14 },
     });
     y = (doc as any).lastAutoTable.finalY + 6;
@@ -1048,14 +1197,40 @@ export async function generateVATReportPDF(opts: {
         .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
         .map(x => [x.date, x.counterparty.slice(0, 60), KZT(x.amount), KZT(x.vat)]),
       styles: { font: 'Roboto', fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
-      headStyles: { fillColor: [99, 102, 241], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'normal' },
+      headStyles: { fillColor: [99, 102, 241], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } },
       foot: [['Итого', '', KZT(inGross), KZT(inVat)]],
-      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], font: 'Roboto', fontStyle: 'normal' },
+      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], font: 'Roboto', fontStyle: 'bold' },
       margin: { left: 14, right: 14 },
     });
+    y = (doc as any).lastAutoTable.finalY + 6;
   }
+
+  // Prominent «НДС к уплате» summary band — the headline number any KZ
+  // accountant looks for. Was buried in a KPI card; now duplicated as
+  // a wide green/amber band right after the tables so it's impossible
+  // to miss.
+  if (y > 240) { doc.addPage(); y = 20; }
+  const pageW = doc.internal.pageSize.getWidth();
+  doc.setFillColor(toPay > 0 ? 254 : 240, toPay > 0 ? 243 : 253, toPay > 0 ? 199 : 244);
+  doc.rect(14, y, pageW - 28, 18, 'F');
+  doc.setDrawColor(toPay > 0 ? 245 : 16, toPay > 0 ? 158 : 185, toPay > 0 ? 11 : 129);
+  doc.setLineWidth(0.4);
+  doc.line(14, y, 14, y + 18);
+  doc.setLineWidth(0.2);
+  doc.setFontSize(9); doc.setTextColor(80, 80, 80);
+  doc.text('НДС начисленный', 20, y + 6);
+  doc.setFontSize(11); doc.setTextColor(15, 23, 42);
+  doc.text(KZT(outVat), 20, y + 13);
+  doc.setFontSize(9); doc.setTextColor(80, 80, 80);
+  doc.text('НДС к зачёту', 80, y + 6);
+  doc.setFontSize(11); doc.setTextColor(15, 23, 42);
+  doc.text(KZT(inVat), 80, y + 13);
+  doc.setFontSize(9); doc.setTextColor(120, 80, 0);
+  doc.text(toPay > 0 ? 'К УПЛАТЕ В БЮДЖЕТ' : 'К ВОЗМЕЩЕНИЮ ИЗ БЮДЖЕТА', 140, y + 6);
+  doc.setFontSize(14); doc.setTextColor(toPay > 0 ? 180 : 16, toPay > 0 ? 83 : 185, toPay > 0 ? 9 : 129);
+  doc.text(KZT(Math.abs(outVat - inVat)), pageW - 20, y + 13, { align: 'right' });
 
   drawFooter(doc);
   doc.save(`nds-esf-${todayStamp()}.pdf`);

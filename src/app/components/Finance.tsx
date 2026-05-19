@@ -514,6 +514,8 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
           id: selected.id,
           customerName: selected.customerName,
           customerPhone: selected.phone,
+          customerBIN: selected.customerBIN,
+          customerAddress: selected.address,
           product: selected.product,
           amount: selected.amount || 0,
           paidAmount,
@@ -523,6 +525,8 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
         await pdf.generateActPDF({
           id: selected.id,
           customerName: selected.customerName,
+          customerBIN: selected.customerBIN,
+          customerAddress: selected.address,
           product: selected.product,
           amount: selected.amount || 0,
         }, requisites || {}, number ? { actNumber: number } : undefined);
