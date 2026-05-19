@@ -259,7 +259,10 @@ async function enhancePromptWithClaude(prompt: string): Promise<string | null> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-5',
+        // Latest flagship — Opus 4.7 (1M context). Prompt enhancement
+        // benefits from the smartest model since it shapes every
+        // downstream image.
+        model: 'claude-opus-4-7',
         max_tokens: 600,
         messages: [{
           role: 'user',

@@ -44,14 +44,23 @@ export interface WorkingHours {
 // Each family is gated by a separate env key. The frontend disables model
 // cards whose family has no key configured (see /api/ai-chat/providers).
 export type ClientAIModel =
+  // Anthropic — 4.7 is the latest flagship (1M context, May 2026).
+  // 4.5 family kept as cheaper alternatives.
+  | 'claude-opus-4-7' | 'claude-sonnet-4-7'
   | 'claude-opus-4-5' | 'claude-sonnet-4-5' | 'claude-haiku-4-5'
-  | 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4-turbo'
+  // OpenAI — GPT-5 family (GA Aug 2025) + GPT-4o for those who want
+  // the older multimodal model.
+  | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano'
+  | 'gpt-4o' | 'gpt-4o-mini'
+  // Google + DeepSeek.
   | 'gemini-2.5-pro' | 'gemini-2.5-flash'
   | 'deepseek-chat' | 'deepseek-reasoner';
 
 export const ALL_CLIENT_AI_MODELS: ClientAIModel[] = [
+  'claude-opus-4-7', 'claude-sonnet-4-7',
   'claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5',
-  'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo',
+  'gpt-5', 'gpt-5-mini', 'gpt-5-nano',
+  'gpt-4o', 'gpt-4o-mini',
   'gemini-2.5-pro', 'gemini-2.5-flash',
   'deepseek-chat', 'deepseek-reasoner',
 ];
@@ -106,7 +115,7 @@ const DEFAULT_DAY: DaySlot = { enabled: true, start: '09:00', end: '20:00' };
 export const DEFAULT_CLIENT_AI: ClientAIConfig = {
   enabled: false,
   channels: { instagram: false, whatsapp: false },
-  aiModel: 'claude-opus-4-5',
+  aiModel: 'claude-opus-4-7',
   creativity: 0.7,
   botName: '',
   tone: 'polite',
@@ -148,10 +157,17 @@ export function readClientAI(db: Database.Database, teamId: string): ClientAICon
       // Map legacy short model ids ('claude', 'gpt4o') to full versions so
       // existing rows keep working after the migration to model-id strings.
       const LEGACY_MODEL_MAP: Record<string, ClientAIModel> = {
-        claude:   'claude-opus-4-5',
-        gpt4o:    'gpt-4o',
+        // Old short ids that pre-date model-id strings.
+        claude:   'claude-opus-4-7',
+        gpt4o:    'gpt-5',
         gemini:   'gemini-2.5-pro',
         deepseek: 'deepseek-chat',
+        // Auto-upgrade users who picked a now-superseded model to the
+        // current latest in the same family. Keeps existing rows on the
+        // newest tech without forcing a manual re-pick.
+        'claude-opus-4-5':   'claude-opus-4-7',
+        'claude-sonnet-4-5': 'claude-sonnet-4-7',
+        'gpt-4-turbo':       'gpt-5',
       };
       const rawModel = parsed.aiModel;
       const aiModel: ClientAIModel = (ALL_CLIENT_AI_MODELS as string[]).includes(rawModel)

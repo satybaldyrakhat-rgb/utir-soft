@@ -1319,8 +1319,10 @@ type SectionId = 'brain' | 'persona' | 'behavior' | 'hours' | 'channels' | 'test
 // Model id strings = the actual API model id we send to each provider.
 // Keep this list in sync with server/clientAi.ts ALL_CLIENT_AI_MODELS.
 type ClientAIModelId =
+  | 'claude-opus-4-7' | 'claude-sonnet-4-7'
   | 'claude-opus-4-5' | 'claude-sonnet-4-5' | 'claude-haiku-4-5'
-  | 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4-turbo'
+  | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano'
+  | 'gpt-4o' | 'gpt-4o-mini'
   | 'gemini-2.5-pro' | 'gemini-2.5-flash'
   | 'deepseek-chat' | 'deepseek-reasoner';
 
@@ -1362,7 +1364,7 @@ const DEFAULT_DAY_UI: DaySlot = { enabled: true, start: '09:00', end: '20:00' };
 const DEFAULT_CLIENT_AI_UI: ClientAIConfigUI = {
   enabled: false,
   channels: { instagram: false, whatsapp: false },
-  aiModel: 'claude-opus-4-5',
+  aiModel: 'claude-opus-4-7',
   creativity: 0.7,
   botName: '',
   tone: 'polite',
@@ -1537,17 +1539,21 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
     {
       family: 'anthropic', title: 'Anthropic Claude',
       options: [
-        { id: 'claude-opus-4-5',   name: 'Claude Opus 4.5',   tone: l('Самая глубокая и внимательная к стилю', 'Ең тереңі', 'Deepest / nuance'), badge: l('топ', 'топ', 'top') },
-        { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', tone: l('Баланс качества и скорости', 'Баланс',    'Balanced') },
-        { id: 'claude-haiku-4-5',  name: 'Claude Haiku 4.5',  tone: l('Самая быстрая и дешёвая',   'Тез',       'Fastest / cheap'), badge: '⚡' },
+        { id: 'claude-opus-4-7',   name: 'Claude Opus 4.7',   tone: l('Флагман · 1M контекст, самая умная', 'Флагман · 1M контекст', 'Flagship · 1M ctx'), badge: l('новое', 'жаңа', 'new') },
+        { id: 'claude-sonnet-4-7', name: 'Claude Sonnet 4.7', tone: l('Быстрее Opus, почти не уступает',    'Тез әрі сапалы',        'Fast + smart') },
+        { id: 'claude-opus-4-5',   name: 'Claude Opus 4.5',   tone: l('Прошлый флагман, дешевле 4.7',       'Алдыңғы флагман',        'Previous gen') },
+        { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', tone: l('Баланс качества и скорости',         'Баланс',                  'Balanced') },
+        { id: 'claude-haiku-4-5',  name: 'Claude Haiku 4.5',  tone: l('Самая быстрая и дешёвая',            'Тез',                     'Fastest / cheap'), badge: '⚡' },
       ],
     },
     {
       family: 'openai', title: 'OpenAI GPT',
       options: [
-        { id: 'gpt-4o',      name: 'GPT-4o',      tone: l('Универсал, мультимодальная', 'Әмбебап, мультимодальды', 'Versatile') },
-        { id: 'gpt-4o-mini', name: 'GPT-4o mini', tone: l('Быстрый и дешёвый',          'Тез',  'Fast / cheap'), badge: '⚡' },
-        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', tone: l('Стабильная для длинных диалогов', 'Ұзақ диалогтар үшін тұрақты', 'Stable, long-ctx') },
+        { id: 'gpt-5',       name: 'GPT-5',       tone: l('Флагман OpenAI, мультимодальный', 'Флагман', 'Flagship'), badge: l('новое', 'жаңа', 'new') },
+        { id: 'gpt-5-mini',  name: 'GPT-5 mini',  tone: l('Быстрее и в 5× дешевле GPT-5',    'Жылдам',  'Fast / cheap'), badge: '⚡' },
+        { id: 'gpt-5-nano',  name: 'GPT-5 nano',  tone: l('Самый дешёвый, для простых задач', 'Ең арзан', 'Cheapest') },
+        { id: 'gpt-4o',      name: 'GPT-4o',      tone: l('Предыдущее поколение, мультимодальная', 'Алдыңғы буын', 'Previous gen') },
+        { id: 'gpt-4o-mini', name: 'GPT-4o mini', tone: l('Быстрый и дешёвый',                'Тез',  'Fast / cheap') },
       ],
     },
     {
