@@ -189,6 +189,31 @@ CREATE TABLE IF NOT EXISTS bom_templates (
 );
 CREATE INDEX IF NOT EXISTS idx_bom_templates_team ON bom_templates(team_id);
 
+-- Suppliers — vendor catalog. JSON blob holds: name, contactPerson,
+-- phone, email, address, paymentTerms, deliveryDays, rating, category,
+-- notes. Each team has its own list.
+CREATE TABLE IF NOT EXISTS suppliers (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_suppliers_team ON suppliers(team_id);
+
+-- Purchase orders — when stock gets low or a deal needs materials,
+-- create a PO. JSON blob holds: supplierId, items (array of {name, qty,
+-- unit, costPerUnit}), totalCost, status (draft/sent/received/cancelled),
+-- expectedDate, receivedDate, notes, linkedDealIds.
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_team ON purchase_orders(team_id);
+
 CREATE TABLE IF NOT EXISTS tax_payments (
   id TEXT PRIMARY KEY,
   team_id TEXT NOT NULL,
@@ -1944,6 +1969,71 @@ bomRouter.delete('/:id', requirePermission('warehouse'), (req: AuthedRequest, re
 });
 
 app.use('/api/bom-templates', bomRouter);
+
+// ─── Suppliers ─────────────────────────────────────────────────────
+// Vendor catalog used by the Производство → Поставщики tab. Same
+// CRUD pattern as bom_templates: GET list, POST create, PATCH merge,
+// DELETE row.
+const suppliersRouter = express.Router();
+suppliersRouter.use(authMiddleware);
+
+suppliersRouter.get('/', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  const rows = db.prepare('SELECT id, data, created_at, updated_at FROM suppliers WHERE team_id = ? ORDER BY rowid DESC').all(req.teamId!) as any[];
+  res.json(rows.map(r => ({ id: r.id, ...JSON.parse(r.data), createdAt: r.created_at, updatedAt: r.updated_at })));
+});
+
+suppliersRouter.post('/', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  const id = newId('sup_');
+  db.prepare('INSERT INTO suppliers (id, team_id, data) VALUES (?, ?, ?)').run(id, req.teamId!, JSON.stringify(req.body || {}));
+  res.json({ id, ...req.body });
+});
+
+suppliersRouter.patch('/:id', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT data FROM suppliers WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  const merged = { ...JSON.parse(row.data), ...req.body };
+  db.prepare("UPDATE suppliers SET data = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(merged), req.params.id);
+  res.json({ id: req.params.id, ...merged });
+});
+
+suppliersRouter.delete('/:id', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  db.prepare('DELETE FROM suppliers WHERE id = ? AND team_id = ?').run(req.params.id, req.teamId!);
+  res.json({ ok: true });
+});
+
+app.use('/api/suppliers', suppliersRouter);
+
+// ─── Purchase orders ───────────────────────────────────────────────
+// Закупки у поставщиков. PO is created when stock hits «low» or a deal
+// requests materials. Status flow: draft → sent → received → archived.
+const poRouter = express.Router();
+poRouter.use(authMiddleware);
+
+poRouter.get('/', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  const rows = db.prepare('SELECT id, data, created_at, updated_at FROM purchase_orders WHERE team_id = ? ORDER BY rowid DESC').all(req.teamId!) as any[];
+  res.json(rows.map(r => ({ id: r.id, ...JSON.parse(r.data), createdAt: r.created_at, updatedAt: r.updated_at })));
+});
+
+poRouter.post('/', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  const id = newId('po_');
+  db.prepare('INSERT INTO purchase_orders (id, team_id, data) VALUES (?, ?, ?)').run(id, req.teamId!, JSON.stringify(req.body || {}));
+  res.json({ id, ...req.body });
+});
+
+poRouter.patch('/:id', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT data FROM purchase_orders WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  const merged = { ...JSON.parse(row.data), ...req.body };
+  db.prepare("UPDATE purchase_orders SET data = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(merged), req.params.id);
+  res.json({ id: req.params.id, ...merged });
+});
+
+poRouter.delete('/:id', requirePermission('warehouse'), (req: AuthedRequest, res) => {
+  db.prepare('DELETE FROM purchase_orders WHERE id = ? AND team_id = ?').run(req.params.id, req.teamId!);
+  res.json({ ok: true });
+});
+
+app.use('/api/purchase-orders', poRouter);
 
 // Map of team-wide Telegram pairings (Block F.6). Used by the team panel to
 // show which teammates have linked their account to the bot — admin sees who

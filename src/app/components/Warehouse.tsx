@@ -19,9 +19,46 @@ interface ProdOrder {
 
 interface WarehouseProps { language: 'kz' | 'ru' | 'eng'; }
 
+// ─── Suppliers ────────────────────────────────────────────────────
+// Vendor catalog. Stored team-wide on the server (/api/suppliers).
+// Each row: name (required), contact person, phone, email, address,
+// category (Плиты / Фурнитура / Кромка / Краска / ...), payment terms
+// (предоплата / 50/50 / отсрочка), delivery days, rating 1-5, notes.
+interface Supplier {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  category?: string;
+  paymentTerms?: string;
+  deliveryDays?: number;
+  rating?: number;
+  notes?: string;
+  createdAt?: string;
+}
+
+// ─── Purchase Orders ──────────────────────────────────────────────
+// Закупки у поставщиков. PO is created when stock hits «low» or a deal
+// requests materials. Status flow: draft → sent → received → archived.
+interface POItem { name: string; qty: number; unit: string; costPerUnit: number; }
+interface PurchaseOrder {
+  id: string;
+  supplierId: string;
+  items: POItem[];
+  totalCost: number;
+  status: 'draft' | 'sent' | 'received' | 'cancelled';
+  expectedDate?: string;
+  receivedDate?: string;
+  notes?: string;
+  linkedDealIds?: string[];
+  createdAt?: string;
+}
+
 export function Warehouse({ language }: WarehouseProps) {
   const store = useDataStore();
-  const [activeView, setActiveView] = useState<'materials' | 'production' | 'bom' | 'calculator' | 'nesting'>('production');
+  const [activeView, setActiveView] = useState<'materials' | 'production' | 'bom' | 'calculator' | 'nesting' | 'suppliers' | 'purchases'>('production');
   const [selectedCategory, setSelectedCategory] = useState('Все');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -29,6 +66,88 @@ export function Warehouse({ language }: WarehouseProps) {
   const [selectedOrder, setSelectedOrder] = useState<ProdOrder | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [newProduct, setNewProduct] = useState({ name: '', category: 'Плиты', quantity: 0, unit: 'лист', supplier: '', cost: 0 });
+
+  // Suppliers & purchase orders — loaded from the server when their
+  // tab opens (lazy: don't pay the network cost if the user never
+  // visits these views).
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [supplierFlash, setSupplierFlash] = useState('');
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [showPoModal, setShowPoModal] = useState(false);
+  const [editingPo, setEditingPo] = useState<PurchaseOrder | null>(null);
+
+  useEffect(() => {
+    if (activeView === 'suppliers' || activeView === 'purchases') {
+      api.get<Supplier[]>('/api/suppliers').then(setSuppliers).catch(() => { /* ignore */ });
+    }
+    if (activeView === 'purchases') {
+      api.get<PurchaseOrder[]>('/api/purchase-orders').then(setPurchaseOrders).catch(() => { /* ignore */ });
+    }
+  }, [activeView]);
+
+  const flash = (msg: string) => { setSupplierFlash(msg); setTimeout(() => setSupplierFlash(''), 1800); };
+
+  async function saveSupplier(s: Partial<Supplier>) {
+    try {
+      if (editingSupplier?.id) {
+        const updated = await api.patch<Supplier>(`/api/suppliers/${editingSupplier.id}`, s);
+        setSuppliers(prev => prev.map(x => x.id === editingSupplier.id ? updated : x));
+      } else {
+        const created = await api.post<Supplier>('/api/suppliers', s);
+        setSuppliers(prev => [created, ...prev]);
+      }
+      setShowSupplierModal(false);
+      setEditingSupplier(null);
+      flash(l('Поставщик сохранён', 'Жеткізуші сақталды', 'Supplier saved'));
+    } catch (e: any) {
+      flash(l('Ошибка: ', 'Қате: ', 'Error: ') + (e?.message || e));
+    }
+  }
+
+  async function deleteSupplier(id: string) {
+    if (!confirm(l('Удалить поставщика?', 'Жеткізушіні жою?', 'Delete supplier?'))) return;
+    try {
+      await api.delete(`/api/suppliers/${id}`);
+      setSuppliers(prev => prev.filter(x => x.id !== id));
+      flash(l('Поставщик удалён', 'Жойылды', 'Deleted'));
+    } catch { /* ignore */ }
+  }
+
+  async function savePo(po: Partial<PurchaseOrder>) {
+    try {
+      if (editingPo?.id) {
+        const updated = await api.patch<PurchaseOrder>(`/api/purchase-orders/${editingPo.id}`, po);
+        setPurchaseOrders(prev => prev.map(x => x.id === editingPo.id ? updated : x));
+      } else {
+        const created = await api.post<PurchaseOrder>('/api/purchase-orders', { ...po, status: 'draft' });
+        setPurchaseOrders(prev => [created, ...prev]);
+      }
+      setShowPoModal(false);
+      setEditingPo(null);
+      flash(l('Закупка сохранена', 'Сатып алу сақталды', 'PO saved'));
+    } catch (e: any) {
+      flash(l('Ошибка: ', 'Қате: ', 'Error: ') + (e?.message || e));
+    }
+  }
+
+  async function updatePoStatus(id: string, status: PurchaseOrder['status']) {
+    const patch: Partial<PurchaseOrder> = { status };
+    if (status === 'received') patch.receivedDate = new Date().toISOString().slice(0, 10);
+    try {
+      const updated = await api.patch<PurchaseOrder>(`/api/purchase-orders/${id}`, patch);
+      setPurchaseOrders(prev => prev.map(x => x.id === id ? updated : x));
+    } catch { /* ignore */ }
+  }
+
+  async function deletePo(id: string) {
+    if (!confirm(l('Удалить закупку?', 'Сатып алуды жою?', 'Delete PO?'))) return;
+    try {
+      await api.delete(`/api/purchase-orders/${id}`);
+      setPurchaseOrders(prev => prev.filter(x => x.id !== id));
+    } catch { /* ignore */ }
+  }
 
   // Use store products
   const products = store.products;
@@ -112,6 +231,8 @@ export function Warehouse({ language }: WarehouseProps) {
             <button onClick={() => setActiveView('calculator')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'calculator' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Калькулятор', 'Калькулятор', 'Calculator')}</button>
             <button onClick={() => setActiveView('nesting')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'nesting' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Раскрой', 'Раскрой', 'Nesting')}</button>
             <button onClick={() => setActiveView('materials')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'materials' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Склад', 'Қойма', 'Warehouse')}</button>
+            <button onClick={() => setActiveView('suppliers')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'suppliers' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Поставщики', 'Жеткізушілер', 'Suppliers')}</button>
+            <button onClick={() => setActiveView('purchases')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'purchases' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Закупки', 'Сатып алулар', 'Purchases')}</button>
           <button onClick={() => setShowAddModal(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
             <Plus className="w-3.5 h-3.5" />{l('Добавить', 'Қосу', 'Add')}
           </button>
@@ -292,6 +413,58 @@ export function Warehouse({ language }: WarehouseProps) {
       {/* ===== Раскрой (Nesting) ===== */}
       {activeView === 'nesting' && (
         <NestingView language={language} prodOrders={prodOrders} deals={store.deals} />
+      )}
+
+      {/* ===== Поставщики ===== */}
+      {activeView === 'suppliers' && (
+        <SuppliersView
+          language={language}
+          suppliers={suppliers}
+          onAdd={() => { setEditingSupplier(null); setShowSupplierModal(true); }}
+          onEdit={(s) => { setEditingSupplier(s); setShowSupplierModal(true); }}
+          onDelete={deleteSupplier}
+        />
+      )}
+
+      {/* ===== Закупки ===== */}
+      {activeView === 'purchases' && (
+        <PurchasesView
+          language={language}
+          purchaseOrders={purchaseOrders}
+          suppliers={suppliers}
+          onAdd={() => { setEditingPo(null); setShowPoModal(true); }}
+          onEdit={(p) => { setEditingPo(p); setShowPoModal(true); }}
+          onDelete={deletePo}
+          onUpdateStatus={updatePoStatus}
+        />
+      )}
+
+      {/* Flash toast for supplier/PO operations */}
+      {supplierFlash && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 bg-slate-900/90 backdrop-blur-xl text-white text-xs rounded-2xl shadow-[0_12px_32px_-8px_var(--accent-shadow)] ring-1 ring-white/10 z-50">
+          {supplierFlash}
+        </div>
+      )}
+
+      {/* Supplier add/edit modal */}
+      {showSupplierModal && (
+        <SupplierModal
+          language={language}
+          initial={editingSupplier}
+          onClose={() => { setShowSupplierModal(false); setEditingSupplier(null); }}
+          onSave={saveSupplier}
+        />
+      )}
+
+      {/* Purchase order add/edit modal */}
+      {showPoModal && (
+        <PoModal
+          language={language}
+          initial={editingPo}
+          suppliers={suppliers}
+          onClose={() => { setShowPoModal(false); setEditingPo(null); }}
+          onSave={savePo}
+        />
       )}
 
       {/* ===== MODALS ===== */}
@@ -882,6 +1055,466 @@ function NestingView({ language, prodOrders, deals }: {
             <a href="https://www.felder-group.com/" target="_blank" rel="noopener noreferrer" className="text-[11px] text-amber-700 underline">Felder Maxisoft →</a>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Suppliers view (vendor catalog) ──────────────────────────────
+// KPI strip (количество / средний рейтинг / средние дни доставки) +
+// search + add CTA + glass cards with phone/category/rating chips.
+function SuppliersView({
+  language, suppliers, onAdd, onEdit, onDelete,
+}: {
+  language: 'kz' | 'ru' | 'eng';
+  suppliers: Supplier[];
+  onAdd: () => void;
+  onEdit: (s: Supplier) => void;
+  onDelete: (id: string) => void;
+}) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [q, setQ] = useState('');
+  const filtered = suppliers.filter(s =>
+    !q.trim() || (s.name + ' ' + (s.category || '') + ' ' + (s.contactPerson || '')).toLowerCase().includes(q.toLowerCase()),
+  );
+  const avgRating = suppliers.length
+    ? (suppliers.reduce((sum, s) => sum + (s.rating || 0), 0) / suppliers.length).toFixed(1)
+    : '—';
+  const avgDays = suppliers.filter(s => s.deliveryDays).length
+    ? Math.round(suppliers.reduce((sum, s) => sum + (s.deliveryDays || 0), 0) / suppliers.filter(s => s.deliveryDays).length)
+    : '—';
+
+  return (
+    <div className="space-y-5">
+      {/* KPI strip */}
+      <div className="grid grid-cols-3 gap-2.5">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-3.5">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">{l('Поставщиков', 'Жеткізушілер', 'Suppliers')}</div>
+          <div className="text-lg text-slate-900 tabular-nums">{suppliers.length}</div>
+        </div>
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-3.5">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">{l('Средний рейтинг', 'Орташа рейтинг', 'Avg rating')}</div>
+          <div className="text-lg text-slate-900 tabular-nums">{avgRating}<span className="text-slate-300 text-sm"> / 5</span></div>
+        </div>
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-3.5">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">{l('Срок доставки', 'Жеткізу мерзімі', 'Delivery days')}</div>
+          <div className="text-lg text-slate-900 tabular-nums">{avgDays} <span className="text-slate-300 text-sm">дней</span></div>
+        </div>
+      </div>
+
+      {/* Search + add */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <input
+            type="text"
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder={l('Поиск по имени, категории, контакту', 'Атау, санат, байланыс', 'Search by name, category, contact')}
+            className="w-full pl-9 pr-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs focus:outline-none focus:bg-white focus:ring-slate-300 transition-all placeholder:text-slate-400"
+          />
+        </div>
+        <button
+          onClick={onAdd}
+          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          {l('Добавить поставщика', 'Жеткізуші қосу', 'Add supplier')}
+        </button>
+      </div>
+
+      {/* List */}
+      {filtered.length === 0 ? (
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+          {q ? l('Ничего не найдено', 'Ештеңе табылмады', 'Nothing found')
+             : l('Пока нет поставщиков — добавьте первого', 'Жеткізушілер жоқ — біріншісін қосыңыз', 'No suppliers yet — add your first')}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+          {filtered.map(s => (
+            <div key={s.id} className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-4 group hover:bg-white/70 transition-all shadow-[0_4px_16px_-8px_rgba(15,23,42,0.08)]">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-sm text-slate-900 truncate">{s.name}</span>
+                    {s.rating && (
+                      <span className="flex items-center gap-0.5 text-[10px] text-amber-700 bg-amber-100/70 px-1.5 py-0.5 rounded-full ring-1 ring-white/40">
+                        ★ {s.rating}
+                      </span>
+                    )}
+                  </div>
+                  {s.contactPerson && <div className="text-[11px] text-slate-500 truncate">{s.contactPerson}</div>}
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                  <button onClick={() => onEdit(s)} className="p-1.5 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl transition-all" title={l('Редактировать', 'Өңдеу', 'Edit')}>
+                    <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                  </button>
+                  <button onClick={() => onDelete(s.id)} className="p-1.5 hover:bg-rose-100/70 rounded-xl transition-colors" title={l('Удалить', 'Жою', 'Delete')}>
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center flex-wrap gap-1.5 text-[10px] text-slate-600">
+                {s.category && <span className="px-2 py-0.5 bg-white/60 ring-1 ring-white/60 rounded-full">{s.category}</span>}
+                {s.phone && <span className="px-2 py-0.5 bg-white/60 ring-1 ring-white/60 rounded-full">{s.phone}</span>}
+                {s.deliveryDays && <span className="px-2 py-0.5 bg-white/60 ring-1 ring-white/60 rounded-full">{s.deliveryDays} {l('дн.', 'күн.', 'd')}</span>}
+                {s.paymentTerms && <span className="px-2 py-0.5 bg-white/60 ring-1 ring-white/60 rounded-full">{s.paymentTerms}</span>}
+              </div>
+              {s.notes && <div className="mt-2 text-[11px] text-slate-500 leading-snug">{s.notes}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Purchase orders view ─────────────────────────────────────────
+function PurchasesView({
+  language, purchaseOrders, suppliers, onAdd, onEdit, onDelete, onUpdateStatus,
+}: {
+  language: 'kz' | 'ru' | 'eng';
+  purchaseOrders: PurchaseOrder[];
+  suppliers: Supplier[];
+  onAdd: () => void;
+  onEdit: (p: PurchaseOrder) => void;
+  onDelete: (id: string) => void;
+  onUpdateStatus: (id: string, status: PurchaseOrder['status']) => void;
+}) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [filter, setFilter] = useState<'all' | PurchaseOrder['status']>('all');
+  const supName = (id: string) => suppliers.find(s => s.id === id)?.name || '—';
+  const filtered = purchaseOrders.filter(p => filter === 'all' || p.status === filter);
+
+  const STATUS_META: Record<PurchaseOrder['status'], { ru: string; kz: string; eng: string; cls: string }> = {
+    draft:     { ru: 'Черновик',  kz: 'Жоба',     eng: 'Draft',     cls: 'bg-slate-100/70 text-slate-700 ring-slate-200/40' },
+    sent:      { ru: 'Отправлен', kz: 'Жіберілді',eng: 'Sent',      cls: 'bg-sky-100/70 text-sky-700 ring-sky-200/40' },
+    received:  { ru: 'Получен',   kz: 'Қабылданды',eng: 'Received', cls: 'bg-emerald-100/70 text-emerald-700 ring-emerald-200/40' },
+    cancelled: { ru: 'Отменён',   kz: 'Болдырмады',eng: 'Cancelled',cls: 'bg-rose-100/70 text-rose-700 ring-rose-200/40' },
+  };
+
+  const totalSpent = purchaseOrders
+    .filter(p => p.status === 'received')
+    .reduce((s, p) => s + (p.totalCost || 0), 0);
+  const pending = purchaseOrders.filter(p => p.status === 'draft' || p.status === 'sent').length;
+
+  return (
+    <div className="space-y-5">
+      {/* KPI strip */}
+      <div className="grid grid-cols-3 gap-2.5">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-3.5">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">{l('Всего закупок', 'Барлық сатып алу', 'Total POs')}</div>
+          <div className="text-lg text-slate-900 tabular-nums">{purchaseOrders.length}</div>
+        </div>
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-3.5">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">{l('В пути', 'Жолда', 'Pending')}</div>
+          <div className="text-lg text-slate-900 tabular-nums">{pending}</div>
+        </div>
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-3.5">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">{l('Потрачено', 'Жұмсалды', 'Spent')}</div>
+          <div className="text-lg text-slate-900 tabular-nums">{Math.round(totalSpent).toLocaleString('ru-RU')} ₸</div>
+        </div>
+      </div>
+
+      {/* Filter chips + add */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {(['all', 'draft', 'sent', 'received', 'cancelled'] as const).map(f => {
+          const active = filter === f;
+          const meta = f === 'all'
+            ? { label: l('Все', 'Барлығы', 'All'), cls: 'bg-slate-100/70 text-slate-700 ring-slate-200/40' }
+            : { label: STATUS_META[f][language], cls: STATUS_META[f].cls };
+          return (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-full text-[11px] ring-1 transition-all ${
+                active
+                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
+                  : `${meta.cls} hover:bg-white/70`
+              }`}
+            >
+              {meta.label}
+            </button>
+          );
+        })}
+        <div className="flex-1" />
+        <button
+          onClick={onAdd}
+          disabled={suppliers.length === 0}
+          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+          title={suppliers.length === 0 ? l('Сначала добавьте поставщика', 'Алдымен жеткізуші қосыңыз', 'Add a supplier first') : undefined}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          {l('Новая закупка', 'Жаңа сатып алу', 'New PO')}
+        </button>
+      </div>
+
+      {/* List */}
+      {filtered.length === 0 ? (
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+          {suppliers.length === 0
+            ? l('Сначала добавьте поставщика во вкладке «Поставщики»', 'Алдымен «Жеткізушілер» қойындысында жеткізуші қосыңыз', 'Add a supplier in the Suppliers tab first')
+            : l('Закупок пока нет', 'Сатып алулар жоқ', 'No purchases yet')}
+        </div>
+      ) : (
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 rounded-3xl overflow-hidden shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+          <div className="divide-y divide-white/50">
+            {filtered.map(p => {
+              const meta = STATUS_META[p.status];
+              return (
+                <div key={p.id} className="px-5 py-3 hover:bg-white/40 transition-colors group">
+                  <div className="flex items-center justify-between gap-3 mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm text-slate-900 truncate">{supName(p.supplierId)}</span>
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full ring-1 ${meta.cls}`}>
+                        {meta[language]}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <span className="text-sm text-slate-900 tabular-nums">{Math.round(p.totalCost || 0).toLocaleString('ru-RU')} ₸</span>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                        {p.status === 'draft' && (
+                          <button onClick={() => onUpdateStatus(p.id, 'sent')} className="text-[10px] px-2 py-1 bg-sky-100/70 text-sky-700 ring-1 ring-sky-200/40 rounded-lg hover:bg-sky-100" title={l('Отправить поставщику', 'Жеткізушіге жіберу', 'Mark as sent')}>
+                            ✈ {l('Отправить', 'Жіберу', 'Send')}
+                          </button>
+                        )}
+                        {p.status === 'sent' && (
+                          <button onClick={() => onUpdateStatus(p.id, 'received')} className="text-[10px] px-2 py-1 bg-emerald-100/70 text-emerald-700 ring-1 ring-emerald-200/40 rounded-lg hover:bg-emerald-100" title={l('Отметить как получено', 'Қабылданды деп белгілеу', 'Mark received')}>
+                            ✓ {l('Получено', 'Қабылданды', 'Received')}
+                          </button>
+                        )}
+                        <button onClick={() => onEdit(p)} className="p-1.5 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl transition-all">
+                          <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                        </button>
+                        <button onClick={() => onDelete(p.id)} className="p-1.5 hover:bg-rose-100/70 rounded-xl transition-colors">
+                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
+                    <span>{(p.items || []).length} {l('позиций', 'позиция', 'items')}</span>
+                    {p.expectedDate && <span>· {l('ожидается', 'күтілуде', 'expected')} {p.expectedDate}</span>}
+                    {p.receivedDate && <span>· {l('получено', 'қабылданды', 'received')} {p.receivedDate}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Supplier modal (add / edit) ──────────────────────────────────
+function SupplierModal({
+  language, initial, onClose, onSave,
+}: {
+  language: 'kz' | 'ru' | 'eng';
+  initial: Supplier | null;
+  onClose: () => void;
+  onSave: (s: Partial<Supplier>) => void;
+}) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [data, setData] = useState<Partial<Supplier>>({
+    name: '', contactPerson: '', phone: '', email: '', address: '',
+    category: '', paymentTerms: '50/50', deliveryDays: 7, rating: 5, notes: '',
+    ...(initial || {}),
+  });
+  const INPUT = 'w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all';
+  const LABEL = 'block text-[11px] text-slate-500 mb-1.5';
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]">
+        <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between">
+          <div>
+            <div className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Поставщик', 'Жеткізуші', 'Supplier')}</div>
+            <div className="text-lg text-slate-900 tracking-tight">
+              {initial ? l('Редактировать', 'Өңдеу', 'Edit') : l('Новый поставщик', 'Жаңа жеткізуші', 'New supplier')}
+            </div>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+        <div className="p-6 space-y-3">
+          <div>
+            <label className={LABEL}>{l('Название', 'Атауы', 'Name')} *</label>
+            <input className={INPUT} value={data.name} onChange={e => setData(d => ({ ...d, name: e.target.value }))} placeholder={l('например: Kronospan', 'мысалы: Kronospan', 'e.g. Kronospan')} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={LABEL}>{l('Контактное лицо', 'Байланыс тұлғасы', 'Contact')}</label>
+              <input className={INPUT} value={data.contactPerson} onChange={e => setData(d => ({ ...d, contactPerson: e.target.value }))} />
+            </div>
+            <div>
+              <label className={LABEL}>{l('Телефон', 'Телефон', 'Phone')}</label>
+              <input className={INPUT} value={data.phone} onChange={e => setData(d => ({ ...d, phone: e.target.value }))} placeholder="+7 ___ ___ __ __" />
+            </div>
+          </div>
+          <div>
+            <label className={LABEL}>Email</label>
+            <input className={INPUT} value={data.email} onChange={e => setData(d => ({ ...d, email: e.target.value }))} />
+          </div>
+          <div>
+            <label className={LABEL}>{l('Адрес', 'Мекенжай', 'Address')}</label>
+            <input className={INPUT} value={data.address} onChange={e => setData(d => ({ ...d, address: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={LABEL}>{l('Категория', 'Санат', 'Category')}</label>
+              <select className={INPUT} value={data.category} onChange={e => setData(d => ({ ...d, category: e.target.value }))}>
+                <option value="">—</option>
+                <option>Плиты ЛДСП/МДФ</option>
+                <option>Фурнитура</option>
+                <option>Кромка</option>
+                <option>Краска/Лак</option>
+                <option>Стекло</option>
+                <option>Освещение</option>
+                <option>Прочее</option>
+              </select>
+            </div>
+            <div>
+              <label className={LABEL}>{l('Условия оплаты', 'Төлем шарттары', 'Payment terms')}</label>
+              <select className={INPUT} value={data.paymentTerms} onChange={e => setData(d => ({ ...d, paymentTerms: e.target.value }))}>
+                <option value="100% предоплата">100% предоплата</option>
+                <option value="50/50">50/50</option>
+                <option value="Отсрочка 7 дн.">Отсрочка 7 дн.</option>
+                <option value="Отсрочка 14 дн.">Отсрочка 14 дн.</option>
+                <option value="Отсрочка 30 дн.">Отсрочка 30 дн.</option>
+              </select>
+            </div>
+            <div>
+              <label className={LABEL}>{l('Срок доставки (дн.)', 'Жеткізу мерзімі', 'Delivery (days)')}</label>
+              <input type="number" min={0} className={INPUT} value={data.deliveryDays || 0} onChange={e => setData(d => ({ ...d, deliveryDays: Number(e.target.value) || 0 }))} />
+            </div>
+            <div>
+              <label className={LABEL}>{l('Рейтинг 1-5', 'Рейтинг 1-5', 'Rating 1-5')}</label>
+              <input type="number" min={1} max={5} step={0.5} className={INPUT} value={data.rating || 5} onChange={e => setData(d => ({ ...d, rating: Number(e.target.value) || 5 }))} />
+            </div>
+          </div>
+          <div>
+            <label className={LABEL}>{l('Заметки', 'Жазбалар', 'Notes')}</label>
+            <textarea rows={3} className={`${INPUT} resize-none`} value={data.notes} onChange={e => setData(d => ({ ...d, notes: e.target.value }))} placeholder={l('Особенности, договорённости...', 'Ерекшеліктер...', 'Anything special...')} />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-white/60 flex items-center gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-2xl text-xs hover:bg-white transition-colors">
+            {l('Отмена', 'Бас тарту', 'Cancel')}
+          </button>
+          <button onClick={() => data.name && onSave(data)} disabled={!data.name} className="px-4 py-2 bg-emerald-600 disabled:opacity-40 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
+            {l('Сохранить', 'Сақтау', 'Save')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Purchase order modal (add / edit) ────────────────────────────
+function PoModal({
+  language, initial, suppliers, onClose, onSave,
+}: {
+  language: 'kz' | 'ru' | 'eng';
+  initial: PurchaseOrder | null;
+  suppliers: Supplier[];
+  onClose: () => void;
+  onSave: (p: Partial<PurchaseOrder>) => void;
+}) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [data, setData] = useState<Partial<PurchaseOrder>>({
+    supplierId: suppliers[0]?.id || '',
+    items: [{ name: '', qty: 1, unit: 'шт', costPerUnit: 0 }],
+    expectedDate: '',
+    notes: '',
+    ...(initial || {}),
+  });
+  const INPUT = 'w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all';
+  const LABEL = 'block text-[11px] text-slate-500 mb-1.5';
+
+  const items = data.items || [];
+  const totalCost = items.reduce((s, it) => s + (it.qty || 0) * (it.costPerUnit || 0), 0);
+
+  const updateItem = (i: number, patch: Partial<POItem>) => {
+    setData(d => ({ ...d, items: (d.items || []).map((it, idx) => idx === i ? { ...it, ...patch } : it) }));
+  };
+  const addItem = () => setData(d => ({ ...d, items: [...(d.items || []), { name: '', qty: 1, unit: 'шт', costPerUnit: 0 }] }));
+  const removeItem = (i: number) => setData(d => ({ ...d, items: (d.items || []).filter((_, idx) => idx !== i) }));
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(15,23,42,0.3)]">
+        <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between flex-shrink-0">
+          <div>
+            <div className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Закупка', 'Сатып алу', 'Purchase order')}</div>
+            <div className="text-lg text-slate-900 tracking-tight">
+              {initial ? l('Редактировать', 'Өңдеу', 'Edit') : l('Новая закупка', 'Жаңа сатып алу', 'New PO')}
+            </div>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={LABEL}>{l('Поставщик', 'Жеткізуші', 'Supplier')} *</label>
+              <select className={INPUT} value={data.supplierId} onChange={e => setData(d => ({ ...d, supplierId: e.target.value }))}>
+                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={LABEL}>{l('Ожидаемая дата', 'Күтілетін күн', 'Expected date')}</label>
+              <input type="date" className={INPUT} value={data.expectedDate} onChange={e => setData(d => ({ ...d, expectedDate: e.target.value }))} />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className={LABEL}>{l('Позиции', 'Позициялар', 'Items')}</div>
+              <button onClick={addItem} className="text-[11px] text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
+                <Plus className="w-3 h-3" /> {l('Добавить позицию', 'Позиция қосу', 'Add item')}
+              </button>
+            </div>
+            <div className="space-y-2">
+              {items.map((it, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2 items-center bg-white/40 ring-1 ring-white/60 rounded-2xl p-2">
+                  <input className={`${INPUT} col-span-5`} placeholder={l('Материал', 'Материал', 'Material')} value={it.name} onChange={e => updateItem(i, { name: e.target.value })} />
+                  <input type="number" min={0} step={0.1} className={`${INPUT} col-span-2`} placeholder={l('Кол.', 'Саны', 'Qty')} value={it.qty} onChange={e => updateItem(i, { qty: Number(e.target.value) || 0 })} />
+                  <input className={`${INPUT} col-span-2`} placeholder={l('Ед.', 'Бір.', 'Unit')} value={it.unit} onChange={e => updateItem(i, { unit: e.target.value })} />
+                  <input type="number" min={0} className={`${INPUT} col-span-2`} placeholder="₸/ед." value={it.costPerUnit} onChange={e => updateItem(i, { costPerUnit: Number(e.target.value) || 0 })} />
+                  <button onClick={() => removeItem(i)} className="col-span-1 p-1.5 hover:bg-rose-100/70 rounded-xl transition-colors text-rose-500" title={l('Удалить', 'Жою', 'Remove')}>
+                    <X className="w-3.5 h-3.5 mx-auto" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className={LABEL}>{l('Заметки', 'Жазбалар', 'Notes')}</label>
+            <textarea rows={2} className={`${INPUT} resize-none`} value={data.notes} onChange={e => setData(d => ({ ...d, notes: e.target.value }))} />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-white/60 flex items-center gap-2 justify-between flex-shrink-0">
+          <div className="text-sm text-slate-900 tabular-nums">
+            {l('Итого:', 'Барлығы:', 'Total:')} <b>{Math.round(totalCost).toLocaleString('ru-RU')} ₸</b>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-4 py-2 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-2xl text-xs hover:bg-white transition-colors">
+              {l('Отмена', 'Бас тарту', 'Cancel')}
+            </button>
+            <button
+              onClick={() => data.supplierId && onSave({ ...data, totalCost })}
+              disabled={!data.supplierId || items.length === 0 || !items.some(it => it.name.trim())}
+              className="px-4 py-2 bg-emerald-600 disabled:opacity-40 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+            >
+              {l('Сохранить', 'Сақтау', 'Save')}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
