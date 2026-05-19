@@ -103,7 +103,7 @@ interface PurchaseOrder {
 
 export function Warehouse({ language }: WarehouseProps) {
   const store = useDataStore();
-  const [activeView, setActiveView] = useState<'materials' | 'production' | 'bom' | 'calculator' | 'nesting' | 'suppliers' | 'purchases'>('production');
+  const [activeView, setActiveView] = useState<'materials' | 'production' | 'bom' | 'calculator' | 'nesting' | 'suppliers' | 'purchases' | 'reports'>('production');
   const [selectedCategory, setSelectedCategory] = useState('Все');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -124,10 +124,10 @@ export function Warehouse({ language }: WarehouseProps) {
   const [editingPo, setEditingPo] = useState<PurchaseOrder | null>(null);
 
   useEffect(() => {
-    if (activeView === 'suppliers' || activeView === 'purchases') {
+    if (activeView === 'suppliers' || activeView === 'purchases' || activeView === 'reports') {
       api.get<Supplier[]>('/api/suppliers').then(setSuppliers).catch(() => { /* ignore */ });
     }
-    if (activeView === 'purchases') {
+    if (activeView === 'purchases' || activeView === 'reports') {
       api.get<PurchaseOrder[]>('/api/purchase-orders').then(setPurchaseOrders).catch(() => { /* ignore */ });
     }
   }, [activeView]);
@@ -422,6 +422,7 @@ export function Warehouse({ language }: WarehouseProps) {
             <button onClick={() => setActiveView('materials')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'materials' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Склад', 'Қойма', 'Warehouse')}</button>
             <button onClick={() => setActiveView('suppliers')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'suppliers' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Поставщики', 'Жеткізушілер', 'Suppliers')}</button>
             <button onClick={() => setActiveView('purchases')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'purchases' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Закупки', 'Сатып алулар', 'Purchases')}</button>
+            <button onClick={() => setActiveView('reports')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'reports' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Отчёты', 'Есептер', 'Reports')}</button>
           <button onClick={() => setShowAddModal(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
             <Plus className="w-3.5 h-3.5" />{l('Добавить', 'Қосу', 'Add')}
           </button>
@@ -723,6 +724,16 @@ export function Warehouse({ language }: WarehouseProps) {
           onEdit={(p) => { setEditingPo(p); setShowPoModal(true); }}
           onDelete={deletePo}
           onUpdateStatus={updatePoStatus}
+        />
+      )}
+
+      {/* ===== Отчёты ===== */}
+      {activeView === 'reports' && (
+        <ReportsView
+          language={language}
+          deals={store.deals}
+          purchaseOrders={purchaseOrders}
+          suppliers={suppliers}
         />
       )}
 
@@ -1929,6 +1940,232 @@ function ConsumeMaterialsModal({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Reports view ─────────────────────────────────────────────────
+// Production-level analytics surfaced from data we already have:
+//   • Supplier spend — sum totalCost of POs (received / sent), ranked.
+//   • Top consumed materials — aggregate ConsumedMaterial across all
+//     deals, by productName, with qty + cost.
+//   • Material share of deal cost — sum(consumed cost) / sum(amount)
+//     for completed deals → % of revenue absorbed by raw materials.
+//   • Monthly purchase trend — last 6 months of PO spend.
+// All inferred locally — no extra API calls.
+function ReportsView({
+  language, deals, purchaseOrders, suppliers,
+}: {
+  language: 'kz' | 'ru' | 'eng';
+  deals: any[];
+  purchaseOrders: PurchaseOrder[];
+  suppliers: Supplier[];
+}) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU');
+
+  // ── Supplier spend ranking ──
+  // Only count POs that have actually moved past draft (sent/received).
+  const supplierSpend = useMemo(() => {
+    const map = new Map<string, { name: string; total: number; orders: number }>();
+    for (const po of purchaseOrders) {
+      if (po.status === 'draft' || po.status === 'cancelled') continue;
+      const sup = suppliers.find(s => s.id === po.supplierId);
+      const name = sup?.name || l('Без поставщика', 'Жеткізушісіз', 'No supplier');
+      const prev = map.get(po.supplierId) || { name, total: 0, orders: 0 };
+      prev.total += po.totalCost || 0;
+      prev.orders += 1;
+      map.set(po.supplierId, prev);
+    }
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [purchaseOrders, suppliers, language]);
+
+  // ── Top consumed materials ──
+  const topMaterials = useMemo(() => {
+    const map = new Map<string, { name: string; qty: number; unit: string; cost: number }>();
+    for (const d of deals) {
+      const consumed: ConsumedMaterial[] = (d as any).consumed || [];
+      for (const c of consumed) {
+        const prev = map.get(c.productName) || { name: c.productName, qty: 0, unit: c.unit, cost: 0 };
+        prev.qty += c.qty;
+        prev.cost += c.qty * c.costPerUnit;
+        map.set(c.productName, prev);
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
+  }, [deals]);
+
+  // ── Material share of revenue (completed deals only) ──
+  const costShare = useMemo(() => {
+    let revenue = 0;
+    let materialCost = 0;
+    let dealsWithConsumption = 0;
+    for (const d of deals) {
+      if (d.status !== 'completed') continue;
+      revenue += d.amount || 0;
+      const consumed: ConsumedMaterial[] = (d as any).consumed || [];
+      const dealCost = consumed.reduce((s, c) => s + c.qty * c.costPerUnit, 0);
+      if (dealCost > 0) dealsWithConsumption += 1;
+      materialCost += dealCost;
+    }
+    const sharePct = revenue > 0 ? (materialCost / revenue) * 100 : 0;
+    return { revenue, materialCost, sharePct, dealsWithConsumption };
+  }, [deals]);
+
+  // ── Monthly PO trend (last 6 months) ──
+  const monthlyTrend = useMemo(() => {
+    const months: { key: string; label: string; total: number }[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('ru-RU', { month: 'short' });
+      months.push({ key, label, total: 0 });
+    }
+    for (const po of purchaseOrders) {
+      if (po.status === 'cancelled') continue;
+      const created = po.createdAt ? new Date(po.createdAt) : null;
+      if (!created || isNaN(created.getTime())) continue;
+      const key = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`;
+      const slot = months.find(m => m.key === key);
+      if (slot) slot.total += po.totalCost || 0;
+    }
+    return months;
+  }, [purchaseOrders]);
+
+  const maxMonthly = Math.max(1, ...monthlyTrend.map(m => m.total));
+  const totalSpend = supplierSpend.reduce((s, x) => s + x.total, 0);
+  const maxSupplier = Math.max(1, ...supplierSpend.map(x => x.total));
+  const maxMaterial = Math.max(1, ...topMaterials.map(x => x.cost));
+
+  const hasAnyData = supplierSpend.length > 0 || topMaterials.length > 0 || costShare.revenue > 0;
+
+  return (
+    <div className="space-y-5">
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-3.5">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">{l('Расход на закупки', 'Сатып алу шығыны', 'Purchase spend')}</div>
+          <div className="text-lg text-slate-900 tabular-nums">{fmt(totalSpend)} <span className="text-slate-300 text-sm">₸</span></div>
+          <div className="text-[10px] text-slate-400 mt-1">{purchaseOrders.filter(p => p.status !== 'draft' && p.status !== 'cancelled').length} {l('заказов', 'тапсырыс', 'orders')}</div>
+        </div>
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-3.5">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">{l('Расход материалов', 'Материал шығыны', 'Material cost')}</div>
+          <div className="text-lg text-slate-900 tabular-nums">{fmt(costShare.materialCost)} <span className="text-slate-300 text-sm">₸</span></div>
+          <div className="text-[10px] text-slate-400 mt-1">{costShare.dealsWithConsumption} {l('сделок', 'мәміле', 'deals')}</div>
+        </div>
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-3.5">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">{l('Доля материалов', 'Материал үлесі', 'Material share')}</div>
+          <div className="text-lg text-slate-900 tabular-nums">{costShare.sharePct.toFixed(1)}<span className="text-slate-300 text-sm">%</span></div>
+          <div className="text-[10px] text-slate-400 mt-1">{l('от выручки', 'кірістен', 'of revenue')}</div>
+        </div>
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-3.5">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">{l('Поставщиков активно', 'Белсенді жеткізушілер', 'Active suppliers')}</div>
+          <div className="text-lg text-slate-900 tabular-nums">{supplierSpend.length}<span className="text-slate-300 text-sm"> / {suppliers.length}</span></div>
+          <div className="text-[10px] text-slate-400 mt-1">{l('были заказы', 'тапсырыс болды', 'with orders')}</div>
+        </div>
+      </div>
+
+      {!hasAnyData ? (
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+          <BarChart3 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+          {l('Данных пока нет — оформите первую закупку или спишите материал на сделку.',
+             'Деректер әлі жоқ — алғашқы сатып алуды рәсімдеңіз немесе материалды мәмілеге жазыңыз.',
+             'No data yet — record your first purchase or deduct materials to a deal.')}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {/* Supplier spend ranking */}
+          <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-4 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.08)]">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-slate-400" />
+                <span className="text-xs text-slate-700">{l('Топ поставщиков по расходу', 'Шығын бойынша топ жеткізушілер', 'Top suppliers by spend')}</span>
+              </div>
+              <span className="text-[10px] text-slate-400">{supplierSpend.length}</span>
+            </div>
+            {supplierSpend.length === 0 ? (
+              <div className="py-6 text-center text-[11px] text-slate-400">{l('Нет данных', 'Деректер жоқ', 'No data')}</div>
+            ) : (
+              <div className="space-y-2">
+                {supplierSpend.slice(0, 6).map((s, i) => (
+                  <div key={i}>
+                    <div className="flex items-center justify-between text-[11px] mb-1">
+                      <span className="text-slate-700 truncate flex-1 min-w-0">{s.name}</span>
+                      <span className="text-slate-500 tabular-nums flex-shrink-0 ml-2">{fmt(s.total)} ₸ <span className="text-slate-300">· {s.orders}</span></span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white/40 ring-1 ring-white/60 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-[var(--accent-500)] to-[var(--accent-600)] rounded-full transition-all"
+                        style={{ width: `${(s.total / maxSupplier) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Top materials by consumption */}
+          <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-4 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.08)]">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-slate-400" />
+                <span className="text-xs text-slate-700">{l('Топ материалов по расходу', 'Шығын бойынша топ материалдар', 'Top consumed materials')}</span>
+              </div>
+              <span className="text-[10px] text-slate-400">{topMaterials.length}</span>
+            </div>
+            {topMaterials.length === 0 ? (
+              <div className="py-6 text-center text-[11px] text-slate-400">{l('Нет списаний', 'Жазулар жоқ', 'No deductions')}</div>
+            ) : (
+              <div className="space-y-2">
+                {topMaterials.slice(0, 6).map((m, i) => (
+                  <div key={i}>
+                    <div className="flex items-center justify-between text-[11px] mb-1">
+                      <span className="text-slate-700 truncate flex-1 min-w-0">{m.name}</span>
+                      <span className="text-slate-500 tabular-nums flex-shrink-0 ml-2">{fmt(m.cost)} ₸ <span className="text-slate-300">· {fmt(m.qty)} {m.unit}</span></span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white/40 ring-1 ring-white/60 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full transition-all"
+                        style={{ width: `${(m.cost / maxMaterial) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Monthly purchase trend */}
+          <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-2xl p-4 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.08)] lg:col-span-2">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-slate-400" />
+                <span className="text-xs text-slate-700">{l('Закупки по месяцам', 'Айлар бойынша сатып алу', 'Purchases by month')}</span>
+              </div>
+              <span className="text-[10px] text-slate-400">{l('последние 6', 'соңғы 6', 'last 6')}</span>
+            </div>
+            <div className="flex items-end gap-2 h-32">
+              {monthlyTrend.map((m, i) => {
+                const h = m.total > 0 ? Math.max(4, (m.total / maxMonthly) * 100) : 2;
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
+                    <div className="text-[10px] text-slate-500 tabular-nums truncate w-full text-center">{m.total > 0 ? fmt(m.total) : ''}</div>
+                    <div className="w-full flex-1 flex items-end">
+                      <div
+                        className="w-full bg-gradient-to-t from-[var(--accent-600)] to-[var(--accent-400)] rounded-t-lg ring-1 ring-white/40 transition-all"
+                        style={{ height: `${h}%`, opacity: m.total > 0 ? 1 : 0.25 }}
+                      />
+                    </div>
+                    <div className="text-[10px] text-slate-400 capitalize">{m.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
