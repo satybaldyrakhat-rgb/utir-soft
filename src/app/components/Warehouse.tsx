@@ -149,6 +149,66 @@ export function Warehouse({ language }: WarehouseProps) {
     } catch { /* ignore */ }
   }
 
+  // ─── Smart PO suggestion ────────────────────────────────────────
+  // When a product is «low» or «outofstock» the user can one-click an
+  // «→ Закупить» button. We seed the PO modal with that product as
+  // the first item and try to guess the supplier:
+  //   1. Exact match: any supplier whose name equals product.supplier
+  //   2. Category match: supplier.category contains product.category
+  //   3. First supplier in the list (fallback)
+  // Always loads suppliers first if the list is empty so the modal's
+  // dropdown isn't empty.
+  function suggestSupplierFor(product: Product): Supplier | undefined {
+    if (!suppliers.length) return undefined;
+    const exact = suppliers.find(s => s.name.toLowerCase().trim() === (product.supplier || '').toLowerCase().trim());
+    if (exact) return exact;
+    const cat = suppliers.find(s => s.category && product.category &&
+      s.category.toLowerCase().includes(product.category.toLowerCase().slice(0, 4)));
+    if (cat) return cat;
+    return suppliers[0];
+  }
+
+  async function triggerPurchaseFor(product: Product) {
+    // Make sure suppliers are loaded so the modal dropdown has options.
+    let sups = suppliers;
+    if (sups.length === 0) {
+      try { sups = await api.get<Supplier[]>('/api/suppliers'); setSuppliers(sups); }
+      catch { /* ignore */ }
+    }
+    if (sups.length === 0) {
+      flash(l('Сначала добавьте поставщика во вкладке «Поставщики»',
+              'Алдымен «Жеткізушілер» қойындысында жеткізуші қосыңыз',
+              'Add a supplier first in the Suppliers tab'));
+      setActiveView('suppliers');
+      return;
+    }
+    const supplier = suggestSupplierFor(product);
+    // Suggested qty: enough to refill to «in stock» = minQty * 3, or 10 if no minQty
+    const suggestedQty = Math.max((product.minQty || 0) * 3 - product.quantity, 10);
+    const draft: PurchaseOrder = {
+      id: '',
+      supplierId: supplier?.id || sups[0].id,
+      items: [{ name: product.name, qty: suggestedQty, unit: product.unit, costPerUnit: product.cost }],
+      totalCost: suggestedQty * product.cost,
+      status: 'draft',
+      expectedDate: '',
+      notes: l(`Авто-закупка по низкому остатку (текущий: ${product.quantity} ${product.unit})`,
+               `Аз қалдыққа автоматты сатып алу (қазір: ${product.quantity} ${product.unit})`,
+               `Auto-PO for low stock (current: ${product.quantity} ${product.unit})`),
+      linkedDealIds: [],
+    };
+    setEditingPo(draft);
+    setShowPoModal(true);
+  }
+
+  function triggerPurchaseForAll() {
+    // Bulk: not yet — we open the modal for the FIRST low item; user can
+    // add more items in the modal itself. Keeping it simple: one PO per
+    // supplier later if grouping by supplier matters.
+    const firstLow = store.products.find(p => p.status === 'low' || p.status === 'outofstock');
+    if (firstLow) triggerPurchaseFor(firstLow);
+  }
+
   // Use store products
   const products = store.products;
   const setProducts = (fn: any) => {}; // removed
@@ -347,6 +407,25 @@ export function Warehouse({ language }: WarehouseProps) {
       {/* ===== MATERIALS VIEW ===== */}
       {activeView === 'materials' && (
         <div className="space-y-4">
+          {/* Low-stock banner — appears only when there's at least one
+              low / out-of-stock material. Bulk CTA seeds the PO modal
+              from the first low item; user can add more rows there. */}
+          {(lowCount + outCount > 0) && (
+            <div className="flex items-center gap-3 bg-amber-50/80 backdrop-blur-xl ring-1 ring-amber-200/60 rounded-2xl px-4 py-3">
+              <AlertTriangle className="w-4 h-4 text-amber-700 flex-shrink-0" />
+              <div className="text-[12px] text-amber-900 flex-1">
+                <b>{outCount + lowCount}</b> {l('материалов нужно докупить', 'материал сатып алу керек', 'materials need restocking')}
+                {outCount > 0 && <span className="ml-1.5 text-amber-700">· {outCount} {l('нет в наличии', 'жоқ', 'out')}</span>}
+              </div>
+              <button
+                onClick={triggerPurchaseForAll}
+                className="text-[11px] px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl ring-1 ring-amber-200/40 transition-colors flex-shrink-0"
+              >
+                {l('Создать закупку →', 'Сатып алу жасау →', 'Create PO →')}
+              </button>
+            </div>
+          )}
+
           {/* Search + Filters */}
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex-1 relative">
@@ -389,6 +468,15 @@ export function Warehouse({ language }: WarehouseProps) {
                     <div className="col-span-2 text-right text-xs text-gray-900 hidden sm:block">{p.cost.toLocaleString()} ₸</div>
                     <div className="col-span-2 flex items-center justify-end gap-1.5">
                       <span className={`text-[10px] px-2 py-0.5 rounded-lg ${st.bg}`}>{st.label}</span>
+                      {(p.status === 'low' || p.status === 'outofstock') && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); triggerPurchaseFor(p); }}
+                          className="text-[10px] px-2 py-0.5 rounded-lg bg-amber-100/80 text-amber-800 ring-1 ring-amber-200/60 hover:bg-amber-200/80 transition-colors flex-shrink-0"
+                          title={l('Создать закупку этого материала', 'Бұл материалды сатып алу', 'Create PO for this material')}
+                        >
+                          ↳ {l('Закупить', 'Алу', 'Order')}
+                        </button>
+                      )}
                       <Edit2 className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                     </div>
                   </div>
