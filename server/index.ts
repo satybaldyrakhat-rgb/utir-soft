@@ -302,6 +302,16 @@ migrateColumn('team_settings', 'integrations', 'TEXT');
 // Team-wide so every employee picks from the same lists when creating
 // deals / products. Previously was per-user in localStorage only.
 migrateColumn('team_settings', 'catalogs', 'TEXT');
+// Niche — short id from src/app/utils/niches.ts (furniture / windows /
+// ceilings / blinds / doors / stairs / flooring / construction / custom).
+// Drives default production stages, role labels, material categories
+// across the whole platform. Defaults to 'furniture' for legacy teams
+// when no value is set (preserves the original product positioning).
+migrateColumn('team_settings', 'niche', 'TEXT');
+// Onboarding state — JSON { completed: bool, step?: string, completedAt?: ISO }.
+// Drives whether we show the first-time setup wizard. Once completed=true
+// the user won't see the wizard again unless explicitly reset.
+migrateColumn('team_settings', 'onboarding', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -2032,6 +2042,65 @@ catalogsRouter.put('/', requireRole('manager'), (req: AuthedRequest, res) => {
 });
 
 app.use('/api/team/catalogs', catalogsRouter);
+
+// ─── Niche + onboarding state ─────────────────────────────────────
+// GET  /api/team/profile        → { niche, onboarding }
+// PATCH /api/team/profile       → { niche?, onboarding? } merged into row
+//
+// Niche drives default stages / role labels / material categories
+// platform-wide. Onboarding tracks whether the first-time setup wizard
+// has been completed.
+const profileRouter = express.Router();
+profileRouter.use(authMiddleware);
+
+profileRouter.get('/', (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT niche, onboarding FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+  const niche = (row?.niche as string) || 'furniture';  // legacy default
+  let onboarding: any = { completed: false };
+  try { if (row?.onboarding) onboarding = JSON.parse(row.onboarding); } catch { /* keep default */ }
+  res.json({ niche, onboarding });
+});
+
+profileRouter.patch('/', (req: AuthedRequest, res) => {
+  const patch = req.body || {};
+  // Only the admin can change the niche — it has platform-wide effects
+  // (stage names, default categories) so a junior employee shouldn't
+  // be able to flip it.
+  if (patch.niche !== undefined && req.teamRole !== 'admin') {
+    return res.status(403).json({ error: 'only admin can change niche' });
+  }
+  const cur = db.prepare('SELECT niche, onboarding FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+  const next: { niche?: string; onboarding?: string } = {};
+  if (patch.niche !== undefined) {
+    const allowed = ['furniture','windows','ceilings','blinds','doors','stairs','flooring','construction','custom'];
+    if (!allowed.includes(String(patch.niche))) return res.status(400).json({ error: 'invalid niche' });
+    next.niche = String(patch.niche);
+  }
+  if (patch.onboarding !== undefined) {
+    let existing: any = {};
+    try { if (cur?.onboarding) existing = JSON.parse(cur.onboarding); } catch { /* ignore */ }
+    next.onboarding = JSON.stringify({ ...existing, ...patch.onboarding });
+  }
+  db.prepare(`
+    INSERT INTO team_settings (team_id, niche, onboarding, updated_at)
+    VALUES (?, ?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET
+      niche = COALESCE(excluded.niche, team_settings.niche),
+      onboarding = COALESCE(excluded.onboarding, team_settings.onboarding),
+      updated_at = excluded.updated_at
+  `).run(
+    req.teamId!,
+    next.niche ?? cur?.niche ?? null,
+    next.onboarding ?? cur?.onboarding ?? null,
+  );
+  // Read back so caller has the merged state.
+  const fresh = db.prepare('SELECT niche, onboarding FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+  let ob: any = { completed: false };
+  try { if (fresh?.onboarding) ob = JSON.parse(fresh.onboarding); } catch { /* keep default */ }
+  res.json({ niche: fresh?.niche || 'furniture', onboarding: ob });
+});
+
+app.use('/api/team/profile', profileRouter);
 
 // ─── Tax payments (mark a tax as paid / undo) ─────────────────────
 // Stores one row per (team, period_key). period_key is built client-side

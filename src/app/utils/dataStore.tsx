@@ -532,6 +532,15 @@ interface DataStore {
   modules: PlatformModule[];
   customRecords: CustomRecordsByModule;
   aiSettings: AISettings;
+  // Niche the team operates in — drives default stages / role labels /
+  // material categories across the platform. Defaults to 'furniture'
+  // for backwards compat. Set via Onboarding wizard or Settings.
+  niche: string;
+  setNiche: (niche: string) => Promise<void>;
+  // Onboarding state — first-time setup wizard. completed=false → show
+  // the wizard on next page load. Persisted server-side.
+  onboarding: { completed: boolean; step?: string; completedAt?: string };
+  setOnboarding: (patch: Partial<{ completed: boolean; step?: string; completedAt?: string }>) => Promise<void>;
   loaded: boolean;
   // Current user's role — set by App.tsx after auth. Used together with
   // `rolePermissions` so any page can ask "can I write this module?".
@@ -635,7 +644,37 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [modules, setModules] = useState<PlatformModule[]>(() => loadModules());
   const [customRecords, setCustomRecords] = useState<CustomRecordsByModule>(() => loadCustomRecords());
   const [aiSettings, setAISettings] = useState<AISettings>(() => loadAISettings());
+  // Niche + onboarding — loaded from /api/team/profile on reloadAll.
+  // Default 'furniture' matches the original product positioning so
+  // pre-niche-feature teams behave identically until they switch.
+  const [niche, setNicheState] = useState<string>('furniture');
+  const [onboarding, setOnboardingState] = useState<{ completed: boolean; step?: string; completedAt?: string }>({ completed: false });
   const [loaded, setLoaded] = useState(false);
+
+  // Niche setter — optimistic UI update, then PATCH /api/team/profile.
+  // Throws on failure so the caller can show a toast and rollback.
+  const setNiche = useCallback(async (next: string) => {
+    setNicheState(next);
+    try {
+      await api.patch('/api/team/profile', { niche: next });
+    } catch (e) {
+      console.error('[setNiche] failed', e);
+      throw e;
+    }
+  }, []);
+
+  // Onboarding setter — merges the patch into existing state then PATCHes.
+  // Component typically calls setOnboarding({ completed: true }) after
+  // the wizard finishes; rest of the time it's read-only.
+  const setOnboarding = useCallback(async (patch: Partial<{ completed: boolean; step?: string; completedAt?: string }>) => {
+    setOnboardingState(prev => ({ ...prev, ...patch }));
+    try {
+      await api.patch('/api/team/profile', { onboarding: patch });
+    } catch (e) {
+      console.error('[setOnboarding] failed', e);
+      throw e;
+    }
+  }, []);
 
   const updateAIClient = useCallback((updates: Partial<AISettings['client']>) => {
     setAISettings(prev => {
@@ -992,7 +1031,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Matrix-gated reads (deals/products/transactions/activity) may return
       // 403 for a role whose matrix entry is 'none'. Swallow so the UI still
       // boots — the sidebar item for that module is hidden anyway.
-      const [d, e, t, p, tx, ig, al, ai, rp, cat] = await Promise.all([
+      const [d, e, t, p, tx, ig, al, ai, rp, cat, prof] = await Promise.all([
         api.get<Deal[]>('/api/deals').catch(() => [] as Deal[]),
         api.get<Employee[]>('/api/employees'),
         api.get<Task[]>('/api/tasks'),
@@ -1004,9 +1043,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
         api.get<{ permissions?: RolePermissions; roles?: TeamRole[] } | RolePermissions | null>('/api/team-permissions').catch(() => null),
         // Team catalogs — falls back to localStorage if backend unavailable.
         api.get<UserCatalogs>('/api/team/catalogs').catch(() => null),
+        // Team profile — niche + onboarding state. Both drive default
+        // labels and the first-run wizard. Swallow errors to null so
+        // a missing endpoint doesn't break the whole reload.
+        api.get<{ niche: string; onboarding: { completed: boolean; step?: string; completedAt?: string } } | null>('/api/team/profile').catch(() => null),
       ]);
       setDeals(d); setEmployees(e); setTasks(t); setProducts(p);
       setTransactions(tx); setIntegrations(ig); setActivityLogs(al);
+      // Apply team profile (niche + onboarding) — default to furniture
+      // when missing so legacy teams keep working unchanged.
+      if (prof) {
+        setNicheState(prof.niche || 'furniture');
+        setOnboardingState(prof.onboarding || { completed: false });
+      }
       // If backend returned catalogs, use them as the source of truth (team-wide).
       // Local cache stays as offline fallback.
       if (cat) {
@@ -1072,6 +1121,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setModules(DEFAULT_MODULES);
     setCustomRecords({});
     setAISettings(DEFAULT_AI_SETTINGS);
+    // Reset niche to default + clear onboarding state so the next user
+    // who logs in on this device sees their own wizard run if needed.
+    setNicheState('furniture');
+    setOnboardingState({ completed: false });
     try { localStorage.removeItem(PROFILE_STORAGE_KEY); } catch {}
     try { localStorage.removeItem(CATALOGS_STORAGE_KEY); } catch {}
     try { localStorage.removeItem(ROLE_PERMS_STORAGE_KEY); } catch {}
@@ -1271,6 +1324,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const store: DataStore = {
     deals, employees, tasks, products, transactions, integrations, activityLogs, profile, catalogs, rolePermissions, roles, modules, customRecords, aiSettings, loaded,
+    // Niche + onboarding — read-only state from /api/team/profile,
+    // plus setters that PATCH the server. See setNiche / setOnboarding
+    // above for the optimistic-update pattern.
+    niche, setNiche, onboarding, setOnboarding,
     currentUserRole, setCurrentUserRole, getModuleLevel, canWriteModule,
     addDeal, updateDeal, deleteDeal,
     addEmployee, updateEmployee, deleteEmployee,

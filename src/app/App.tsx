@@ -19,6 +19,7 @@ import { ComingSoon } from './components/ComingSoon';
 import { Terms } from './components/Terms';
 import { Privacy } from './components/Privacy';
 import { ResetPassword } from './components/ResetPassword';
+import { OnboardingWizard } from './components/OnboardingWizard';
 import { Menu, X, LogOut } from 'lucide-react';
 import profileLogo from '../imports/utirsoft.png';
 import { t } from './utils/translations';
@@ -245,6 +246,32 @@ function AppContent() {
   // Show Auth screen if not authenticated
   if (!isAuthenticated) {
     return <Auth onLogin={handleLogin} language={language} onLanguageChange={setLanguage} />;
+  }
+
+  // First-run wizard — shown to brand new teams whose onboarding flag
+  // isn't set yet. We wait for the store to load so we don't flash the
+  // wizard for a returning user during the (brief) initial fetch.
+  // Existing teams created before this feature shipped have onboarding=
+  // {completed:false} by default; for THEM we silently auto-complete the
+  // wizard if they already have data (deals/employees), so we don't shove
+  // a setup flow at someone who's been using the platform for months.
+  if (dataStore.loaded && !dataStore.onboarding.completed) {
+    const hasExistingData = dataStore.deals.length > 0 || dataStore.products.length > 0
+                          || dataStore.tasks.length > 0 || dataStore.transactions.length > 0;
+    if (hasExistingData) {
+      // Legacy team — auto-complete silently (fire-and-forget, don't block UI).
+      dataStore.setOnboarding({ completed: true, completedAt: new Date().toISOString() }).catch(() => { /* ignore */ });
+    } else {
+      // Fresh team — show the wizard.
+      return (
+        <OnboardingWizard
+          language={language}
+          currentUserName={currentUser?.name}
+          currentUserEmail={currentUser?.email}
+          onDone={() => { /* state will re-render once onboarding.completed flips */ }}
+        />
+      );
+    }
   }
 
   const renderPage = () => {
