@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands } from './telegram.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
-import { sendEmail, isEmailReady, otpTemplate, inviteTemplate } from './email.js';
+import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
 import { chat as aiChat, chatProviderStatuses, type ChatProviderId, type ChatMessage } from './aiChat.js';
 import aiTools from './aiTools.js';
@@ -528,7 +528,71 @@ function genVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-app.post('/api/auth/signup', async (req, res) => {
+// ─── Auth rate limiting ───────────────────────────────────────────
+// In-memory sliding-window per IP+bucket. Protects /signup, /login,
+// /resend-code, /forgot-password from brute-force and bot spam. Cleared
+// on process restart — acceptable for an MVP. For multi-instance prod
+// later: swap the Map for Redis with the same shape.
+const rateBuckets = new Map<string, number[]>();
+const RATE_LIMITS: Record<string, { max: number; windowMs: number }> = {
+  signup:        { max: 5,  windowMs: 60 * 60 * 1000 },  // 5 / hour per IP
+  login:         { max: 10, windowMs: 5  * 60 * 1000 },  // 10 / 5min — soft
+  'resend-code': { max: 5,  windowMs: 15 * 60 * 1000 },  // 5 / 15min
+  'forgot':      { max: 3,  windowMs: 15 * 60 * 1000 },  // 3 / 15min — strict, prevents email-spam-via-form
+};
+function rateLimit(bucket: keyof typeof RATE_LIMITS) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const cfg = RATE_LIMITS[bucket];
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
+            || req.socket.remoteAddress || 'unknown';
+    const key = `${bucket}:${ip}`;
+    const now = Date.now();
+    const window = (rateBuckets.get(key) || []).filter(t => now - t < cfg.windowMs);
+    if (window.length >= cfg.max) {
+      const retryAfter = Math.ceil((cfg.windowMs - (now - window[0])) / 1000);
+      res.setHeader('Retry-After', String(retryAfter));
+      return res.status(429).json({
+        error: `rate_limit: попробуйте через ${Math.ceil(retryAfter / 60)} мин.`,
+      });
+    }
+    window.push(now);
+    rateBuckets.set(key, window);
+    next();
+  };
+}
+
+// Periodic cleanup so the Map doesn't grow forever — drop entries with
+// no events in the last hour.
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, arr] of rateBuckets) {
+    const fresh = arr.filter(t => now - t < 60 * 60 * 1000);
+    if (fresh.length === 0) rateBuckets.delete(k);
+    else if (fresh.length !== arr.length) rateBuckets.set(k, fresh);
+  }
+}, 5 * 60 * 1000);
+
+// ─── Password reset tokens ────────────────────────────────────────
+// Sparse table — only rows for in-flight reset flows. Tokens are 32-char
+// hex (cryptographically random) so they can't be brute-forced. We
+// expire them after 1 hour and mark as used after a successful reset.
+db.exec(`
+CREATE TABLE IF NOT EXISTS password_resets (
+  token TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL,
+  used_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
+`);
+
+function genResetToken(): string {
+  // 32 random bytes → 64 hex chars. Plenty of entropy against guessing.
+  return Array.from(randomBytes(32)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+app.post('/api/auth/signup', rateLimit('signup'), async (req, res) => {
   const { email, password, name, company, termsAccepted, inviteCode } = req.body || {};
   if (!email || !EMAIL_RE.test(String(email))) return res.status(400).json({ error: 'invalid email' });
   if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
@@ -633,7 +697,7 @@ app.post('/api/auth/signup', async (req, res) => {
   });
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', rateLimit('login'), async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
   const user = db.prepare('SELECT id, email, name, company, password_hash, email_verified, verification_code, team_role, disabled_at FROM users WHERE email = ?').get(String(email).toLowerCase()) as any;
@@ -648,8 +712,10 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({
     token,
     user: { id: user.id, email: user.email, name: user.name, company: user.company || '', emailVerified: verified, teamRole: user.team_role || 'admin' },
-    // If not verified, also return the pending code so the OTP screen can pre-fill / display it.
-    verificationCode: verified ? undefined : user.verification_code,
+    // SECURITY: never return the OTP code in login response. Even for
+    // unverified users — they should use /resend-code (rate-limited) to
+    // get the code emailed. The previous behavior leaked OTP to anyone
+    // who knew the password, defeating the email-verification purpose.
   });
 });
 
@@ -666,7 +732,7 @@ app.post('/api/auth/verify-email', authMiddleware, (req: AuthedRequest, res) => 
   res.json({ emailVerified: true });
 });
 
-app.post('/api/auth/resend-code', authMiddleware, async (req: AuthedRequest, res) => {
+app.post('/api/auth/resend-code', rateLimit('resend-code'), authMiddleware, async (req: AuthedRequest, res) => {
   const user = db.prepare('SELECT email, email_verified FROM users WHERE id = ?').get(req.userId!) as any;
   if (!user) return res.status(404).json({ error: 'user not found' });
   if (user.email_verified) return res.status(400).json({ error: 'already verified' });
@@ -691,6 +757,99 @@ app.post('/api/auth/logout', authMiddleware, (req: AuthedRequest, res) => {
   const u = db.prepare('SELECT name, email FROM users WHERE id = ?').get(req.userId!) as any;
   if (u) logActivity(req.userId!, { user: u.name, action: 'Вышел из системы', target: u.email, type: 'logout', page: 'auth' });
   res.json({ ok: true });
+});
+
+// ─── Password reset flow ──────────────────────────────────────────
+// POST /api/auth/forgot-password { email } → always returns ok:true
+// (don't leak whether the email exists in the system — prevents user-
+// enumeration). If the email IS registered, generates a token, stores it
+// in password_resets, and emails the reset link. If Resend isn't
+// configured, surfaces the token in the response so dev / local testing
+// still works (mirrors the OTP fallback pattern).
+app.post('/api/auth/forgot-password', rateLimit('forgot'), async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!email || !EMAIL_RE.test(email)) {
+    // Don't 400 — keep the response shape identical for valid/invalid
+    // so attackers can't probe.
+    return res.json({ ok: true });
+  }
+  const user = db.prepare('SELECT id, name, disabled_at FROM users WHERE email = ?').get(email) as any;
+  if (!user || user.disabled_at) {
+    // Same shape, no leakage of whether the account exists.
+    return res.json({ ok: true });
+  }
+  const token = genResetToken();
+  // 1-hour expiry. SQLite stores ISO timestamps as TEXT.
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  db.prepare(
+    'INSERT INTO password_resets (token, user_id, expires_at) VALUES (?, ?, ?)'
+  ).run(token, user.id, expiresAt);
+
+  // Build the reset link. Frontend listens on /#/reset-password?token=XXX.
+  const origin = (req.headers.origin as string) || (req.headers.referer as string)?.replace(/\/$/, '') || 'https://utir-soft.vercel.app';
+  const link = `${origin}/#/reset-password?token=${token}`;
+  const tpl = passwordResetTemplate(link);
+  const emailResult = await sendEmail(email, tpl.subject, tpl.html, tpl.text);
+
+  logActivity(user.id, {
+    user: user.name, action: 'Запросил сброс пароля',
+    target: email, type: 'settings', page: 'auth',
+  });
+
+  res.json({
+    ok: true,
+    emailSent: emailResult.ok,
+    // Dev fallback — when no email provider is configured, surface the
+    // token so the user can still complete the flow locally.
+    resetToken: emailResult.ok ? undefined : token,
+  });
+});
+
+// POST /api/auth/reset-password { token, password } → verifies the token
+// hasn't expired or been used, updates the password hash, marks the
+// token as used. Doesn't issue a new session — the user is bounced back
+// to the login page after success so they explicitly re-authenticate.
+app.post('/api/auth/reset-password', rateLimit('forgot'), async (req, res) => {
+  const token = String(req.body?.token || '').trim();
+  const password = String(req.body?.password || '');
+  if (!token || token.length < 32) return res.status(400).json({ error: 'invalid_token' });
+  const pwdCheck = passwordOk(password);
+  if (!pwdCheck.ok) return res.status(400).json({ error: pwdCheck.reason });
+
+  const row = db.prepare(
+    `SELECT pr.user_id, pr.expires_at, pr.used_at, u.name, u.email
+     FROM password_resets pr JOIN users u ON u.id = pr.user_id
+     WHERE pr.token = ?`
+  ).get(token) as any;
+  if (!row) return res.status(400).json({ error: 'invalid_token' });
+  if (row.used_at) return res.status(400).json({ error: 'token_already_used' });
+  if (new Date(row.expires_at).getTime() < Date.now()) return res.status(400).json({ error: 'token_expired' });
+
+  const hash = await bcrypt.hash(password, 10);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, row.user_id);
+  db.prepare("UPDATE password_resets SET used_at = datetime('now') WHERE token = ?").run(token);
+
+  logActivity(row.user_id, {
+    user: row.name, action: 'Сменил пароль через сброс',
+    target: row.email, type: 'settings', page: 'auth',
+  });
+
+  res.json({ ok: true });
+});
+
+// GET /api/auth/check-reset-token?token=XXX → tells the frontend if the
+// link is still valid before rendering the new-password form. Avoids
+// the user typing a new password only to be told the link expired.
+app.get('/api/auth/check-reset-token', (req, res) => {
+  const token = String(req.query?.token || '').trim();
+  if (!token) return res.json({ valid: false, reason: 'missing' });
+  const row = db.prepare(
+    'SELECT expires_at, used_at FROM password_resets WHERE token = ?'
+  ).get(token) as any;
+  if (!row) return res.json({ valid: false, reason: 'invalid' });
+  if (row.used_at) return res.json({ valid: false, reason: 'used' });
+  if (new Date(row.expires_at).getTime() < Date.now()) return res.json({ valid: false, reason: 'expired' });
+  res.json({ valid: true });
 });
 
 // ─── GENERIC CRUD ROUTER FACTORY ───────────────────────

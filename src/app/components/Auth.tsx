@@ -241,9 +241,35 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     setError(l('Социальный вход пока недоступен. Используйте email.', 'Әлеуметтік кіру қол жетімсіз. Email пайдаланыңыз.', 'Social login is not configured yet. Use email.'));
   };
 
-  const handleForgotPassword = () => {
-    if (!email) { setError(l('Введите email', 'Email енгізіңіз', 'Enter email')); return; }
-    simulateLoading(() => setStep('forgot-sent'));
+  // Dev-mode reset token surfaced when no email provider is configured —
+  // mirrors the OTP dev fallback so local/test users can complete the
+  // flow without a real inbox. In production (Resend wired) this stays
+  // undefined and the user must check their email.
+  const [devResetToken, setDevResetToken] = useState<string>('');
+
+  const handleForgotPassword = async () => {
+    if (!email || !email.includes('@')) {
+      setError(l('Введите корректный email', 'Дұрыс email енгізіңіз', 'Enter a valid email'));
+      return;
+    }
+    setIsLoading(true); setError('');
+    try {
+      // Server always returns ok:true regardless of whether the email
+      // exists in the system (anti-enumeration). The user sees "check
+      // your inbox" either way — only difference is whether an email
+      // actually went out. Dev mode also returns `resetToken` so the
+      // local tester can click straight through.
+      const r = await api.post<{ ok: boolean; emailSent?: boolean; resetToken?: string }>(
+        '/api/auth/forgot-password', { email },
+      );
+      if (r.resetToken) setDevResetToken(r.resetToken);
+      setStep('forgot-sent');
+    } catch (err: any) {
+      // Rate limit / network — surface the message so the user can retry.
+      setError(String(err?.message || l('Не удалось отправить', 'Жіберілмеді', 'Could not send')));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const goBack = () => {
@@ -273,6 +299,12 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
   };
 
   const strength = getPasswordStrength(password);
+
+  // Social login is hidden by default — the buttons used to throw
+  // "feature unavailable" alerts which felt broken. Enable via
+  // `VITE_ENABLE_SOCIAL_LOGIN=true` when Google/Apple/WhatsApp OAuth
+  // is actually wired through the backend.
+  const showSocial = import.meta.env.VITE_ENABLE_SOCIAL_LOGIN === 'true';
 
   // Social buttons config
   const socialButtons = [
@@ -304,8 +336,10 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-2xl text-gray-900 mb-1 text-center">{l('Добро пожаловать', 'Қош келдіңіз', 'Welcome')}</h1>
-            <p className="text-sm text-slate-500 mb-8 text-center max-w-[280px]">
-              {l('CRM-платформа для мебельного бизнеса Казахстана', 'Қазақстан жиһаз бизнесіне арналған CRM-платформа', 'CRM platform for furniture business in Kazakhstan')}
+            <p className="text-sm text-slate-500 mb-8 text-center max-w-[300px]">
+              {l('CRM для замерных ниш: мебель, окна, потолки, двери, жалюзи',
+                 'Өлшеу салалары үшін CRM: жиһаз, терезе, төбе, есік, перде',
+                 'CRM for measure-based businesses: furniture, windows, ceilings, doors, blinds')}
             </p>
 
             <div className="w-full space-y-2.5 mb-6">
@@ -317,21 +351,23 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </button>
             </div>
 
-            <div className="w-full">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-px bg-white/60 flex-1" />
-                <span className="text-[10px] text-slate-400">{l('или продолжить с', 'немесе жалғастыру', 'or continue with')}</span>
-                <div className="h-px bg-white/60 flex-1" />
+            {showSocial && (
+              <div className="w-full">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-px bg-white/60 flex-1" />
+                  <span className="text-[10px] text-slate-400">{l('или продолжить с', 'немесе жалғастыру', 'or continue with')}</span>
+                  <div className="h-px bg-white/60 flex-1" />
+                </div>
+                <div className="flex gap-2">
+                  {socialButtons.map(sb => (
+                    <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-xs text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
+                      {sb.icon}
+                      <span className="hidden sm:inline">{sb.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex gap-2">
-                {socialButtons.map(sb => (
-                  <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-xs text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
-                    {sb.icon}
-                    <span className="hidden sm:inline">{sb.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            )}
 
             <button
               onClick={() => { window.location.hash = '#/cabinet'; }}
@@ -364,16 +400,19 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
 
-            <div className="flex items-center gap-3 mb-4"><div className="h-px bg-white/60 flex-1" /><span className="text-[10px] text-slate-400">{l('или', 'немесе', 'or')}</span><div className="h-px bg-white/60 flex-1" /></div>
-
-            <div className="space-y-2">
-              {socialButtons.map(sb => (
-                <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
-                  {sb.icon}
-                  <span>{l('Войти через', 'Арқылы кіру', 'Continue with')} {sb.label}</span>
-                </button>
-              ))}
-            </div>
+            {showSocial && (
+              <>
+                <div className="flex items-center gap-3 mb-4"><div className="h-px bg-white/60 flex-1" /><span className="text-[10px] text-slate-400">{l('или', 'немесе', 'or')}</span><div className="h-px bg-white/60 flex-1" /></div>
+                <div className="space-y-2">
+                  {socialButtons.map(sb => (
+                    <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
+                      {sb.icon}
+                      <span>{l('Войти через', 'Арқылы кіру', 'Continue with')} {sb.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             <p className="text-center text-xs text-slate-500 mt-6">
               {l('Нет аккаунта?', 'Аккаунт жоқ па?', "Don't have an account?")} <button onClick={() => { setStep('signup-email'); setError(''); }} className="text-gray-900 hover:underline">{l('Создать', 'Жасау', 'Sign up')}</button>
@@ -478,16 +517,19 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
             </button>
 
-            <div className="flex items-center gap-3 mb-4"><div className="h-px bg-white/60 flex-1" /><span className="text-[10px] text-slate-400">{l('или', 'немесе', 'or')}</span><div className="h-px bg-white/60 flex-1" /></div>
-
-            <div className="space-y-2">
-              {socialButtons.map(sb => (
-                <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
-                  {sb.icon}
-                  <span>{l('Продолжить через', 'Арқылы жалғастыру', 'Continue with')} {sb.label}</span>
-                </button>
-              ))}
-            </div>
+            {showSocial && (
+              <>
+                <div className="flex items-center gap-3 mb-4"><div className="h-px bg-white/60 flex-1" /><span className="text-[10px] text-slate-400">{l('или', 'немесе', 'or')}</span><div className="h-px bg-white/60 flex-1" /></div>
+                <div className="space-y-2">
+                  {socialButtons.map(sb => (
+                    <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
+                      {sb.icon}
+                      <span>{l('Продолжить через', 'Арқылы жалғастыру', 'Continue with')} {sb.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             <p className="text-center text-xs text-slate-500 mt-6">
               {l('Уже есть аккаунт?', 'Аккаунт бар ма?', 'Already have an account?')} <button onClick={() => { setStep('login-email'); setError(''); }} className="text-gray-900 hover:underline">{l('Войти', 'Кіру', 'Log in')}</button>
@@ -693,7 +735,27 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             <p className="text-sm text-slate-500 mb-1">{l('Мы отправили ссылку для сброса на', 'Біз қалпына келтіру сілтемесін жібердік', 'We sent a reset link to')}</p>
             <p className="text-sm text-gray-900 mb-6">{email}</p>
 
-            <button onClick={() => { setStep('login-email'); setPassword(''); setError(''); }} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
+            {/* Dev-mode banner — real email isn't configured, so we show
+                the reset link inline. Hidden in production when Resend
+                returns ok:true (resetToken is undefined in that case). */}
+            {devResetToken && (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-5 text-left">
+                <div className="text-[10px] uppercase tracking-wider text-amber-700 mb-1">
+                  {l('Демо-режим · email не отправляется', 'Демо-режим · email жіберілмейді', 'Demo mode · no email is sent')}
+                </div>
+                <div className="text-xs text-amber-900 mb-2">
+                  {l('Перейдите по этой ссылке для сброса пароля:', 'Құпия сөзді қалпына келтіру үшін осы сілтемеге өтіңіз:', 'Open this link to reset your password:')}
+                </div>
+                <a
+                  href={`#/reset-password?token=${devResetToken}`}
+                  className="text-xs text-amber-900 underline break-all hover:text-amber-700"
+                >
+                  /#/reset-password?token={devResetToken.slice(0, 16)}…
+                </a>
+              </div>
+            )}
+
+            <button onClick={() => { setStep('login-email'); setPassword(''); setError(''); setDevResetToken(''); }} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
               {l('Вернуться к входу', 'Кіруге оралу', 'Back to login')}
             </button>
             <p className="text-xs text-slate-500 mt-4">{l('Не получили? Проверьте папку спам', 'Алмадыңыз ба? Спам қалтасын тексеріңіз', "Didn't receive it? Check spam folder")}</p>
@@ -731,10 +793,14 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
           </div>
 
           <h2 className="text-3xl text-slate-900 mb-3 max-w-md leading-tight tracking-tight">
-            {l('Управляйте мебельным бизнесом в одной платформе', 'Жиһаз бизнесін бір платформада басқарыңыз', 'Manage your furniture business in one platform')}
+            {l('Замерные ниши — единая платформа от заявки до установки',
+               'Өлшеу салалары — өтінімнен орнатуға дейін бірыңғай платформа',
+               'Measure-based businesses — one platform from lead to install')}
           </h2>
           <p className="text-sm text-slate-500 mb-12 max-w-sm">
-            {l('От первой заявки до установки — полный контроль производства, финансов и клиентов', 'Бірінші өтінімнен орнатуға дейін — өндірісті, қаржыны және клиенттерді толық бақылау', 'From the first lead to installation — full control of production, finance and clients')}
+            {l('Мебель, окна, потолки, двери, жалюзи, лестницы — выберите свою нишу при настройке, а платформа подстроится под её этапы и материалы.',
+               'Жиһаз, терезе, төбе, есік, перде — өз салаңызды таңдаңыз, платформа кезеңдерге және материалдарға бейімделеді.',
+               'Furniture, windows, ceilings, doors, blinds, stairs — pick your niche during setup and the platform adapts its stages and materials.')}
           </p>
 
           <div className="space-y-3">

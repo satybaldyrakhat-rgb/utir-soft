@@ -76,6 +76,28 @@ export function otpTemplate(code: string, productName = 'Utir Soft'): { subject:
   };
 }
 
+export function passwordResetTemplate(link: string, productName = 'Utir Soft'): { subject: string; html: string; text: string } {
+  return {
+    subject: `Сброс пароля ${productName}`,
+    text: `Вы (или кто-то от вашего имени) запросили сброс пароля в ${productName}.\n\nЧтобы создать новый пароль, откройте ссылку:\n${link}\n\nСсылка действует 1 час. Если вы не запрашивали сброс — просто проигнорируйте это письмо.`,
+    html: `
+      <div style="font-family: -apple-system, system-ui, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; color: #111;">
+        <h2 style="margin: 0 0 12px;">Сброс пароля</h2>
+        <p style="color: #444; line-height: 1.5;">
+          Вы (или кто-то от вашего имени) запросили сброс пароля в <b>${productName}</b>.
+        </p>
+        <p style="margin: 24px 0;">
+          <a href="${link}" style="display: inline-block; background: #059669; color: #fff; text-decoration: none; padding: 12px 20px; border-radius: 12px; font-weight: 500;">
+            Создать новый пароль
+          </a>
+        </p>
+        <p style="color: #888; font-size: 12px; line-height: 1.4;">Если кнопка не работает, скопируйте ссылку:<br><span style="word-break: break-all;">${link}</span></p>
+        <p style="color: #aaa; font-size: 11px; margin-top: 24px;">Ссылка действует 1 час. Если вы не запрашивали сброс — проигнорируйте это письмо.</p>
+      </div>
+    `,
+  };
+}
+
 export function inviteTemplate(inviter: string, company: string | undefined, role: string, link: string): { subject: string; html: string; text: string } {
   const where = company ? `команду «${company}»` : 'команду';
   return {

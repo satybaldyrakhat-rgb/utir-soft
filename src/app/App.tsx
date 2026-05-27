@@ -18,6 +18,7 @@ import { Auth } from './components/Auth';
 import { ComingSoon } from './components/ComingSoon';
 import { Terms } from './components/Terms';
 import { Privacy } from './components/Privacy';
+import { ResetPassword } from './components/ResetPassword';
 import { Menu, X, LogOut } from 'lucide-react';
 import profileLogo from '../imports/utirsoft.png';
 import { t } from './utils/translations';
@@ -713,6 +714,10 @@ function PublicRouter({ children }: { children: React.ReactNode }) {
   if (hash === '#/booking') return <Booking />;
   if (hash === '#/terms') return <Terms language={legalLang} onLanguageChange={setLegalLang} />;
   if (hash === '#/privacy') return <Privacy language={legalLang} onLanguageChange={setLegalLang} />;
+  // Password-reset landing — opened from the email link
+  // (#/reset-password?token=XXX). Stays public so the user doesn't
+  // need to be logged in to reset their forgotten password.
+  if (hash.startsWith('#/reset-password')) return <ResetPassword language={legalLang} onLanguageChange={setLegalLang} />;
   return <>{children}</>;
 }
 
