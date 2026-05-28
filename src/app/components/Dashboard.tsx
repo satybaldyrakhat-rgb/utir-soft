@@ -1,92 +1,233 @@
-import { useState } from 'react';
+// Dashboard — landing screen after auth + onboarding.
+//
+// Two main modes:
+//   1. Empty (deals=0 AND products=0): shows a 4-step "Start here" check-
+//      list instead of a sea of zeros. Drives new users into the funnel.
+//   2. Populated: niche-aware KPIs, revenue chart (period-filtered),
+//      tasks widget, recent orders, activity feed, weekly orders, plus
+//      an AI insight card that opens UTIR AI with a pre-filled question.
+//
+// Niche-aware: copy and CTAs read from src/app/utils/niches.ts so a
+// stretch-ceiling business doesn't see "furniture orders" everywhere.
+//
+// All derived data is wrapped in useMemo so recharts doesn't re-render
+// on every unrelated store mutation.
+
+import { useState, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   TrendingUp, TrendingDown, Plus, ArrowUpRight, ArrowRight,
   Clock, CheckCircle2, Circle, ShoppingBag, Users, DollarSign,
-  Package, Palette, ChevronRight, X, Sparkles,
+  Package, Palette, ChevronRight, X, Sparkles, MessageCircle,
+  Rocket, Wallet,
 } from 'lucide-react';
 import { t } from '../utils/translations';
 import { useDataStore } from '../utils/dataStore';
+import { getNiche } from '../utils/niches';
 
-// Liquid-glass status palette — soft pastels with translucent fills so
-// badges stay readable on top of the glassy cards.
-const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
-  new:               { label: 'Новый',   color: 'text-sky-700     bg-sky-100/70',     icon: Circle },
-  'in-progress':     { label: 'В работе',color: 'text-amber-700   bg-amber-100/70',   icon: Clock },
-  measured:          { label: 'Замер',   color: 'text-violet-700  bg-violet-100/70',  icon: Package },
-  'project-agreed':  { label: 'Проект',  color: 'text-violet-700  bg-violet-100/70',  icon: Palette },
-  contract:          { label: 'Договор', color: 'text-sky-700     bg-sky-100/70',     icon: DollarSign },
-  production:        { label: 'Произв.', color: 'text-amber-700   bg-amber-100/70',   icon: Package },
-  assembly:          { label: 'Сборка',  color: 'text-yellow-700  bg-yellow-100/70',  icon: Package },
-  completed:         { label: 'Готов',   color: 'text-emerald-700 bg-emerald-100/70', icon: CheckCircle2 },
-  rejected:          { label: 'Отказ',   color: 'text-rose-700    bg-rose-100/70',    icon: X },
+// Universal pipeline statuses — these are shared across niches (the
+// sales funnel itself doesn't change, only the production stages do).
+// Labels are niche-neutral; "Сборка" was the one furniture-specific
+// outlier and is now "Установка" (which applies to all install-based
+// niches). For per-niche labels we look up niches[].productionStages
+// at render time inside Recent Orders.
+const statusConfig: Record<string, { ru: string; kz: string; eng: string; color: string; icon: any }> = {
+  new:               { ru: 'Новый',     kz: 'Жаңа',      eng: 'New',         color: 'text-sky-700     bg-sky-100/70',     icon: Circle },
+  'in-progress':     { ru: 'В работе',  kz: 'Жұмыста',   eng: 'In progress', color: 'text-amber-700   bg-amber-100/70',   icon: Clock },
+  measured:          { ru: 'Замер',     kz: 'Өлшем',     eng: 'Measured',    color: 'text-violet-700  bg-violet-100/70',  icon: Package },
+  'project-agreed':  { ru: 'Проект',    kz: 'Жоба',      eng: 'Project',     color: 'text-violet-700  bg-violet-100/70',  icon: Palette },
+  contract:          { ru: 'Договор',   kz: 'Шарт',      eng: 'Contract',    color: 'text-sky-700     bg-sky-100/70',     icon: DollarSign },
+  production:        { ru: 'Произв.',   kz: 'Өндіріс',   eng: 'Production',  color: 'text-amber-700   bg-amber-100/70',   icon: Package },
+  assembly:          { ru: 'Сборка',    kz: 'Жинау',     eng: 'Assembly',    color: 'text-yellow-700  bg-yellow-100/70',  icon: Package },
+  installation:      { ru: 'Установка', kz: 'Орнату',    eng: 'Installation',color: 'text-amber-700   bg-amber-100/70',   icon: Package },
+  completed:         { ru: 'Готов',     kz: 'Дайын',     eng: 'Done',        color: 'text-emerald-700 bg-emerald-100/70', icon: CheckCircle2 },
+  rejected:          { ru: 'Отказ',     kz: 'Бас тарту', eng: 'Rejected',    color: 'text-rose-700    bg-rose-100/70',    icon: X },
 };
+
+type PeriodKey = 'week' | 'month' | 'quarter' | 'all';
 
 interface DashboardProps {
   language: 'kz' | 'ru' | 'eng';
   onNavigate?: (page: string) => void;
 }
 
-// Shared glass-card class. Centralised so every surface in the dashboard
-// shares the same translucency / blur / border / shadow.
+// Shared glass-card class — centralised so every surface shares the same
+// translucency / blur / border / shadow.
 const GLASS = 'bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl';
 const GLASS_HOVER = 'transition-all hover:bg-white/70 hover:shadow-[0_16px_48px_-12px_rgba(15,23,42,0.18)] hover:-translate-y-0.5';
+
+// Format KZT amount with smart units. For small businesses < 1k we keep
+// the literal value so "850 ₸" isn't shown as "0K ₸".
+const fmtKZT = (n: number) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} млн ₸`;
+  if (n >= 1_000)     return `${Math.round(n / 1_000)}K ₸`;
+  return `${Math.round(n).toLocaleString('ru-RU')} ₸`;
+};
 
 export function Dashboard({ language, onNavigate }: DashboardProps) {
   const store = useDataStore();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  // Period filter for the revenue chart and trends. 'month' is the most
+  // useful default for SMB.
+  const [period, setPeriod] = useState<PeriodKey>('month');
 
-  // ─── Real data ─────────────────────────────────────────────────────
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const niche = getNiche(store.niche);
+  const nicheName = niche.name[language];
+
+  // ─── Empty-state detection ─────────────────────────────────────────
+  // A "fresh" team has nothing in any of the data buckets. Show the
+  // onboarding checklist instead of zero-filled widgets that look broken.
+  const hasAnyData =
+    store.deals.length > 0
+    || store.products.length > 0
+    || store.tasks.length > 0
+    || store.transactions.length > 0;
+
+  // ─── Permission-aware module visibility ───────────────────────────
+  // KPI cards deeplink to other pages — if the user has no access to
+  // that module, the card is misleading. getModuleLevel returns 'none'
+  // when the role's matrix entry blocks the module.
+  const canSee = (page: string) => store.getModuleLevel(page) !== 'none';
+
+  // ─── Real numbers ─────────────────────────────────────────────────
+  // KPI top line — these are still all-time across the team. The
+  // period filter only affects the revenue chart + the trend % bubble.
   const totalRevenue  = store.getTotalRevenue();
   const totalExpenses = store.getTotalExpenses();
   const activeDeals   = store.getActiveDealsCount();
   const totalClients  = store.getTotalClients();
   const averageCheck  = store.getAverageCheck();
 
-  // Month-over-month deltas (real, no hardcoded percentages).
-  const trends = (() => {
+  // ─── Period helpers ───────────────────────────────────────────────
+  // Returns [start, end] dates for the selected period. 'all' returns
+  // null so callers know to skip filtering.
+  const periodRange = useMemo<[Date, Date] | null>(() => {
+    if (period === 'all') return null;
     const now = new Date();
-    const thisMonthKey = now.toISOString().slice(0, 7);
-    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthKey = lastMonthDate.toISOString().slice(0, 7);
-    const pct = (a: number, b: number) => {
-      if (b === 0) return a === 0 ? '0%' : '+∞';
+    const start = new Date(now);
+    if (period === 'week') start.setDate(now.getDate() - 6);
+    else if (period === 'month') start.setMonth(now.getMonth() - 1);
+    else if (period === 'quarter') start.setMonth(now.getMonth() - 3);
+    start.setHours(0, 0, 0, 0);
+    return [start, now];
+  }, [period]);
+
+  const periodLabel = period === 'week'    ? l('неделя',   'апта',   'week')
+                    : period === 'month'   ? l('месяц',    'ай',     'month')
+                    : period === 'quarter' ? l('квартал',  'тоқсан', 'quarter')
+                    :                         l('всё время','барлық',  'all time');
+
+  // ─── Trends (period-aware) ────────────────────────────────────────
+  // Compares the current period to the previous period of the same
+  // length. "+∞" was the worst — replaced with localized "Новое" when
+  // the prior period is empty.
+  const trends = useMemo(() => {
+    const dash = (a: number, b: number): { txt: string; up: boolean } => {
+      if (b === 0) return { txt: a === 0 ? '—' : l('Новое', 'Жаңа', 'New'), up: a >= 0 };
       const d = Math.round((a - b) / b * 100);
-      return `${d >= 0 ? '+' : ''}${d}%`;
+      return { txt: `${d >= 0 ? '+' : ''}${d}%`, up: a >= b };
     };
-    const sumIn = (key: string) => store.transactions
-      .filter(t => t.type === 'income' && t.status === 'completed' && (t.date || '').startsWith(key))
-      .reduce((s, t) => s + t.amount, 0);
-    const dealsInMonth = (key: string) => store.deals.filter(d => (d.date || '').startsWith(key));
-    const newClientsInMonth = (key: string) => {
+    const now = new Date();
+    let curStart: Date, curEnd: Date, prevStart: Date, prevEnd: Date;
+    if (period === 'all') {
+      // For "all time" we compare this-vs-last full month as a sane proxy.
+      curEnd = now;
+      curStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      prevEnd = new Date(curStart.getTime() - 1);
+      prevStart = new Date(prevEnd.getFullYear(), prevEnd.getMonth(), 1);
+    } else {
+      const days = period === 'week' ? 7 : period === 'month' ? 30 : 90;
+      curEnd = now;
+      curStart = new Date(now.getTime() - days * 86400000);
+      prevEnd = new Date(curStart.getTime() - 1);
+      prevStart = new Date(prevEnd.getTime() - days * 86400000);
+    }
+    const inRange = (iso: string | undefined, s: Date, e: Date) => {
+      if (!iso) return false;
+      const t = new Date(iso).getTime();
+      return t >= s.getTime() && t <= e.getTime();
+    };
+    const sumIncome = (s: Date, e: Date) => store.transactions
+      .filter(tx => tx.type === 'income' && tx.status === 'completed' && inRange(tx.date, s, e))
+      .reduce((acc, tx) => acc + tx.amount, 0);
+    const dealsIn = (s: Date, e: Date) => store.deals.filter(d => inRange(d.date || d.createdAt, s, e));
+    const clientsIn = (s: Date, e: Date) => {
       const names = new Set<string>();
-      for (const d of dealsInMonth(key)) names.add(d.customerName);
+      for (const d of dealsIn(s, e)) names.add(d.customerName);
       return names.size;
     };
-    const avgCheckInMonth = (key: string) => {
-      const ds = dealsInMonth(key).filter(d => d.amount > 0);
+    const avgCheckIn = (s: Date, e: Date) => {
+      const ds = dealsIn(s, e).filter(d => d.amount > 0);
       if (ds.length === 0) return 0;
-      return ds.reduce((s, d) => s + d.amount, 0) / ds.length;
+      return ds.reduce((acc, d) => acc + d.amount, 0) / ds.length;
     };
-    const revT = sumIn(thisMonthKey);
-    const revL = sumIn(lastMonthKey);
     return {
-      revenue:     { txt: pct(revT, revL), up: revT >= revL },
-      activeDeals: { txt: pct(dealsInMonth(thisMonthKey).length, dealsInMonth(lastMonthKey).length), up: dealsInMonth(thisMonthKey).length >= dealsInMonth(lastMonthKey).length },
-      clients:     { txt: pct(newClientsInMonth(thisMonthKey), newClientsInMonth(lastMonthKey)), up: newClientsInMonth(thisMonthKey) >= newClientsInMonth(lastMonthKey) },
-      avgCheck:    { txt: pct(avgCheckInMonth(thisMonthKey), avgCheckInMonth(lastMonthKey)), up: avgCheckInMonth(thisMonthKey) >= avgCheckInMonth(lastMonthKey) },
+      revenue:     dash(sumIncome(curStart, curEnd),  sumIncome(prevStart, prevEnd)),
+      activeDeals: dash(dealsIn(curStart, curEnd).length, dealsIn(prevStart, prevEnd).length),
+      clients:     dash(clientsIn(curStart, curEnd), clientsIn(prevStart, prevEnd)),
+      avgCheck:    dash(avgCheckIn(curStart, curEnd), avgCheckIn(prevStart, prevEnd)),
     };
-  })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, store.transactions, store.deals, language]);
 
-  const recentOrders = [...store.deals]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5);
+  // ─── Revenue chart data (period-aware) ────────────────────────────
+  // Bucket transactions by day within the selected period. If empty,
+  // we return an empty array and the renderer shows an empty-state
+  // CTA instead of a broken single-point area chart.
+  const revenueData = useMemo(() => {
+    const txs = store.transactions.filter(tx => tx.type === 'income' && tx.status === 'completed');
+    const inWindow = periodRange
+      ? txs.filter(tx => {
+          if (!tx.date) return false;
+          const ms = new Date(tx.date).getTime();
+          return ms >= periodRange[0].getTime() && ms <= periodRange[1].getTime();
+        })
+      : txs;
+    const byDay: Record<string, number> = {};
+    inWindow.forEach(tx => {
+      const day = (tx.date || '').slice(0, 10);
+      if (day) byDay[day] = (byDay[day] || 0) + tx.amount;
+    });
+    return Object.entries(byDay)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([day, value]) => ({ day: day.slice(5), value }));
+  }, [periodRange, store.transactions]);
 
+  // ─── Weekly orders ────────────────────────────────────────────────
+  const weeklyData = useMemo(() => {
+    const labels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const counts = [0, 0, 0, 0, 0, 0, 0];
+    store.deals.forEach(d => {
+      const ts = new Date(d.createdAt);
+      if (!isNaN(ts.getTime())) counts[ts.getDay()]++;
+    });
+    return ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => ({
+      day,
+      orders: counts[labels.indexOf(day)],
+    }));
+  }, [store.deals]);
+
+  // ─── Recent orders ────────────────────────────────────────────────
+  const recentOrders = useMemo(() =>
+    [...store.deals]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5),
+  [store.deals]);
+
+  // ─── Tasks (open + due today/before) ──────────────────────────────
+  // Heading and filter were out of sync before. Now both speak of
+  // "tasks due today or overdue" — the actually-actionable subset.
   const todayStr = new Date().toISOString().slice(0, 10);
-  const todayTasks = store.tasks.filter(t => t.dueDate === todayStr || t.status !== 'done').slice(0, 6);
-  const completedTasks = todayTasks.filter(t => t.status === 'done').length;
-  const totalTasks = todayTasks.length || 1;
+  const openTasks = useMemo(() =>
+    store.tasks.filter(t => t.status !== 'done' && (!t.dueDate || t.dueDate <= todayStr + 'Z')),
+  [store.tasks, todayStr]);
+  const todayDueCount = openTasks.filter(t => t.dueDate === todayStr).length;
+  const overdueCount  = openTasks.filter(t => t.dueDate && t.dueDate < todayStr).length;
+  const completedToday = store.tasks.filter(t => t.status === 'done' && t.completedAt?.slice(0, 10) === todayStr).length;
+  const totalForBar = Math.max(1, completedToday + openTasks.length);
 
+  // ─── Activity feed ────────────────────────────────────────────────
   const activities = store.activityLogs.slice(0, 5);
   const activityIcons: Record<string, { icon: any; bg: string; fg: string }> = {
     create: { icon: Plus,         bg: 'bg-sky-100/70',     fg: 'text-sky-700' },
@@ -96,98 +237,358 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
     logout: { icon: Users,        bg: 'bg-slate-100/70',   fg: 'text-slate-600' },
   };
 
-  const incomeByDay: Record<string, number> = {};
-  store.transactions.filter(t => t.type === 'income' && t.status === 'completed').forEach(tx => {
-    const day = tx.date.slice(8, 10).replace(/^0/, '');
-    incomeByDay[day] = (incomeByDay[day] || 0) + tx.amount;
-  });
-  const revenueData = Object.entries(incomeByDay).sort((a, b) => +a[0] - +b[0]).map(([day, value]) => ({ day, value }));
-  if (revenueData.length === 0) revenueData.push({ day: '1', value: 0 });
+  // Relative-time formatter — turns "2026-05-19T12:34:00Z" into
+  // "5 мин назад" / "2 ч назад" / "вчера" so the activity feed is
+  // readable at a glance instead of dumping raw ISO timestamps.
+  const relTime = (iso: string | undefined): string => {
+    if (!iso) return '—';
+    const ms = Date.now() - new Date(iso).getTime();
+    if (isNaN(ms) || ms < 0) return '—';
+    const min = Math.round(ms / 60000);
+    if (min < 1)    return l('только что', 'қазір ғана', 'just now');
+    if (min < 60)   return l(`${min} мин назад`, `${min} мин бұрын`, `${min}m ago`);
+    const hr = Math.round(min / 60);
+    if (hr < 24)    return l(`${hr} ч назад`,  `${hr} сағ бұрын`,   `${hr}h ago`);
+    const dd = Math.round(hr / 24);
+    if (dd === 1)   return l('вчера',          'кеше',               'yesterday');
+    if (dd < 7)     return l(`${dd} дн назад`, `${dd} күн бұрын`,    `${dd}d ago`);
+    return new Date(iso).toLocaleDateString(language === 'eng' ? 'en-GB' : 'ru-RU', { day: '2-digit', month: 'short' });
+  };
 
-  const weekdayLabels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-  const weekdayCounts = [0, 0, 0, 0, 0, 0, 0];
-  store.deals.forEach(d => {
-    const ts = new Date(d.createdAt);
-    if (!isNaN(ts.getTime())) weekdayCounts[ts.getDay()]++;
-  });
-  const weeklyData = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => ({
-    day,
-    orders: weekdayCounts[weekdayLabels.indexOf(day)],
-  }));
-
-  const getGreeting = () => {
+  // ─── Greeting ─────────────────────────────────────────────────────
+  // Picks up the user's first name from store.profile.name so a fresh
+  // sign-up sees "Доброе утро, Айым" instead of a generic greeting.
+  const getGreeting = (): string => {
     const hour = new Date().getHours();
+    const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
     const greetings: Record<string, Record<string, string>> = {
       morning:   { kz: 'Қайырлы таң', ru: 'Доброе утро',  eng: 'Good morning' },
       afternoon: { kz: 'Қайырлы күн', ru: 'Добрый день',  eng: 'Good afternoon' },
       evening:   { kz: 'Қайырлы кеш', ru: 'Добрый вечер', eng: 'Good evening' },
     };
-    const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
     return greetings[period][language];
   };
+  const firstName = (store.profile.name || '').split(' ')[0];
 
-  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const today = new Date().toLocaleDateString(
+    language === 'kz' ? 'kk-KZ' : language === 'eng' ? 'en-US' : 'ru-RU',
+    { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' },
+  );
 
-  const today = new Date().toLocaleDateString(language === 'kz' ? 'kk-KZ' : language === 'eng' ? 'en-US' : 'ru-RU', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  });
-
-  const fmt = (n: number) => {
-    if (n >= 1000000) return `${(n / 1000000).toFixed(1)} млн ₸`;
-    if (n >= 1000) return `${Math.round(n / 1000)}K ₸`;
-    return `${n.toLocaleString()} ₸`;
+  // Niche-aware status label — falls back to RU label from statusConfig
+  // and otherwise reads from the niche's production-stage labels (so
+  // a ceilings business sees "Раскрой / Монтаж" instead of "Сборка").
+  const statusLabel = (status: string): string => {
+    // Universal pipeline statuses (new, measured, etc.) keep their labels —
+    // they describe the SALES funnel, not the production stages.
+    const cfg = statusConfig[status];
+    if (cfg) return cfg[language];
+    // Anything else might be a production-stage id (cutting, glazing, etc.)
+    // — look it up in the niche config.
+    const stage = niche.productionStages.find(s => s.id === status);
+    if (stage) return stage[language];
+    return status;
   };
 
-  // ─── Render ────────────────────────────────────────────────────────
+  // ─── Skeleton while store loads ────────────────────────────────────
+  // First paint of dashboard used to flash zeros, then real values
+  // popped in — looked like a broken trend. Now we show a skeleton
+  // grid until `store.loaded` flips.
+  if (!store.loaded) {
+    return (
+      <div className="min-h-full relative">
+        <div className="relative p-4 md:p-8 max-w-[1400px] mx-auto">
+          <div className="mb-8 space-y-3">
+            <div className="h-3 w-32 bg-white/60 rounded-full animate-pulse" />
+            <div className="h-9 w-64 bg-white/60 rounded-2xl animate-pulse" />
+            <div className="h-4 w-80 bg-white/60 rounded-full animate-pulse" />
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {[0, 1, 2, 3].map(i => <div key={i} className={`${GLASS} h-32 animate-pulse`} />)}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className={`lg:col-span-2 ${GLASS} h-72 animate-pulse`} />
+            <div className={`${GLASS} h-72 animate-pulse`} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Empty-state checklist ────────────────────────────────────────
+  // Brand-new team — drive them into the funnel with 4 concrete next
+  // steps. Each step deeplinks to the relevant module so it's clear
+  // where to go. Once any of these complete (deals/products/tasks/tx)
+  // the full dashboard takes over.
+  if (!hasAnyData) {
+    const steps = [
+      {
+        id: 'deal',
+        icon: ShoppingBag,
+        title: l('Создайте первого клиента', 'Алғашқы клиентті жасаңыз', 'Create your first client'),
+        desc: l(`Заведите карточку клиента и сделку — фундамент для всего остального в ${nicheName.toLowerCase()}.`,
+                `Бірінші клиент картасын ашыңыз — қалғанының негізі.`,
+                `Add the first client + deal — the foundation for everything else.`),
+        cta: l('Открыть Заказы', 'Тапсырыстар', 'Open Orders'),
+        page: 'sales',
+        accent: 'from-emerald-200/80 to-emerald-100/40',
+        ringCls: 'text-emerald-700 bg-emerald-100/80',
+        enabled: canSee('sales'),
+      },
+      {
+        id: 'product',
+        icon: Package,
+        title: l('Добавьте материалы на склад', 'Қоймаға материал қосыңыз', 'Add materials to stock'),
+        desc: l(`Каталог материалов под нишу «${nicheName}» — ${niche.materialCategories.slice(0, 3).join(', ')} и др.`,
+                `«${nicheName}» санатына арналған материалдар каталогы.`,
+                `Material catalog for "${nicheName}" — ${niche.materialCategories.slice(0, 3).join(', ')} etc.`),
+        cta: l('Открыть Склад', 'Қойма', 'Open Stock'),
+        page: 'warehouse',
+        accent: 'from-sky-200/80 to-sky-100/40',
+        ringCls: 'text-sky-700 bg-sky-100/80',
+        enabled: canSee('warehouse'),
+      },
+      {
+        id: 'team',
+        icon: Users,
+        title: l('Пригласите команду', 'Командаңызды шақырыңыз', 'Invite your team'),
+        desc: l(`Замерщик, дизайнер, ${niche.roleLabels.installer[language].toLowerCase()} — каждому своя роль с правами доступа.`,
+                'Әр маманға өз рөлі мен қол жетімділік құқықтары.',
+                'Each role with their own access rights.'),
+        cta: l('Открыть Команда', 'Команда', 'Open Team'),
+        page: 'settings',
+        accent: 'from-violet-200/80 to-violet-100/40',
+        ringCls: 'text-violet-700 bg-violet-100/80',
+        enabled: canSee('settings'),
+      },
+      {
+        id: 'integrations',
+        icon: MessageCircle,
+        title: l('Подключите Telegram / WhatsApp', 'Telegram / WhatsApp қосыңыз', 'Connect Telegram / WhatsApp'),
+        desc: l('AI-помощник в Telegram умеет создавать сделки, оплаты и задачи голосом или текстом.',
+                'AI-көмекші Telegram-да дауыспен тапсырыс жасайды.',
+                'AI assistant in Telegram creates deals, payments, tasks.'),
+        cta: l('Открыть Интеграции', 'Интеграциялар', 'Open Integrations'),
+        page: 'settings',
+        accent: 'from-amber-200/80 to-amber-100/40',
+        ringCls: 'text-amber-700 bg-amber-100/80',
+        enabled: canSee('settings'),
+      },
+    ];
+
+    return (
+      <div className="min-h-full relative">
+        <div className="relative p-4 md:p-8 max-w-[1100px] mx-auto">
+          {/* Greeting */}
+          <div className="mb-8">
+            <p className="text-[11px] text-slate-400 mb-2 capitalize tracking-widest uppercase">{today}</p>
+            <h1 className="text-slate-900 mb-1 text-3xl md:text-4xl font-medium tracking-tight">
+              {getGreeting()}{firstName ? `, ${firstName}` : ''} 👋
+            </h1>
+            <p className="text-sm text-slate-500 max-w-2xl">
+              {l(`Платформа готова под нишу «${nicheName}». Сделаем 4 шага, чтобы запустить ваш бизнес.`,
+                 `Платформа «${nicheName}» салаға дайын. 4 қадамда бизнесті іске қосамыз.`,
+                 `Platform is set up for "${nicheName}". Let's get you running in 4 steps.`)}
+            </p>
+          </div>
+
+          {/* Niche badge */}
+          <div className={`${GLASS} p-5 mb-6 flex items-center justify-between flex-wrap gap-3`}>
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{niche.icon}</span>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-0.5">
+                  {l('Ваша ниша', 'Сіздің сала', 'Your niche')}
+                </div>
+                <div className="text-sm text-slate-900">{nicheName}</div>
+                <div className="text-[11px] text-slate-500">{niche.description[language]}</div>
+              </div>
+            </div>
+            <button
+              onClick={() => onNavigate?.('settings')}
+              className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center gap-1"
+            >
+              {l('Сменить нишу', 'Сала ауыстыру', 'Change niche')} <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+
+          {/* 4-step checklist */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {steps.map((step, idx) => {
+              const Icon = step.icon;
+              return (
+                <button
+                  key={step.id}
+                  onClick={() => step.enabled && onNavigate?.(step.page)}
+                  disabled={!step.enabled}
+                  className={`${GLASS} ${step.enabled ? GLASS_HOVER : 'opacity-60 cursor-not-allowed'} p-5 text-left relative overflow-hidden group`}
+                >
+                  <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full bg-gradient-to-br ${step.accent} blur-2xl opacity-70 group-hover:opacity-100 transition-opacity`} />
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${step.ringCls} ring-1 ring-white/60`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <span className="text-[10px] text-slate-400 tracking-widest">
+                        {l('Шаг', 'Қадам', 'Step')} {idx + 1} / 4
+                      </span>
+                    </div>
+                    <div className="text-sm text-slate-900 mb-1">{step.title}</div>
+                    <div className="text-[11px] text-slate-500 leading-relaxed mb-3">{step.desc}</div>
+                    <div className="flex items-center gap-1 text-[11px] text-emerald-700">
+                      {step.cta} <ArrowRight className="w-3 h-3" />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* AI helper card — invites the user to ask UTIR AI to do
+              things for them via chat. The popup already has all the
+              tools for creating deals / materials / employees etc. */}
+          <button
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('ai-assistant:open', {
+                detail: {
+                  prompt: l(
+                    `Заведи первую сделку: клиент Иван Петров, телефон +7..., продукт ${niche.productTypeOptions[0]?.toLowerCase() || 'заказ'}, сумма 500 000 ₸`,
+                    `Бірінші мәмілені жасаңыз: клиент Иван Петров, телефон +7..., өнім ${niche.productTypeOptions[0]?.toLowerCase() || 'тапсырыс'}, сома 500 000 ₸`,
+                    `Create first deal: client Ivan Petrov, phone +7..., product ${niche.productTypeOptions[0]?.toLowerCase() || 'order'}, amount 500000 KZT`,
+                  ),
+                },
+              }));
+            }}
+            className={`${GLASS} ${GLASS_HOVER} mt-4 p-5 w-full text-left relative overflow-hidden group flex items-center gap-4`}
+          >
+            <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-gradient-to-br from-violet-200/80 to-indigo-100/40 blur-2xl opacity-80" />
+            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-sm flex-shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div className="relative flex-1">
+              <div className="text-sm text-slate-900 mb-0.5 flex items-center gap-2">
+                {l('Или попросите AI сделать всё за вас', 'Немесе AI-ге барлығын тапсырыңыз', 'Or have AI do it for you')}
+                <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase">live</span>
+              </div>
+              <div className="text-[11px] text-slate-500">
+                {l('UTIR AI создаст сделку, материалы и сотрудников по вашему описанию.',
+                   'UTIR AI сипаттама бойынша мәміле, материал, қызметкерлерді жасайды.',
+                   'UTIR AI creates deals, materials and employees from a free-text request.')}
+              </div>
+            </div>
+            <ArrowUpRight className="relative w-4 h-4 text-slate-400" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Populated dashboard ──────────────────────────────────────────
+  // KPI cards — labels are now period-aware (not the misleading "(мес)"
+  // that used to display all-time data). Cards filter by visible
+  // modules so a finance-blocked user doesn't see a card linking to
+  // a 403 page.
+  const kpiCards = [
+    {
+      id: 'revenue', show: canSee('finance'),
+      label: l(`Выручка · ${periodLabel}`, `Табыс · ${periodLabel}`, `Revenue · ${periodLabel}`),
+      value: fmtKZT(totalRevenue),
+      change: trends.revenue.txt, up: trends.revenue.up,
+      icon: TrendingUp, page: 'finance',
+      tint: 'from-emerald-200/80 to-emerald-100/40', iconCls: 'text-emerald-700 bg-emerald-100/80',
+    },
+    {
+      id: 'deals', show: canSee('orders') || canSee('sales'),
+      label: l('Активные заказы', 'Белсенді тапсырыстар', 'Active orders'),
+      value: String(activeDeals),
+      change: trends.activeDeals.txt, up: trends.activeDeals.up,
+      icon: ShoppingBag, page: 'sales',
+      tint: 'from-sky-200/80 to-sky-100/40', iconCls: 'text-sky-700 bg-sky-100/80',
+    },
+    {
+      id: 'clients', show: canSee('orders') || canSee('sales'),
+      label: l('Всего клиентов', 'Барлық клиенттер', 'Total clients'),
+      value: String(totalClients),
+      change: trends.clients.txt, up: trends.clients.up,
+      icon: Users, page: 'sales',
+      tint: 'from-rose-200/80 to-rose-100/40', iconCls: 'text-rose-700 bg-rose-100/80',
+    },
+    {
+      id: 'avg', show: canSee('analytics') || canSee('orders'),
+      label: l('Средний чек', 'Орташа чек', 'Avg. check'),
+      value: fmtKZT(averageCheck),
+      change: trends.avgCheck.txt, up: trends.avgCheck.up,
+      icon: DollarSign, page: 'analytics',
+      tint: 'from-violet-200/80 to-violet-100/40', iconCls: 'text-violet-700 bg-violet-100/80',
+    },
+  ].filter(c => c.show);
+
   return (
-    // Liquid-glass page background: a soft pastel gradient + 4 blurred
-    // colour orbs painted with radial-gradients. The orbs sit on the page
-    // background itself so the entire scroll height stays ambient.
-    <div
-      className="min-h-full relative"
-    >
+    <div className="min-h-full relative">
       <div className="relative p-4 md:p-8 max-w-[1400px] mx-auto">
 
         {/* ─── Greeting ────────────────────────────────────────── */}
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <p className="text-[11px] text-slate-400 mb-2 capitalize tracking-widest uppercase">{today}</p>
-              <h1 className="text-slate-900 mb-1 text-3xl md:text-4xl font-medium tracking-tight">{getGreeting()}</h1>
+              <p className="text-[11px] text-slate-400 mb-2 capitalize tracking-widest uppercase">
+                {today}
+                {' · '}
+                <span className="normal-case tracking-normal text-slate-500">{niche.icon} {nicheName}</span>
+              </p>
+              <h1 className="text-slate-900 mb-1 text-3xl md:text-4xl font-medium tracking-tight">
+                {getGreeting()}{firstName ? `, ${firstName}` : ''}
+              </h1>
               <p className="text-sm text-slate-500">
                 {l(
-                  'Ваш бизнес в одном спокойном представлении',
-                  'Бизнесіңіздің тыныш көрінісі',
-                  'A calm overview of your business',
+                  `${activeDeals > 0 ? `${activeDeals} активных заказов сегодня` : 'Тихий день — самое время поработать с воронкой'}.`,
+                  `${activeDeals > 0 ? `Бүгін ${activeDeals} белсенді тапсырыс` : 'Тыныш күн — воронкамен жұмыс істеу уақыты'}.`,
+                  `${activeDeals > 0 ? `${activeDeals} active orders today` : 'A quiet day — good time to work the pipeline'}.`,
                 )}
               </p>
             </div>
-            <button
-              onClick={() => onNavigate?.('sales')}
-              className="group flex items-center gap-2 px-5 py-3 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_var(--accent-shadow)] hover:shadow-[0_12px_32px_-8px_var(--accent-shadow)] hover:bg-emerald-700 transition-all w-fit ring-1 ring-white/10"
-            >
-              <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
-              {t('newOrder', language)}
-            </button>
+            {store.canWriteModule('sales') && (
+              <button
+                onClick={() => onNavigate?.('sales')}
+                className="group flex items-center gap-2 px-5 py-3 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_var(--accent-shadow)] hover:shadow-[0_12px_32px_-8px_var(--accent-shadow)] hover:bg-emerald-700 transition-all w-fit ring-1 ring-white/10"
+              >
+                <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
+                {t('newOrder', language)}
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* ─── Period filter ─────────────────────────────────── */}
+        <div className="flex items-center gap-1 mb-4 flex-wrap">
+          {(['week', 'month', 'quarter', 'all'] as PeriodKey[]).map(p => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-3 py-1.5 rounded-2xl text-[11px] transition-all ${
+                period === p
+                  ? 'bg-emerald-600 text-white shadow-[0_4px_12px_-2px_var(--accent-shadow)] ring-1 ring-white/10'
+                  : 'bg-white/50 text-slate-600 ring-1 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+              }`}
+            >
+              {p === 'week'    ? l('Неделя',   'Апта',   'Week')
+               : p === 'month'   ? l('Месяц',    'Ай',     'Month')
+               : p === 'quarter' ? l('Квартал',  'Тоқсан', 'Quarter')
+               :                    l('Всё время','Барлық', 'All time')}
+            </button>
+          ))}
         </div>
 
         {/* ─── Metric Cards ──────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {[
-            { label: l('Выручка (мес)', 'Табыс (ай)', 'Revenue (month)'),  value: fmt(totalRevenue),  change: trends.revenue.txt,     up: trends.revenue.up,     icon: TrendingUp,  page: 'finance',   tint: 'from-emerald-200/80 to-emerald-100/40', iconCls: 'text-violet-700  bg-violet-100/80' },
-            { label: l('Активные заказы', 'Белсенді тапсырыстар', 'Active orders'), value: String(activeDeals), change: trends.activeDeals.txt, up: trends.activeDeals.up, icon: ShoppingBag, page: 'sales',     tint: 'from-sky-200/80 to-sky-100/40',       iconCls: 'text-sky-700     bg-sky-100/80' },
-            { label: l('Всего клиентов', 'Барлық клиенттер', 'Total clients'),     value: String(totalClients), change: trends.clients.txt,     up: trends.clients.up,     icon: Users,       page: 'chats',     tint: 'from-rose-200/80 to-rose-100/40',     iconCls: 'text-rose-700    bg-rose-100/80' },
-            { label: l('Средний чек', 'Орташа чек', 'Avg. check'),                value: fmt(averageCheck),   change: trends.avgCheck.txt,    up: trends.avgCheck.up,    icon: DollarSign,  page: 'analytics', tint: 'from-emerald-200/80 to-emerald-100/40', iconCls: 'text-emerald-700 bg-emerald-100/80' },
-          ].map((card, i) => {
+          {kpiCards.map(card => {
             const Icon = card.icon;
             return (
               <button
-                key={i}
+                key={card.id}
                 onClick={() => onNavigate?.(card.page)}
                 className={`${GLASS} ${GLASS_HOVER} p-5 text-left relative overflow-hidden group`}
               >
-                {/* Tint orb in corner — pure decoration that catches the glass */}
                 <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full bg-gradient-to-br ${card.tint} blur-2xl opacity-70 group-hover:opacity-100 transition-opacity`} />
                 <div className="relative">
                   <div className="flex items-center justify-between mb-5">
@@ -225,116 +626,160 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
                   </div>
                   <div className="text-sm text-slate-900">{l('Доходы', 'Табыстар', 'Revenue')}</div>
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1.5 ml-9">{l('По транзакциям этого месяца', 'Осы айдағы транзакциялар', 'Transactions this month')}</div>
+                <div className="text-[11px] text-slate-500 mt-1.5 ml-9">
+                  {l(`Транзакции · ${periodLabel}`, `Транзакциялар · ${periodLabel}`, `Transactions · ${periodLabel}`)}
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <div className="text-base text-slate-900 tabular-nums tracking-tight">{fmt(totalRevenue)}</div>
+                  <div className="text-base text-slate-900 tabular-nums tracking-tight">{fmtKZT(totalRevenue)}</div>
                   <div className="text-[11px] text-emerald-700 flex items-center gap-1 justify-end mt-0.5">
-                    <TrendingUp className="w-3 h-3" /> {l('Прибыль', 'Пайда', 'Profit')}: {fmt(totalRevenue - totalExpenses)}
+                    <TrendingUp className="w-3 h-3" /> {l('Прибыль', 'Пайда', 'Profit')}: {fmtKZT(totalRevenue - totalExpenses)}
                   </div>
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-slate-400" />
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={revenueData}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%"   stopColor="#10B981" stopOpacity={0.30} />
-                    <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94A3B8' }} />
-                <YAxis hide />
-                <Tooltip
-                  formatter={(value: any) => [`${(value / 1000000).toFixed(2)} млн ₸`, l('Доход', 'Табыс', 'Revenue')]}
-                  contentStyle={{
-                    borderRadius: '16px',
-                    border: '1px solid rgba(255,255,255,0.6)',
-                    fontSize: '12px',
-                    background: 'rgba(255,255,255,0.85)',
-                    backdropFilter: 'blur(16px)',
-                    boxShadow: '0 12px 32px -12px rgba(15,23,42,0.15)',
-                  }}
-                />
-                <Area type="monotone" dataKey="value" stroke="#10B981" strokeWidth={2.5} fill="url(#colorRevenue)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {revenueData.length === 0 ? (
+              // Real empty state — no fake single-point chart.
+              <div className="h-[220px] flex flex-col items-center justify-center text-center px-4">
+                <div className="w-12 h-12 rounded-2xl bg-white/50 ring-1 ring-white/60 flex items-center justify-center mb-3">
+                  <Wallet className="w-5 h-5 text-slate-400" />
+                </div>
+                <div className="text-sm text-slate-700 mb-1">
+                  {l(`Нет транзакций за ${periodLabel}`, `${periodLabel} транзакция жоқ`, `No transactions in ${periodLabel}`)}
+                </div>
+                <div className="text-[11px] text-slate-500 mb-3 max-w-sm">
+                  {l('Доход появится здесь, когда вы запишете первую оплату или закроете сделку.',
+                     'Бірінші төлемді жазғанда табыс осы жерде көрсетіледі.',
+                     'Revenue will appear once you log the first payment or close a deal.')}
+                </div>
+                {canSee('finance') && (
+                  <button
+                    onClick={e => { e.stopPropagation(); onNavigate?.('finance'); }}
+                    className="text-[11px] px-3 py-1.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors ring-1 ring-white/10"
+                  >
+                    {l('Открыть Финансы', 'Қаржы ашу', 'Open Finance')}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={revenueData}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stopColor="#10B981" stopOpacity={0.30} />
+                      <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94A3B8' }} />
+                  <YAxis hide />
+                  <Tooltip
+                    formatter={(value: any) => [fmtKZT(value), l('Доход', 'Табыс', 'Revenue')]}
+                    contentStyle={{
+                      borderRadius: '16px',
+                      border: '1px solid rgba(255,255,255,0.6)',
+                      fontSize: '12px',
+                      background: 'rgba(255,255,255,0.85)',
+                      backdropFilter: 'blur(16px)',
+                      boxShadow: '0 12px 32px -12px rgba(15,23,42,0.15)',
+                    }}
+                  />
+                  <Area type="monotone" dataKey="value" stroke="#10B981" strokeWidth={2.5} fill="url(#colorRevenue)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
-          {/* Tasks widget */}
-          {(() => {
-            const overdueCount = todayTasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate < todayStr).length;
-            const urgent = [...todayTasks]
-              .filter(t => t.status !== 'done')
-              .sort((a, b) => {
-                const order: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-                return (order[a.priority || 'low'] ?? 3) - (order[b.priority || 'low'] ?? 3);
-              })
-              .slice(0, 3);
-            const dotColor = (p?: string) =>
-              p === 'urgent' || p === 'high' ? 'bg-rose-500'
-              : p === 'medium'              ? 'bg-amber-400'
-              :                                'bg-slate-300';
-            return (
-              <div className={`${GLASS} p-6 flex flex-col`}>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-sm text-slate-900">{l('Что нужно сделать', 'Қазір не істеу', 'What to do now')}</div>
-                </div>
-                <div className="text-[11px] text-slate-500 mb-4">
-                  {l(`У вас ${todayTasks.length} задач на сегодня`, `Бүгін ${todayTasks.length} тапсырма`, `${todayTasks.length} tasks today`)}
-                  {overdueCount > 0 && (
-                    <span className="text-rose-600"> · {overdueCount} {l('просрочены', 'мерзімі өткен', 'overdue')}</span>
-                  )}
-                </div>
+          {/* Tasks widget — heading + filter now match (open tasks
+              due today or overdue), and overdue count is highlighted. */}
+          <div className={`${GLASS} p-6 flex flex-col`}>
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-sm text-slate-900">{l('Что нужно сделать', 'Қазір не істеу', 'What to do now')}</div>
+            </div>
+            <div className="text-[11px] text-slate-500 mb-4">
+              {todayDueCount > 0 || overdueCount > 0
+                ? l(
+                    `${todayDueCount} на сегодня${overdueCount > 0 ? `, ${overdueCount} просрочено` : ''}`,
+                    `Бүгін ${todayDueCount}${overdueCount > 0 ? `, ${overdueCount} мерзімі өткен` : ''}`,
+                    `${todayDueCount} due today${overdueCount > 0 ? `, ${overdueCount} overdue` : ''}`,
+                  )
+                : openTasks.length > 0
+                  ? l(`${openTasks.length} открытых задач`, `${openTasks.length} ашық тапсырма`, `${openTasks.length} open tasks`)
+                  : l('Сегодня всё под контролем 🌿', 'Бүгін бәрі бақылауда 🌿', 'All caught up 🌿')}
+            </div>
 
-                <div className="space-y-2 flex-1">
-                  {urgent.length === 0 && (
-                    <div className="text-[11px] text-slate-400 py-6 text-center">{l('Нет срочных задач 🌿', 'Шұғыл тапсырма жоқ 🌿', 'No urgent tasks 🌿')}</div>
-                  )}
-                  {urgent.map(task => (
-                    <div
-                      key={task.id}
-                      className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-white/40 hover:bg-white/70 ring-1 ring-white/50 transition-all"
+            <div className="space-y-2 flex-1">
+              {openTasks.length === 0 ? (
+                <div className="py-6 text-center">
+                  <div className="text-[11px] text-slate-400 mb-2">{l('Нет открытых задач', 'Ашық тапсырма жоқ', 'No open tasks')}</div>
+                  {store.canWriteModule('tasks') && (
+                    <button
+                      onClick={() => onNavigate?.('tasks')}
+                      className="text-[10px] px-2.5 py-1 bg-white/70 hover:bg-white ring-1 ring-white/60 rounded-xl text-slate-700 transition-colors"
                     >
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor(task.priority)}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs text-slate-900 truncate">{task.title}</div>
-                        {task.dueDate && <div className="text-[10px] text-slate-400 mt-0.5">{task.dueDate}</div>}
-                      </div>
-                      <button
-                        onClick={() => onNavigate?.('tasks')}
-                        className="text-[10px] px-2.5 py-1 bg-emerald-600/90 text-white rounded-xl hover:bg-emerald-700 flex-shrink-0 backdrop-blur-xl"
+                      {l('+ Создать задачу', '+ Тапсырма жасау', '+ Create task')}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                openTasks
+                  .sort((a, b) => {
+                    const order: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+                    return (order[a.priority || 'low'] ?? 3) - (order[b.priority || 'low'] ?? 3);
+                  })
+                  .slice(0, 3)
+                  .map(task => {
+                    const isOverdue = task.dueDate && task.dueDate < todayStr;
+                    return (
+                      <div
+                        key={task.id}
+                        className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-white/40 hover:bg-white/70 ring-1 ring-white/50 transition-all"
                       >
-                        {l('Открыть', 'Ашу', 'Open')}
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          task.priority === 'urgent' || task.priority === 'high' ? 'bg-rose-500'
+                          : task.priority === 'medium' ? 'bg-amber-400' : 'bg-slate-300'
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-slate-900 truncate">{task.title}</div>
+                          {task.dueDate && (
+                            <div className={`text-[10px] mt-0.5 ${isOverdue ? 'text-rose-600' : 'text-slate-400'}`}>
+                              {task.dueDate}{isOverdue && ` · ${l('просрочена', 'мерзімі өтті', 'overdue')}`}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => onNavigate?.('tasks')}
+                          className="text-[10px] px-2.5 py-1 bg-emerald-600/90 text-white rounded-xl hover:bg-emerald-700 flex-shrink-0 backdrop-blur-xl"
+                        >
+                          {l('Открыть', 'Ашу', 'Open')}
+                        </button>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
 
-                <button
-                  onClick={() => onNavigate?.('tasks')}
-                  className="text-[11px] text-slate-500 hover:text-slate-900 mt-3 flex items-center gap-1 self-start"
-                >
-                  {l('Все задачи', 'Барлық тапсырмалар', 'All tasks')} <ArrowUpRight className="w-3 h-3" />
-                </button>
+            <button
+              onClick={() => onNavigate?.('tasks')}
+              className="text-[11px] text-slate-500 hover:text-slate-900 mt-3 flex items-center gap-1 self-start"
+            >
+              {l('Все задачи', 'Барлық тапсырмалар', 'All tasks')} <ArrowUpRight className="w-3 h-3" />
+            </button>
 
-                <div className="mt-4 pt-4 border-t border-white/60">
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1.5">
-                    <span>{l('Выполнено сегодня', 'Бүгін орындалды', 'Done today')}</span>
-                    <span className="tabular-nums">{completedTasks} / {todayTasks.length}</span>
-                  </div>
-                  <div className="h-1.5 bg-white/60 rounded-full overflow-hidden ring-1 ring-white/40">
-                    <div
-                      className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all"
-                      style={{ width: `${(completedTasks / totalTasks) * 100}%` }}
-                    />
-                  </div>
-                </div>
+            <div className="mt-4 pt-4 border-t border-white/60">
+              <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1.5">
+                <span>{l('Выполнено сегодня', 'Бүгін орындалды', 'Done today')}</span>
+                <span className="tabular-nums">{completedToday} / {totalForBar}</span>
               </div>
-            );
-          })()}
+              <div className="h-1.5 bg-white/60 rounded-full overflow-hidden ring-1 ring-white/40">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all"
+                  style={{ width: `${(completedToday / totalForBar) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* ─── Orders + Activity ─────────────────────────────── */}
@@ -352,8 +797,19 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
             </div>
             <div className="space-y-2">
               {recentOrders.length === 0 && (
-                <div className="text-[11px] text-slate-400 py-8 text-center">
-                  {l('Пока нет заказов — создайте первый ↑', 'Әзірге тапсырыс жоқ', 'No orders yet — create your first ↑')}
+                <div className="py-8 text-center">
+                  <Rocket className="w-7 h-7 text-slate-300 mx-auto mb-2" />
+                  <div className="text-[11px] text-slate-500 mb-2">
+                    {l('Пока нет заказов', 'Әзірге тапсырыс жоқ', 'No orders yet')}
+                  </div>
+                  {store.canWriteModule('sales') && (
+                    <button
+                      onClick={() => onNavigate?.('sales')}
+                      className="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />{l('Создать первый заказ', 'Бірінші тапсырыс', 'Create first order')}
+                    </button>
+                  )}
                 </div>
               )}
               {recentOrders.map(deal => {
@@ -370,17 +826,17 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-sm text-slate-900 truncate">{deal.product}</span>
+                        <span className="text-sm text-slate-900 truncate">{deal.product || statusLabel(deal.status)}</span>
                         <span className="text-[10px] text-slate-400 font-mono">#{(deal.id || '').slice(-6)}</span>
                       </div>
                       <div className="text-[11px] text-slate-500">{deal.customerName} · {deal.date}</div>
                     </div>
                     <div className={`hidden sm:flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full ${st.color} ring-1 ring-white/40`}>
                       <StIcon className="w-3 h-3" />
-                      {st.label}
+                      {statusLabel(deal.status)}
                     </div>
                     <div className="text-sm text-slate-900 text-right flex-shrink-0 tabular-nums">
-                      {deal.amount > 0 ? fmt(deal.amount) : '—'}
+                      {deal.amount > 0 ? fmtKZT(deal.amount) : '—'}
                     </div>
                     <div className="w-16 h-1 bg-white/60 rounded-full overflow-hidden flex-shrink-0 hidden md:block ring-1 ring-white/40">
                       <div
@@ -394,14 +850,12 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
             </div>
           </div>
 
-          {/* Activity feed */}
+          {/* Activity feed — "live" badge removed (was a lie, no polling).
+              Timestamp now relative-formatted for readability. */}
           <div className={`${GLASS} p-6`}>
             <div className="flex items-center justify-between mb-5">
               <div className="text-sm text-slate-900">{l('Активность', 'Белсенділік', 'Activity')}</div>
-              <span className="flex items-center gap-1.5 text-[10px] text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded-full ring-1 ring-white/40">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                live
-              </span>
+              <span className="text-[10px] text-slate-400">{activities.length}</span>
             </div>
             <div className="space-y-4">
               {activities.length === 0 && (
@@ -426,7 +880,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
                     </div>
                     <div className="pb-4 flex-1 min-w-0">
                       <p className="text-xs text-slate-700 truncate">{act.user}: {act.action} — {act.target}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{act.timestamp}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{relTime(act.timestamp)}</p>
                     </div>
                   </div>
                 );
@@ -435,39 +889,75 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
           </div>
         </div>
 
-        {/* ─── Weekly orders ─────────────────────────────────── */}
-        <div
-          className={`mt-4 ${GLASS} ${GLASS_HOVER} p-6 cursor-pointer`}
-          onClick={() => onNavigate?.('analytics')}
-        >
-          <div className="flex items-center justify-between mb-5">
-            <div className="text-sm text-slate-900">{l('Заказы по дням', 'Тапсырыстар күн бойынша', 'Orders by weekday')}</div>
-            <div className="text-[11px] text-slate-500 px-2 py-0.5 rounded-full bg-white/50 ring-1 ring-white/40">
-              {store.deals.length} {l('заказов', 'тапсырыс', 'orders')}
+        {/* ─── Weekly orders — real empty state ─────────────── */}
+        {store.deals.length > 0 ? (
+          <div
+            className={`mt-4 ${GLASS} ${GLASS_HOVER} p-6 cursor-pointer`}
+            onClick={() => onNavigate?.('analytics')}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <div className="text-sm text-slate-900">{l('Заказы по дням', 'Тапсырыстар күн бойынша', 'Orders by weekday')}</div>
+              <div className="text-[11px] text-slate-500 px-2 py-0.5 rounded-full bg-white/50 ring-1 ring-white/40">
+                {store.deals.length} {l('заказов', 'тапсырыс', 'orders')}
+              </div>
+            </div>
+            <div className="flex items-end gap-2 h-24">
+              {weeklyData.map(d => {
+                const maxOrders = Math.max(...weeklyData.map(w => w.orders), 1);
+                const height = Math.max(8, (d.orders / maxOrders) * 64);
+                const isMax = d.orders === maxOrders && d.orders > 0;
+                return (
+                  <div key={d.day} className="flex-1 flex flex-col items-center gap-2 justify-end">
+                    <span className="text-[10px] text-slate-500 tabular-nums">{d.orders}</span>
+                    <div
+                      className={`w-full rounded-xl transition-all ${
+                        isMax
+                          ? 'bg-gradient-to-t from-slate-900 to-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.2)]'
+                          : 'bg-white/60 ring-1 ring-white/50 hover:bg-white/80'
+                      }`}
+                      style={{ height: `${height}px` }}
+                    />
+                    <span className={`text-[10px] ${isMax ? 'text-slate-900' : 'text-slate-400'}`}>{d.day}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <div className="flex items-end gap-2 h-24">
-            {weeklyData.map(d => {
-              const maxOrders = Math.max(...weeklyData.map(w => w.orders), 1);
-              const height = Math.max(8, (d.orders / maxOrders) * 64);
-              const isMax = d.orders === maxOrders && d.orders > 0;
-              return (
-                <div key={d.day} className="flex-1 flex flex-col items-center gap-2 justify-end">
-                  <span className="text-[10px] text-slate-500 tabular-nums">{d.orders}</span>
-                  <div
-                    className={`w-full rounded-xl transition-all ${
-                      isMax
-                        ? 'bg-gradient-to-t from-slate-900 to-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.2)]'
-                        : 'bg-white/60 ring-1 ring-white/50 hover:bg-white/80'
-                    }`}
-                    style={{ height: `${height}px` }}
-                  />
-                  <span className={`text-[10px] ${isMax ? 'text-slate-900' : 'text-slate-400'}`}>{d.day}</span>
-                </div>
-              );
-            })}
+        ) : null}
+
+        {/* ─── AI insight card — invites the user to ask UTIR AI
+             a question about their numbers. The popup already has
+             finance context, tools, and conversation memory. */}
+        <button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('ai-assistant:open', {
+              detail: {
+                prompt: l(
+                  'Сделай сводку по бизнесу за месяц: выручка, топ клиенты, рискованные сделки.',
+                  'Ай бойынша қорытынды: табыс, топ клиенттер, тәуекелді мәмілелер.',
+                  'Monthly business summary: revenue, top clients, at-risk deals.',
+                ),
+              },
+            }));
+          }}
+          className={`mt-4 ${GLASS} ${GLASS_HOVER} p-5 w-full text-left relative overflow-hidden group flex items-center gap-4`}
+        >
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-gradient-to-br from-violet-200/80 to-indigo-100/40 blur-2xl opacity-80" />
+          <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-sm flex-shrink-0">
+            <Sparkles className="w-5 h-5" />
           </div>
-        </div>
+          <div className="relative flex-1">
+            <div className="text-sm text-slate-900 mb-0.5 flex items-center gap-2">
+              {l('Спросить AI о бизнесе', 'AI-ден бизнес туралы сұрау', 'Ask AI about your business')}
+            </div>
+            <div className="text-[11px] text-slate-500">
+              {l('UTIR AI разберёт ваши цифры и предложит что улучшить — и сразу запишет действия.',
+                 'UTIR AI цифрларды талдап, әрекеттерді жазады.',
+                 'UTIR AI analyzes your numbers and records actions on the spot.')}
+            </div>
+          </div>
+          <ArrowUpRight className="relative w-4 h-4 text-slate-400" />
+        </button>
 
         {/* ─── Order Modal (glass) ───────────────────────────── */}
         {selectedOrder && (
@@ -482,7 +972,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
               <div className="p-6 border-b border-white/60 flex items-center justify-between">
                 <div>
                   <div className="text-[11px] text-slate-400 mb-0.5 font-mono">#{(selectedOrder.id || '').slice(-6)}</div>
-                  <h2 className="text-slate-900 text-lg tracking-tight">{selectedOrder.product}</h2>
+                  <h2 className="text-slate-900 text-lg tracking-tight">{selectedOrder.product || statusLabel(selectedOrder.status)}</h2>
                 </div>
                 <button
                   onClick={() => setSelectedOrder(null)}
@@ -512,18 +1002,18 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
                   </div>
                   <div className="flex justify-between mt-1.5">
                     <div className="text-[11px] text-slate-500 tabular-nums">{selectedOrder.progress}%</div>
-                    <div className="text-[11px] text-slate-500">{(statusConfig[selectedOrder.status] || statusConfig.new).label}</div>
+                    <div className="text-[11px] text-slate-500">{statusLabel(selectedOrder.status)}</div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-white/50 ring-1 ring-white/60 rounded-2xl p-3">
                     <div className="text-[10px] text-slate-500 mb-1">{l('Сумма', 'Сомасы', 'Amount')}</div>
-                    <div className="text-sm text-slate-900 tabular-nums">{selectedOrder.amount?.toLocaleString('ru-RU')} ₸</div>
+                    <div className="text-sm text-slate-900 tabular-nums">{(selectedOrder.amount || 0).toLocaleString('ru-RU')} ₸</div>
                   </div>
                   <div className="bg-emerald-100/50 ring-1 ring-white/60 rounded-2xl p-3">
                     <div className="text-[10px] text-emerald-700 mb-1">{l('Оплачено', 'Төленді', 'Paid')}</div>
-                    <div className="text-sm text-emerald-700 tabular-nums">{selectedOrder.paidAmount?.toLocaleString('ru-RU')} ₸</div>
+                    <div className="text-sm text-emerald-700 tabular-nums">{(selectedOrder.paidAmount || 0).toLocaleString('ru-RU')} ₸</div>
                   </div>
                 </div>
 
