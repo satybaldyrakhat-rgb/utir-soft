@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Package, TrendingUp, AlertTriangle, ShoppingCart, Wrench, Users, Clock, CheckCircle, Plus, X, Search, Edit2, Eye, Truck, Calendar, BarChart3, ArrowUpDown, MapPin, FileText, Trash2, Loader2, Copy, PlayCircle, Download } from 'lucide-react';
+import { Package, TrendingUp, AlertTriangle, ShoppingCart, Wrench, Users, Clock, CheckCircle, Plus, X, Search, Edit2, Eye, Truck, Calendar, BarChart3, ArrowUpDown, MapPin, FileText, Trash2, Loader2, Copy, PlayCircle, Download, Upload, ArrowUp, ArrowDown } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { Calculator } from './Calculator';
 import { api } from '../utils/api';
+import { getNiche, type NicheStage } from '../utils/niches';
+import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
+import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 
 interface Product {
   id: string; name: string; category: string; quantity: number; unit: string; supplier: string; cost: number; status: 'instock' | 'low' | 'outofstock'; minQty: number;
@@ -32,31 +35,52 @@ export interface ConsumedMaterial {
   by?: string; // employee who deducted
 }
 
-// ─── Production stages (5-step workshop flow) ─────────────────────
-// Each in-production deal carries a `stages` array tracking the
-// workshop pipeline: cutting → edging → assembly → packaging →
-// delivery. Stored on the deal JSON blob alongside everything else,
-// so no extra table is needed.
+// ─── Production stages (niche-aware workshop flow) ───────────────
+// Each in-production deal carries a `stages` array tracking its
+// workshop pipeline. The pipeline definition is NOT hardcoded — it
+// comes from the team's niche (see src/app/utils/niches.ts):
+//   • Furniture  → cutting → edging → assembly → packaging → delivery
+//   • Windows    → cutting → welding → glazing → delivery → installation
+//   • Ceilings   → cutting → preparation → installation → finishing → handover
+//   • etc.
+// Stored on the deal JSON blob alongside everything else, so no extra
+// table is needed.
 export type StageStatus = 'pending' | 'in-progress' | 'done';
 export interface DealStage {
-  id: 'cutting' | 'edging' | 'assembly' | 'packaging' | 'delivery';
+  id: string;  // matches a niche stage id (cutting, welding, glazing, etc.)
   status: StageStatus;
   startedAt?: string;
   completedAt?: string;
   assignee?: string;
   notes?: string;
 }
-export const DEFAULT_STAGES_TEMPLATE: { id: DealStage['id']; ru: string; kz: string; eng: string; icon: any }[] = [
+// Legacy export kept so other modules (e.g. ClientOrderModal) that
+// imported DEFAULT_STAGES_TEMPLATE continue to compile. It's now just
+// the furniture fallback — actual rendering inside Warehouse pulls
+// from the live niche config.
+export const DEFAULT_STAGES_TEMPLATE: { id: string; ru: string; kz: string; eng: string; icon: any }[] = [
   { id: 'cutting',    ru: 'Распил',   kz: 'Кесу',     eng: 'Cutting',   icon: Wrench },
   { id: 'edging',     ru: 'Кромка',   kz: 'Жиектеу',  eng: 'Edging',    icon: Wrench },
   { id: 'assembly',   ru: 'Сборка',   kz: 'Жинау',    eng: 'Assembly',  icon: Wrench },
   { id: 'packaging',  ru: 'Упаковка', kz: 'Орау',     eng: 'Packaging', icon: Package },
   { id: 'delivery',   ru: 'Доставка', kz: 'Жеткізу',  eng: 'Delivery',  icon: Truck },
 ];
+
+// Heuristic stage → icon mapping. Niches don't carry icons in the config
+// (keeping `niches.ts` non-React), so we infer one here based on the
+// stage id. Falls back to Wrench.
+function stageIcon(id: string): any {
+  if (/deliver/i.test(id)) return Truck;
+  if (/package|pack|hand|finish/i.test(id)) return Package;
+  if (/install|monta/i.test(id)) return Wrench;
+  return Wrench;
+}
+
 // Build a fresh `stages` array for a deal — used when a deal first
-// enters production and we haven't tracked stages before.
-function makeDefaultStages(): DealStage[] {
-  return DEFAULT_STAGES_TEMPLATE.map(s => ({ id: s.id, status: 'pending' as StageStatus }));
+// enters production and we haven't tracked stages before. Takes the
+// niche-specific stage list as input.
+function makeDefaultStages(template: ReadonlyArray<{ id: string }>): DealStage[] {
+  return template.map(s => ({ id: s.id, status: 'pending' as StageStatus }));
 }
 
 // (Stale mockProducts + prodOrders removed — store is the single source of
@@ -103,14 +127,38 @@ interface PurchaseOrder {
 
 export function Warehouse({ language }: WarehouseProps) {
   const store = useDataStore();
-  const [activeView, setActiveView] = useState<'materials' | 'production' | 'bom' | 'calculator' | 'nesting' | 'suppliers' | 'purchases' | 'reports'>('production');
+  // Niche drives production stage labels, material categories, default
+  // product types — everything that was hardcoded to furniture before.
+  const niche = getNiche(store.niche);
+  // Permission gate — Производство is a "production" module in the matrix.
+  const canWrite = store.canWriteModule('production');
+  // Cut-sheet (nesting) tab only applies to niches that physically cut
+  // sheet material: furniture and stairs. Hide for ceilings/windows/etc.
+  const hasNesting = niche.id === 'furniture' || niche.id === 'stairs' || niche.id === 'custom';
+  // Default landing: if the team has no production work yet, land them
+  // on Склад so they can populate materials first. Once they have deals
+  // or products, default to the production order list.
+  const initialView = useMemo<'materials' | 'production'>(() => {
+    const hasProductionDeals = store.deals.some(d =>
+      ['production', 'assembly', 'contract', 'project-agreed', 'manufacturing', 'installation', 'measured'].includes(d.status),
+    );
+    return hasProductionDeals || store.products.length > 0 ? 'production' : 'materials';
+  }, [store.deals, store.products.length]);
+  const [activeView, setActiveView] = useState<'materials' | 'production' | 'bom' | 'calculator' | 'nesting' | 'suppliers' | 'purchases' | 'reports'>(initialView);
   const [selectedCategory, setSelectedCategory] = useState('Все');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<ProdOrder | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [newProduct, setNewProduct] = useState({ name: '', category: 'Плиты', quantity: 0, unit: 'лист', supplier: '', cost: 0 });
+  // CSV import modals for materials + suppliers (paste from Excel for
+  // a new-team migration). Toggled via the import buttons in each tab.
+  const [showProductImport, setShowProductImport] = useState(false);
+  const [showSupplierImport, setShowSupplierImport] = useState(false);
+  // Default new-product category from the niche so the picker shows
+  // sensible options (Плиты for furniture, Профиль for windows, etc.).
+  const defaultCategory = niche.materialCategories[0] || 'Прочее';
+  const [newProduct, setNewProduct] = useState({ name: '', category: defaultCategory, quantity: 0, unit: 'лист', supplier: '', cost: 0 });
 
   // Suppliers & purchase orders — loaded from the server when their
   // tab opens (lazy: don't pay the network cost if the user never
@@ -342,7 +390,7 @@ export function Warehouse({ language }: WarehouseProps) {
       status: d.progress >= 100 ? 'done' as const : d.progress > 50 ? 'working' as const : d.progress > 0 ? 'started' as const : 'paused' as const,
       start: d.measurementDate || d.date, end: d.completionDate || '',
       materials: d.materials ? d.materials.split(', ').slice(0, 3) : [],
-      stages: ((d as any).stages as DealStage[] | undefined) || makeDefaultStages(),
+      stages: ((d as any).stages as DealStage[] | undefined) || makeDefaultStages(niche.productionStages),
       consumed: ((d as any).consumed as ConsumedMaterial[] | undefined) || [],
     }));
 
@@ -401,8 +449,15 @@ export function Warehouse({ language }: WarehouseProps) {
   // the deal blob with the updated stages array and stamps timestamps as
   // appropriate. Also auto-bumps deal.progress proportional to completed
   // stages so the existing progress bar stays in sync without manual edits.
-  async function cycleStage(order: ProdOrder, stageId: DealStage['id']) {
-    const current = order.stages || makeDefaultStages();
+  //
+  // Stage count is now niche-driven (3-6 depending on niche), so the
+  // progress math is dynamic: each completed stage contributes
+  // (100 / stages.length)%. Previously hardcoded `* 20` assumed exactly
+  // 5 stages and broke for niches with fewer/more.
+  async function cycleStage(order: ProdOrder, stageId: string) {
+    if (!canWrite) return; // permission gate
+    const stageTemplate = niche.productionStages;
+    const current = order.stages || makeDefaultStages(stageTemplate);
     const now = new Date().toISOString();
     const nextStatus = (s: StageStatus): StageStatus =>
       s === 'pending' ? 'in-progress' : s === 'in-progress' ? 'done' : 'pending';
@@ -418,19 +473,20 @@ export function Warehouse({ language }: WarehouseProps) {
     });
     const doneCount = updated.filter(s => s.status === 'done').length;
     const inProg    = updated.filter(s => s.status === 'in-progress').length;
-    // Progress: completed stages * 20%, with +5% for any in-progress
-    // (so users see immediate feedback when starting a new stage).
-    const newProgress = Math.min(100, doneCount * 20 + (inProg > 0 ? 5 : 0));
+    const totalStages = stageTemplate.length || 5;
+    // Progress: (100 / N) per done stage + small bump for any in-progress
+    // so the user sees immediate feedback when starting a new stage.
+    const perStage = 100 / totalStages;
+    const inProgressBump = Math.min(perStage / 4, 5);
+    const newProgress = Math.min(100, Math.round(doneCount * perStage + (inProg > 0 ? inProgressBump : 0)));
     try {
-      // Build patch without `status: undefined` — the server spreads
-      // req.body onto the stored object, so an undefined value would
-      // wipe deal.status on next reload (silent data loss).
       const patch: any = { stages: updated, progress: newProgress };
-      if (doneCount === 5) patch.status = 'completed';
+      // All stages done → mark deal completed.
+      if (doneCount === totalStages) patch.status = 'completed';
       await store.updateDeal(order.dealId, patch);
-      // Audit trail — make stage changes searchable from the activity log
-      // alongside other deal updates.
-      const stageLabel = DEFAULT_STAGES_TEMPLATE.find(t => t.id === stageId)?.ru || stageId;
+      // Audit trail — make stage changes searchable in activity log.
+      // Look up label from the niche's stage template (RU label fallback).
+      const stageLabel = stageTemplate.find(t => t.id === stageId)?.ru || stageId;
       const newStat = updated.find(s => s.id === stageId)?.status;
       const statLabel = newStat === 'done' ? 'завершён'
                        : newStat === 'in-progress' ? 'в работе'
@@ -460,7 +516,7 @@ export function Warehouse({ language }: WarehouseProps) {
       // Closing the order from outside the stage strip — also mark every
       // stage 'done' so the chip strip / reports reflect reality.
       const now = new Date().toISOString();
-      const allDone = (order.stages || makeDefaultStages()).map(s =>
+      const allDone = (order.stages || makeDefaultStages(niche.productionStages)).map(s =>
         s.status === 'done' ? s : { ...s, status: 'done' as StageStatus, completedAt: now },
       );
       patch = { progress: 100, status: 'completed', stages: allDone };
@@ -498,7 +554,7 @@ export function Warehouse({ language }: WarehouseProps) {
   const handleAdd = () => {
     if (newProduct.name && newProduct.supplier && newProduct.cost > 0) {
       store.addProduct({ ...newProduct, status: newProduct.quantity > 20 ? 'instock' : newProduct.quantity > 0 ? 'low' : 'outofstock', minQty: 10 });
-      setNewProduct({ name: '', category: 'Плиты', quantity: 0, unit: 'лист', supplier: '', cost: 0 }); setShowAddModal(false);
+      setNewProduct({ name: '', category: defaultCategory, quantity: 0, unit: 'лист', supplier: '', cost: 0 }); setShowAddModal(false);
     }
   };
 
@@ -521,26 +577,68 @@ export function Warehouse({ language }: WarehouseProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-4">
         <div>
-          <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Производство', 'Өндірі', 'Production')}</p>
+          <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">
+            {l('Производство', 'Өндіріс', 'Production')}
+            {' · '}
+            <span className="normal-case tracking-normal text-slate-500">{niche.icon} {niche.name[language]}</span>
+          </p>
           <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight">{l('Производство и склад', 'Өндіріс және қойма', 'Production & Warehouse')}</h1>
+          {!canWrite && (
+            <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-100/70 ring-1 ring-amber-200/40 px-2 py-0.5 rounded-full">
+              <Eye className="w-3 h-3" />
+              {l('Только просмотр', 'Тек қарау', 'View only')}
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <button onClick={() => setActiveView('production')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'production' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Заказы', 'Тапсырыстар', 'Orders')}</button>
-            <button onClick={() => setActiveView('bom')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'bom' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('BOM', 'BOM', 'BOM')}</button>
-            <button onClick={() => setActiveView('calculator')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'calculator' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Калькулятор', 'Калькулятор', 'Calculator')}</button>
-            <button onClick={() => setActiveView('nesting')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'nesting' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Раскрой', 'Раскрой', 'Nesting')}</button>
-            <button onClick={() => setActiveView('materials')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'materials' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Склад', 'Қойма', 'Warehouse')}</button>
-            <button onClick={() => setActiveView('suppliers')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'suppliers' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Поставщики', 'Жеткізушілер', 'Suppliers')}</button>
-            <button onClick={() => setActiveView('purchases')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'purchases' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Закупки', 'Сатып алулар', 'Purchases')}</button>
-            <button onClick={() => setActiveView('reports')} className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all ${activeView === 'reports' ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}>{l('Отчёты', 'Есептер', 'Reports')}</button>
-          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
-            <Plus className="w-3.5 h-3.5" />{l('Добавить', 'Қосу', 'Add')}
-          </button>
+        <div className="flex items-stretch gap-1.5 min-w-0 w-full sm:w-auto">
+          {/* Horizontal-scroll tab strip — was wrapping into 3 rows on
+              phones which pushed the «Add» CTA below the fold. Now
+              scrolls horizontally with snap so the active tab is always
+              reachable. The Add button is anchored to the right of the
+              strip so it stays visible. */}
+          <div className="flex items-center gap-1.5 overflow-x-auto flex-1 min-w-0 -mx-1 px-1 snap-x">
+            {[
+              { id: 'production', label: l('Заказы',        'Тапсырыстар',  'Orders') },
+              { id: 'bom',        label: l('BOM',           'BOM',          'BOM') },
+              { id: 'calculator', label: l('Калькулятор',   'Калькулятор',  'Calculator') },
+              ...(hasNesting ? [{ id: 'nesting' as const, label: l('Раскрой', 'Раскрой', 'Nesting') }] : []),
+              { id: 'materials',  label: l('Склад',         'Қойма',        'Warehouse') },
+              { id: 'suppliers',  label: l('Поставщики',    'Жеткізушілер', 'Suppliers') },
+              { id: 'purchases',  label: l('Закупки',       'Сатып алулар', 'Purchases') },
+              { id: 'reports',    label: l('Отчёты',        'Есептер',      'Reports') },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveView(tab.id as any)}
+                className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all flex-shrink-0 snap-start ${
+                  activeView === tab.id
+                    ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
+                    : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {/* «Add» — context-aware: on Suppliers/Purchases/Materials tabs
+              we open the right modal directly. Permission-gated. */}
+          {canWrite && (
+            <button
+              onClick={() => {
+                if (activeView === 'suppliers') { setEditingSupplier(null); setShowSupplierModal(true); }
+                else if (activeView === 'purchases') { setEditingPo(null); setShowPoModal(true); }
+                else { setShowAddModal(true); }
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all flex-shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />{l('Добавить', 'Қосу', 'Add')}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         {[
           { label: l('В работе', 'Жұмыста', 'In Progress'), value: String(activeOrders), sub: l('заказов', 'тапсырыс', 'orders'), icon: Wrench, color: '' },
           { label: l('Материалов', 'Материалдар', 'Materials'), value: String(products.length), sub: l('позиций', 'позиция', 'items'), icon: Package, color: '' },
@@ -602,12 +700,18 @@ export function Warehouse({ language }: WarehouseProps) {
                     <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${conf.bar} rounded-full transition-all`} style={{ width: `${o.progress}%` }} /></div>
                   </div>
 
-                  {/* Stage chain — 5 clickable dots representing the
-                      cutting → edging → assembly → packaging → delivery
-                      workshop pipeline. Click cycles the stage:
-                          pending → in-progress → done → pending */}
-                  <div className="mt-3 grid grid-cols-5 gap-1" onClick={e => e.stopPropagation()}>
-                    {DEFAULT_STAGES_TEMPLATE.map(tpl => {
+                  {/* Stage chain — N clickable dots representing the
+                      workshop pipeline FOR THIS NICHE. Labels and count
+                      come from niche.productionStages so a ceiling
+                      business shows Раскрой/Подготовка/Монтаж/Светильники/Сдача
+                      instead of furniture's Распил/Кромка/Сборка/etc.
+                      Click cycles: pending → in-progress → done → pending. */}
+                  <div
+                    className="mt-3 grid gap-1"
+                    style={{ gridTemplateColumns: `repeat(${niche.productionStages.length}, minmax(0, 1fr))` }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {niche.productionStages.map((tpl: NicheStage) => {
                       const stage = (o.stages || []).find(s => s.id === tpl.id);
                       const status = stage?.status || 'pending';
                       const label = tpl[language];
@@ -620,8 +724,9 @@ export function Warehouse({ language }: WarehouseProps) {
                         <button
                           key={tpl.id}
                           onClick={() => cycleStage(o, tpl.id)}
+                          disabled={!canWrite}
                           title={tip}
-                          className={`flex flex-col items-center gap-1 py-1.5 rounded-xl ring-1 transition-all ${
+                          className={`flex flex-col items-center gap-1 py-1.5 rounded-xl ring-1 transition-all ${!canWrite ? 'cursor-not-allowed' : ''} ${
                             status === 'done'        ? 'bg-emerald-100/80 text-emerald-700 ring-emerald-200/60' :
                             status === 'in-progress' ? 'bg-amber-100/80 text-amber-700 ring-amber-200/60' :
                                                        'bg-white/40 text-slate-400 ring-white/60 hover:bg-white/70'
@@ -714,6 +819,59 @@ export function Warehouse({ language }: WarehouseProps) {
 
       {/* ===== MATERIALS VIEW ===== */}
       {activeView === 'materials' && (
+        store.products.length === 0 ? (
+          // ─── Empty-state hero ─────────────────────────────────
+          // Brand-new team — no materials yet. Replace the empty table
+          // with three clear paths: add manually, import CSV from Excel,
+          // or ask AI to bulk-create from a free-text description.
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+            <div className="text-4xl mb-3">{niche.icon}</div>
+            <h3 className="text-lg text-slate-900 mb-2 tracking-tight">
+              {l('Здесь будут материалы', 'Материалдар осы жерде болады', 'Materials live here')}
+            </h3>
+            <p className="text-xs text-slate-500 mb-5 max-w-md mx-auto leading-relaxed">
+              {l(
+                `Каталог под нишу «${niche.name[language]}» — ${niche.materialCategories.slice(0, 4).join(' / ')}. Добавьте первый материал или импортируйте из Excel.`,
+                `«${niche.name[language]}» санатына арналған каталог. Бірінші материалды қосыңыз немесе CSV импорттаңыз.`,
+                `Catalog for "${niche.name[language]}" — ${niche.materialCategories.slice(0, 4).join(' / ')}. Add the first item or import from Excel.`,
+              )}
+            </p>
+            <div className="flex items-center gap-2 justify-center flex-wrap">
+              {canWrite && (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" /> {l('Добавить первый материал', 'Бірінші материал', 'Add first material')}
+                </button>
+              )}
+              {canWrite && (
+                <button
+                  onClick={() => setShowProductImport(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl text-xs text-slate-700 backdrop-blur-xl transition-all"
+                >
+                  <Upload className="w-3.5 h-3.5" /> {l('Импорт CSV', 'CSV импорт', 'Import CSV')}
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('ai-assistant:open', {
+                    detail: {
+                      prompt: l(
+                        `Заведи на склад: ЛДСП белый 50 листов 8000₸, петли Blum 100 пар 1500₸, и т.д. — у меня ниша «${niche.name[language]}»`,
+                        `Қоймаға қос: материал тізімі — менің салам «${niche.name[language]}»`,
+                        `Add to stock: a list of materials — my niche is "${niche.name[language]}"`,
+                      ),
+                    },
+                  }));
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-violet-600/90 hover:bg-violet-700 text-white rounded-2xl text-xs ring-1 ring-white/10 transition-all"
+              >
+                ✨ {l('Через AI', 'AI арқылы', 'Via AI')}
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="space-y-4">
           {/* Low-stock banner — appears only when there's at least one
               low / out-of-stock material. Bulk CTA seeds the PO modal
@@ -725,16 +883,18 @@ export function Warehouse({ language }: WarehouseProps) {
                 <b>{outCount + lowCount}</b> {l('материалов нужно докупить', 'материал сатып алу керек', 'materials need restocking')}
                 {outCount > 0 && <span className="ml-1.5 text-amber-700">· {outCount} {l('нет в наличии', 'жоқ', 'out')}</span>}
               </div>
-              <button
-                onClick={triggerPurchaseForAll}
-                className="text-[11px] px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl ring-1 ring-amber-200/40 transition-colors flex-shrink-0"
-              >
-                {l('Создать закупку →', 'Сатып алу жасау →', 'Create PO →')}
-              </button>
+              {canWrite && (
+                <button
+                  onClick={triggerPurchaseForAll}
+                  className="text-[11px] px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl ring-1 ring-amber-200/40 transition-colors flex-shrink-0"
+                >
+                  {l('Создать закупку →', 'Сатып алу жасау →', 'Create PO →')}
+                </button>
+              )}
             </div>
           )}
 
-          {/* Search + Filters */}
+          {/* Search + Filters + CSV toolbar */}
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
@@ -745,6 +905,35 @@ export function Warehouse({ language }: WarehouseProps) {
                 <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-gray-900 text-white' : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-400 hover:border-gray-200'}`}>{cat}</button>
               ))}
             </div>
+            {/* CSV export — produces an Excel-readable file with BOM */}
+            <button
+              onClick={() => {
+                const cols: CsvColumn<Product>[] = [
+                  { header: 'Название',  value: 'name' },
+                  { header: 'Категория', value: 'category' },
+                  { header: 'Кол-во',    value: 'quantity' },
+                  { header: 'Ед.',       value: 'unit' },
+                  { header: 'Поставщик', value: 'supplier' },
+                  { header: 'Цена',      value: 'cost' },
+                  { header: 'Мин',       value: 'minQty' },
+                  { header: 'Статус',    value: 'status' },
+                ];
+                downloadCsv(todayStampedName('materials'), rowsToCsv(store.products as any[], cols));
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 rounded-xl text-xs text-slate-600 backdrop-blur-xl transition-all flex-shrink-0"
+              title={l('Экспорт в CSV', 'CSV экспорт', 'Export CSV')}
+            >
+              <Download className="w-3.5 h-3.5" />
+            </button>
+            {canWrite && (
+              <button
+                onClick={() => setShowProductImport(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 rounded-xl text-xs text-slate-600 backdrop-blur-xl transition-all flex-shrink-0"
+                title={l('Импорт из CSV', 'CSV-ден импорт', 'Import from CSV')}
+              >
+                <Upload className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Materials Table */}
@@ -796,6 +985,7 @@ export function Warehouse({ language }: WarehouseProps) {
             </div>
           </div>
         </div>
+        )
       )}
 
       {/* ===== BOM (Спецификации изделий) ===== */}
@@ -806,8 +996,8 @@ export function Warehouse({ language }: WarehouseProps) {
       {/* ===== Калькулятор стоимости ===== */}
       {activeView === 'calculator' && <Calculator language={language} />}
 
-      {/* ===== Раскрой (Nesting) ===== */}
-      {activeView === 'nesting' && (
+      {/* ===== Раскрой (Nesting) — only for cut-based niches ===== */}
+      {activeView === 'nesting' && hasNesting && (
         <NestingView language={language} prodOrders={prodOrders} deals={store.deals} />
       )}
 
@@ -816,9 +1006,12 @@ export function Warehouse({ language }: WarehouseProps) {
         <SuppliersView
           language={language}
           suppliers={suppliers}
+          canWrite={canWrite}
           onAdd={() => { setEditingSupplier(null); setShowSupplierModal(true); }}
           onEdit={(s) => { setEditingSupplier(s); setShowSupplierModal(true); }}
           onDelete={deleteSupplier}
+          onImport={() => setShowSupplierImport(true)}
+          nicheCategories={niche.materialCategories}
         />
       )}
 
@@ -859,6 +1052,68 @@ export function Warehouse({ language }: WarehouseProps) {
           initial={editingSupplier}
           onClose={() => { setShowSupplierModal(false); setEditingSupplier(null); }}
           onSave={saveSupplier}
+          categories={niche.materialCategories}
+        />
+      )}
+
+      {/* CSV import for materials */}
+      {showProductImport && (
+        <CsvImportModal
+          language={language}
+          title={l('Материалы', 'Материалдар', 'Materials')}
+          fields={[
+            { key: 'name',     headers: ['Название', 'Name', 'Material'], required: true },
+            { key: 'category', headers: ['Категория', 'Category'] },
+            { key: 'quantity', headers: ['Кол-во', 'Quantity', 'Qty'], transform: (v) => Number(String(v).replace(/[^0-9.-]/g, '')) || 0 },
+            { key: 'unit',     headers: ['Ед.', 'Unit'] },
+            { key: 'supplier', headers: ['Поставщик', 'Supplier'] },
+            { key: 'cost',     headers: ['Цена', 'Price', 'Cost'], transform: (v) => Number(String(v).replace(/[^0-9.-]/g, '')) || 0 },
+            { key: 'minQty',   headers: ['Мин', 'Min', 'MinQty'], transform: (v) => Number(String(v).replace(/[^0-9.-]/g, '')) || 0 },
+          ] as CsvFieldSpec[]}
+          onImport={async (rec) => {
+            const quantity = Number(rec.quantity) || 0;
+            const minQty = Number(rec.minQty) || 10;
+            const status = quantity === 0 ? 'outofstock' : quantity < minQty ? 'low' : 'instock';
+            await store.addProduct({
+              name: String(rec.name),
+              category: String(rec.category || niche.materialCategories[0] || 'Прочее'),
+              quantity,
+              unit: String(rec.unit || 'шт'),
+              supplier: String(rec.supplier || ''),
+              cost: Number(rec.cost) || 0,
+              status: status as any,
+              minQty,
+            });
+          }}
+          onClose={() => setShowProductImport(false)}
+        />
+      )}
+
+      {/* CSV import for suppliers */}
+      {showSupplierImport && (
+        <CsvImportModal
+          language={language}
+          title={l('Поставщики', 'Жеткізушілер', 'Suppliers')}
+          fields={[
+            { key: 'name',          headers: ['Название', 'Name', 'Поставщик'], required: true },
+            { key: 'contactPerson', headers: ['Контакт', 'Contact', 'ФИО'] },
+            { key: 'phone',         headers: ['Телефон', 'Phone'] },
+            { key: 'email',         headers: ['Email'] },
+            { key: 'address',       headers: ['Адрес', 'Address'] },
+            { key: 'category',      headers: ['Категория', 'Category'] },
+            { key: 'paymentTerms',  headers: ['Оплата', 'Payment', 'Условия'] },
+            { key: 'deliveryDays',  headers: ['Доставка', 'Delivery', 'Дни'], transform: (v) => Number(String(v).replace(/[^0-9]/g, '')) || undefined },
+            { key: 'rating',        headers: ['Рейтинг', 'Rating'], transform: (v) => Number(v) || undefined },
+            { key: 'notes',         headers: ['Заметки', 'Notes'] },
+          ] as CsvFieldSpec[]}
+          onImport={async (rec) => {
+            await api.post<Supplier>('/api/suppliers', rec);
+          }}
+          onClose={() => {
+            setShowSupplierImport(false);
+            // Re-fetch so the imported rows appear immediately.
+            api.get<Supplier[]>('/api/suppliers').then(setSuppliers).catch(() => { /* ignore */ });
+          }}
         />
       )}
 
@@ -893,8 +1148,20 @@ export function Warehouse({ language }: WarehouseProps) {
               <button onClick={() => setShowAddModal(false)} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-400" /></button>
             </div>
             <div className="p-5 space-y-3">
-              <ModalInput label={l('Название', 'Атауы', 'Name')} value={newProduct.name} onChange={e => setNewProduct({ ...newProduct, name: (e.target as HTMLInputElement).value })} placeholder="ЛДСП White" />
-              <div><label className="block text-[11px] text-slate-400 mb-1">{l('Категория', 'Санат', 'Category')}</label><select value={newProduct.category} onChange={e => setNewProduct({ ...newProduct, category: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none">{categories.filter(c => c !== 'Все').map(c => <option key={c}>{c}</option>)}</select></div>
+              <ModalInput
+                label={l('Название', 'Атауы', 'Name')}
+                value={newProduct.name}
+                onChange={e => setNewProduct({ ...newProduct, name: (e.target as HTMLInputElement).value })}
+                placeholder={niche.id === 'furniture' ? 'ЛДСП White' : niche.id === 'windows' ? 'Профиль REHAU 70mm' : niche.id === 'ceilings' ? 'Полотно матовое 320×400' : niche.materialCategories[0]}
+              />
+              <div>
+                <label className="block text-[11px] text-slate-400 mb-1">{l('Категория', 'Санат', 'Category')}</label>
+                <select value={newProduct.category} onChange={e => setNewProduct({ ...newProduct, category: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none">
+                  {/* Union of niche default categories + any custom ones
+                      the user already entered (so old data still appears). */}
+                  {Array.from(new Set([...niche.materialCategories, ...categories.filter(c => c !== 'Все')])).map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <ModalInput label={l('Кол-во', 'Саны', 'Qty')} type="number" value={String(newProduct.quantity)} onChange={e => setNewProduct({ ...newProduct, quantity: Number((e.target as HTMLInputElement).value) })} />
                 <div><label className="block text-[11px] text-slate-400 mb-1">{l('Ед.', 'Бірл.', 'Unit')}</label><select value={newProduct.unit} onChange={e => setNewProduct({ ...newProduct, unit: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none"><option value="лист">{l('лист', 'парақ', 'sheet')}</option><option value="шт">{l('шт', 'дана', 'pcs')}</option><option value="м">м</option><option value="пара">{l('пара', 'жұп', 'pair')}</option></select></div>
@@ -989,6 +1256,10 @@ interface BomTemplate {
   updatedAt?: string;
 }
 
+// Fallback furniture-only BOM type list — kept for back-compat with
+// existing data. The active list inside BomTemplates is built from
+// the team's niche so a windows business sees "Окно глухое / Балкон"
+// instead of "Кухня / Шкаф-купе".
 const TYPE_LABELS: Record<string, string> = {
   kitchen: 'Кухня', wardrobe: 'Шкаф-купе', closet: 'Гардероб',
   hallway: 'Прихожая', bed: 'Кровать', table: 'Стол', other: 'Прочее',
@@ -1011,6 +1282,14 @@ function bomTotals(t: BomTemplate) {
 function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const store = useDataStore();
+  const niche = getNiche(store.niche);
+  // Niche-aware product types — replaces the furniture-only TYPE_OPTIONS
+  // for the picker. We also build a label map so old data referencing
+  // legacy ids ('kitchen', 'wardrobe') still renders their RU labels.
+  const typeOptions = useMemo(() => {
+    return niche.productTypeOptions.map(name => ({ id: name, ru: name }));
+  }, [niche]);
+  const labelFor = (id: string) => TYPE_LABELS[id] || id;
   const [templates, setTemplates] = useState<BomTemplate[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState<BomTemplate | null>(null); // null = no modal; «»  = new
@@ -1051,7 +1330,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
     const totals = bomTotals(t);
     const seed = {
       product: t.name, amount: Math.round(totals.clientTotal),
-      furnitureType: TYPE_LABELS[t.type] || t.type,
+      furnitureType: labelFor(t.type),
       completionDate: '', measurementDate: '',
       materials: t.materials.map(m => m.mat).join(', '),
       notes: `Из шаблона: материалы ${Math.round(totals.materials).toLocaleString('ru-RU')} ₸, работа ${Math.round(totals.labour).toLocaleString('ru-RU')} ₸, наценка ${t.markupPct}%`,
@@ -1089,7 +1368,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
           <div className="text-[11px] text-slate-400">{templates.length} {l('шаблонов', 'шаблон', 'templates')}</div>
         </div>
         <button
-          onClick={() => setEditing(blankTemplate())}
+          onClick={() => setEditing(blankTemplate(typeOptions[0]?.id))}
           className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded-xl hover:bg-gray-800 inline-flex items-center gap-1.5"
         >
           <Plus className="w-3 h-3" /> {l('Создать шаблон', 'Шаблон жасау', 'Create template')}
@@ -1101,7 +1380,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
           <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <div className="text-sm text-slate-900 mb-1">{l('Пока нет шаблонов', 'Әзірге шаблондар жоқ', 'No templates yet')}</div>
           <div className="text-xs text-slate-400 mb-4">{l('Создайте первый шаблон чтобы быстро повторять типовые изделия', 'Типтік бұйымдарды тез қайталау үшін алғашқы шаблон жасаңыз', 'Create a template to reuse common items')}</div>
-          <button onClick={() => setEditing(blankTemplate())} className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all inline-flex items-center gap-1.5">
+          <button onClick={() => setEditing(blankTemplate(typeOptions[0]?.id))} className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all inline-flex items-center gap-1.5">
             <Plus className="w-3 h-3" /> {l('Создать первый', 'Біріншісін жасау', 'Create first')}
           </button>
         </div>
@@ -1113,7 +1392,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
               <div key={t.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 hover:shadow-sm transition-all">
                 <div className="w-full h-24 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center mb-3 relative">
                   <Package className="w-8 h-8 text-slate-300" />
-                  <span className="absolute top-2 right-2 text-[9px] px-1.5 py-0.5 bg-white/80 rounded text-gray-600">{TYPE_LABELS[t.type] || t.type}</span>
+                  <span className="absolute top-2 right-2 text-[9px] px-1.5 py-0.5 bg-white/80 rounded text-gray-600">{labelFor(t.type)}</span>
                 </div>
                 <div className="text-sm text-slate-900 mb-1 truncate" title={t.name}>{t.name}</div>
                 <div className="flex items-center justify-between text-[11px] text-slate-400 mb-2">
@@ -1144,23 +1423,28 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
           onSave={save}
           busy={busy}
           language={language}
+          typeOptions={typeOptions}
         />
       )}
     </div>
   );
 }
 
-function blankTemplate(): BomTemplate {
+// Default dims are kitchen-counter-shaped; for non-furniture niches the
+// user will override them in the editor. Niche-aware default `type` is
+// applied by the caller (BomTemplates uses the first niche option).
+function blankTemplate(defaultType = 'kitchen'): BomTemplate {
   return {
-    name: '', type: 'kitchen',
+    name: '', type: defaultType,
     width: 3000, height: 900, depth: 600,
     materials: [{ mat: '', sup: '', qty: 1, unit: 'шт', price: 0 }],
     labourCost: 0, markupPct: 30, leadDays: 14,
   };
 }
 
-function BomEditorModal({ initial, onClose, onSave, busy, language }: {
+function BomEditorModal({ initial, onClose, onSave, busy, language, typeOptions }: {
   initial: BomTemplate; onClose: () => void; onSave: (t: BomTemplate) => void; busy: boolean; language: 'kz' | 'ru' | 'eng';
+  typeOptions: Array<{ id: string; ru: string }>;
 }) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const [t, setT] = useState<BomTemplate>(initial);
@@ -1198,7 +1482,7 @@ function BomEditorModal({ initial, onClose, onSave, busy, language }: {
             <div>
               <div className="text-[10px] text-slate-400 mb-1">{l('Тип изделия', 'Бұйым түрі', 'Type')}</div>
               <select value={t.type} onChange={e => up({ type: e.target.value })} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200">
-                {TYPE_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.ru}</option>)}
+                {typeOptions.map(o => <option key={o.id} value={o.id}>{o.ru}</option>)}
               </select>
             </div>
           </div>
@@ -1481,13 +1765,16 @@ function NestingView({ language, prodOrders, deals }: {
 // KPI strip (количество / средний рейтинг / средние дни доставки) +
 // search + add CTA + glass cards with phone/category/rating chips.
 function SuppliersView({
-  language, suppliers, onAdd, onEdit, onDelete,
+  language, suppliers, canWrite, onAdd, onEdit, onDelete, onImport, nicheCategories,
 }: {
   language: 'kz' | 'ru' | 'eng';
   suppliers: Supplier[];
+  canWrite: boolean;
   onAdd: () => void;
   onEdit: (s: Supplier) => void;
   onDelete: (id: string) => void;
+  onImport: () => void;
+  nicheCategories: string[];
 }) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const [q, setQ] = useState('');
@@ -1519,7 +1806,7 @@ function SuppliersView({
         </div>
       </div>
 
-      {/* Search + add */}
+      {/* Search + actions toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
@@ -1531,21 +1818,65 @@ function SuppliersView({
             className="w-full pl-9 pr-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs focus:outline-none focus:bg-white focus:ring-slate-300 transition-all placeholder:text-slate-400"
           />
         </div>
-        <button
-          onClick={onAdd}
-          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          {l('Добавить поставщика', 'Жеткізуші қосу', 'Add supplier')}
-        </button>
+        {canWrite && suppliers.length > 0 && (
+          <button
+            onClick={onImport}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 rounded-xl text-xs text-slate-600 backdrop-blur-xl transition-all"
+            title={l('Импорт CSV', 'CSV импорт', 'Import CSV')}
+          >
+            <Upload className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {canWrite && (
+          <button
+            onClick={onAdd}
+            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {l('Добавить поставщика', 'Жеткізуші қосу', 'Add supplier')}
+          </button>
+        )}
       </div>
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
-          {q ? l('Ничего не найдено', 'Ештеңе табылмады', 'Nothing found')
-             : l('Пока нет поставщиков — добавьте первого', 'Жеткізушілер жоқ — біріншісін қосыңыз', 'No suppliers yet — add your first')}
-        </div>
+        // Empty state — hero CTA card. Search-empty state has its own
+        // softer copy; absolute-empty state pushes the user to add.
+        suppliers.length === 0 ? (
+          <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-10 text-center shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+            <Truck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <h3 className="text-sm text-slate-900 mb-1.5">
+              {l('Здесь будут поставщики', 'Жеткізушілер осы жерде болады', 'Suppliers live here')}
+            </h3>
+            <p className="text-[11px] text-slate-500 mb-5 max-w-md mx-auto leading-relaxed">
+              {l(
+                `Поставщики по категориям ${nicheCategories.slice(0, 3).join(' / ')} и др. Заведите первого или импортируйте список из Excel.`,
+                'Бірінші жеткізушіні қосыңыз немесе CSV-тен импорттаңыз.',
+                `Suppliers by category (${nicheCategories.slice(0, 3).join(' / ')} etc.). Add the first or import from Excel.`,
+              )}
+            </p>
+            {canWrite && (
+              <div className="flex items-center gap-2 justify-center flex-wrap">
+                <button
+                  onClick={onAdd}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" /> {l('Добавить первого поставщика', 'Бірінші жеткізуші', 'Add first supplier')}
+                </button>
+                <button
+                  onClick={onImport}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl text-xs text-slate-700 backdrop-blur-xl transition-all"
+                >
+                  <Upload className="w-3.5 h-3.5" /> {l('Импорт CSV', 'CSV импорт', 'Import CSV')}
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+            {l('Ничего не найдено', 'Ештеңе табылмады', 'Nothing found')}
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
           {filtered.map(s => (
@@ -1562,14 +1893,16 @@ function SuppliersView({
                   </div>
                   {s.contactPerson && <div className="text-[11px] text-slate-500 truncate">{s.contactPerson}</div>}
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button onClick={() => onEdit(s)} className="p-1.5 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl transition-all" title={l('Редактировать', 'Өңдеу', 'Edit')}>
-                    <Edit2 className="w-3.5 h-3.5 text-slate-500" />
-                  </button>
-                  <button onClick={() => onDelete(s.id)} className="p-1.5 hover:bg-rose-100/70 rounded-xl transition-colors" title={l('Удалить', 'Жою', 'Delete')}>
-                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                  </button>
-                </div>
+                {canWrite && (
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <button onClick={() => onEdit(s)} className="p-1.5 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl transition-all" title={l('Редактировать', 'Өңдеу', 'Edit')}>
+                      <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                    </button>
+                    <button onClick={() => onDelete(s.id)} className="p-1.5 hover:bg-rose-100/70 rounded-xl transition-colors" title={l('Удалить', 'Жою', 'Delete')}>
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="flex items-center flex-wrap gap-1.5 text-[10px] text-slate-600">
                 {s.category && <span className="px-2 py-0.5 bg-white/60 ring-1 ring-white/60 rounded-full">{s.category}</span>}
@@ -1725,13 +2058,16 @@ function PurchasesView({
 }
 
 // ─── Supplier modal (add / edit) ──────────────────────────────────
+// Categories list comes from the niche so a windows business sees
+// «Профиль / Стеклопакеты / Фурнитура» instead of furniture-only options.
 function SupplierModal({
-  language, initial, onClose, onSave,
+  language, initial, onClose, onSave, categories,
 }: {
   language: 'kz' | 'ru' | 'eng';
   initial: Supplier | null;
   onClose: () => void;
   onSave: (s: Partial<Supplier>) => void;
+  categories: string[];
 }) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const [data, setData] = useState<Partial<Supplier>>({
@@ -1784,13 +2120,7 @@ function SupplierModal({
               <label className={LABEL}>{l('Категория', 'Санат', 'Category')}</label>
               <select className={INPUT} value={data.category} onChange={e => setData(d => ({ ...d, category: e.target.value }))}>
                 <option value="">—</option>
-                <option>Плиты ЛДСП/МДФ</option>
-                <option>Фурнитура</option>
-                <option>Кромка</option>
-                <option>Краска/Лак</option>
-                <option>Стекло</option>
-                <option>Освещение</option>
-                <option>Прочее</option>
+                {categories.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div>
