@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { X, ChevronLeft, ChevronRight, Upload, User, Package, CalendarClock, FileText } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, User, Package, CalendarClock, FileText, AlertTriangle } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { t } from '../utils/translations';
+import { getNiche } from '../utils/niches';
 
 // Seed shape — pre-fills the modal when opened from a BOM template.
 // All fields optional; whatever is supplied overrides the empty defaults.
@@ -19,18 +20,27 @@ export interface NewDealSeed {
   height?: number;
 }
 
-interface Props { language: 'kz' | 'ru' | 'eng'; onClose: () => void; seed?: NewDealSeed; }
+interface Props {
+  language: 'kz' | 'ru' | 'eng';
+  onClose: () => void;
+  seed?: NewDealSeed;
+  // Optional default funnel stage — used when "+" is clicked on a kanban
+  // column header so the deal lands directly in that stage instead of
+  // always starting at 'new'.
+  defaultStatus?: string;
+}
 
 // Shared glass-input class so every field across all four tabs reads the
 // same on the translucent dialog background.
 const INPUT = 'w-full px-3 py-2.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all';
 const LABEL = 'block text-[11px] text-slate-500 mb-1.5';
 
-export function NewDealModal({ language, onClose, seed }: Props) {
+export function NewDealModal({ language, onClose, seed, defaultStatus }: Props) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const tt = (key: Parameters<typeof t>[0]) => t(key, language);
   const store = useDataStore();
   const catalogs = store.catalogs;
+  const niche = getNiche(store.niche);
   // When opened from a BOM template we jump straight to the «Product»
   // tab so the user sees the pre-filled fields immediately and only needs
   // to fill in client info on tab 0. Plain «Новая сделка» starts on tab 0.
@@ -39,7 +49,10 @@ export function NewDealModal({ language, onClose, seed }: Props) {
   // Seed overrides — note we convert mm dimensions to m for the UI
   // (which works in meters: 3000mm → 3m).
   const [product, setProduct] = useState({
-    type: seed?.furnitureType || '',
+    // Default type from the niche's first option (e.g. «Кухня» for furniture,
+    // «Окно глухое» for windows). Previously hardcoded to «Кухня» which
+    // broke when oconщик created a deal.
+    type: seed?.furnitureType || niche.productTypeOptions[0] || '',
     template: seed?.product || '',
     l: seed?.width ? seed.width / 1000 : 3,
     w: seed?.depth ? seed.depth / 1000 : 0.6,
@@ -55,6 +68,9 @@ export function NewDealModal({ language, onClose, seed }: Props) {
   const [docs, setDocs] = useState({ notes: seed?.notes || '' });
   // Owner — feeds the team-metrics dashboard precisely. Empty = unassigned.
   const [ownerId, setOwnerId] = useState('');
+  // Validation message shown above the action bar when the user tries
+  // to create a deal with missing required fields.
+  const [validationError, setValidationError] = useState('');
 
   // Tabs with icons so the wizard step bar reads visually, not just by
   // number. Tab labels stay numbered for muscle-memory.
@@ -67,24 +83,53 @@ export function NewDealModal({ language, onClose, seed }: Props) {
 
   const toggleAddon = (a: string) => setProduct(p => ({ ...p, addons: p.addons.includes(a) ? p.addons.filter(x => x !== a) : [...p.addons, a] }));
 
+  // ─── Validation ─────────────────────────────────────────────
+  // Stricter than before: name + (phone OR email) + (template OR type)
+  // are required to create a real deal. Draft mode (save and finish
+  // later) only requires the name.
+  const validate = (draft: boolean): string | null => {
+    if (!client.name.trim()) return l('Введите имя клиента', 'Клиент атын енгізіңіз', 'Enter client name');
+    if (draft) return null;
+    if (!client.phone.trim() && !client.email.trim()) {
+      return l('Укажите телефон или email клиента', 'Телефон немесе email қажет', 'Provide phone or email');
+    }
+    if (!product.template.trim() && !product.type.trim()) {
+      return l('Укажите тип или шаблон изделия', 'Бұйым түрін немесе шаблонын қажет', 'Provide product type or template');
+    }
+    return null;
+  };
+
   const create = (draft = false) => {
-    if (!client.name) return;
+    const err = validate(draft);
+    if (err) { setValidationError(err); return; }
+    setValidationError('');
     const sourceMap: Record<string, any> = { Instagram: 'instagram', WhatsApp: 'whatsapp', Telegram: 'telegram' };
+    // Derive funnel stage. Priority order:
+    //   1. defaultStatus prop (when "+" clicked on a column header)
+    //   2. 'new' if creating a draft
+    //   3. 'measured' otherwise (matches the original "completed form → in-progress" intent)
+    const status = defaultStatus || (draft ? 'new' : 'measured');
+    const progressMap: Record<string, number> = {
+      new: 5, measured: 25, 'project-agreed': 50, production: 70, installation: 88, completed: 100,
+    };
     store.addDeal({
-      customerName: client.name,
-      phone: client.phone,
+      customerName: client.name.trim(),
+      phone: client.phone.trim(),
+      email: client.email.trim() || undefined,
       address: client.address,
       siteAddress: client.siteAddress || undefined,
-      workType: 'furniture',
+      // workType derives from the team's niche — no more hardcoded
+      // 'furniture' for non-furniture businesses.
+      workType: (store.niche || 'furniture') as any,
       product: product.template || (product.type ? `${product.type} ${product.l}×${product.w}×${product.h}м` : `${product.l}×${product.w}×${product.h}м`),
       furnitureType: product.type,
       amount: term.amount,
       paidAmount: Math.round(term.amount * term.prepay / 100),
-      status: draft ? 'new' : 'measured',
+      status,
       icon: sourceMap[client.source] || 'phone',
       priority: 'medium',
       date: new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
-      progress: draft ? 5 : 25,
+      progress: progressMap[status] ?? 5,
       source: client.source,
       measurer: term.measurer,
       designer: '',
@@ -104,10 +149,13 @@ export function NewDealModal({ language, onClose, seed }: Props) {
       },
       notes: docs.notes,
       ownerId: ownerId || undefined,
-    });
+    } as any);
     onClose();
   };
 
+  // Per-tab "can go forward" gate — tab 0 still just needs a name, but
+  // we surface validation messages on tabs 1-2 if the user tries to
+  // jump straight to creation without filling required fields.
   const canNext = tab === 0 ? client.name.trim().length > 0 : true;
 
   return (
@@ -200,15 +248,28 @@ export function NewDealModal({ language, onClose, seed }: Props) {
 
           {tab === 1 && (<>
             {/* All product attributes use user-managed catalogs (Settings → Справочники).
-                Empty catalog → user just types whatever they need. */}
-            <datalist id="dl-furniture-types">{catalogs.furnitureTypes.map(v => <option key={v} value={v} />)}</datalist>
+                Empty catalog → user just types whatever they need.
+                When the catalog is empty we ALSO seed the niche's
+                productTypeOptions so a fresh furniture business sees
+                "Кухня / Шкаф-купе / Гардероб" and an oconщик sees
+                "Окно глухое / Двухстворчатое / ..." right away. */}
+            <datalist id="dl-furniture-types">
+              {catalogs.furnitureTypes.length > 0
+                ? catalogs.furnitureTypes.map(v => <option key={v} value={v} />)
+                : niche.productTypeOptions.map(v => <option key={v} value={v} />)}
+            </datalist>
             <datalist id="dl-product-templates">{catalogs.productTemplates.map(v => <option key={v} value={v} />)}</datalist>
-            <datalist id="dl-materials">{catalogs.materials.map(v => <option key={v} value={v} />)}</datalist>
+            <datalist id="dl-materials">
+              {catalogs.materials.length > 0
+                ? catalogs.materials.map(v => <option key={v} value={v} />)
+                : niche.materialCategories.map(v => <option key={v} value={v} />)}
+            </datalist>
             <datalist id="dl-hardware">{catalogs.hardware.map(v => <option key={v} value={v} />)}</datalist>
 
             <div>
-              <label className={LABEL}>{tt('furnitureType')}</label>
-              <input list="dl-furniture-types" value={product.type} onChange={e => setProduct({ ...product, type: e.target.value })} placeholder={catalogs.furnitureTypes.length ? '' : tt('catalogEmpty')} className={INPUT} />
+              {/* Label is niche-aware: «Тип мебели» / «Тип окна» / «Тип потолка» */}
+              <label className={LABEL}>{niche.productTypeLabel[language]}</label>
+              <input list="dl-furniture-types" value={product.type} onChange={e => setProduct({ ...product, type: e.target.value })} placeholder={catalogs.furnitureTypes.length || niche.productTypeOptions.length ? '' : tt('catalogEmpty')} className={INPUT} />
             </div>
             <div>
               <label className={LABEL}>{tt('productTemplate')}</label>
@@ -334,68 +395,87 @@ export function NewDealModal({ language, onClose, seed }: Props) {
 
           {tab === 3 && (<>
             <div>
-              <label className={LABEL}>{l('Эскизы / чертежи', 'Эскиздер', 'Sketches')}</label>
-              <div className="border-2 border-dashed border-white/70 bg-white/30 backdrop-blur-xl rounded-2xl p-6 text-center hover:bg-white/50 cursor-pointer transition-colors">
-                <Upload className="w-5 h-5 text-slate-400 mx-auto mb-2" />
-                <div className="text-xs text-slate-500">{l('Перетащите файлы сюда', 'Файлдарды осында', 'Drop files')}</div>
-              </div>
-            </div>
-            <div>
-              <label className={LABEL}>{l('Договор', 'Шарт', 'Contract')}</label>
-              <div className="border-2 border-dashed border-white/70 bg-white/30 backdrop-blur-xl rounded-2xl p-6 text-center hover:bg-white/50 cursor-pointer transition-colors">
-                <Upload className="w-5 h-5 text-slate-400 mx-auto mb-2" />
-                <div className="text-xs text-slate-500">PDF, DOCX</div>
-              </div>
-            </div>
-            <div>
               <label className={LABEL}>{l('Заметки менеджера', 'Жазбалар', 'Notes')}</label>
               <textarea
                 value={docs.notes}
                 onChange={e => setDocs({ ...docs, notes: e.target.value })}
-                rows={4}
+                rows={5}
+                placeholder={l('Особые условия, договорённости, пожелания клиента…',
+                               'Ерекше шарттар, келісімдер…',
+                               'Special terms, agreements, client wishes…')}
                 className={`${INPUT} resize-none`}
               />
+            </div>
+            {/* File-upload zones removed — they were placeholders with no
+                onChange wiring, which gave a false sense of capability.
+                Documents are uploadable from the deal card itself
+                (Заказы → карточка клиента → Документы) where the
+                base64 data-URL pipeline is real. */}
+            <div className="bg-white/40 ring-1 ring-white/60 rounded-2xl px-4 py-3 text-[11px] text-slate-500 leading-relaxed">
+              <div className="text-slate-700 mb-1">
+                {l('Документы и эскизы', 'Құжаттар мен эскиздер', 'Documents and sketches')}
+              </div>
+              {l(
+                'Прикрепите файлы после создания сделки — откройте карточку → раздел «Документы». До 5 МБ каждый, до 10 файлов на сделку.',
+                'Мәміле жасалғаннан кейін «Құжаттар» бөлімінде файл қосуға болады.',
+                "Attach files after creating the deal — open the card → Documents section. Up to 5 MB each, 10 files max.",
+              )}
             </div>
           </>)}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-white/60 flex items-center gap-2 flex-shrink-0 flex-wrap">
-          <button
-            onClick={() => setTab(Math.max(0, tab - 1) as any)}
-            disabled={tab === 0}
-            className="px-3 py-2 text-xs flex items-center gap-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 rounded-xl hover:bg-white/50 transition-colors"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" /> {l('Назад', 'Артқа', 'Back')}
-          </button>
-          <div className="flex-1" />
-          <button onClick={onClose} className="px-3 py-2 text-xs text-slate-500 hover:text-slate-900 rounded-xl hover:bg-white/50 transition-colors">
-            {l('Отмена', 'Болдырмау', 'Cancel')}
-          </button>
-          <button
-            onClick={() => create(true)}
-            disabled={!client.name}
-            className="px-3.5 py-2 bg-white/70 hover:bg-white ring-1 ring-white/60 rounded-2xl text-xs text-slate-700 transition-colors disabled:opacity-40"
-          >
-            {l('Черновик', 'Жоба', 'Draft')}
-          </button>
-          {tab < 3 ? (
-            <button
-              onClick={() => canNext && setTab(Math.min(3, tab + 1) as any)}
-              disabled={!canNext}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 flex items-center gap-1 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 disabled:opacity-40 disabled:shadow-none transition-all"
-            >
-              {l('Вперёд', 'Алға', 'Next')} <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            <button
-              onClick={() => create(false)}
-              disabled={!client.name}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 disabled:opacity-40 disabled:shadow-none transition-all"
-            >
-              {l('Создать сделку', 'Мәміле жасау', 'Create deal')}
-            </button>
+        <div className="px-6 py-3 border-t border-white/60 flex-shrink-0">
+          {/* Validation surface — shown when create() fails the required-
+              field check. Doesn't block the user from continuing to type. */}
+          {validationError && (
+            <div className="mb-2 flex items-center gap-2 text-[11px] text-rose-700 bg-rose-50 ring-1 ring-rose-200/60 px-3 py-2 rounded-xl">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+              {validationError}
+            </div>
           )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setTab(Math.max(0, tab - 1) as any)}
+              disabled={tab === 0}
+              className="px-3 py-2 text-xs flex items-center gap-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 rounded-xl hover:bg-white/50 transition-colors"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> {l('Назад', 'Артқа', 'Back')}
+            </button>
+            <div className="flex-1" />
+            <button onClick={onClose} className="px-3 py-2 text-xs text-slate-500 hover:text-slate-900 rounded-xl hover:bg-white/50 transition-colors">
+              {l('Отмена', 'Болдырмау', 'Cancel')}
+            </button>
+            {/* "Сохранить и закрыть" — only on the final tab now (was
+                on every tab, confusingly creating empty deals from tab 0).
+                Skips the strict validation since it's intentional partial save. */}
+            {tab === 3 && (
+              <button
+                onClick={() => create(true)}
+                disabled={!client.name.trim()}
+                className="px-3.5 py-2 bg-white/70 hover:bg-white ring-1 ring-white/60 rounded-2xl text-xs text-slate-700 transition-colors disabled:opacity-40"
+                title={l('Сохранить как черновик — можно дозаполнить позже', 'Жоба ретінде сақтау', 'Save as draft — complete later')}
+              >
+                {l('Сохранить как черновик', 'Жоба ретінде сақтау', 'Save as draft')}
+              </button>
+            )}
+            {tab < 3 ? (
+              <button
+                onClick={() => canNext && setTab(Math.min(3, tab + 1) as any)}
+                disabled={!canNext}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 flex items-center gap-1 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 disabled:opacity-40 disabled:shadow-none transition-all"
+              >
+                {l('Вперёд', 'Алға', 'Next')} <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <button
+                onClick={() => create(false)}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+              >
+                {l('Создать сделку', 'Мәміле жасау', 'Create deal')}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
