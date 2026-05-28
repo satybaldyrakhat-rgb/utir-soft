@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, CreditCard, Wallet, TrendingUp, AlertCircle, CheckCircle2, Clock, Download, Filter, Sparkles, ChevronDown, Send, Zap, FileText, Loader2, Copy, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, CreditCard, Wallet, TrendingUp, AlertCircle, CheckCircle2, Clock, Download, Filter, Sparkles, ChevronDown, Send, Zap, FileText, Loader2, Copy, Check, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import { useDataStore, Deal, FinanceTransaction } from '../utils/dataStore';
 import { Finance } from './Finance';
 import { AI_MODELS } from './AIAssistant';
 import { api } from '../utils/api';
+import { getNiche, type NicheConfig } from '../utils/niches';
 // PDF generator is heavy (jspdf + html2canvas) — load only when needed.
 import type { PaymentDealRow } from '../utils/pdfReports';
 
@@ -207,8 +208,11 @@ function computeFinanceInsights(transactions: FinanceTransaction[], language: 'k
 
 // Build a compact textual summary of the team's finance state to prepend
 // to user prompts — lets the AI answer with real numbers instead of
-// generic templated replies.
-function buildFinanceContext(deals: Deal[], transactions: FinanceTransaction[]): string {
+// generic templated replies. Niche is now part of the context so the
+// model gives niche-appropriate advice (e.g. doesn't suggest a 50%
+// prepay for a niche that typically takes 30%, or talk about production
+// for niches that have no production stage).
+function buildFinanceContext(deals: Deal[], transactions: FinanceTransaction[], niche: NicheConfig): string {
   const active = deals.filter(d => d.status !== 'rejected');
   const billed = active.reduce((s, d) => s + (d.amount || 0), 0);
   const paid   = active.reduce((s, d) => s + Math.round((d.amount || 0) * (d.progress || 0) / 100), 0);
@@ -222,7 +226,10 @@ function buildFinanceContext(deals: Deal[], transactions: FinanceTransaction[]):
     return Date.now() - new Date(d.date).getTime() > 14 * 24 * 3600 * 1000;
   });
   const lines = [
-    '=== Финансовое состояние команды (живые данные) ===',
+    `=== Контекст команды ===`,
+    `Ниша: «${niche.name.ru}». Типовой цикл: ${niche.productionStages.map(s => s.ru).join(' → ')}.`,
+    '',
+    '=== Финансовое состояние (живые данные) ===',
     `Сделки: всего ${active.length}, к оплате ${fmt(billed)}, получено ${fmt(paid)}, остаток ${fmt(due)}.`,
     `Просроченных сделок: ${overdue.length}.`,
     overdue.length > 0
@@ -230,7 +237,7 @@ function buildFinanceContext(deals: Deal[], transactions: FinanceTransaction[]):
       : '',
     `Финансовые операции: доходы ${fmt(income)}, расходы ${fmt(expense)}, прибыль ${fmt(profit)}.`,
     `Маржа: ${income > 0 ? (profit / income * 100).toFixed(1) : 0}%.`,
-    '=== Используй эти цифры в ответах. ===',
+    '=== Используй эти цифры и учитывай специфику ниши в ответах. ===',
   ].filter(Boolean);
   return lines.join('\n');
 }
@@ -262,6 +269,9 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
   transactions: FinanceTransaction[];
 }) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const store = useDataStore();
+  const niche = getNiche(store.niche);
+  const canWrite = store.canWriteModule('finance');
   // Default to UTIR AI — gives the panel tool access (add_finance,
   // log_payment, find_client). Other providers fall back to pure text.
   const [model, setModel] = useState(AI_MODELS.find(m => m.id === 'utir-ai') || AI_MODELS[0]);
@@ -291,17 +301,28 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
     [variant, deals, transactions, language],
   );
 
-  const quickActions = variant === 'deals' ? [
-    l('Кто из клиентов должен больше всех?', 'Ең көп қарызды клиент кім?', 'Who owes the most?'),
-    l('Прогноз поступлений на эту неделю',    'Аптадағы түсім болжамы',     'Inflow forecast this week'),
-    l('Какие сделки рискуют сорваться?',      'Қандай мәмілелер тәуекелде?', 'Which deals are at risk?'),
-    l('Сделай сводку платежей за месяц',      'Айдағы төлемдер сводкасы',   'Summarize payments this month'),
-  ] : [
-    l('Проанализируй доходы и расходы за месяц', 'Айдың кірісі мен шығынын талда', 'Analyze monthly P&L'),
-    l('Запиши расход на аренду 200к',             'Жалдау шығыны 200к жаз',         'Record rent expense 200k'),
-    l('Прогноз прибыли до конца квартала',         'Тоқсан соңына дейінгі пайда',  'Forecast profit until quarter end'),
-    l('Сколько денег осталось «в обороте»?',       'Айналымда қанша қалды?',       'How much cash is in flight?'),
-  ];
+  // Quick actions adapt to whether the team has data yet. A fresh team
+  // with 0 deals/transactions sees "how do I start" prompts instead of
+  // "who owes the most" (which would return nothing meaningful).
+  const isEmpty = deals.filter(d => d.status !== 'rejected').length === 0 && transactions.length === 0;
+  const quickActions = isEmpty
+    ? [
+        l('Как начать вести финансы в моей нише?', 'Қаржыны қалай бастаймын?', 'How do I start tracking finances?'),
+        l(`Какие категории расходов завести для ниши «${niche.name.ru}»?`, 'Қандай шығын санаттары керек?', 'What expense categories should I set up?'),
+        l('Запиши расход: аренда 200к за этот месяц', 'Шығын жаз: жалдау 200к', 'Record expense: rent 200k this month'),
+        l('Какой аванс брать с клиентов в моей нише?', 'Қандай аванс алу керек?', 'What prepay % is typical for my niche?'),
+      ]
+    : variant === 'deals' ? [
+        l('Кто из клиентов должен больше всех?', 'Ең көп қарызды клиент кім?', 'Who owes the most?'),
+        l('Прогноз поступлений на эту неделю',    'Аптадағы түсім болжамы',     'Inflow forecast this week'),
+        l('Какие сделки рискуют сорваться?',      'Қандай мәмілелер тәуекелде?', 'Which deals are at risk?'),
+        l('Сделай сводку платежей за месяц',      'Айдағы төлемдер сводкасы',   'Summarize payments this month'),
+      ] : [
+        l('Проанализируй доходы и расходы за месяц', 'Айдың кірісі мен шығынын талда', 'Analyze monthly P&L'),
+        l('Запиши расход на аренду 200к',             'Жалдау шығыны 200к жаз',         'Record rent expense 200k'),
+        l('Прогноз прибыли до конца квартала',         'Тоқсан соңына дейінгі пайда',  'Forecast profit until quarter end'),
+        l('Сколько денег осталось «в обороте»?',       'Айналымда қанша қалды?',       'How much cash is in flight?'),
+      ];
 
   async function ask(q: string) {
     if (!q.trim() || sending) return;
@@ -311,7 +332,7 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
     // memory.
     const text = q.trim();
     const userPayload = !contextSeeded
-      ? `${buildFinanceContext(deals, transactions)}\n\nВопрос пользователя: ${text}`
+      ? `${buildFinanceContext(deals, transactions, niche)}\n\nВопрос пользователя: ${text}`
       : text;
     const userMsg: FinChatMsg = { id: finMsgId(), role: 'user', content: text };
     const nextMessages: FinChatMsg[] = [...messages, userMsg];
@@ -358,6 +379,15 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
 
   async function confirmTool(msg: FinChatMsg) {
     if (!msg.pendingTool) return;
+    // View-only role can chat with AI but can't execute write tools.
+    // Refuse here before the network call so the user gets a clear msg
+    // instead of a silent 403.
+    if (!canWrite) {
+      setError(l('Только просмотр — нет прав на изменение финансов',
+                 'Тек қарау — қаржыны өзгерту құқығы жоқ',
+                 'View only — no permission to modify finance'));
+      return;
+    }
     setExecutingId(msg.id);
     try {
       const resp = await api.post<{ ok: boolean; text: string }>('/api/ai-chat/execute', {
@@ -465,7 +495,7 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
               <ChevronDown className="w-3 h-3 text-gray-400" />
             </button>
             {showModelMenu && (
-              <div className="absolute right-0 top-full mt-1 w-64 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl shadow-lg z-20 p-1">
+              <div className="absolute right-0 top-full mt-1 w-64 max-w-[calc(100vw-2rem)] bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl shadow-lg z-20 p-1">
                 {AI_MODELS.map(m => {
                   const ok = providerOk[m.id] !== false;
                   return (
@@ -622,6 +652,14 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [query, setQuery] = useState('');
   const [exportBusy, setExportBusy] = useState<'pdf' | 'csv' | null>(null);
+  // Sort — clickable column headers cycle the key + direction. Default
+  // 'due desc' keeps the prior behaviour (biggest debtors on top).
+  const [sortKey, setSortKey] = useState<'due' | 'amount' | 'date' | 'name'>('due');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (key: typeof sortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('desc'); }
+  };
   // Pagination — 25 rows per page. Reset to page 0 when filter/query changes
   // so the user always sees the top of the new result set.
   const PAGE_SIZE = 25;
@@ -651,8 +689,30 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
 
   const filtered = enriched
     .filter(d => filter === 'all' || d._status === filter)
-    .filter(d => !query || d.customerName.toLowerCase().includes(query.toLowerCase()) || (d.product || '').toLowerCase().includes(query.toLowerCase()))
-    .sort((a, b) => b._due - a._due);
+    // Search now covers phone + БИН too — useful for finance staff
+    // looking up an unpaid invoice by phone the client gave them.
+    .filter(d => {
+      if (!query) return true;
+      const q = query.toLowerCase();
+      const phoneDigits = (d.phone || '').replace(/[^0-9]/g, '');
+      const qDigits = q.replace(/[^0-9]/g, '');
+      return d.customerName.toLowerCase().includes(q)
+          || (d.product || '').toLowerCase().includes(q)
+          || (d.phone || '').toLowerCase().includes(q)
+          || (qDigits.length >= 3 && phoneDigits.includes(qDigits))
+          || ((d as any).customerBIN || '').includes(q);
+    })
+    .sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      if (sortKey === 'amount') return (a._amount - b._amount) * dir;
+      if (sortKey === 'name')   return a.customerName.localeCompare(b.customerName) * dir;
+      if (sortKey === 'date') {
+        const ta = a.date ? new Date(a.date).getTime() : 0;
+        const tb = b.date ? new Date(b.date).getTime() : 0;
+        return (ta - tb) * dir;
+      }
+      return (a._due - b._due) * dir; // 'due'
+    });
 
   // Slice to current page; clamp page when filtered count changes.
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -705,8 +765,19 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
     setExportBusy('csv');
     try {
       const pdf = await import('../utils/pdfReports');
+      // Localized headers — old version produced Russian-only CSV
+      // regardless of user language, which surprised KZ/EN users.
+      const header: string[] = [
+        l('Клиент',   'Клиент',   'Client'),
+        l('Продукт',  'Өнім',     'Product'),
+        l('Дата',     'Күн',      'Date'),
+        l('Сумма (₸)', 'Сома (₸)', 'Amount (₸)'),
+        l('Оплачено (₸)', 'Төленді (₸)', 'Paid (₸)'),
+        l('Остаток (₸)',  'Қалдық (₸)',  'Outstanding (₸)'),
+        l('Статус',   'Күй',      'Status'),
+      ];
       const rows: Array<Array<string | number>> = [
-        ['Клиент', 'Продукт', 'Дата', 'Сумма (₸)', 'Оплачено (₸)', 'Остаток (₸)', 'Статус'],
+        header,
         ...filtered.map(d => [
           d.customerName,
           d.product || '',
@@ -748,7 +819,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-gray-300 absolute left-2.5 top-1/2 -translate-y-1/2" />
-              <input value={query} onChange={e => setQuery(e.target.value)} placeholder={l('Поиск по клиенту...', 'Клиент іздеу...', 'Search client...')}
+              <input value={query} onChange={e => setQuery(e.target.value)} placeholder={l('Поиск: клиент, продукт, телефон, БИН', 'Іздеу: клиент, өнім, телефон', 'Search: client, product, phone, BIN')}
                 className="pl-7 pr-3 py-1.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs w-44 focus:outline-none focus:ring-1 focus:ring-gray-200" />
             </div>
             <button
@@ -782,11 +853,20 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
         </div>
 
         <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-2 border-b border-white/60 bg-white/30 text-[9px] text-gray-400 uppercase tracking-wide">
-          <div className="col-span-3">{l('Клиент', 'Клиент', 'Client')}</div>
+          <button onClick={() => toggleSort('name')} className="col-span-3 text-left flex items-center gap-1 hover:text-gray-700 transition-colors">
+            {l('Клиент', 'Клиент', 'Client')}
+            {sortKey === 'name' && <ArrowUpDown className="w-2.5 h-2.5" />}
+          </button>
           <div className="col-span-3">{l('Продукт', 'Өнім', 'Product')}</div>
           <div className="col-span-3">{l('Прогресс', 'Прогресс', 'Progress')}</div>
-          <div className="col-span-1 text-right">{l('Сумма', 'Сома', 'Amount')}</div>
-          <div className="col-span-2 text-right">{l('Статус', 'Статус', 'Status')}</div>
+          <button onClick={() => toggleSort('amount')} className="col-span-1 text-right flex items-center justify-end gap-1 hover:text-gray-700 transition-colors">
+            {l('Сумма', 'Сома', 'Amount')}
+            {sortKey === 'amount' && <ArrowUpDown className="w-2.5 h-2.5" />}
+          </button>
+          <button onClick={() => toggleSort('due')} className="col-span-2 text-right flex items-center justify-end gap-1 hover:text-gray-700 transition-colors">
+            {l('Статус', 'Статус', 'Status')}
+            {(sortKey === 'due' || sortKey === 'date') && <ArrowUpDown className="w-2.5 h-2.5" />}
+          </button>
         </div>
 
         <div className="divide-y divide-gray-50">
@@ -806,10 +886,14 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
                   </div>
                 </div>
                 <div className="md:col-span-3 min-w-0">
+                  {/* Mobile label — on phones there's no column header so we
+                      surface what this row segment IS under each value. */}
+                  <div className="md:hidden text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">{l('Продукт', 'Өнім', 'Product')}</div>
                   <div className="text-xs text-gray-700 truncate">{d.product || '—'}</div>
-                  <div className="text-[10px] text-gray-400">{d.furnitureType || ''}</div>
+                  {d.furnitureType && <div className="text-[10px] text-gray-400">{d.furnitureType}</div>}
                 </div>
                 <div className="md:col-span-3">
+                  <div className="md:hidden text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">{l('Прогресс', 'Прогресс', 'Progress')}</div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full transition-all ${d._pct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : d._pct > 0 ? 'bg-gradient-to-r from-sky-400 to-violet-400' : 'bg-amber-300'}`} style={{ width: `${Math.min(d._pct, 100)}%` }} />
@@ -821,6 +905,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
                   </div>
                 </div>
                 <div className="md:col-span-1 text-right">
+                  <div className="md:hidden text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">{l('Сумма', 'Сома', 'Amount')}</div>
                   <div className="text-xs text-gray-900 tabular-nums">{fmtShort(d._amount)} ₸</div>
                   {d._due > 0 && <div className="text-[10px] text-rose-500 tabular-nums">−{fmtShort(d._due)}</div>}
                 </div>

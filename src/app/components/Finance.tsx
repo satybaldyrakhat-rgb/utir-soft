@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { api } from '../utils/api';
+import { getNiche } from '../utils/niches';
 
 interface FinanceProps { language: 'kz' | 'ru' | 'eng'; }
 
@@ -36,10 +37,20 @@ const TAB_GROUPS = [
 
 type TabId = 'orders' | 'calendar' | 'cashflow' | 'profitloss' | 'balance' | 'taxes';
 
+// Localized month labels — chart axis was always Cyrillic regardless of
+// user language. EN/KZ users see their own short month forms.
 const MONTH_NAMES_RU = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+const MONTH_NAMES_KZ = ['Қаң', 'Ақп', 'Нау', 'Сәу', 'Мам', 'Мау', 'Шіл', 'Там', 'Қыр', 'Қаз', 'Қар', 'Жел'];
+const MONTH_NAMES_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function Finance({ language }: FinanceProps) {
   const store = useDataStore();
+  // Niche drives the "in production" KPI label + status list; finance
+  // module was 100% furniture-coded before. canWrite gates the Invoice
+  // CTA and AI quick-actions that mutate finance data.
+  const niche = getNiche(store.niche);
+  const canWrite = store.canWriteModule('finance');
+  const monthNames = language === 'kz' ? MONTH_NAMES_KZ : language === 'eng' ? MONTH_NAMES_EN : MONTH_NAMES_RU;
   const [activeTab, setActiveTab] = useState<TabId>('orders');
   const [chartRange, setChartRange] = useState<'7d' | '30d' | '6m' | '12m'>('6m');
   const [downloadOpen, setDownloadOpen] = useState(false);
@@ -78,7 +89,7 @@ export function Finance({ language }: FinanceProps) {
         const rev = sumInRange(start, end, 'income');
         const exp = sumInRange(start, end, 'expense');
         out.push({
-          m: `${MONTH_NAMES_RU[start.getMonth()]} ${String(start.getFullYear()).slice(2)}`,
+          m: `${monthNames[start.getMonth()]} ${String(start.getFullYear()).slice(2)}`,
           revenue: +rev.toFixed(2), expenses: +exp.toFixed(2), profit: +(rev - exp).toFixed(2),
         });
       }
@@ -96,13 +107,13 @@ export function Finance({ language }: FinanceProps) {
     .reduce((s, t) => s + t.amount, 0);
   const monthProfit = monthRevenue - monthExpenses;
   const margin = monthRevenue ? Math.round((monthProfit / monthRevenue) * 100) : 0;
-  // «In production» = anything that's actively being worked on (not just one
-  // hardcoded status string). Covers the full middle of the lifecycle:
-  // measurement done → project agreed → manufacturing → assembly → installation.
-  // Excludes terminal states (rejected / completed / paid) and the very first
-  // touch (new).
-  const PRODUCTION_STATUSES = ['contract', 'project-agreed', 'production', 'manufacturing', 'assembly', 'installation', 'measured'];
-  const inProductionDeals = store.deals.filter(d => PRODUCTION_STATUSES.includes(d.status));
+  // «В работе» = всё что в активной части воронки. Никакой
+  // furniture-specific логики — это универсальные стадии для всех ниш
+  // (потолочнику тоже нужно видеть, сколько денег в активных заказах).
+  // Исключаем терминальные состояния (rejected / completed) и самую
+  // первую точку (new).
+  const ACTIVE_STATUSES = ['measured', 'project-agreed', 'contract', 'production', 'manufacturing', 'assembly', 'installation'];
+  const inProductionDeals = store.deals.filter(d => ACTIVE_STATUSES.includes(d.status));
   const inProductionSum = inProductionDeals.reduce((s, d) => s + d.amount, 0);
   const receivablesSum = store.transactions
     .filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'overdue'))
@@ -153,6 +164,30 @@ export function Finance({ language }: FinanceProps) {
       try { company = JSON.parse(localStorage.getItem('utir_user_profile') || '{}')?.company || ''; } catch {}
       const periodObj = { from: new Date(period.from), to: new Date(period.to + 'T23:59:59') };
 
+      // Pre-flight check: a report with no data is just a blank PDF
+      // with the company header — confusing for new users who'll think
+      // the platform is broken. Show a guidance message instead.
+      const fromMs = periodObj.from.getTime();
+      const toMs = periodObj.to.getTime();
+      const scopedTxCount = store.transactions.filter(t => {
+        if (!t.date) return false;
+        const d = new Date(t.date).getTime();
+        return d >= fromMs && d <= toMs;
+      }).length;
+      const activeDealsCount = store.deals.filter(d => d.status !== 'rejected').length;
+      const needsTx = kind === 'finance' || kind === 'pl';
+      const needsDeals = kind === 'aging' || kind === 'forecast';
+      if ((needsTx && scopedTxCount === 0) || (needsDeals && activeDealsCount === 0)) {
+        setReportError(l(
+          'Нет данных за выбранный период. Добавьте операции или сделки и попробуйте снова.',
+          'Таңдалған кезеңде дерек жоқ. Операциялар немесе мәмілелер қосыңыз.',
+          'No data for selected period. Add operations or deals first.',
+        ));
+        setReportBusy(null);
+        setTimeout(() => setReportError(null), 7000);
+        return;
+      }
+
       if (kind === 'finance') {
         await pdf.generateFinancePDF(store.transactions.map(t => ({
           id: t.id, type: t.type, category: t.category,
@@ -185,7 +220,18 @@ export function Finance({ language }: FinanceProps) {
           const paid = Math.round((d.amount || 0) * (d.progress || 0) / 100);
           const outstanding = (d.amount || 0) - paid;
           if (outstanding <= 0) continue;
-          const dueDate = d.completionDate || d.installationDate;
+          // Prefer planned dates when set. For deals without either
+          // (common in non-furniture niches that don't track install/
+          // completion dates), fall back to deal.date + a niche lead-time
+          // proxy: 30 days from creation. Better than dropping the inflow.
+          let dueDate = d.completionDate || d.installationDate;
+          if (!dueDate && d.date) {
+            const created = new Date(d.date);
+            if (!isNaN(created.getTime())) {
+              created.setDate(created.getDate() + 30);
+              dueDate = created.toISOString().slice(0, 10);
+            }
+          }
           if (dueDate && new Date(dueDate) >= today) {
             inflows.push({ date: dueDate, customerName: d.customerName, product: d.product, expectedAmount: outstanding });
           }
@@ -253,7 +299,10 @@ export function Finance({ language }: FinanceProps) {
     {
       icon: Clock, iconWrap: 'bg-amber-50 text-amber-600',
       value: `${fmtM(inProductionSum)} ${l('млн', 'млн', 'mln')} ₸`,
-      label: l(`В производстве (${inProductionDeals.length})`, `Өндірісте (${inProductionDeals.length})`, `In production (${inProductionDeals.length})`),
+      // Label was "В производстве" — niche-neutral "В работе" covers
+      // ceilings (no production), blinds (sewing), flooring (laying)
+      // etc. without claiming furniture-only workflow.
+      label: l(`В работе (${inProductionDeals.length})`, `Жұмыста (${inProductionDeals.length})`, `Active (${inProductionDeals.length})`),
       hint: l('Активные заказы', 'Белсенді тапсырыстар', 'Active orders'),
       hintCls: 'text-gray-500',
     },
@@ -343,18 +392,20 @@ export function Finance({ language }: FinanceProps) {
               </div>
             )}
           </div>
-          <button
-            onClick={() => setShowInvoice(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all transition-colors"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            {l('Счёт / Акт', 'Шот / Акт', 'Invoice / Act')}
-          </button>
+          {canWrite && (
+            <button
+              onClick={() => setShowInvoice(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              {l('Счёт / Акт', 'Шот / Акт', 'Invoice / Act')}
+            </button>
+          )}
           <button
             onClick={() => askAI(l(
-              'Проанализируй мои финансы за месяц',
-              'Айдағы қаржыны талда',
-              'Analyze my finances for this month',
+              `Проанализируй мои финансы за месяц. Моя ниша — ${niche.name.ru}.`,
+              `Айдағы қаржыны талда. Менің салам — ${niche.name.kz}.`,
+              `Analyze my finances for this month. My niche is ${niche.name.eng}.`,
             ))}
             className="flex items-center gap-1.5 px-3 py-2 bg-purple-500 text-white rounded-xl text-xs hover:bg-purple-600 transition-colors"
           >
@@ -376,21 +427,61 @@ export function Finance({ language }: FinanceProps) {
         <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">
           {l('Финансовая сводка', 'Қаржы жиынтығы', 'Financial summary')}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          {kpis.map((k, i) => {
-            const Icon = k.icon;
-            return (
-              <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 hover:shadow-sm transition-shadow">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${k.iconWrap} mb-3`}>
-                  <Icon className="w-4 h-4" />
+        {store.transactions.length === 0 ? (
+          // Empty state — replaces 5 zeros with a single CTA card.
+          // Drives the user toward entering their first transaction
+          // (either manually via Orders sub-tab, or by asking AI).
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 text-center">
+            <Wallet className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <div className="text-sm text-slate-900 mb-1">
+              {l('Финансы пока пустые', 'Қаржы әлі бос', 'Finance is empty')}
+            </div>
+            <div className="text-[11px] text-slate-500 mb-5 max-w-md mx-auto leading-relaxed">
+              {l(
+                `Запишите первый доход или расход — KPI и графики оживут сразу. Можно вручную через раздел ниже или попросить AI ("аренда 200к за май").`,
+                'Бірінші табыс немесе шығынды жазыңыз — KPI мен графиктер бірден жанданады.',
+                'Record your first income or expense — KPIs and charts come alive instantly.',
+              )}
+            </div>
+            <div className="flex items-center gap-2 justify-center flex-wrap">
+              {canWrite && (
+                <button
+                  onClick={() => setActiveTab('orders')}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+                >
+                  {l('Записать вручную', 'Қолмен жазу', 'Record manually')}
+                </button>
+              )}
+              <button
+                onClick={() => askAI(l(
+                  `Запиши расход: аренда офиса 200 000 ₸ за этот месяц. Моя ниша — ${niche.name.ru}.`,
+                  `Шығынды жаз: офис жалдау 200 000 ₸. Менің салам — ${niche.name.kz}.`,
+                  `Record expense: office rent 200000 KZT this month. My niche is ${niche.name.eng}.`,
+                ))}
+                className="flex items-center gap-1.5 px-4 py-2 bg-purple-500 text-white rounded-2xl text-xs hover:bg-purple-600 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                {l('Через AI', 'AI арқылы', 'Via AI')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {kpis.map((k, i) => {
+              const Icon = k.icon;
+              return (
+                <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 hover:shadow-sm transition-shadow">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${k.iconWrap} mb-3`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="text-lg text-gray-900 tabular-nums mb-1">{k.value}</div>
+                  <div className="text-[11px] text-slate-400 mb-2 leading-tight">{k.label}</div>
+                  <div className={`text-[10px] ${k.hintCls}`}>{k.hint}</div>
                 </div>
-                <div className="text-lg text-gray-900 tabular-nums mb-1">{k.value}</div>
-                <div className="text-[11px] text-slate-400 mb-2 leading-tight">{k.label}</div>
-                <div className={`text-[10px] ${k.hintCls}`}>{k.hint}</div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 hover:shadow-sm transition-shadow">
