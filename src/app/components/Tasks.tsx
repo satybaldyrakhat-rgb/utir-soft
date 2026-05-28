@@ -10,6 +10,27 @@ import { useAutoRefresh } from '../utils/useAutoRefresh';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
 import { TelegramBotPanel } from './TelegramBotPanel';
+import { getNiche, type NicheConfig } from '../utils/niches';
+
+// Niche-aware category palette. Production stage names from the niche
+// become categories (Распил/Кромка for furniture, Замер/Монтаж for
+// ceilings, etc.), plus a fixed set of cross-niche business categories.
+// Colors cycle through a fixed palette so any category gets a chip color.
+const CATEGORY_PALETTE = [
+  'bg-cyan-100 text-cyan-700', 'bg-amber-100 text-amber-700', 'bg-emerald-100 text-emerald-700',
+  'bg-rose-100 text-rose-700', 'bg-indigo-100 text-indigo-700', 'bg-pink-100 text-pink-700',
+  'bg-violet-100 text-violet-700', 'bg-sky-100 text-sky-700',
+];
+const GENERIC_CATEGORIES = ['Замер', 'Дизайн', 'Продажи', 'Закупки', 'Доставка', 'Маркетинг', 'Прочее'];
+function buildCategories(niche: NicheConfig): string[] {
+  const fromNiche = niche.productionStages.map(s => s.ru);
+  // De-dupe while preserving order: niche stages first, then generic.
+  return Array.from(new Set([...fromNiche, ...GENERIC_CATEGORIES]));
+}
+function categoryColor(cat: string, allCats: string[]): string {
+  const idx = allCats.indexOf(cat);
+  return CATEGORY_PALETTE[(idx >= 0 ? idx : cat.length) % CATEGORY_PALETTE.length];
+}
 
 // ─── TYPES ───────────────────────────────────────────────────
 interface Task {
@@ -63,16 +84,6 @@ const priorityConfig: Record<string, { label: string; color: string; bg: string 
   urgent: { label: 'Срочно', color: 'text-red-600', bg: 'bg-red-50' },
 };
 
-const categoryColors: Record<string, string> = {
-  'Замер': 'bg-cyan-100 text-cyan-700',
-  'Сборка': 'bg-amber-100 text-amber-700',
-  'Дизайн': 'bg-emerald-100 text-emerald-700',
-  'Продажи': 'bg-emerald-100 text-emerald-700',
-  'Закупки': 'bg-rose-100 text-rose-700',
-  'Монтаж': 'bg-indigo-100 text-indigo-700',
-  'Маркетинг': 'bg-pink-100 text-pink-700',
-};
-
 interface TasksProps {
   language: 'kz' | 'ru' | 'eng';
 }
@@ -83,6 +94,12 @@ export function Tasks({ language }: TasksProps) {
   const store = useDataStore();
   // Poll backend every 15s so tasks created via Telegram bot show up without manual reload.
   useAutoRefresh(store.reloadAll, 15000);
+  const niche = getNiche(store.niche);
+  // Tasks are intentionally writable by all team members (no matrix key),
+  // BUT destructive actions (delete) are gated so a restricted role can't
+  // wipe the board. canWrite reflects the 'tasks' module level.
+  const canWrite = store.canWriteModule('tasks');
+  const taskCategories = buildCategories(niche);
 
   // Real team members from the store, projected into this component's `Employee` shape
   // for use in dropdowns and the "Сотрудники" view. Empty array means no team yet.
@@ -101,7 +118,11 @@ export function Tasks({ language }: TasksProps) {
       id: st.id, title: st.title, description: st.description, status: st.status, priority: st.priority,
       assignee: emp ? { id: emp.id, name: emp.name, role: emp.department, avatar: emp.avatar, telegramUsername: '@' + emp.name.split(' ')[0].toLowerCase(), telegramConnected: emp.status === 'active', tasksToday: store.tasks.filter(t => t.assigneeId === emp.id).length, tasksDone: store.tasks.filter(t => t.assigneeId === emp.id && t.status === 'done').length } : UNASSIGNED,
       createdAt: st.createdAt, dueDate: st.dueDate, completedAt: st.completedAt,
-      source: 'telegram', telegramConfirmed: true, completionNote: st.completionNote,
+      // Source derives from the stored field rather than always claiming
+      // Telegram. Falls back to 'platform' for tasks created in-app.
+      source: ((st as any).source === 'telegram' ? 'telegram' : 'platform'),
+      telegramConfirmed: (st as any).source === 'telegram',
+      completionNote: st.completionNote,
       category: st.category, subtasks: st.subtasks, linkedDealId: st.linkedDealId,
     };
   };
@@ -111,6 +132,8 @@ export function Tasks({ language }: TasksProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterEmployee, setFilterEmployee] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterDue, setFilterDue] = useState<'all' | 'overdue' | 'today' | 'week'>('all');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTelegramPanel, setShowTelegramPanel] = useState(false);
   const [showBotSettings, setShowBotSettings] = useState(false);
@@ -124,16 +147,31 @@ export function Tasks({ language }: TasksProps) {
     if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase()) && !t.description.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (filterEmployee !== 'all' && t.assignee.id !== filterEmployee) return false;
     if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
+    if (filterCategory !== 'all' && t.category !== filterCategory) return false;
+    if (filterDue !== 'all') {
+      if (!t.dueDate) return false;
+      if (filterDue === 'overdue' && !(t.dueDate < today && t.status !== 'done')) return false;
+      if (filterDue === 'today' && t.dueDate !== today) return false;
+      if (filterDue === 'week') {
+        const weekAhead = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+        if (!(t.dueDate >= today && t.dueDate <= weekAhead)) return false;
+      }
+    }
     return true;
   });
 
-  const todayTasks = filteredTasks.filter(t => t.dueDate === today);
+  // Headline stats cover ALL filtered tasks (not just today-due) so a
+  // brand-new team that imported tasks doesn't see all-zero cards. The
+  // "overdue" count is the actually-urgent signal.
+  const openTasks = filteredTasks.filter(t => t.status !== 'done');
   const stats = {
-    total: todayTasks.length,
-    done: todayTasks.filter(t => t.status === 'done').length,
-    inProgress: todayTasks.filter(t => t.status === 'in_progress').length,
-    review: todayTasks.filter(t => t.status === 'review').length,
-    newCount: todayTasks.filter(t => t.status === 'new').length,
+    total: filteredTasks.length,
+    done: filteredTasks.filter(t => t.status === 'done').length,
+    inProgress: filteredTasks.filter(t => t.status === 'in_progress').length,
+    review: filteredTasks.filter(t => t.status === 'review').length,
+    newCount: filteredTasks.filter(t => t.status === 'new').length,
+    overdue: openTasks.filter(t => t.dueDate && t.dueDate < today).length,
+    dueToday: openTasks.filter(t => t.dueDate === today).length,
   };
 
   const moveTask = (taskId: string, newStatus: Task['status']) => {
@@ -346,6 +384,26 @@ export function Tasks({ language }: TasksProps) {
             <option value="medium">Средний</option>
             <option value="low">Низкий</option>
           </select>
+
+          <select
+            value={filterCategory}
+            onChange={e => setFilterCategory(e.target.value)}
+            className="px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
+          >
+            <option value="all">Все категории</option>
+            {taskCategories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+
+          <select
+            value={filterDue}
+            onChange={e => setFilterDue(e.target.value as any)}
+            className="px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
+          >
+            <option value="all">Все сроки</option>
+            <option value="overdue">Просроченные</option>
+            <option value="today">На сегодня</option>
+            <option value="week">На неделю</option>
+          </select>
         </div>
 
         <div className="relative">
@@ -360,8 +418,39 @@ export function Tasks({ language }: TasksProps) {
         </div>
       </div>
 
+      {/* EMPTY STATE — fresh team with 0 tasks. Replaces 4 empty
+          columns + zeroed stat cards with a single clear CTA. */}
+      {viewMode === 'board' && tasks.length === 0 && (
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+          <CheckCircle2 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-lg text-slate-900 mb-1 tracking-tight">Здесь будут задачи команды</h3>
+          <p className="text-xs text-slate-500 mb-5 max-w-md mx-auto leading-relaxed">
+            Канбан-доска: Новые → В работе → На проверке → Выполнено. Привязывайте задачи к сделкам,
+            назначайте сотрудников, ставьте сроки. Категории — под нишу «{niche.name[language]}».
+          </p>
+          <div className="flex items-center gap-2 justify-center flex-wrap">
+            <button
+              onClick={() => setShowNewTaskModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" /> Создать первую задачу
+            </button>
+            <button
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('ai-assistant:open', {
+                  detail: { prompt: `Поставь задачу: позвонить клиенту завтра. Моя ниша — ${niche.name.ru}.` },
+                }));
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-violet-600/90 hover:bg-violet-700 text-white rounded-2xl text-xs ring-1 ring-white/10 transition-all"
+            >
+              ✨ Через AI
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* BOARD VIEW */}
-      {viewMode === 'board' && (
+      {viewMode === 'board' && tasks.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {columns.map(col => {
             const colTasks = filteredTasks.filter(t => t.status === col.id);
@@ -378,6 +467,7 @@ export function Tasks({ language }: TasksProps) {
                     <TaskCard
                       key={task.id}
                       task={task}
+                      categories={taskCategories}
                       onClick={() => setSelectedTask(task)}
                       onMove={moveTask}
                     />
@@ -414,7 +504,7 @@ export function Tasks({ language }: TasksProps) {
                       <div className="text-xs text-gray-400 truncate max-w-[250px]">{task.description}</div>
                     </td>
                     <td className="px-3 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColors[task.category] || 'bg-gray-100 text-gray-600'}`}>{task.category}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColor(task.category, taskCategories)}`}>{task.category}</span>
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
@@ -509,7 +599,7 @@ export function Tasks({ language }: TasksProps) {
                             <div>
                               <div className="text-sm text-gray-900">{task.title}</div>
                               <div className="flex items-center gap-2 mt-0.5">
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColors[task.category] || 'bg-gray-100 text-gray-600'}`}>{task.category}</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColor(task.category, taskCategories)}`}>{task.category}</span>
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded ${priorityConfig[task.priority].bg} ${priorityConfig[task.priority].color}`}>{priorityConfig[task.priority].label}</span>
                               </div>
                             </div>
@@ -550,6 +640,8 @@ export function Tasks({ language }: TasksProps) {
             store.deleteTask(selectedTask.id);
             setSelectedTask(null);
           }}
+          categories={taskCategories}
+          canDelete={canWrite}
         />
       )}
 
@@ -557,13 +649,16 @@ export function Tasks({ language }: TasksProps) {
       {showNewTaskModal && (
         <NewTaskModal
           employees={teamEmployees}
+          categories={taskCategories}
+          deals={store.deals.filter(d => d.status !== 'rejected').map(d => ({ id: d.id, customerName: d.customerName, product: d.product }))}
           onClose={() => setShowNewTaskModal(false)}
           onAdd={(task) => {
             store.addTask({
               title: task.title, description: task.description, status: task.status,
               priority: task.priority, assigneeId: task.assignee.id, dueDate: task.dueDate,
               category: task.category, subtasks: task.subtasks || [],
-            });
+              linkedDealId: task.linkedDealId,
+            } as any);
             setShowNewTaskModal(false);
           }}
         />
@@ -613,20 +708,26 @@ export function Tasks({ language }: TasksProps) {
 }
 
 // ─── TASK CARD ───────────────────────────────────────────────
-function TaskCard({ task, onClick, onMove }: { task: Task; onClick: () => void; onMove: (id: string, status: Task['status']) => void }) {
-  const pr = priorityConfig[task.priority];
+function TaskCard({ task, categories, onClick, onMove }: { task: Task; categories: string[]; onClick: () => void; onMove: (id: string, status: Task['status']) => void }) {
   const next = task.status === 'new' ? 'in_progress' : task.status === 'in_progress' ? 'review' : task.status === 'review' ? 'done' : null;
   const subtasksDone = task.subtasks?.filter(s => s.done).length || 0;
   const subtasksTotal = task.subtasks?.length || 0;
+  // Overdue = past due date and not done. Surfaced as a red due-date chip
+  // so the board reads urgency at a glance.
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const isOverdue = !!task.dueDate && task.dueDate < todayISO && task.status !== 'done';
+  const isDueToday = task.dueDate === todayISO && task.status !== 'done';
 
   return (
     <div
-      className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-3 hover:shadow-md transition-shadow cursor-pointer group"
+      className={`bg-white/55 backdrop-blur-2xl ring-1 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-3 hover:shadow-md transition-shadow cursor-pointer group ${
+        isOverdue ? 'ring-rose-200/70' : 'ring-white/60'
+      }`}
       onClick={onClick}
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColors[task.category] || 'bg-gray-100 text-gray-600'}`}>{task.category}</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColor(task.category, categories)}`}>{task.category}</span>
           {task.priority === 'urgent' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600">Срочно</span>}
           {task.priority === 'high' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">Высокий</span>}
         </div>
@@ -634,6 +735,16 @@ function TaskCard({ task, onClick, onMove }: { task: Task; onClick: () => void; 
       </div>
 
       <div className="text-sm text-gray-900 mb-2">{task.title}</div>
+
+      {/* Due-date chip — red when overdue, amber when due today */}
+      {task.dueDate && (
+        <div className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full mb-2 ${
+          isOverdue ? 'bg-rose-100 text-rose-700' : isDueToday ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'
+        }`}>
+          <Calendar className="w-2.5 h-2.5" />
+          {isOverdue ? 'Просрочено · ' : isDueToday ? 'Сегодня · ' : ''}{task.dueDate}
+        </div>
+      )}
 
       {subtasksTotal > 0 && (
         <div className="mb-2">
@@ -652,10 +763,15 @@ function TaskCard({ task, onClick, onMove }: { task: Task; onClick: () => void; 
           <span className="text-[10px] text-gray-500">{task.assignee.name.split(' ')[0]}</span>
         </div>
         {next && (
+          // Always visible (was opacity-0 hover-only → invisible/unusable
+          // on touch). Shows the next-stage label so it's clear what tap
+          // does. Drag-drop is a future enhancement; this works everywhere.
           <button
             onClick={(e) => { e.stopPropagation(); onMove(task.id, next as Task['status']); }}
-            className="opacity-0 group-hover:opacity-100 text-[10px] text-gray-400 hover:text-gray-700 flex items-center gap-0.5 transition-opacity"
+            className="text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg flex items-center gap-0.5 transition-colors"
+            title="Передвинуть на следующий этап"
           >
+            {next === 'in_progress' ? 'В работу' : next === 'review' ? 'На проверку' : 'Готово'}
             <ArrowRight className="w-3 h-3" />
           </button>
         )}
@@ -665,13 +781,22 @@ function TaskCard({ task, onClick, onMove }: { task: Task; onClick: () => void; 
 }
 
 // ─── NEW TASK MODAL ──────────────────────────────────────────
-function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; onClose: () => void; onAdd: (task: Task) => void }) {
+function NewTaskModal({ employees, categories, deals, onClose, onAdd }: {
+  employees: Employee[];
+  categories: string[];
+  deals: Array<{ id: string; customerName: string; product: string }>;
+  onClose: () => void;
+  onAdd: (task: Task) => void;
+}) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   // If no team yet, default assigneeId to '' (unassigned).
   const [assigneeId, setAssigneeId] = useState(employees[0]?.id ?? '');
   const [priority, setPriority] = useState<Task['priority']>('medium');
-  const [category, setCategory] = useState('Замер');
+  const [category, setCategory] = useState(categories[0] || 'Прочее');
+  // Default due date = today (was hardcoded to a past literal 2026-04-03).
+  const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
+  const [linkedDealId, setLinkedDealId] = useState('');
 
   const handleSubmit = () => {
     if (!title.trim()) return;
@@ -684,10 +809,11 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
       priority,
       assignee,
       createdAt: new Date().toISOString(),
-      dueDate: '2026-04-03',
+      dueDate,
       source: 'platform',
       telegramConfirmed: false,
       category,
+      linkedDealId: linkedDealId || undefined,
     };
     onAdd(task);
   };
@@ -706,7 +832,7 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="Например: Замер кухни — ул. Абая"
+              placeholder="Например: Выезд на замер — ул. Абая 12"
               className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
             />
           </div>
@@ -738,12 +864,34 @@ function NewTaskModal({ employees, onClose, onAdd }: { employees: Employee[]; on
               </select>
             </div>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Категория</label>
-            <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
-              {Object.keys(categoryColors).map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Категория</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Срок</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={e => setDueDate(e.target.value)}
+                className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all tabular-nums"
+              />
+            </div>
           </div>
+          {/* Link to a deal — feeds the «Связи» tab on the deal card so
+              the task shows up there. Optional. */}
+          {deals.length > 0 && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Связать со сделкой</label>
+              <select value={linkedDealId} onChange={e => setLinkedDealId(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
+                <option value="">— без привязки —</option>
+                {deals.map(d => <option key={d.id} value={d.id}>{d.customerName}{d.product ? ` · ${d.product}` : ''}</option>)}
+              </select>
+            </div>
+          )}
           <button
             onClick={handleSubmit}
             disabled={!title.trim()}
@@ -770,6 +918,8 @@ interface TaskUpdates {
 function TaskDetailModal({
   task,
   storeEmployees,
+  categories,
+  canDelete,
   onClose,
   onMoveStatus,
   onSave,
@@ -777,6 +927,8 @@ function TaskDetailModal({
 }: {
   task: Task;
   storeEmployees: { id: string; name: string }[];
+  categories: string[];
+  canDelete: boolean;
   onClose: () => void;
   onMoveStatus: (s: Task['status']) => void;
   onSave: (u: TaskUpdates) => void;
@@ -809,9 +961,9 @@ function TaskDetailModal({
     assigneeId !== task.assignee.id ||
     (dueDate || '') !== (task.dueDate || '');
 
-  // Category options: predefined + current value if it's not in the list (so AI-generated
+  // Category options: niche-derived + current value if it's not in the list (so AI-generated
   // categories like "Прочее" still appear and are editable).
-  const categoryOptions = Array.from(new Set([...Object.keys(categoryColors), 'Прочее', category])).filter(Boolean);
+  const categoryOptions = Array.from(new Set([...categories, 'Прочее', category])).filter(Boolean);
 
   const handleSave = () => {
     if (!title.trim()) return;
@@ -833,7 +985,7 @@ function TaskDetailModal({
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColors[category] || 'bg-gray-100 text-gray-600'}`}>{category}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColor(category, categoryOptions)}`}>{category}</span>
                 <span className={`text-xs px-2 py-0.5 rounded ${priorityConfig[priority].bg} ${priorityConfig[priority].color}`}>
                   {priorityConfig[priority].label}
                 </span>
@@ -1012,7 +1164,9 @@ function TaskDetailModal({
                 Отмена
               </button>
             </div>
-            {confirmDelete ? (
+            {/* Delete is gated — a restricted/view-only role can edit
+                task status but can't permanently destroy a task. */}
+            {canDelete && (confirmDelete ? (
               <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-lg">
                 <span className="text-xs text-red-700 flex-1">Удалить задачу безвозвратно?</span>
                 <button
@@ -1036,7 +1190,7 @@ function TaskDetailModal({
                 <Trash2 className="w-4 h-4" />
                 Удалить задачу
               </button>
-            )}
+            ))}
           </div>
         </div>
       </div>
