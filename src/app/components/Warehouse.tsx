@@ -155,6 +155,14 @@ export function Warehouse({ language }: WarehouseProps) {
   // a new-team migration). Toggled via the import buttons in each tab.
   const [showProductImport, setShowProductImport] = useState(false);
   const [showSupplierImport, setShowSupplierImport] = useState(false);
+  // Production tab — search + status filter + sort. Empty defaults so
+  // users see everything until they narrow.
+  const [prodSearch, setProdSearch] = useState('');
+  const [prodStatusFilter, setProdStatusFilter] = useState<'all' | 'working' | 'started' | 'paused' | 'done'>('all');
+  const [prodSort, setProdSort] = useState<'date' | 'deadline' | 'progress' | 'amount'>('date');
+  // Materials tab — sort by qty/cost/value. Status filter (low/out)
+  // already lives via selectedCategory.
+  const [matSort, setMatSort] = useState<'name' | 'qty' | 'cost' | 'value' | 'status'>('name');
   // Default new-product category from the niche so the picker shows
   // sensible options (Плиты for furniture, Профиль for windows, etc.).
   const defaultCategory = niche.materialCategories[0] || 'Прочее';
@@ -542,9 +550,24 @@ export function Warehouse({ language }: WarehouseProps) {
   const categories = ['Все', ...new Set(store.products.map(p => p.category))];
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
 
-  const filtered = products
-    .filter(p => selectedCategory === 'Все' || p.category === selectedCategory)
-    .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Filter + sort. The default 'name' sort matches the previous
+  // alphabetical order (which is basically insertion order since names
+  // are user-typed); other modes are opt-in via the toolbar.
+  const filtered = useMemo(() => {
+    const arr = products
+      .filter(p => selectedCategory === 'Все' || p.category === selectedCategory)
+      .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const sorted = [...arr];
+    const statusRank: Record<string, number> = { outofstock: 0, low: 1, instock: 2 };
+    sorted.sort((a, b) => {
+      if (matSort === 'qty')    return a.quantity - b.quantity;
+      if (matSort === 'cost')   return b.cost - a.cost;
+      if (matSort === 'value')  return (b.quantity * b.cost) - (a.quantity * a.cost);
+      if (matSort === 'status') return (statusRank[a.status] ?? 3) - (statusRank[b.status] ?? 3);
+      return (a.name || '').localeCompare(b.name || ''); // 'name'
+    });
+    return sorted;
+  }, [products, selectedCategory, searchQuery, matSort]);
 
   const totalValue = products.reduce((s, p) => s + p.quantity * p.cost, 0);
   const lowCount = products.filter(p => p.status === 'low').length;
@@ -658,16 +681,86 @@ export function Warehouse({ language }: WarehouseProps) {
       </div>
 
       {/* ===== PRODUCTION VIEW ===== */}
-      {activeView === 'production' && (
-        <div className="space-y-5">
+      {activeView === 'production' && (() => {
+        // Filter + sort production orders by search query, status, sort key.
+        const q = prodSearch.trim().toLowerCase();
+        const filteredOrders = prodOrders
+          .filter(o => prodStatusFilter === 'all' || o.status === prodStatusFilter)
+          .filter(o => !q || (o.name || '').toLowerCase().includes(q)
+                          || (o.client || '').toLowerCase().includes(q)
+                          || (o.master || '').toLowerCase().includes(q));
+        const sortedOrders = [...filteredOrders].sort((a, b) => {
+          if (prodSort === 'progress') return b.progress - a.progress;
+          if (prodSort === 'deadline') return a.daysLeft - b.daysLeft;
+          if (prodSort === 'amount') {
+            const da = store.deals.find(d => d.id === a.dealId)?.amount || 0;
+            const db = store.deals.find(d => d.id === b.dealId)?.amount || 0;
+            return db - da;
+          }
+          // date — newest first by deal createdAt
+          const ta = store.deals.find(d => d.id === a.dealId)?.createdAt || '';
+          const tb = store.deals.find(d => d.id === b.dealId)?.createdAt || '';
+          return tb.localeCompare(ta);
+        });
+        return (
+        <div className="space-y-4">
+          {/* Toolbar — search, status chips, sort */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
+              <input
+                type="text"
+                value={prodSearch}
+                onChange={e => setProdSearch(e.target.value)}
+                placeholder={l('Поиск по клиенту, продукту, мастеру', 'Іздеу...', 'Search...')}
+                className="w-full pl-9 pr-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs focus:outline-none focus:bg-white"
+              />
+            </div>
+            <div className="flex gap-1 overflow-x-auto pb-0.5">
+              {([
+                { id: 'all',     label: l('Все', 'Барлығы', 'All') },
+                { id: 'started', label: l('Начали', 'Бастадық', 'Started') },
+                { id: 'working', label: l('В работе', 'Жұмыста', 'Working') },
+                { id: 'paused',  label: l('Пауза', 'Тоқтат.', 'Paused') },
+                { id: 'done',    label: l('Готово', 'Дайын', 'Done') },
+              ] as const).map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setProdStatusFilter(s.id as any)}
+                  className={`px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${
+                    prodStatusFilter === s.id
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-500 hover:bg-white/80'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <select
+              value={prodSort}
+              onChange={e => setProdSort(e.target.value as any)}
+              className="px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs text-slate-600 cursor-pointer flex-shrink-0"
+            >
+              <option value="date">{l('Дата ↓', 'Күн ↓', 'Date ↓')}</option>
+              <option value="deadline">{l('Срок', 'Мерзім', 'Deadline')}</option>
+              <option value="progress">{l('Прогресс ↓', 'Прогресс ↓', 'Progress ↓')}</option>
+              <option value="amount">{l('Сумма ↓', 'Сома ↓', 'Amount ↓')}</option>
+            </select>
+          </div>
+
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-900">{l('Заказы в производстве', 'Өндірістегі тапсырыстар', 'Production Orders')}</div>
-            <span className="text-[10px] text-slate-400">{prodOrders.length} {l('всего', 'барлығы', 'total')}</span>
+            <span className="text-[10px] text-slate-400">
+              {sortedOrders.length}
+              {sortedOrders.length !== prodOrders.length && <span className="text-slate-300"> / {prodOrders.length}</span>}
+              {' '}{l('всего', 'барлығы', 'total')}
+            </span>
           </div>
 
           {/* Order Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {prodOrders.map(o => {
+            {sortedOrders.map(o => {
               const conf = orderConf(o.status);
               const Icon = conf.icon;
               return (
@@ -806,16 +899,25 @@ export function Warehouse({ language }: WarehouseProps) {
                 </div>
               );
             })}
-            {prodOrders.length === 0 && (
+            {sortedOrders.length === 0 && (
               <div className="md:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
                 <Wrench className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                <div className="text-sm text-slate-900 mb-1">{l('Нет заказов в производстве', 'Өндірісте тапсырыс жоқ', 'No production orders')}</div>
-                <div className="text-xs text-slate-400">{l('Переведите сделку в статус «Производство» / «Сборка» — она появится здесь', 'Мәмілені «Өндіріс» / «Жинау» күйіне ауыстырыңыз — осында пайда болады', 'Move a deal to «Production» status to see it here')}</div>
+                <div className="text-sm text-slate-900 mb-1">
+                  {prodOrders.length === 0
+                    ? l('Нет заказов в производстве', 'Өндірісте тапсырыс жоқ', 'No production orders')
+                    : l('Ничего не найдено по фильтрам', 'Сүзгілер бойынша табылмады', 'Nothing matches filters')}
+                </div>
+                <div className="text-xs text-slate-400">
+                  {prodOrders.length === 0
+                    ? l('Переведите сделку в статус «Производство» — она появится здесь', 'Мәмілені «Өндіріс» күйіне ауыстырыңыз', 'Move a deal to «Production» status to see it here')
+                    : l('Сбросьте поиск или статус-фильтр', 'Сүзгіні тазалаңыз', 'Clear search or status filter')}
+                </div>
               </div>
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ===== MATERIALS VIEW ===== */}
       {activeView === 'materials' && (
@@ -934,6 +1036,20 @@ export function Warehouse({ language }: WarehouseProps) {
                 <Upload className="w-3.5 h-3.5" />
               </button>
             )}
+            {/* Sort dropdown for materials — qty/cost/value useful when
+                planning purchases or stock-takes. */}
+            <select
+              value={matSort}
+              onChange={e => setMatSort(e.target.value as any)}
+              className="px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-xl text-xs text-slate-600 cursor-pointer flex-shrink-0"
+              title={l('Сортировка', 'Сұрыптау', 'Sort')}
+            >
+              <option value="name">{l('A → Я', 'А → Я', 'A → Z')}</option>
+              <option value="qty">{l('Кол-во ↑', 'Саны ↑', 'Qty ↑')}</option>
+              <option value="cost">{l('Цена ↓', 'Бағасы ↓', 'Price ↓')}</option>
+              <option value="value">{l('Стоимость ↓', 'Құны ↓', 'Value ↓')}</option>
+              <option value="status">{l('Статус', 'Күй', 'Status')}</option>
+            </select>
           </div>
 
           {/* Materials Table */}
