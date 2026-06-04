@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, ArrowUpRight, ChevronRight, ShoppingBag, DollarSign, Users, Target, BarChart3, Percent, ArrowRight, Star, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUpRight, ChevronRight, ShoppingBag, DollarSign, Users, Target, BarChart3, Percent, ArrowRight, Star, X, Sparkles, Eye, Download } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AdAnalytics } from './AdAnalytics';
 import { t } from '../utils/translations';
 import { useDataStore } from '../utils/dataStore';
+import { getNiche } from '../utils/niches';
+
+type PeriodKey = 'month' | 'quarter' | 'year' | 'all';
 
 const TYPE_COLORS = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#22C55E', '#0EA5E9', '#6366F1', '#EAB308'];
 const SOURCE_COLORS: Record<string, string> = {
@@ -18,15 +21,55 @@ interface AnalyticsProps {
 
 export function Analytics({ language }: AnalyticsProps) {
   const store = useDataStore();
+  const niche = getNiche(store.niche);
+  // Aналитика — read-only по природе. Если матрица говорит 'none' для
+  // модуля analytics — раздел в сайдбаре скрыт, но если кто-то попадёт
+  // сюда по deeplink, отдадим понятный no-access экран вместо данных.
+  const analyticsLevel = store.getModuleLevel('analytics');
   const [activeTab, setActiveTab] = useState<'overview' | 'ads' | 'team'>('overview');
   const [selectedMaster, setSelectedMaster] = useState<string | null>(null);
+  const [period, setPeriod] = useState<PeriodKey>('all');
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
 
-  // Sales by month from completed income transactions + deal counts
+  // Period range — null = no filter (all time).
+  const periodRange = useMemo<[Date, Date] | null>(() => {
+    if (period === 'all') return null;
+    const now = new Date();
+    const start = new Date(now);
+    if (period === 'month')   start.setMonth(now.getMonth() - 1);
+    if (period === 'quarter') start.setMonth(now.getMonth() - 3);
+    if (period === 'year')    start.setFullYear(now.getFullYear() - 1);
+    start.setHours(0, 0, 0, 0);
+    return [start, now];
+  }, [period]);
+
+  const inPeriod = (iso: string | undefined): boolean => {
+    if (!periodRange || !iso) return !periodRange;
+    const t = new Date(iso).getTime();
+    return t >= periodRange[0].getTime() && t <= periodRange[1].getTime();
+  };
+
+  // Scoped data — only deals/transactions inside the picked period.
+  const scopedDeals = useMemo(
+    () => period === 'all' ? store.deals : store.deals.filter(d => inPeriod(d.createdAt) || inPeriod(d.date)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [store.deals, periodRange],
+  );
+
+  // Sales by month from completed income transactions + deal counts.
+  // Localized month names (was Cyrillic-only before).
   const monthlySales = useMemo(() => {
-    const monthNames = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+    const monthsByLang = {
+      ru:  ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'],
+      kz:  ['Қаң', 'Ақп', 'Нау', 'Сәу', 'Мам', 'Мау', 'Шіл', 'Там', 'Қыр', 'Қаз', 'Қар', 'Жел'],
+      eng: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    };
+    const monthNames = monthsByLang[language];
     const out: { month: string; revenue: number; orders: number }[] = [];
     const now = new Date();
-    for (let i = 5; i >= 0; i--) {
+    // Window: 12 months for quarter+/year+/all, 6 for month.
+    const windowMonths = period === 'month' ? 6 : 12;
+    for (let i = windowMonths - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const revenue = store.transactions
@@ -36,52 +79,82 @@ export function Analytics({ language }: AnalyticsProps) {
       out.push({ month: monthNames[d.getMonth()], revenue, orders });
     }
     return out;
-  }, [store.transactions, store.deals]);
+  }, [store.transactions, store.deals, language, period]);
 
-  // Furniture types breakdown
-  const furnitureData = useMemo(() => {
+  // Product types breakdown — niche-aware. Falls back to a generic
+  // "Прочее" bucket when a deal predates the niche feature and has no
+  // product type. Was hardcoded "Furniture Types" before.
+  const productTypeData = useMemo(() => {
     const map = new Map<string, number>();
-    store.deals.forEach(d => {
-      const key = d.furnitureType || 'Прочее';
+    scopedDeals.forEach(d => {
+      const key = (d.furnitureType || d.product || 'Прочее').trim() || 'Прочее';
       map.set(key, (map.get(key) || 0) + 1);
     });
-    const total = store.deals.length || 1;
+    const total = scopedDeals.length || 1;
     let i = 0;
-    return Array.from(map.entries()).map(([name, count]) => ({
-      name,
-      value: Math.round((count / total) * 100),
-      color: TYPE_COLORS[i++ % TYPE_COLORS.length],
-    }));
-  }, [store.deals]);
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, count]) => ({
+        name,
+        value: Math.round((count / total) * 100),
+        color: TYPE_COLORS[i++ % TYPE_COLORS.length],
+      }));
+  }, [scopedDeals]);
 
-  // Masters performance from employees + linked deals
+  // Team performance from employees + linked deals.
+  // Role label "Сборщик" was furniture-only — for ceiling/flooring/etc
+  // businesses we use the niche-specific installer label, plus generic
+  // CRM roles for non-production employees.
   const mastersData = useMemo(() => {
+    const nicheInstaller = niche.roleLabels.installer;
     const specMap: Record<string, { ru: string; kz: string; eng: string }> = {
       admin: { ru: 'Админ', kz: 'Әкімші', eng: 'Admin' },
       manager: { ru: 'Менеджер', kz: 'Менеджер', eng: 'Manager' },
-      designer: { ru: 'Дизайнер', kz: 'Дизайнер', eng: 'Designer' },
-      production: { ru: 'Сборщик', kz: 'Жинаушы', eng: 'Assembler' },
+      designer: niche.roleLabels.designer,
+      production: nicheInstaller,  // ← Сборщик / Монтажник / Укладчик / Установщик / Бригада
+      installer: nicheInstaller,
+      measurer: niche.roleLabels.measurer,
       sales: { ru: 'Продажник', kz: 'Сатушы', eng: 'Sales' },
       accountant: { ru: 'Бухгалтер', kz: 'Бухгалтер', eng: 'Accountant' },
     };
+    // Helper for MoM trend — compares this month's revenue to last month
+    // by income transactions linked via deal.ownerId. Was hardcoded to 0
+    // which made every employee look like they were failing (-0% red).
+    const now = new Date();
+    const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthKey = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
     return store.employees.map(e => {
-      const linked = store.deals.filter(d => d.measurer === e.name || d.designer === e.name);
-      const revenue = linked.reduce((s, d) => s + d.amount, 0);
+      const linked = scopedDeals.filter(d =>
+        d.measurer === e.name || d.designer === e.name || (d.ownerId && d.ownerId === e.id),
+      );
+      const revenue = linked.reduce((s, d) => s + (d.amount || 0), 0);
       const orders = linked.length;
       const avgCheck = orders ? Math.round(revenue / orders) : 0;
-      const plan = e.salary * 25;
+      const thisMonthRev = linked.filter(d => (d.createdAt || '').startsWith(thisMonthKey)).reduce((s, d) => s + (d.amount || 0), 0);
+      const lastMonthRev = linked.filter(d => (d.createdAt || '').startsWith(lastMonthKey)).reduce((s, d) => s + (d.amount || 0), 0);
+      const trend = lastMonthRev > 0
+        ? Math.round(((thisMonthRev - lastMonthRev) / lastMonthRev) * 100)
+        : (thisMonthRev > 0 ? 100 : 0);
+      const trendAmount = thisMonthRev - lastMonthRev;
+      // Plan is OPTIONAL — based on salary × 25 (a furniture-team convention).
+      // Show only when salary is set, hide gracefully otherwise so we don't
+      // mock revenue plans for employees who never had one.
+      const hasPlan = e.salary > 0;
+      const plan = hasPlan ? e.salary * 25 : 0;
       const planProgress = plan ? Math.min(100, Math.round((revenue / plan) * 100)) : 0;
       return {
         name: e.name,
         avatar: e.avatar || e.name.slice(0, 1),
         specialization: specMap[e.role] || { ru: e.role, kz: e.role, eng: e.role },
         orders, revenue, avgCheck,
-        trend: 0, trendAmount: 0,
-        plan, planProgress,
+        trend, trendAmount,
+        plan, planProgress, hasPlan,
         rating: e.performance.rating, reviewsCount: e.performance.ordersCompleted,
       };
     });
-  }, [store.employees, store.deals]);
+  }, [store.employees, scopedDeals, niche]);
 
   // Client sources from deals
   const sources = useMemo(() => {
@@ -105,21 +178,48 @@ export function Analytics({ language }: AnalyticsProps) {
     return ranked.map(p => ({ name: p.name, pct: Math.round(((p.cost * p.quantity) / maxVal) * 100) }));
   }, [store.products]);
 
-  const totalOrders = store.deals.length;
-  const totalRevenue = store.getTotalRevenue();
-  const avgCheck = store.getAverageCheck();
-  const conversion = store.deals.length
-    ? Math.round((store.deals.filter(d => d.status === 'completed').length / store.deals.length) * 100)
+  // KPIs scoped to the period filter (was always all-time).
+  const totalOrders = scopedDeals.length;
+  const totalRevenue = useMemo(() =>
+    store.transactions.filter(t => t.type === 'income' && t.status === 'completed' && inPeriod(t.date))
+      .reduce((s, t) => s + t.amount, 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [store.transactions, periodRange]);
+  const avgCheck = useMemo(() => {
+    const withAmount = scopedDeals.filter(d => d.amount > 0);
+    return withAmount.length ? Math.round(withAmount.reduce((s, d) => s + d.amount, 0) / withAmount.length) : 0;
+  }, [scopedDeals]);
+  const conversion = scopedDeals.length
+    ? Math.round((scopedDeals.filter(d => d.status === 'completed').length / scopedDeals.length) * 100)
     : 0;
-
-  const l = (ru: string, kz: string, eng: string) =>
-    language === 'kz' ? kz : language === 'eng' ? eng : ru;
 
   const tabs = {
     overview: { kz: 'Шолу',     ru: 'Обзор',   eng: 'Overview' },
     team:     { kz: 'Команда',  ru: 'Команда', eng: 'Team' },
     ads:      { kz: 'Жарнама',  ru: 'Реклама', eng: 'Ads' },
   };
+
+  // Defensive view-gate. If a role has analytics='none', deeplinks to
+  // this route get a clear no-access screen instead of zeroed charts.
+  if (analyticsLevel === 'none') {
+    return (
+      <div className="min-h-full relative flex items-center justify-center p-8">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-10 max-w-md text-center">
+          <Eye className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-lg text-slate-900 mb-1 tracking-tight">
+            {l('Нет доступа', 'Қол жетімсіз', 'No access')}
+          </h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            {l(
+              'У вашей роли нет прав на просмотр аналитики. Попросите администратора открыть модуль.',
+              'Сіздің рөліңізде аналитиканы қарау құқығы жоқ.',
+              'Your role does not have access to analytics. Ask an admin to enable it.',
+            )}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -129,7 +229,11 @@ export function Analytics({ language }: AnalyticsProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
         <div>
-          <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{t('analytics', language)}</p>
+          <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">
+            {t('analytics', language)}
+            {' · '}
+            <span className="normal-case tracking-normal text-slate-500">{niche.icon} {niche.name[language]}</span>
+          </p>
           <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight mb-0">
             {language === 'kz' ? 'Сатылымдар мен тиімділік' : language === 'eng' ? 'Sales & Performance' : 'Продажи и эффективность'}
           </h1>
@@ -156,23 +260,154 @@ export function Analytics({ language }: AnalyticsProps) {
         </div>
       </div>
 
+      {/* Period filter — affects all KPIs / charts / funnel on Overview.
+          Also hosts the CSV export of the current period summary. */}
+      {activeTab === 'overview' && store.deals.length > 0 && (
+        <div className="flex items-center gap-1 mb-6 flex-wrap">
+          {(['month', 'quarter', 'year', 'all'] as PeriodKey[]).map(p => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-3 py-1.5 rounded-2xl text-[11px] transition-all ${
+                period === p
+                  ? 'bg-emerald-600 text-white shadow-[0_4px_12px_-2px_var(--accent-shadow)] ring-1 ring-white/10'
+                  : 'bg-white/50 text-slate-600 ring-1 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+              }`}
+            >
+              {p === 'month'   ? l('Месяц',    'Ай',     'Month')
+               : p === 'quarter' ? l('Квартал',  'Тоқсан', 'Quarter')
+               : p === 'year'    ? l('Год',     'Жыл',    'Year')
+               :                    l('Всё время','Барлық', 'All time')}
+            </button>
+          ))}
+          <button
+            onClick={() => {
+              // Build a CSV snapshot of the current period — KPIs, monthly
+              // sales, product type breakdown, sources, team performance.
+              // Localized headers + UTF-8 BOM so Excel/Numbers in KZ/RU/EN
+              // open it cleanly.
+              const rows: string[] = [];
+              const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+              const periodLabel =
+                period === 'month'   ? l('Месяц', 'Ай', 'Month')
+                : period === 'quarter' ? l('Квартал', 'Тоқсан', 'Quarter')
+                : period === 'year'    ? l('Год', 'Жыл', 'Year')
+                :                        l('Всё время', 'Барлық', 'All time');
+              rows.push(`# ${l('Аналитика', 'Аналитика', 'Analytics')} · ${niche.name[language]} · ${periodLabel}`);
+              rows.push('');
+              rows.push(`# ${l('Ключевые метрики', 'Негізгі метрикалар', 'Key metrics')}`);
+              rows.push([l('Метрика', 'Метрика', 'Metric'), l('Значение', 'Мән', 'Value')].map(esc).join(','));
+              rows.push([l('Всего заказов', 'Тапсырыстар', 'Total orders'), totalOrders].map(esc).join(','));
+              rows.push([l('Выручка ₸', 'Түсім ₸', 'Revenue KZT'), totalRevenue].map(esc).join(','));
+              rows.push([l('Средний чек ₸', 'Орташа чек ₸', 'Avg check KZT'), avgCheck].map(esc).join(','));
+              rows.push([l('Конверсия %', 'Конверсия %', 'Conversion %'), conversion].map(esc).join(','));
+              rows.push('');
+              rows.push(`# ${l('Продажи по месяцам', 'Ай бойынша сатылым', 'Sales by month')}`);
+              rows.push([l('Месяц', 'Ай', 'Month'), l('Выручка ₸', 'Түсім ₸', 'Revenue KZT'), l('Заказы', 'Тапсырыстар', 'Orders')].map(esc).join(','));
+              monthlySales.forEach(m => rows.push([m.month, m.revenue, m.orders].map(esc).join(',')));
+              rows.push('');
+              rows.push(`# ${niche.productTypeLabel[language]}`);
+              rows.push([l('Тип', 'Түрі', 'Type'), l('Доля %', 'Үлес %', 'Share %')].map(esc).join(','));
+              productTypeData.forEach(t => rows.push([t.name, t.value].map(esc).join(',')));
+              rows.push('');
+              rows.push(`# ${l('Источники клиентов', 'Клиент көздері', 'Client sources')}`);
+              rows.push([l('Источник', 'Көз', 'Source'), l('Доля %', 'Үлес %', 'Share %')].map(esc).join(','));
+              sources.forEach(s => rows.push([s.name, s.value].map(esc).join(',')));
+              rows.push('');
+              rows.push(`# ${l('Эффективность команды', 'Команда тиімділігі', 'Team performance')}`);
+              rows.push([
+                l('Сотрудник', 'Қызметкер', 'Employee'),
+                l('Заказы', 'Тапсырыстар', 'Orders'),
+                l('Выручка ₸', 'Түсім ₸', 'Revenue KZT'),
+                l('Средний чек ₸', 'Орташа чек ₸', 'Avg check KZT'),
+                l('Тренд %', 'Үрдіс %', 'Trend %'),
+                l('План ₸', 'Жоспар ₸', 'Plan KZT'),
+                l('% от плана', 'Жоспардан %', '% of plan'),
+              ].map(esc).join(','));
+              mastersData.forEach(m => rows.push([
+                m.name, m.orders, m.revenue, m.avgCheck, m.trend,
+                m.hasPlan ? m.plan : '—',
+                m.hasPlan ? m.planProgress : '—',
+              ].map(esc).join(',')));
+              const csv = '﻿' + rows.join('\n');
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              const today = new Date().toISOString().slice(0, 10);
+              a.href = url;
+              a.download = `analytics-${period}-${today}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-[11px] bg-white/50 text-slate-600 ring-1 ring-white/60 hover:bg-white/80 backdrop-blur-xl transition-all"
+            title={l('Экспорт сводки в CSV', 'CSV-қа экспорт', 'Export summary to CSV')}
+          >
+            <Download className="w-3.5 h-3.5" />
+            {l('Экспорт CSV', 'CSV экспорт', 'Export CSV')}
+          </button>
+        </div>
+      )}
+
       {activeTab === 'ads' && store.getModuleLevel('marketing') !== 'none' ? (
         <AdAnalytics language={language} />
       ) : activeTab === 'team' ? (
         <TeamMetrics language={language} />
+      ) : store.deals.length === 0 ? (
+        // Empty-state hero — fresh user with no data sees a single CTA
+        // card instead of a wall of zeroed KPIs + broken donut + zero-
+        // width funnel that looks like a load error.
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+          <div className="text-5xl mb-3">{niche.icon}</div>
+          <h2 className="text-xl text-slate-900 mb-2 tracking-tight">
+            {l('Графики и метрики появятся автоматически', 'Графиктер мен метрикалар автоматты түрде шығады', 'Charts appear automatically')}
+          </h2>
+          <p className="text-sm text-slate-500 mb-5 max-w-md mx-auto leading-relaxed">
+            {l(
+              `Аналитика считается из сделок, оплат и задач команды. Создайте первую сделку — выручка, конверсия, воронка и эффективность сотрудников оживут сразу.`,
+              'Аналитика мәмілелерден есептеледі. Бірінші мәмілені жасаңыз — деректер бірден пайда болады.',
+              'Analytics is computed from deals, payments and team tasks. Create the first deal — KPIs come alive.',
+            )}
+          </p>
+          <div className="flex items-center gap-2 justify-center flex-wrap">
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'sales' } }))}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+            >
+              <ShoppingBag className="w-3.5 h-3.5" /> {l('Открыть Заказы', 'Тапсырыстар', 'Open Orders')}
+            </button>
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('ai-assistant:open', { detail: {
+                prompt: l(
+                  `Сделай аналитику для ниши «${niche.name.ru}» — что важно отслеживать первый месяц?`,
+                  `«${niche.name.kz}» салаға қандай метрикалар маңызды?`,
+                  `What metrics matter most in the first month for "${niche.name.eng}"?`,
+                ),
+              }}))}
+              className="flex items-center gap-2 px-4 py-2.5 bg-violet-600/90 hover:bg-violet-700 text-white rounded-2xl text-xs ring-1 ring-white/10 transition-all"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> {l('Спросить AI', 'AI-ден сұрау', 'Ask AI')}
+            </button>
+          </div>
+        </div>
       ) : (
         <>
-          {/* Metric Cards */}
+          {/* Metric Cards — each card deeplinks to the source module so the
+              user can drill from a KPI down to the underlying records. */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {[
-              { label: language === 'kz' ? 'Тапсырыстар' : language === 'eng' ? 'Total Orders' : 'Всего заказов', value: totalOrders.toString(), icon: ShoppingBag },
-              { label: language === 'kz' ? 'Түсім' : language === 'eng' ? 'Revenue' : 'Выручка', value: totalRevenue ? `${(totalRevenue / 1000000).toFixed(1)}М ₸` : '0 ₸', icon: DollarSign },
-              { label: language === 'kz' ? 'Орташа чек' : language === 'eng' ? 'Avg Check' : 'Средний чек', value: avgCheck ? `${(avgCheck / 1000).toFixed(0)}K ₸` : '0 ₸', icon: Target },
-              { label: language === 'kz' ? 'Конверсия' : language === 'eng' ? 'Conversion' : 'Конверсия', value: `${conversion}%`, icon: Percent },
+              { label: language === 'kz' ? 'Тапсырыстар' : language === 'eng' ? 'Total Orders' : 'Всего заказов', value: totalOrders.toString(), icon: ShoppingBag, page: 'sales' },
+              { label: language === 'kz' ? 'Түсім' : language === 'eng' ? 'Revenue' : 'Выручка', value: totalRevenue ? `${(totalRevenue / 1000000).toFixed(1)}М ₸` : '0 ₸', icon: DollarSign, page: 'payments' },
+              { label: language === 'kz' ? 'Орташа чек' : language === 'eng' ? 'Avg Check' : 'Средний чек', value: avgCheck ? `${(avgCheck / 1000).toFixed(0)}K ₸` : '0 ₸', icon: Target, page: 'sales' },
+              { label: language === 'kz' ? 'Конверсия' : language === 'eng' ? 'Conversion' : 'Конверсия', value: `${conversion}%`, icon: Percent, page: 'sales' },
             ].map((card, i) => {
               const Icon = card.icon;
               return (
-                <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+                <button
+                  key={i}
+                  onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: card.page } }))}
+                  className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 text-left hover:bg-white/70 hover:shadow-lg transition-all"
+                  title={l('Перейти к деталям', 'Толығырақ көру', 'View details')}
+                >
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs text-gray-400">{card.label}</span>
                     <div className="w-9 h-9 bg-white/60 ring-1 ring-white/60 rounded-2xl flex items-center justify-center">
@@ -180,10 +415,11 @@ export function Analytics({ language }: AnalyticsProps) {
                     </div>
                   </div>
                   <div className="text-xl text-gray-900 mb-1">{card.value}</div>
-                  <div className="text-[11px] text-gray-400">
+                  <div className="text-[11px] text-gray-400 flex items-center gap-1">
                     {language === 'kz' ? 'нақты деректер' : language === 'eng' ? 'live data' : 'актуальные данные'}
+                    <ArrowUpRight className="w-3 h-3 opacity-50" />
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -224,22 +460,23 @@ export function Analytics({ language }: AnalyticsProps) {
               </ResponsiveContainer>
             </div>
 
-            {/* Furniture Types - Donut */}
+            {/* Product Types — Donut. Title is niche-aware so a windows
+                business doesn't see "Типы мебели" anywhere. */}
             <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
               <div className="text-sm text-gray-900 mb-4">
-                {language === 'kz' ? 'Жиһаз түрлері' : language === 'eng' ? 'Furniture Types' : 'Типы мебели'}
+                {niche.productTypeLabel[language]}
               </div>
               <div className="flex items-center justify-center mb-4">
                 <div className="relative">
                   <PieChart width={160} height={160}>
                     <Pie
-                      data={furnitureData}
+                      data={productTypeData}
                       cx={80} cy={80}
                       innerRadius={50} outerRadius={72}
                       dataKey="value"
                       strokeWidth={0}
                     >
-                      {furnitureData.map((entry) => (
+                      {productTypeData.map((entry) => (
                         <Cell key={entry.name} fill={entry.color} />
                       ))}
                     </Pie>
@@ -255,7 +492,7 @@ export function Analytics({ language }: AnalyticsProps) {
                 </div>
               </div>
               <div className="space-y-2">
-                {furnitureData.map((item, i) => (
+                {productTypeData.map((item, i) => (
                   <div key={i} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
@@ -270,13 +507,43 @@ export function Analytics({ language }: AnalyticsProps) {
 
           {/* Masters + Sources */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            {/* Masters */}
+            {/* Team performance — niche-neutral header (was "Эффективность мастеров"
+                which only made sense for furniture). */}
             <div className="lg:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
               <div className="flex items-center justify-between mb-5">
                 <div className="text-sm text-gray-900">
-                  {language === 'kz' ? 'Шеберлер тиімділігі' : language === 'eng' ? 'Masters Performance' : 'Эффективность мастеров'}
+                  {l('Эффективность команды', 'Команда тиімділігі', 'Team Performance')}
                 </div>
+                {mastersData.length > 0 && (
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'settings', tab: 'team' } }))}
+                    className="text-[11px] text-gray-500 hover:text-gray-900 transition-colors"
+                  >
+                    {l('Настройки команды →', 'Команда баптаулары →', 'Team settings →')}
+                  </button>
+                )}
               </div>
+              {mastersData.length === 0 ? (
+                <div className="text-center py-10">
+                  <Users className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                  <div className="text-sm text-gray-700 mb-1">
+                    {l('В команде ещё никого', 'Командада әзірге ешкім жоқ', 'No teammates yet')}
+                  </div>
+                  <div className="text-xs text-gray-400 mb-4 max-w-xs mx-auto leading-relaxed">
+                    {l(
+                      'Добавьте сотрудников в Настройках — выручка, заказы и план каждого появятся здесь.',
+                      'Баптаулар бөлімінен қызметкерлерді қосыңыз — деректер автоматты түрде шығады.',
+                      'Add teammates in Settings — revenue and plan progress will appear here.',
+                    )}
+                  </div>
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'settings', tab: 'team' } }))}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 ring-1 ring-white/10 transition-all"
+                  >
+                    {l('Открыть Настройки', 'Баптаулар', 'Open Settings')}
+                  </button>
+                </div>
+              ) : (
               <div className="space-y-3">
                 {mastersData.map((master, i) => {
                   const spec = master.specialization[language === 'kz' ? 'kz' : language === 'eng' ? 'eng' : 'ru'];
@@ -308,7 +575,7 @@ export function Analytics({ language }: AnalyticsProps) {
                             <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-6 w-[90vw] max-w-md z-50">
                               <div className="flex items-start justify-between mb-4">
                                 <Dialog.Title className="text-base text-gray-900">
-                                  {l('Профиль мастера', 'Шебер профилі', 'Master profile')}: {master.name}
+                                  {l('Профиль сотрудника', 'Қызметкер профилі', 'Employee profile')}: {master.name}
                                 </Dialog.Title>
                                 <Dialog.Close asChild>
                                   <button className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -377,84 +644,142 @@ export function Analytics({ language }: AnalyticsProps) {
                         </div>
                       </div>
 
-                      {/* Нижняя часть: План */}
-                      <div className="pt-3 border-t border-white/60">
-                        <div className="flex items-center justify-between mb-1.5">
+                      {/* Plan section is OPTIONAL — we only render when the
+                          employee has a salary on file (plan = salary × 25).
+                          Otherwise show a neutral "no plan" hint so the card
+                          doesn't fake a 0% red progress bar. */}
+                      {master.hasPlan ? (
+                        <div className="pt-3 border-t border-white/60">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="text-[11px] text-gray-400">
+                              {l('План на месяц', 'Айлық жоспар', 'Monthly plan')}
+                            </div>
+                            <div className="text-[11px] text-gray-900">
+                              {(master.revenue / 1000000).toFixed(1)}М / {(master.plan / 1000000).toFixed(0)}М ₸
+                            </div>
+                          </div>
+                          <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1">
+                            <div className={`h-full rounded-full ${planColor}`} style={{ width: `${planPct}%` }} />
+                          </div>
+                          <div className="text-[10px] text-gray-400 text-right">
+                            {planPct}% {l('от плана', 'жоспардан', 'of plan')}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pt-3 border-t border-white/60">
                           <div className="text-[11px] text-gray-400">
-                            {l('План на месяц', 'Айлық жоспар', 'Monthly plan')}
+                            {l(
+                              'План не задан — укажите оклад сотрудника в Настройках, чтобы появилась цель на месяц.',
+                              'Жоспар орнатылмаған — Баптаулар бөлімінен жалақыны енгізіңіз.',
+                              'No plan — set salary in Settings to enable monthly target.',
+                            )}
                           </div>
-                          <div className="text-[11px] text-gray-900">
-                            {(master.revenue / 1000000).toFixed(1)}М / {(master.plan / 1000000).toFixed(0)}М ₸
-                          </div>
                         </div>
-                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1">
-                          <div className={`h-full rounded-full ${planColor}`} style={{ width: `${planPct}%` }} />
-                        </div>
-                        <div className="text-[10px] text-gray-400 text-right">
-                          {planPct}% {l('от плана', 'жоспардан', 'of plan')}
-                        </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
+              )}
             </div>
 
-            {/* Sources */}
+            {/* Sources — empty state when no deals carry a source tag */}
             <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
               <div className="text-sm text-gray-900 mb-5">
                 {language === 'kz' ? 'Клиент көздері' : language === 'eng' ? 'Client Sources' : 'Источники клиентов'}
               </div>
-              <div className="space-y-4">
-                {sources.map((src, i) => (
-                  <div key={i}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: src.color }} />
-                        <span className="text-xs text-gray-600">{src.name}</span>
-                      </div>
-                      <span className="text-xs text-gray-900">{src.value}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${src.value}%`, backgroundColor: src.color }} />
-                    </div>
+              {sources.length === 0 ? (
+                <div className="text-center py-6">
+                  <div className="text-xs text-gray-500 mb-1">
+                    {l('Нет данных по источникам', 'Көздер бойынша деректер жоқ', 'No source data')}
                   </div>
-                ))}
-              </div>
+                  <div className="text-[11px] text-gray-400 leading-relaxed">
+                    {l(
+                      'Укажите «Откуда клиент» при создании сделки — здесь появятся Instagram, WhatsApp, Telegram и др.',
+                      'Мәміле жасағанда «Клиент көзі» өрісін толтырыңыз.',
+                      'Set "Source" on new deals — channels will appear here.',
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {sources.map((src, i) => (
+                    <div key={i}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: src.color }} />
+                          <span className="text-xs text-gray-600">{src.name}</span>
+                        </div>
+                        <span className="text-xs text-gray-900">{src.value}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${src.value}%`, backgroundColor: src.color }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Sales Funnel with conversions */}
+          {/* Sales Funnel with conversions — period-scoped + NaN-guarded */}
           {(() => {
-            const newLeads = store.deals.filter(d => d.status === 'new').length;
-            const qualified = store.deals.filter(d => ['measured', 'project-agreed', 'contract'].includes(d.status)).length;
-            const inProd = store.deals.filter(d => ['production', 'assembly'].includes(d.status)).length;
-            const sold = store.deals.filter(d => d.status === 'completed').length;
-            const totalForFunnel = Math.max(1, newLeads + qualified + inProd + sold);
+            const newLeads = scopedDeals.filter(d => d.status === 'new').length;
+            const qualified = scopedDeals.filter(d => ['measured', 'project-agreed', 'contract'].includes(d.status)).length;
+            // Production stage list is niche-aware: assembly only counts for
+            // niches that have it. For ceilings / blinds / doors the
+            // production bucket includes their respective in-progress
+            // statuses without claiming furniture-specific assembly.
+            const inProd = scopedDeals.filter(d => ['production', 'assembly', 'installation', 'manufacturing'].includes(d.status)).length;
+            const sold = scopedDeals.filter(d => d.status === 'completed').length;
+            const maxStage = Math.max(1, newLeads, qualified, inProd, sold);
             const stages = [
-              { label: language === 'kz' ? 'Жаңа лидтер' : language === 'eng' ? 'New leads' : 'Новые лиды', value: newLeads, color: 'bg-blue-500', w: 100 },
-              { label: language === 'kz' ? 'Білікті лидтер' : language === 'eng' ? 'Qualified' : 'Квал. лиды', value: qualified, color: 'bg-blue-400', w: Math.round((qualified / totalForFunnel) * 100) },
-              { label: language === 'kz' ? 'Өндірісте' : language === 'eng' ? 'In production' : 'В производстве', value: inProd, color: 'bg-purple-500', w: Math.round((inProd / totalForFunnel) * 100) },
-              { label: language === 'kz' ? 'Сатылым' : language === 'eng' ? 'Sales' : 'Продажи', value: sold, color: 'bg-emerald-500', w: Math.round((sold / totalForFunnel) * 100) },
-            ];
+              { label: l('Новые лиды',  'Жаңа лидтер',     'New leads'),     value: newLeads,  color: 'bg-blue-500' },
+              { label: l('Квал. лиды',  'Білікті лидтер',  'Qualified'),     value: qualified, color: 'bg-blue-400' },
+              { label: l('В работе',    'Жұмыста',         'In progress'),   value: inProd,    color: 'bg-purple-500' },
+              { label: l('Продажи',     'Сатылым',         'Sales'),         value: sold,      color: 'bg-emerald-500' },
+            ].map(s => ({ ...s, w: Math.round((s.value / maxStage) * 100) }));
+            // Auto-generated insights — find the weakest stage transition
+            // and surface it as a hint. Lights up when conversion < 30%.
             const insights: string[] = [];
+            for (let i = 0; i < stages.length - 1; i++) {
+              const s = stages[i], next = stages[i + 1];
+              if (s.value > 0 && next.value / s.value < 0.3) {
+                insights.push(l(
+                  `Потери на этапе «${s.label} → ${next.label}»: ${(100 - (next.value / s.value) * 100).toFixed(0)}%. Стоит разобрать почему лиды не доходят.`,
+                  `«${s.label} → ${next.label}» кезеңінде жоғалту көп.`,
+                  `High drop at "${s.label} → ${next.label}": ${(100 - (next.value / s.value) * 100).toFixed(0)}%.`,
+                ));
+              }
+            }
             return (
               <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 mb-6">
                 <div className="flex items-center justify-between mb-5">
                   <div>
-                    <div className="text-sm text-gray-900">{language === 'kz' ? 'Воронка: көрсетуден сатылымға дейін' : language === 'eng' ? 'Funnel: from impression to sale' : 'Воронка: от показа до продажи'}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">{language === 'kz' ? 'Конверсиялар мен жоғалулар' : language === 'eng' ? 'Conversions and losses' : 'Конверсии и потери'}</div>
+                    <div className="text-sm text-gray-900">{l('Воронка: от показа до продажи', 'Воронка: көрсетуден сатылымға дейін', 'Funnel: from impression to sale')}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{l('Конверсии и потери', 'Конверсиялар мен жоғалулар', 'Conversions and losses')}</div>
                   </div>
-                  <button className="text-xs text-slate-700 px-3 py-1.5 bg-white/60 ring-1 ring-white/60 rounded-xl hover:bg-white">
-                    {language === 'kz' ? 'Не жақсартуға болады?' : language === 'eng' ? 'What to improve?' : 'Что улучшить?'}
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('ai-assistant:open', { detail: {
+                      prompt: l(
+                        `Проанализируй мою воронку продаж для ниши «${niche.name.ru}». Конкретные шаги: ${stages.map(s => `${s.label} — ${s.value}`).join(', ')}. Что улучшить?`,
+                        `Менің сату воронкамды талда. Не жақсартуға болады?`,
+                        `Analyze my sales funnel. What to improve?`,
+                      ),
+                    }}))}
+                    className="text-xs text-violet-700 px-3 py-1.5 bg-violet-50 ring-1 ring-violet-200/60 rounded-xl hover:bg-violet-100 flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    {l('Что улучшить?', 'Не жақсартуға болады?', 'What to improve?')}
                   </button>
                 </div>
 
                 <div className="space-y-2">
                   {stages.map((s, i) => {
                     const next = stages[i + 1];
-                    const conv = next ? (next.value / s.value) * 100 : null;
-                    const lost = next ? s.value - next.value : 0;
+                    // NaN guard — was producing "0/0 = NaN%" when stage was empty.
+                    const conv = next && s.value > 0 ? (next.value / s.value) * 100 : null;
+                    const lost = next && s.value > 0 ? s.value - next.value : 0;
                     return (
                       <div key={i}>
                         <div className="flex items-center gap-3">
@@ -464,7 +789,7 @@ export function Analytics({ language }: AnalyticsProps) {
                               <span className="text-xs text-gray-900">{s.value.toLocaleString('ru-RU')}</span>
                             </div>
                             <div className="h-7 bg-white/60 ring-1 ring-white/60 rounded-xl overflow-hidden">
-                              <div className={`h-full ${s.color} rounded-lg`} style={{ width: `${s.w}%` }} />
+                              <div className={`h-full ${s.color} rounded-lg`} style={{ width: `${Math.max(2, s.w)}%` }} />
                             </div>
                           </div>
                         </div>
@@ -472,10 +797,12 @@ export function Analytics({ language }: AnalyticsProps) {
                           <div className="flex items-center gap-2 py-2 pl-3 text-[11px]">
                             <span className="text-gray-400">→</span>
                             <span className="text-gray-700">{conv.toFixed(1)}%</span>
-                            <span className="text-red-500">
-                              {language === 'kz' ? `жоғалту: ${lost.toLocaleString('ru-RU')}` : language === 'eng' ? `lost: ${lost.toLocaleString('ru-RU')}` : `теряем ${lost.toLocaleString('ru-RU')}`}
-                              {' '}({(100 - conv).toFixed(1)}%)
-                            </span>
+                            {lost > 0 && (
+                              <span className="text-red-500">
+                                {l(`теряем ${lost.toLocaleString('ru-RU')}`, `жоғалту: ${lost.toLocaleString('ru-RU')}`, `lost: ${lost.toLocaleString('ru-RU')}`)}
+                                {' '}({(100 - conv).toFixed(1)}%)
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -485,9 +812,9 @@ export function Analytics({ language }: AnalyticsProps) {
 
                 <div className="mt-5 space-y-2">
                   {insights.map((txt, i) => (
-                    <div key={i} className="flex items-start gap-2 px-3 py-2.5 bg-red-50 border border-red-100 rounded-xl">
-                      <span className="text-red-500 text-xs flex-shrink-0">⚠</span>
-                      <span className="text-xs text-red-700 leading-relaxed">{txt}</span>
+                    <div key={i} className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-100 rounded-xl">
+                      <span className="text-amber-600 text-xs flex-shrink-0">💡</span>
+                      <span className="text-xs text-amber-800 leading-relaxed">{txt}</span>
                     </div>
                   ))}
                 </div>
@@ -523,27 +850,58 @@ export function Analytics({ language }: AnalyticsProps) {
               </div>
             </div>
 
-            {/* Popular Materials */}
+            {/* Popular Materials — empty state with Warehouse deeplink */}
             <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
-              <div className="text-sm text-gray-900 mb-5">
-                {language === 'kz' ? 'Танымал материалдар' : language === 'eng' ? 'Popular Materials' : 'Популярные материалы'}
+              <div className="flex items-center justify-between mb-5">
+                <div className="text-sm text-gray-900">
+                  {language === 'kz' ? 'Танымал материалдар' : language === 'eng' ? 'Popular Materials' : 'Популярные материалы'}
+                </div>
+                {materials.length > 0 && (
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'warehouse' } }))}
+                    className="text-[11px] text-gray-500 hover:text-gray-900 transition-colors"
+                  >
+                    {l('Склад →', 'Қойма →', 'Warehouse →')}
+                  </button>
+                )}
               </div>
-              <div className="space-y-3">
-                {materials.map((mat, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className="text-[10px] text-gray-400 w-4 text-right">{i + 1}</span>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-700">{mat.name}</span>
-                        <span className="text-xs text-gray-900">{mat.pct}%</span>
-                      </div>
-                      <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-gray-900 rounded-full" style={{ width: `${mat.pct}%` }} />
+              {materials.length === 0 ? (
+                <div className="text-center py-6">
+                  <div className="text-xs text-gray-500 mb-1">
+                    {l('Склад пуст', 'Қойма бос', 'Warehouse is empty')}
+                  </div>
+                  <div className="text-[11px] text-gray-400 mb-3 leading-relaxed">
+                    {l(
+                      'Загрузите материалы — рейтинг по обороту появится автоматически.',
+                      'Материалдарды қосыңыз — рейтинг автоматты түрде шығады.',
+                      'Add materials — rotation ranking will appear automatically.',
+                    )}
+                  </div>
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'warehouse' } }))}
+                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[11px] hover:bg-emerald-700 ring-1 ring-white/10 transition-all"
+                  >
+                    {l('Открыть Склад', 'Қойманы ашу', 'Open Warehouse')}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {materials.map((mat, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="text-[10px] text-gray-400 w-4 text-right">{i + 1}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-700">{mat.name}</span>
+                          <span className="text-xs text-gray-900">{mat.pct}%</span>
+                        </div>
+                        <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-gray-900 rounded-full" style={{ width: `${mat.pct}%` }} />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </>
