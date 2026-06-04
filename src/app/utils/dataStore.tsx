@@ -193,6 +193,12 @@ export interface Product {
   cost: number;
   status: 'instock' | 'low' | 'outofstock';
   minQty: number;
+  // Niche tag — optional. Lets multi-niche teams mark which direction
+  // a material belongs to (e.g. ПВХ-профиль → windows, петля → doors)
+  // so the warehouse can be filtered by direction. Empty / undefined
+  // means "applies to all niches" — common for hardware that's used
+  // across multiple product lines (screws, dowels, sealants).
+  niche?: string;
 }
 
 export interface FinanceTransaction {

@@ -178,6 +178,38 @@ export function Analytics({ language }: AnalyticsProps) {
     return ranked.map(p => ({ name: p.name, pct: Math.round(((p.cost * p.quantity) / maxVal) * 100) }));
   }, [store.products]);
 
+  // Niche breakdown — for multi-niche teams only. Aggregates orders +
+  // revenue per direction (deal.niche || team primary). Renders as a
+  // dedicated section that's hidden for single-niche teams to avoid
+  // clutter. Revenue here comes from deal.amount (not paid transactions)
+  // because we want to compare pipeline sizes across directions, not
+  // cash collection.
+  const nicheBreakdown = useMemo(() => {
+    if (store.secondaryNiches.length === 0) return [] as Array<{ id: string; name: string; icon: string; orders: number; revenue: number; pct: number }>;
+    const totals = new Map<string, { orders: number; revenue: number }>();
+    for (const id of store.allNiches) totals.set(id, { orders: 0, revenue: 0 });
+    for (const d of scopedDeals) {
+      const id = d.niche || store.niche;
+      const slot = totals.get(id) || totals.get(store.niche) || { orders: 0, revenue: 0 };
+      slot.orders += 1;
+      slot.revenue += d.amount || 0;
+      totals.set(id, slot);
+    }
+    const totalRev = Math.max(1, Array.from(totals.values()).reduce((s, v) => s + v.revenue, 0));
+    return store.allNiches.map(id => {
+      const n = getNiche(id);
+      const t = totals.get(id) || { orders: 0, revenue: 0 };
+      return {
+        id,
+        name: n.name[language],
+        icon: n.icon,
+        orders: t.orders,
+        revenue: t.revenue,
+        pct: Math.round((t.revenue / totalRev) * 100),
+      };
+    });
+  }, [scopedDeals, store.niche, store.secondaryNiches, store.allNiches, language]);
+
   // KPIs scoped to the period filter (was always all-time).
   const totalOrders = scopedDeals.length;
   const totalRevenue = useMemo(() =>
@@ -314,6 +346,13 @@ export function Analytics({ language }: AnalyticsProps) {
               rows.push([l('Источник', 'Көз', 'Source'), l('Доля %', 'Үлес %', 'Share %')].map(esc).join(','));
               sources.forEach(s => rows.push([s.name, s.value].map(esc).join(',')));
               rows.push('');
+              // Niche breakdown — only emitted for multi-niche teams
+              if (nicheBreakdown.length > 1) {
+                rows.push(`# ${l('Выручка по направлениям', 'Бағыттар бойынша түсім', 'Revenue by direction')}`);
+                rows.push([l('Направление', 'Бағыт', 'Direction'), l('Сделок', 'Мәміле', 'Deals'), l('Выручка ₸', 'Түсім ₸', 'Revenue KZT'), l('Доля %', 'Үлес %', 'Share %')].map(esc).join(','));
+                nicheBreakdown.forEach(n => rows.push([`${n.icon} ${n.name}`, n.orders, n.revenue, n.pct].map(esc).join(',')));
+                rows.push('');
+              }
               rows.push(`# ${l('Эффективность команды', 'Команда тиімділігі', 'Team performance')}`);
               rows.push([
                 l('Сотрудник', 'Қызметкер', 'Employee'),
@@ -423,6 +462,62 @@ export function Analytics({ language }: AnalyticsProps) {
               );
             })}
           </div>
+
+          {/* Niche breakdown — only for multi-niche teams */}
+          {nicheBreakdown.length > 1 && (
+            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 mb-6">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <div className="text-sm text-gray-900 flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-emerald-600" />
+                    {l('Выручка по направлениям', 'Бағыттар бойынша түсім', 'Revenue by direction')}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    {l('Сумма по сделкам в выбранном периоде', 'Таңдалған кезеңдегі мәмілелер сомасы', 'Pipeline by period')}
+                  </div>
+                </div>
+              </div>
+              {/* Stacked horizontal bar — single row segmented by niche.
+                  Lets the user see proportions at a glance, with a legend
+                  below for exact numbers. */}
+              <div className="w-full h-3 rounded-full overflow-hidden flex bg-gray-100">
+                {nicheBreakdown.filter(n => n.revenue > 0).map((n, i) => {
+                  const palette = ['#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#22C55E', '#0EA5E9', '#6366F1', '#EAB308'];
+                  return (
+                    <div
+                      key={n.id}
+                      style={{ width: `${n.pct}%`, backgroundColor: palette[i % palette.length] }}
+                      title={`${n.icon} ${n.name}: ${n.pct}% · ${n.orders} ${l('сделок', 'мәміле', 'deals')}`}
+                    />
+                  );
+                })}
+              </div>
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {nicheBreakdown.map((n, i) => {
+                  const palette = ['#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#22C55E', '#0EA5E9', '#6366F1', '#EAB308'];
+                  return (
+                    <button
+                      key={n.id}
+                      onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'sales' } }))}
+                      className="text-left bg-white/50 ring-1 ring-white/60 rounded-2xl p-3 hover:bg-white/70 transition-all"
+                      title={l('Перейти в Заказы', 'Тапсырыстарға', 'Open Orders')}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: palette[i % palette.length] }} />
+                        <span className="text-xs text-gray-700 truncate">{n.icon} {n.name}</span>
+                      </div>
+                      <div className="text-sm text-gray-900 tabular-nums">
+                        {n.revenue ? `${(n.revenue / 1000000).toFixed(1)}М ₸` : '0 ₸'}
+                      </div>
+                      <div className="text-[10px] text-gray-400">
+                        {n.orders} {l('сделок', 'мәміле', 'deals')} · {n.pct}%
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">

@@ -76,14 +76,21 @@ const contextRoles: Record<string, Record<string, string>> = {
 // new deal". Keeps the suggestions practically useful right after
 // onboarding instead of forcing the user to translate generic verbs
 // into their actual product line.
-function getGreeting(language: 'kz' | 'ru' | 'eng', nicheRu: string): string {
+function getGreeting(language: 'kz' | 'ru' | 'eng', nicheRu: string, secondaryRu: string[]): string {
+  // Multi-niche teams get a slightly different opener so they
+  // immediately know the assistant is aware of all their directions —
+  // a windows+doors+stairs business wants to feel that the AI won't
+  // forget about the doors and stairs side of the company.
+  const niches = secondaryRu.length > 0
+    ? `${nicheRu} + ${secondaryRu.join(' + ')}`
+    : nicheRu;
   if (language === 'kz') {
     return `Сәлем! Платформаны басқаруға және сұрақтарға жауап беруге көмектесемін. Тапсырманы еркін мәтінмен жазыңыз — мәмілені жасаймын, төлемді жазамын, тапсырма қоямын, клиентті табамын.`;
   }
   if (language === 'eng') {
     return `Hi! I can help run the platform and answer questions. Describe the task in plain words — I'll create deals, log payments, add tasks, look up clients.`;
   }
-  return `Здравствуйте! Помогу управлять платформой по нише «${nicheRu}» и отвечу на любые вопросы. Опишите задачу свободным текстом — создам сделку, запишу оплату, поставлю задачу, найду клиента.`;
+  return `Здравствуйте! Помогу управлять платформой по ${secondaryRu.length > 0 ? 'нишам' : 'нише'} «${niches}» и отвечу на любые вопросы. Опишите задачу свободным текстом — создам сделку, запишу оплату, поставлю задачу, найду клиента.`;
 }
 
 function getQuickActions(language: 'kz' | 'ru' | 'eng', nicheRu: string, nicheKeyword: string): string[] {
@@ -139,6 +146,10 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
   const store = useDataStore();
   const niche = getNiche(store.niche);
   const nicheNoun = NICHE_QUICK_NOUN[store.niche] || 'заказ';
+  // RU names of secondary niches — fed into the greeting so multi-niche
+  // teams see "по нишам Мебель + Двери + Лестницы" instead of just the
+  // primary. Empty array for single-niche teams.
+  const secondaryNicheNames = store.secondaryNiches.map(id => getNiche(id).name.ru);
   const telegramFeed = (store.activityLogs || [])
     .filter(a => (a as any).source === 'telegram')
     .slice(0, 5);
@@ -216,7 +227,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
         hist.push({
           id: 'greet',
           role: 'assistant',
-          content: getGreeting(language, niche.name.ru),
+          content: getGreeting(language, niche.name.ru, secondaryNicheNames),
           timestamp: now(),
         });
       }
@@ -225,7 +236,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
       setMessages([{
         id: 'greet',
         role: 'assistant',
-        content: getGreeting(language, niche.name.ru),
+        content: getGreeting(language, niche.name.ru, secondaryNicheNames),
         timestamp: now(),
       }]);
     });
@@ -304,7 +315,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
     setMessages([{
       id: 'greet',
       role: 'assistant',
-      content: getGreeting(language, niche.name.ru),
+      content: getGreeting(language, niche.name.ru, secondaryNicheNames),
       timestamp: now(),
     }]);
   }
@@ -588,7 +599,14 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
               <div className="space-y-1.5 pt-1">
                 <p className="text-[10px] text-slate-500 px-1 uppercase tracking-wide">
                   {l('Быстро начать', 'Жылдам бастау', 'Quick start')}
-                  <span className="normal-case tracking-normal text-slate-400 ml-1">· {niche.icon} {niche.name[language]}</span>
+                  <span className="normal-case tracking-normal text-slate-400 ml-1">
+                    · {niche.icon} {niche.name[language]}
+                    {store.secondaryNiches.length > 0 && (
+                      <span className="ml-1">
+                        + {store.secondaryNiches.map(id => getNiche(id).icon).join(' ')}
+                      </span>
+                    )}
+                  </span>
                 </p>
                 {getQuickActions(language, niche.name.ru, nicheNoun).map((text, idx) => (
                   <button

@@ -146,6 +146,11 @@ export function Warehouse({ language }: WarehouseProps) {
   }, [store.deals, store.products.length]);
   const [activeView, setActiveView] = useState<'materials' | 'production' | 'bom' | 'calculator' | 'nesting' | 'suppliers' | 'purchases' | 'reports'>(initialView);
   const [selectedCategory, setSelectedCategory] = useState('Все');
+  // Niche filter for multi-niche teams. '' = all niches; otherwise
+  // compares to product.niche. Materials without a niche tag are
+  // treated as cross-niche (visible in every filter) — common for
+  // generic hardware like screws or sealant.
+  const [selectedNiche, setSelectedNiche] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -166,7 +171,7 @@ export function Warehouse({ language }: WarehouseProps) {
   // Default new-product category from the niche so the picker shows
   // sensible options (Плиты for furniture, Профиль for windows, etc.).
   const defaultCategory = niche.materialCategories[0] || 'Прочее';
-  const [newProduct, setNewProduct] = useState({ name: '', category: defaultCategory, quantity: 0, unit: 'лист', supplier: '', cost: 0 });
+  const [newProduct, setNewProduct] = useState({ name: '', category: defaultCategory, quantity: 0, unit: 'лист', supplier: '', cost: 0, niche: '' as string });
 
   // Suppliers & purchase orders — loaded from the server when their
   // tab opens (lazy: don't pay the network cost if the user never
@@ -556,6 +561,9 @@ export function Warehouse({ language }: WarehouseProps) {
   const filtered = useMemo(() => {
     const arr = products
       .filter(p => selectedCategory === 'Все' || p.category === selectedCategory)
+      // Niche filter — products without a niche tag pass every filter
+      // so cross-niche hardware (screws, sealant) stays visible always.
+      .filter(p => !selectedNiche || !p.niche || p.niche === selectedNiche)
       .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     const sorted = [...arr];
     const statusRank: Record<string, number> = { outofstock: 0, low: 1, instock: 2 };
@@ -567,7 +575,7 @@ export function Warehouse({ language }: WarehouseProps) {
       return (a.name || '').localeCompare(b.name || ''); // 'name'
     });
     return sorted;
-  }, [products, selectedCategory, searchQuery, matSort]);
+  }, [products, selectedCategory, selectedNiche, searchQuery, matSort]);
 
   const totalValue = products.reduce((s, p) => s + p.quantity * p.cost, 0);
   const lowCount = products.filter(p => p.status === 'low').length;
@@ -577,7 +585,7 @@ export function Warehouse({ language }: WarehouseProps) {
   const handleAdd = () => {
     if (newProduct.name && newProduct.supplier && newProduct.cost > 0) {
       store.addProduct({ ...newProduct, status: newProduct.quantity > 20 ? 'instock' : newProduct.quantity > 0 ? 'low' : 'outofstock', minQty: 10 });
-      setNewProduct({ name: '', category: defaultCategory, quantity: 0, unit: 'лист', supplier: '', cost: 0 }); setShowAddModal(false);
+      setNewProduct({ name: '', category: defaultCategory, quantity: 0, unit: 'лист', supplier: '', cost: 0, niche: '' as string }); setShowAddModal(false);
     }
   };
 
@@ -996,6 +1004,45 @@ export function Warehouse({ language }: WarehouseProps) {
             </div>
           )}
 
+          {/* Niche filter chip-row (multi-niche teams). Lets the user
+              slice the warehouse by direction (windows / doors / stairs
+              etc). Materials without a niche tag are visible in every
+              slice so generic hardware never disappears from the list. */}
+          {store.secondaryNiches.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => setSelectedNiche('')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-[11px] ring-1 transition-all ${
+                  selectedNiche === ''
+                    ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
+                    : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+                }`}
+              >
+                {l('Все направления', 'Барлық бағыттар', 'All directions')}
+              </button>
+              {store.allNiches.map(nid => {
+                const n = getNiche(nid);
+                const count = store.products.filter(p => p.niche === nid).length;
+                const active = selectedNiche === nid;
+                return (
+                  <button
+                    key={nid}
+                    onClick={() => setSelectedNiche(nid)}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-[11px] ring-1 transition-all ${
+                      active
+                        ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
+                        : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+                    }`}
+                  >
+                    <span>{n.icon}</span>
+                    <span>{n.name[language]}</span>
+                    <span className={`text-[10px] tabular-nums ${active ? 'text-white/70' : 'text-slate-400'}`}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Search + Filters + CSV toolbar */}
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex-1 relative">
@@ -1284,6 +1331,26 @@ export function Warehouse({ language }: WarehouseProps) {
               </div>
               <ModalInput label={l('Поставщик', 'Жеткізуші', 'Supplier')} value={newProduct.supplier} onChange={e => setNewProduct({ ...newProduct, supplier: (e.target as HTMLInputElement).value })} />
               <ModalInput label={l('Цена (₸)', 'Бағасы (₸)', 'Price (₸)')} type="number" value={String(newProduct.cost)} onChange={e => setNewProduct({ ...newProduct, cost: Number((e.target as HTMLInputElement).value) })} />
+              {/* Niche tag (multi-niche teams only). Empty = applies to all. */}
+              {store.secondaryNiches.length > 0 && (
+                <div>
+                  <label className="block text-[11px] text-slate-400 mb-1">
+                    {l('Направление', 'Бағыт', 'Direction')}
+                    <span className="text-slate-300 ml-1">· {l('по желанию', 'қалау бойынша', 'optional')}</span>
+                  </label>
+                  <select
+                    value={newProduct.niche || ''}
+                    onChange={e => setNewProduct({ ...newProduct, niche: e.target.value })}
+                    className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none"
+                  >
+                    <option value="">{l('Любое (общее)', 'Кез келген', 'Any (shared)')}</option>
+                    {store.allNiches.map(nid => {
+                      const n = getNiche(nid);
+                      return <option key={nid} value={nid}>{n.icon} {n.name[language]}</option>;
+                    })}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="p-5 pt-0 flex gap-2">
               <button onClick={() => setShowAddModal(false)} className="flex-1 px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
@@ -1306,6 +1373,23 @@ export function Warehouse({ language }: WarehouseProps) {
                 <ModalInput label={l('Мин. остаток', 'Мин. қалдық', 'Min stock')} type="number" value={String(selectedProduct.minQty)} onChange={e => setSelectedProduct({ ...selectedProduct, minQty: Number((e.target as HTMLInputElement).value) })} />
               </div>
               <ModalInput label={l('Цена (₸)', 'Бағасы (₸)', 'Price (₸)')} type="number" value={String(selectedProduct.cost)} onChange={e => setSelectedProduct({ ...selectedProduct, cost: Number((e.target as HTMLInputElement).value) })} />
+              {/* Niche tag — edit version. Empty = shared across niches. */}
+              {store.secondaryNiches.length > 0 && (
+                <div>
+                  <label className="block text-[11px] text-slate-400 mb-1">{l('Направление', 'Бағыт', 'Direction')}</label>
+                  <select
+                    value={selectedProduct.niche || ''}
+                    onChange={e => setSelectedProduct({ ...selectedProduct, niche: e.target.value || undefined })}
+                    className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none"
+                  >
+                    <option value="">{l('Любое (общее)', 'Кез келген', 'Any (shared)')}</option>
+                    {store.allNiches.map(nid => {
+                      const n = getNiche(nid);
+                      return <option key={nid} value={nid}>{n.icon} {n.name[language]}</option>;
+                    })}
+                  </select>
+                </div>
+              )}
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                 <span className="text-[10px] text-slate-400">{l('Итого на складе', 'Қоймадағы жиыны', 'Total stock value')}</span>
                 <span className="text-sm text-gray-900">{(selectedProduct.quantity * selectedProduct.cost).toLocaleString()} ₸</span>
