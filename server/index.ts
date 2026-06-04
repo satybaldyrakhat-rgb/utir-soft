@@ -255,6 +255,9 @@ migrateColumn('telegram_links', 'pending_action', 'TEXT');
 migrateColumn('telegram_links', 'chat_history', 'TEXT');
 // Multi-turn /design wizard state — JSON with current step + answers so far.
 migrateColumn('telegram_links', 'design_state', 'TEXT');
+// Pending photo a field worker sent outside the design wizard — held as a
+// data URL until they pick which deal to attach it to (Этап 2).
+migrateColumn('telegram_links', 'pending_photo', 'TEXT');
 // Telegram-native worker onboarding — masters / measurers / installers who
 // join via a deep-link invite and never touch the web. The reusable team
 // invite code lives on team_settings; the per-chat onboarding state (name +

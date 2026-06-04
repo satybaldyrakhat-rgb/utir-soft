@@ -99,6 +99,7 @@ export async function registerBotCommands(): Promise<void> {
     await tg('setMyCommands', {
       commands: [
         { command: 'start',   description: '🚀 Начать / приветствие' },
+        { command: 'measures',description: '📐 Мои замеры / заказы' },
         { command: 'design',  description: '🎨 AI Дизайн интерьера (мастер)' },
         { command: 'today',   description: '📊 Что было сегодня' },
         { command: 'tasks',   description: '✅ Мои задачи' },
@@ -359,6 +360,63 @@ function createWorkerAccount(
   });
   tx();
   return { userId, employeeId };
+}
+
+// ─── Inline-keyboard (callback) helpers (Этап 2) ───────────────────
+// Field workers tap inline buttons under each measurement / order card
+// instead of typing. answerCallbackQuery dismisses the spinner; the
+// edit helper strips the buttons after an action so a card can't be
+// double-tapped.
+async function answerCallback(callbackId: string, text?: string) {
+  try { await tg('answerCallbackQuery', { callback_query_id: callbackId, text: text || undefined }); }
+  catch { /* best-effort — Telegram tolerates a missing answer */ }
+}
+async function editReplyMarkupClear(chatId: number, messageId: number) {
+  try { await tg('editMessageReplyMarkup', { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } }); }
+  catch { /* ignore — message may be too old to edit */ }
+}
+
+// 2GIS is the default map app in KZ — build a search link by address.
+function routeUrl(address: string): string {
+  return `https://2gis.kz/search/${encodeURIComponent(address)}`;
+}
+
+// ─── Pending photo state (worker sent a photo outside /design) ──────
+interface PendingPhoto { dataUrl: string }
+function setPendingPhoto(db: Database.Database, chatId: number, dataUrl: string) {
+  db.prepare('UPDATE telegram_links SET pending_photo = ? WHERE chat_id = ?').run(JSON.stringify({ dataUrl }), chatId);
+}
+function getPendingPhoto(db: Database.Database, chatId: number): PendingPhoto | null {
+  const row = db.prepare('SELECT pending_photo FROM telegram_links WHERE chat_id = ?').get(chatId) as any;
+  if (!row?.pending_photo) return null;
+  try { return JSON.parse(row.pending_photo) as PendingPhoto; } catch { return null; }
+}
+function clearPendingPhoto(db: Database.Database, chatId: number) {
+  db.prepare('UPDATE telegram_links SET pending_photo = NULL WHERE chat_id = ?').run(chatId);
+}
+
+// ─── Deal helpers for worker flows ─────────────────────────────────
+interface DealRow { rowId: number; id: string; data: any }
+function loadDeals(db: Database.Database, teamId: string): DealRow[] {
+  const rows = db.prepare('SELECT rowid, id, data FROM deals WHERE team_id = ? ORDER BY rowid DESC').all(teamId) as any[];
+  return rows.map(r => { try { return { rowId: r.rowid, id: r.id, data: JSON.parse(r.data) }; } catch { return null; } }).filter(Boolean) as DealRow[];
+}
+function findDeal(db: Database.Database, teamId: string, dealId: string): DealRow | null {
+  const r = db.prepare('SELECT rowid, id, data FROM deals WHERE team_id = ? AND id = ?').get(teamId, dealId) as any;
+  if (!r) return null;
+  try { return { rowId: r.rowid, id: r.id, data: JSON.parse(r.data) }; } catch { return null; }
+}
+function saveDeal(db: Database.Database, dealId: string, data: any) {
+  db.prepare('UPDATE deals SET data = ? WHERE id = ?').run(JSON.stringify(data), dealId);
+}
+// True when this employee is the measurer/owner on the deal.
+function isAssignedTo(deal: any, emp: { id: string; name: string }): boolean {
+  if (deal.ownerId && deal.ownerId === emp.id) return true;
+  const nameLow = (emp.name || '').toLowerCase().trim();
+  if (!nameLow) return false;
+  const first = nameLow.split(/\s+/)[0] || '';
+  const test = (v: string | undefined) => !!v && (v.toLowerCase().includes(nameLow) || (first.length > 2 && v.toLowerCase().includes(first)));
+  return test(deal.measurer) || test(deal.designer) || test(deal.foreman) || test(deal.architect);
 }
 
 // ─── Pending tool confirmation state (persisted in telegram_links.pending_action) ────
@@ -671,9 +729,170 @@ export interface IncomingUpdate {
     // Audio attachments (paperclip → audio file) — mp3/m4a/etc.
     audio?: { file_id: string; file_unique_id: string; duration: number; mime_type?: string; title?: string; file_size?: number };
   };
+  // Inline-button taps (Этап 2 — measurement / order cards).
+  callback_query?: {
+    id: string;
+    from?: { id: number; username?: string; first_name?: string };
+    message?: { chat: { id: number }; message_id: number };
+    data?: string;
+  };
+}
+
+// Short human label for a deal status (used in worker cards).
+function statusLabelRu(status: string): string {
+  const map: Record<string, string> = {
+    new: '🆕 Новая заявка', measured: '📐 Замер сделан', 'project-agreed': '📝 Проект/договор',
+    contract: '📝 Договор', production: '🏭 В производстве', assembly: '🔩 Сборка',
+    manufacturing: '🏭 Изготовление', installation: '🔧 Монтаж', completed: '✅ Завершено', rejected: '❌ Отказ',
+  };
+  return map[status] || status;
+}
+const nowHM = () => new Date().toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+function appendNote(existing: string | undefined, line: string): string {
+  return existing ? `${existing}\n${line}` : line;
+}
+
+// ─── «Мои замеры» — measurer's assigned, not-yet-finished deals ─────
+async function sendMeasurements(db: Database.Database, chatId: number, teamId: string, emp: { id: string; name: string }) {
+  const deals = loadDeals(db, teamId)
+    .filter(d => isAssignedTo(d.data, emp))
+    .filter(d => ['new', 'measured', 'project-agreed', 'contract'].includes(d.data.status))
+    .slice(0, 8);
+  if (deals.length === 0) {
+    await sendMessage(chatId,
+      `📐 <b>${emp.name}</b>, у вас сейчас нет назначенных замеров.\n\n` +
+      `Как только менеджер назначит вас замерщиком на сделку — она появится здесь с кнопками «Маршрут», «Выехал» и «Замер готов».`);
+    return;
+  }
+  await sendMessage(chatId, `📐 <b>Ваши замеры (${deals.length}):</b>`);
+  for (const d of deals) {
+    const dd = d.data;
+    const addr = dd.siteAddress || dd.address || '';
+    const lines = [
+      `<b>${dd.customerName || 'Без имени'}</b>`,
+      dd.phone ? `📞 ${dd.phone}` : '',
+      addr ? `📍 ${addr}` : '',
+      (dd.furnitureType || dd.product) ? `🔧 ${dd.furnitureType || dd.product}` : '',
+      `${statusLabelRu(dd.status)}`,
+    ].filter(Boolean);
+    const buttonRows: any[] = [];
+    if (addr) buttonRows.push([{ text: '📍 Маршрут (2ГИС)', url: routeUrl(addr) }]);
+    buttonRows.push([
+      { text: '🚗 Выехал', callback_data: `dep|${d.id}` },
+      { text: '✅ Замер готов', callback_data: `msd|${d.id}` },
+    ]);
+    await tg('sendMessage', {
+      chat_id: chatId, parse_mode: 'HTML',
+      text: lines.join('\n'),
+      reply_markup: { inline_keyboard: buttonRows },
+    });
+  }
+}
+
+// ─── Inline-button tap handler (Этап 2) ────────────────────────────
+async function handleCallback(
+  db: Database.Database,
+  cq: NonNullable<IncomingUpdate['callback_query']>,
+  logActivity: (userId: string, entry: any) => void,
+) {
+  const chatId = cq.message?.chat.id;
+  const messageId = cq.message?.message_id;
+  const data = cq.data || '';
+  if (!chatId) { await answerCallback(cq.id); return; }
+  const user = findUserByChat(db, chatId);
+  if (!user) { await answerCallback(cq.id, 'Аккаунт не привязан'); return; }
+  const emp = findEmployeeForUser(db, user.id, user.teamId);
+  const [action, dealId] = data.split('|');
+
+  // Mark «выехал» (on the way to the measurement / install).
+  if (action === 'dep' && dealId) {
+    const d = findDeal(db, user.teamId, dealId);
+    if (!d) { await answerCallback(cq.id, 'Заказ не найден'); return; }
+    d.data.notes = appendNote(d.data.notes, `🚗 ${nowHM()} — ${emp?.name || 'мастер'} выехал на объект`);
+    saveDeal(db, dealId, d.data);
+    await answerCallback(cq.id, 'Отметил: выехал 🚗');
+    if (messageId) await editReplyMarkupClear(chatId, messageId);
+    await sendMessage(chatId,
+      `🚗 Отметил, что вы выехали к <b>${d.data.customerName || 'клиенту'}</b>.\n` +
+      `Клиент получит уведомление, когда подключим WhatsApp.`);
+    logActivity(user.id, {
+      user: emp?.name || user.name, actor: 'human',
+      action: 'Выехал на объект', target: d.data.customerName || dealId,
+      type: 'update', page: 'sales',
+    });
+    return;
+  }
+
+  // Mark «замер готов» → move the deal to 'measured' + nudge to record sizes.
+  if (action === 'msd' && dealId) {
+    const d = findDeal(db, user.teamId, dealId);
+    if (!d) { await answerCallback(cq.id, 'Заказ не найден'); return; }
+    d.data.status = 'measured';
+    d.data.progress = Math.max(25, Number(d.data.progress) || 0);
+    d.data.measurementDate = new Date().toISOString().slice(0, 10);
+    d.data.notes = appendNote(d.data.notes, `📐 ${nowHM()} — замер выполнен (${emp?.name || 'мастер'})`);
+    saveDeal(db, dealId, d.data);
+    await answerCallback(cq.id, 'Замер отмечен ✅');
+    if (messageId) await editReplyMarkupClear(chatId, messageId);
+    await sendMessage(chatId,
+      `✅ Замер у <b>${d.data.customerName || 'клиента'}</b> отмечен.\n\n` +
+      `Теперь запишите размеры — просто наговорите голосом 🎤:\n` +
+      `<i>«Три окна: 1.5 на 1.4 двухстворчатое, 1 на 1 глухое, балконный блок 2 на 2.1»</i>\n\n` +
+      `Или пришлите 📷 фото объекта — я прикреплю к заказу.`);
+    logActivity(user.id, {
+      user: emp?.name || user.name, actor: 'human',
+      action: 'Замер выполнен', target: d.data.customerName || dealId,
+      type: 'update', page: 'sales',
+    });
+    return;
+  }
+
+  // Attach a pending photo to the chosen deal.
+  if (action === 'att' && dealId) {
+    const ph = getPendingPhoto(db, chatId);
+    if (!ph) { await answerCallback(cq.id, 'Фото не найдено — пришлите заново'); if (messageId) await editReplyMarkupClear(chatId, messageId); return; }
+    const d = findDeal(db, user.teamId, dealId);
+    if (!d) { await answerCallback(cq.id, 'Заказ не найден'); return; }
+    const docs = Array.isArray(d.data.documents) ? d.data.documents : [];
+    docs.push({
+      id: newId('doc_'),
+      name: `Фото от ${emp?.name || 'мастера'} · ${nowHM()}`,
+      dataUrl: ph.dataUrl,
+      kind: 'image',
+      uploadedAt: new Date().toISOString(),
+      by: emp?.name || user.name,
+      source: 'telegram',
+    });
+    d.data.documents = docs;
+    saveDeal(db, dealId, d.data);
+    clearPendingPhoto(db, chatId);
+    await answerCallback(cq.id, 'Фото прикреплено ✅');
+    if (messageId) await editReplyMarkupClear(chatId, messageId);
+    await sendMessage(chatId, `📷 Фото прикреплено к заказу <b>${d.data.customerName || ''}</b>. Видно в карточке на платформе.`);
+    logActivity(user.id, {
+      user: emp?.name || user.name, actor: 'human',
+      action: 'Прикрепил фото к заказу', target: d.data.customerName || dealId,
+      type: 'update', page: 'sales',
+    });
+    return;
+  }
+
+  if (action === 'attcancel') {
+    clearPendingPhoto(db, chatId);
+    await answerCallback(cq.id, 'Отменено');
+    if (messageId) await editReplyMarkupClear(chatId, messageId);
+    return;
+  }
+
+  await answerCallback(cq.id);
 }
 
 export async function handleUpdate(db: Database.Database, update: IncomingUpdate, logActivity: (userId: string, entry: any) => void) {
+  // ── Inline-button tap? Route to the callback handler and return. ──
+  if (update.callback_query) {
+    await handleCallback(db, update.callback_query, logActivity);
+    return;
+  }
   const msg = update.message;
   if (!msg) return;
   const chatId = msg.chat.id;
@@ -713,12 +932,38 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
     // Fall through to text handling below.
   }
 
-  // ── Photo message? Only meaningful inside the /design wizard. Route to the
-  //    wizard handler below so it can stash the data URL and advance the step.
+  // ── Photo message? Two cases:
+  //    1. Inside /design wizard → stash as room photo / reference.
+  //    2. Otherwise (field worker sending an object / work photo) →
+  //       hold it and ask which deal to attach it to (Этап 2).
   if (msg.photo && msg.photo.length > 0 && !msg.text) {
     const designState = getDesignState(db, chatId);
     if (!designState || (designState.step !== 'room_photo' && designState.step !== 'references')) {
-      await sendMessage(chatId, 'Получил фото, но я не в режиме сбора картинок. Начните /design.');
+      // Photo-attach flow for field workers.
+      const worker = findUserByChat(db, chatId);
+      if (!worker) { await sendMessage(chatId, 'Сначала привяжите аккаунт по ссылке-приглашению от руководителя.'); return; }
+      const emp = findEmployeeForUser(db, worker.id, worker.teamId);
+      const largestPic = msg.photo[msg.photo.length - 1];
+      await sendMessage(chatId, '📥 Загружаю фото…');
+      const url = await downloadTgFileAsDataUrl(largestPic.file_id);
+      if (!url) { await sendMessage(chatId, '⚠️ Не удалось скачать фото. Попробуйте ещё раз.'); return; }
+      setPendingPhoto(db, chatId, url);
+      // Offer the worker's own active deals first; fall back to recent.
+      const all = loadDeals(db, worker.teamId);
+      const assigned = emp ? all.filter(d => isAssignedTo(d.data, emp) && d.data.status !== 'rejected') : [];
+      const pick = (assigned.length > 0 ? assigned : all.filter(d => d.data.status !== 'rejected')).slice(0, 6);
+      if (pick.length === 0) {
+        clearPendingPhoto(db, chatId);
+        await sendMessage(chatId, 'Пока нет активных заказов, к которым можно прикрепить фото. Создайте сделку — потом пришлите фото снова.');
+        return;
+      }
+      const rows = pick.map(d => [{ text: `${d.data.customerName || 'Без имени'}${d.data.product ? ' · ' + String(d.data.product).slice(0, 24) : ''}`, callback_data: `att|${d.id}` }]);
+      rows.push([{ text: '✕ Отмена', callback_data: 'attcancel|' }]);
+      await tg('sendMessage', {
+        chat_id: chatId, parse_mode: 'HTML',
+        text: '📷 К какому заказу прикрепить фото?',
+        reply_markup: { inline_keyboard: rows },
+      });
       return;
     }
     const user = findUserByChat(db, chatId);
@@ -831,15 +1076,18 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       '💰 зарплата': '/revenue',
       '💰 моя выручка': '/revenue',
       '🎨 ai дизайн': '/design',
+      // Этап 2 — measurer / installer order lists route to /замеры.
+      '📋 мои замеры': '/замеры',
+      '📋 мои монтажи': '/замеры',
+      '📋 мои заказы': '/замеры',
     };
     const soon: Record<string, string> = {
-      '📋 мои замеры':   '📐 Раздел «Мои замеры» скоро появится. А пока просто опишите замер словами или голосом — я запишу.',
-      '🎤 записать замер':'🎤 Запишите голосом: что замеряли, размеры, материал — я structurирую в сделку.',
-      '📷 фото объекта': '📷 Пришлите фото — скоро смогу привязать к сделке. Пока опишите объект словами.',
-      '📋 мои заказы':   '📋 Раздел «Мои заказы» в работе. Пока спросите меня: «что у меня в работе?»',
-      '📷 фото-отчёт':   '📷 Фото-отчёты подключаем. Пока пришлите фото с подписью — кому относится.',
-      '📋 мои монтажи':  '📋 Раздел «Мои монтажи» скоро. Пока спросите: «какие у меня монтажи сегодня?»',
-      '📷 фото работы':  '📷 Фото готовой работы скоро можно будет привязать к заказу. Пока пришлите с подписью.',
+      // Photo buttons just guide the worker to send a photo — the attach
+      // flow kicks in automatically when a photo arrives (Этап 2).
+      '🎤 записать замер':'🎤 Запишите голосом: клиент, что замеряли, размеры, материал — я structurирую в сделку. Можно и текстом.',
+      '📷 фото объекта': '📷 Просто пришлите фото — я спрошу, к какому заказу прикрепить.',
+      '📷 фото-отчёт':   '📷 Просто пришлите фото — я спрошу, к какому заказу прикрепить.',
+      '📷 фото работы':  '📷 Просто пришлите фото готовой работы — я спрошу, к какому заказу прикрепить.',
     };
     const low = text.toLowerCase();
     if (menuMap[low]) {
@@ -1005,6 +1253,17 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       await sendMessage(chatId,
         `<b>Ваши задачи (${mine.length}):</b>\n\n${lines.join('\n')}${mine.length > 20 ? `\n\n…и ещё ${mine.length - 20}` : ''}`,
       );
+      return;
+    }
+
+    // /замеры — measurer/installer's assigned active deals with inline
+    // [Маршрут][Выехал][Замер готов] buttons. The field worker's home screen.
+    if (cmd === '/замеры' || cmd === '/measures' || cmd === '/мои_замеры' || cmd === '/заказы' || cmd === '/монтажи') {
+      const user = findUserByChat(db, chatId);
+      if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт по ссылке-приглашению от руководителя.'); return; }
+      const emp = findEmployeeForUser(db, user.id, user.teamId);
+      if (!emp) { await sendMessage(chatId, 'Ваш профиль не привязан к карточке сотрудника. Попросите админа.'); return; }
+      await sendMeasurements(db, chatId, user.teamId, emp);
       return;
     }
 
