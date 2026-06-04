@@ -135,6 +135,10 @@ export function SalesKanban({ language }: SalesKanbanProps) {
   const [filterPriority, setFilterPriority] = useState<string>('');
   const [filterDateFrom, setFilterDateFrom] = useState<string>('');
   const [filterDateTo, setFilterDateTo] = useState<string>('');
+  // Multi-niche teams get a chip-row above the board to slice deals by
+  // direction. '' means "all niches"; otherwise compares the resolved
+  // niche (deal.niche || team primary) to this filter value.
+  const [filterNiche, setFilterNiche] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'priority' | 'progress'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
@@ -183,6 +187,13 @@ export function SalesKanban({ language }: SalesKanbanProps) {
       if (filterSource   && d.source   !== filterSource)   return false;
       if (filterOwner    && d.ownerId  !== filterOwner)    return false;
       if (filterPriority && d.priority !== filterPriority) return false;
+      // Niche filter (multi-niche teams only). Resolves the effective
+      // niche of the deal (own niche || team primary) so old deals
+      // without a `niche` field are bucketed under the primary.
+      if (filterNiche) {
+        const effective = d.niche || store.niche;
+        if (effective !== filterNiche) return false;
+      }
       if (fromMs !== null || toMs !== null) {
         const ts = d.createdAt ? new Date(d.createdAt).getTime() : NaN;
         if (isNaN(ts)) return false;
@@ -191,7 +202,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
       }
       return true;
     });
-  }, [activeDeals, searchQuery, filterSource, filterOwner, filterPriority, filterDateFrom, filterDateTo]);
+  }, [activeDeals, searchQuery, filterSource, filterOwner, filterPriority, filterDateFrom, filterDateTo, filterNiche, store.niche]);
 
   // Per-stage bucket + sort. Memoized so unrelated store mutations
   // (e.g. an unrelated transaction update) don't rebuild the kanban.
@@ -504,6 +515,44 @@ export function SalesKanban({ language }: SalesKanbanProps) {
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
             </div>
           </div>
+
+          {/* Niche filter row — only for multi-niche teams. Sits above
+              the standard filter chips so the user can slice the board
+              by direction in one click, without opening the filter pane. */}
+          {store.secondaryNiches.length > 0 && (
+            <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => setFilterNiche('')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-[11px] ring-1 transition-all ${
+                  filterNiche === ''
+                    ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
+                    : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+                }`}
+              >
+                {l('Все направления', 'Барлық бағыттар', 'All directions')}
+              </button>
+              {store.allNiches.map(nid => {
+                const n = getNiche(nid);
+                const count = activeDeals.filter(d => (d.niche || store.niche) === nid).length;
+                const active = filterNiche === nid;
+                return (
+                  <button
+                    key={nid}
+                    onClick={() => setFilterNiche(nid)}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-[11px] ring-1 transition-all ${
+                      active
+                        ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
+                        : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+                    }`}
+                  >
+                    <span>{n.icon}</span>
+                    <span>{n.name[language]}</span>
+                    <span className={`text-[10px] tabular-nums ${active ? 'text-white/70' : 'text-slate-400'}`}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Filter chip-row (expanded) */}
           {showFilters && (

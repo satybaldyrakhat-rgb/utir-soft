@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History, RotateCcw, AlertTriangle, Loader2, Upload, Download, FileSpreadsheet, FileImage, Paperclip, Layers, Package, ListChecks, ShoppingCart, ExternalLink, Wrench, Truck, TrendingUp } from 'lucide-react';
 import { t } from '../utils/translations';
 import { useDataStore, type Deal } from '../utils/dataStore';
+import { getNiche } from '../utils/niches';
 import { api } from '../utils/api';
 import { DEFAULT_STAGES_TEMPLATE, type DealStage, type ConsumedMaterial } from './Warehouse';
 
@@ -116,6 +117,9 @@ const formatKZT = (n: number) => `${Math.round(n).toLocaleString('ru-RU').replac
 export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: ClientOrderModalProps) {
   const store = useDataStore();
   const catalogs = store.catalogs;
+  // True when the team has multi-niche enabled — drives whether we show
+  // the niche chip in the header and the "Тип проекта" picker in the form.
+  const showNicheChip = store.secondaryNiches.length > 0;
   const [activeTab, setActiveTab] = useState<'main' | 'progress' | 'related' | 'chat' | 'history'>('main');
 
   // History state — populated by the useEffect below once 'l' is defined.
@@ -135,6 +139,14 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   // Owner — employee responsible for the deal (used by team-metrics tab).
   const [ownerId, setOwnerId] = useState(deal.ownerId || '');
   const [furnitureType, setFurnitureType] = useState(deal.furnitureType || '');
+  // Per-deal niche — only editable for multi-niche teams. Initialised
+  // from the deal's own niche (or the team primary if the deal has none).
+  // The form labels below (productTypeLabel, role labels, material
+  // categories) re-key live when this changes.
+  const [editNiche, setEditNiche] = useState<string>(deal.niche || store.niche);
+  // Resolved niche config for every label below. Updates instantly when
+  // the user picks a different "Тип проекта".
+  const dealNiche = getNiche(editNiche);
   const [materials, setMaterials] = useState(deal.materials || '');
   const [measurementDate, setMeasurementDate] = useState(deal.measurementDate || '');
   const [completionDate, setCompletionDate] = useState(deal.completionDate || '');
@@ -183,6 +195,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     setArchitect(deal.architect || '');
     setOwnerId(deal.ownerId || '');
     setFurnitureType(deal.furnitureType || '');
+    setEditNiche(deal.niche || store.niche);
     setMaterials(deal.materials || '');
     setMeasurementDate(deal.measurementDate || '');
     setCompletionDate(deal.completionDate || '');
@@ -224,13 +237,16 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     address: l('Адрес', 'Мекенжай', 'Address'),
     siteAddress: l('Адрес объекта', 'Нысан мекенжайы', 'Site address'),
     product: l('Продукт', 'Өнім', 'Product'),
-    furnitureType: l('Тип мебели', 'Жиһаз түрі', 'Furniture type'),
+    // Niche-aware — "Тип мебели" was hardcoded, broken for windows/doors/etc.
+    furnitureType: dealNiche.productTypeLabel[language],
     amount: l('Сумма', 'Сома', 'Amount'),
     paidAmount: l('Оплачено', 'Төленген', 'Paid'),
     status: l('Статус', 'Күй', 'Status'),
     source: l('Источник', 'Көзі', 'Source'),
-    measurer: l('Замерщик', 'Өлшеуші', 'Measurer'),
-    designer: l('Дизайнер', 'Дизайнер', 'Designer'),
+    // Niche-aware role names — for windows/blinds the measurer label
+    // might be "Замерщик", for ceilings "Замерщик-консультант", etc.
+    measurer: dealNiche.roleLabels.measurer[language],
+    designer: dealNiche.roleLabels.designer[language],
     foreman: l('Прораб', 'Прораб', 'Foreman'),
     architect: l('Архитектор', 'Сәулетші', 'Architect'),
     ownerId: l('Ответственный', 'Жауапты', 'Owner'),
@@ -404,6 +420,9 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         paymentMethods,
         status,
         customerBIN,
+        // Per-deal niche — persisted only when it differs from the
+        // team's primary so single-niche teams stay clean.
+        niche: editNiche && editNiche !== store.niche ? editNiche : undefined,
         // Auto-derive progress from status so the kanban and progress
         // bar stay in sync without a separate manual edit.
         progress: STATUS_OPTIONS.find(o => o.id === status)?.progress ?? deal.progress ?? 0,
@@ -464,6 +483,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       architect !== (deal.architect || '') ||
       ownerId !== (deal.ownerId || '') ||
       furnitureType !== (deal.furnitureType || '') ||
+      editNiche !== (deal.niche || store.niche) ||
       materials !== (deal.materials || '') ||
       measurementDate !== (deal.measurementDate || '') ||
       completionDate !== (deal.completionDate || '') ||
@@ -497,7 +517,18 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         {/* Header */}
         <div className="px-6 py-5 border-b border-white/60 flex items-center justify-between flex-shrink-0">
           <div className="min-w-0">
-            <div className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Заказ', 'Тапсырыс', 'Order')} · #{(deal.id || '').slice(-6)}</div>
+            <div className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase flex items-center gap-2 flex-wrap">
+              <span>{l('Заказ', 'Тапсырыс', 'Order')} · #{(deal.id || '').slice(-6)}</span>
+              {/* Niche tag — only when team has multi-niche AND this deal
+                  has its own niche. Tells the user at a glance which
+                  niche profile drives this deal's labels and stages. */}
+              {showNicheChip && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 normal-case tracking-normal ring-1 ring-emerald-100/60">
+                  <span>{dealNiche.icon}</span>
+                  <span>{dealNiche.name[language]}</span>
+                </span>
+              )}
+            </div>
             <div className="text-lg text-slate-900 tracking-tight truncate">{deal.customerName}</div>
             <div className="text-[11px] text-slate-500 mt-0.5 truncate">{deal.product} · <span className="tabular-nums">{(deal.amount || 0).toLocaleString('ru-RU')} ₸</span></div>
           </div>
@@ -540,9 +571,21 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
           {/* MAIN TAB — furniture-only, structured into clean sections */}
           {activeTab === 'main' && (
             <div className="p-5 space-y-6">
-              {/* Datalists from user-managed catalogs (Settings → Справочники) */}
-              <datalist id="dl-card-furniture-types">{catalogs.furnitureTypes.map(v => <option key={v} value={v} />)}</datalist>
-              <datalist id="dl-card-materials">{catalogs.materials.map(v => <option key={v} value={v} />)}</datalist>
+              {/* Datalists from user-managed catalogs (Settings → Справочники).
+                  When the team's catalog is empty we fall back to the niche's
+                  default product-type / material lists from niches.ts, so a
+                  fresh windows / ceilings / doors business sees suggestions
+                  out of the box without having to seed the catalog manually. */}
+              <datalist id="dl-card-furniture-types">
+                {catalogs.furnitureTypes.length
+                  ? catalogs.furnitureTypes.map(v => <option key={v} value={v} />)
+                  : dealNiche.productTypeOptions.map(v => <option key={v} value={v} />)}
+              </datalist>
+              <datalist id="dl-card-materials">
+                {catalogs.materials.length
+                  ? catalogs.materials.map(v => <option key={v} value={v} />)
+                  : dealNiche.materialCategories.map(v => <option key={v} value={v} />)}
+              </datalist>
 
               {/* ── Section: Contacts ── */}
               <section>
@@ -575,17 +618,62 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                 </div>
               </section>
 
-              {/* ── Section: Furniture details ── */}
+              {/* ── Section: Project type (multi-niche teams only) ── */}
+              {/* Lets admin/manager re-assign a deal to a different niche
+                  if it was created under the wrong direction. Changes
+                  re-key the product-type / role labels / material lists
+                  below instantly so the user can verify the new niche
+                  feels right before saving. */}
+              {showNicheChip && (
+                <section>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">
+                    {l('Тип проекта', 'Жоба түрі', 'Project type')}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {store.allNiches.map(nid => {
+                      const n = getNiche(nid);
+                      const active = editNiche === nid;
+                      return (
+                        <button
+                          key={nid}
+                          type="button"
+                          onClick={() => setEditNiche(nid)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] border transition-all ${
+                            active
+                              ? 'border-emerald-400 bg-emerald-50/80 text-emerald-800'
+                              : 'border-gray-100 bg-white/60 hover:border-emerald-200 text-gray-600'
+                          }`}
+                        >
+                          <span>{n.icon}</span>
+                          <span>{n.name[language]}</span>
+                          {active && <Check className="w-3 h-3 text-emerald-700" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-2">
+                    {l(
+                      `Изменение перенастроит названия полей, материалов и этапов под нишу «${dealNiche.name.ru}».`,
+                      `Өзгерту «${dealNiche.name.kz}» салаға бейімдейді.`,
+                      `Switching rekeys labels, materials and stages to "${dealNiche.name.eng}".`,
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* ── Section: product details — niche-aware ── */}
               <section>
                 <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Изделие', 'Бұйым', 'Product')}</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] text-slate-500 mb-1.5">{tt('furnitureType')}</label>
+                    {/* Label flips with the niche: "Тип мебели" / "Тип окна"
+                        / "Тип потолка" / "Тип двери" / etc. */}
+                    <label className="block text-[11px] text-slate-500 mb-1.5">{dealNiche.productTypeLabel[language]}</label>
                     <input
                       list="dl-card-furniture-types"
                       value={furnitureType}
                       onChange={e => setFurnitureType(e.target.value)}
-                      placeholder={catalogs.furnitureTypes.length ? '' : tt('catalogEmpty')}
+                      placeholder={catalogs.furnitureTypes.length || dealNiche.productTypeOptions.length ? '' : tt('catalogEmpty')}
                       className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all"
                     />
                   </div>
@@ -661,13 +749,16 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                 </datalist>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                   <div>
-                    <label className="block text-[11px] text-slate-500 mb-1.5">{tt('measurer')}</label>
+                    {/* Niche-aware role label — "Замерщик" stays for furniture
+                        but turns into the niche's own measurer role name for
+                        windows / ceilings / etc when those configs add one. */}
+                    <label className="block text-[11px] text-slate-500 mb-1.5">{dealNiche.roleLabels.measurer[language]}</label>
                     <input list="dl-card-employees" value={measurer} onChange={e => setMeasurer(e.target.value)}
                       placeholder={tt('notSelected')}
                       className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-500 mb-1.5">{tt('designer')}</label>
+                    <label className="block text-[11px] text-slate-500 mb-1.5">{dealNiche.roleLabels.designer[language]}</label>
                     <input list="dl-card-employees" value={designer} onChange={e => setDesigner(e.target.value)}
                       placeholder={tt('notSelected')}
                       className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
