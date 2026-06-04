@@ -16,10 +16,11 @@ import {
   Sparkles, Loader2, Download, Check, X, Bot, History, Wand2,
   CookingPot, BedDouble, Sofa, Bath, Baby, DoorOpen, Link as LinkIcon, Search,
   TreePine, Square as SquareIcon, Building2, Landmark, Leaf, Camera,
-  Trash2, RefreshCw, Pencil, Copy, Maximize2, User,
+  Trash2, RefreshCw, Pencil, Copy, Maximize2, User, Eye, MessageCircle, Info,
 } from 'lucide-react';
 import { api } from '../utils/api';
 import { useDataStore } from '../utils/dataStore';
+import { getNiche } from '../utils/niches';
 import utirLogo from '../../imports/utirsoft.png';
 
 // ─── Brand-icon SVGs (real provider logos, inline so no extra requests) ──
@@ -157,8 +158,34 @@ function StepBadge({ n, active }: { n: number | string; active: boolean }) {
   );
 }
 
+// ─── Niche-specific prompt hints ─────────────────────────────────
+// Auto-appended to the user's prompt so the AI keeps the *product* the
+// business actually sells front-and-centre in the render. A windows
+// company doesn't want a beautiful bedroom — they want a beautiful
+// bedroom with their windows clearly visible.
+const NICHE_HINT_RU: Record<string, string> = {
+  furniture:    '', // wizard already focuses on furniture-rich rooms
+  windows:      'крупные панорамные окна с белым ПВХ-профилем как акцент сцены, дневной свет из окон',
+  ceilings:     'натяжной потолок как акцент: ровная поверхность, встроенные светильники, аккуратные стыки со стенами',
+  blinds:       'окна оформлены жалюзи или шторами: римские/рулонные/тканевые — на выбор по стилю комнаты',
+  doors:        'входные и межкомнатные двери в кадре, аккуратные наличники, петли и фурнитура читаемые',
+  stairs:       'парадная лестница в центре композиции, деревянные ступени, кованые или стеклянные перила',
+  flooring:     'фокус на покрытии пола: паркет/ламинат/плитка крупным планом с заметной фактурой и швами',
+  construction: 'современная отделка стен и потолка, аккуратные углы, заметная штукатурка/покраска/обои',
+  custom:       '',
+};
+
 export function AIDesign({ language }: AIDesignProps) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const dataStore = useDataStore();
+  const niche = getNiche(dataStore.niche);
+  // Module-level view-gate. If the permission matrix gives this role
+  // 'none' for ai-design, the sidebar already hides the link — but
+  // deeplinks land here, so render a clean no-access screen instead of
+  // a half-functioning wizard with no providers/quotas/history.
+  const designLevel = dataStore.getModuleLevel('ai-design');
+  const canGenerateByRole = designLevel === 'full';
+  const nicheHint = NICHE_HINT_RU[dataStore.niche] || '';
 
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<ProviderId>('utir-mix');
@@ -226,7 +253,9 @@ export function AIDesign({ language }: AIDesignProps) {
 
   // Attach-to-deal picker — opens a modal listing the team's active deals
   // and writes the generation id into deal.designIds via updateDeal.
-  const store = useDataStore();
+  // Reuses the dataStore reference grabbed above for niche / permission
+  // checks — was a second useDataStore() call before, harmless but noisy.
+  const store = dataStore;
   const [attachingId, setAttachingId] = useState<string | null>(null);
   const [attachQuery, setAttachQuery] = useState('');
   const [attachToast, setAttachToast] = useState('');
@@ -300,6 +329,10 @@ export function AIDesign({ language }: AIDesignProps) {
 
   // Auto-assembled prompt from wizard selections. Concatenates room +
   // style + optional moods + extra free-text comma-separated, in Russian.
+  // Niche hint is auto-appended LAST so the AI keeps the product the
+  // business actually sells (windows / ceilings / doors / floors / …)
+  // prominent in the render. The user sees it as a small badge under the
+  // prompt preview so it's transparent — not a black-box modification.
   const assembledPrompt = useMemo(() => {
     const parts: string[] = [];
     const room = ROOMS.find(r => r.id === roomId);
@@ -311,11 +344,19 @@ export function AIDesign({ language }: AIDesignProps) {
       if (m) parts.push(m.promptRu);
     }
     if (extraText.trim()) parts.push(extraText.trim());
+    if (nicheHint) parts.push(nicheHint);
     return parts.join(', ');
-  }, [roomId, styleId, moodIds, extraText]);
+  }, [roomId, styleId, moodIds, extraText, nicheHint]);
 
-  const finalPrompt = freeMode ? freePrompt : assembledPrompt;
-  const canGenerate = finalPrompt.trim().length > 0 && !generating;
+  // For free-prompt mode we append the niche hint behind a comma if the
+  // user didn't already write about their product. Otherwise the AI
+  // ignores the niche and renders a generic interior.
+  const finalPrompt = freeMode
+    ? (freePrompt.trim() && nicheHint && !freePrompt.toLowerCase().includes(niche.name.ru.toLowerCase())
+        ? `${freePrompt.trim()}, ${nicheHint}`
+        : freePrompt)
+    : assembledPrompt;
+  const canGenerate = finalPrompt.trim().length > 0 && !generating && canGenerateByRole;
 
   const reloadAll = async () => {
     try {
@@ -453,6 +494,30 @@ export function AIDesign({ language }: AIDesignProps) {
   // returns the role on `usage.role` — we mirror that here.
   const isAdmin = usage?.role === 'admin';
 
+  // ─── Defensive view-gate ────────────────────────────────────────
+  // The sidebar already hides this link when the matrix says 'none' —
+  // but anyone can deeplink, so render a clean no-access screen instead
+  // of a half-broken wizard that errors on every fetch.
+  if (designLevel === 'none') {
+    return (
+      <div className="min-h-full relative flex items-center justify-center p-8">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-10 max-w-md text-center">
+          <Eye className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-lg text-slate-900 mb-1 tracking-tight">
+            {l('Нет доступа', 'Қол жетімсіз', 'No access')}
+          </h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            {l(
+              'У вашей роли нет прав на AI-дизайн. Попросите администратора открыть модуль в Настройки → Роли.',
+              'Сіздің рөліңізде AI-дизайн құқығы жоқ. Әкімшіден сұраңыз.',
+              'Your role does not have access to AI Design. Ask an admin to enable the module.',
+            )}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     // Liquid-glass page backdrop. Same vocabulary as Dashboard: soft
     // pastel base + four blurred orbs (violet/rose/sky/emerald) so the
@@ -465,7 +530,11 @@ export function AIDesign({ language }: AIDesignProps) {
         {/* ─── Header ────────────────────────────────────────── */}
         <div className="mb-7 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <p className="text-[11px] text-slate-400 mb-2 tracking-widest uppercase">AI Дизайн</p>
+            <p className="text-[11px] text-slate-400 mb-2 tracking-widest uppercase">
+              AI Дизайн
+              {' · '}
+              <span className="normal-case tracking-normal text-slate-500">{niche.icon} {niche.name[language]}</span>
+            </p>
             <h1 className="text-slate-900 text-3xl md:text-4xl font-medium tracking-tight mb-1">
               {l('Генерация интерьеров', 'Интерьер генерациясы', 'Interior generator')}
             </h1>
@@ -742,7 +811,7 @@ export function AIDesign({ language }: AIDesignProps) {
               <Wand2 className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-2">
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-2 flex-wrap">
                 <span>{l('Что отправим в AI', 'AI-ге не жібереміз', 'AI prompt')}</span>
                 {/* Brand-kit applied indicator — non-empty hint OR photoreal flag */}
                 {brandKit && (brandKit.styleHint.trim() || brandKit.photorealism) && (
@@ -752,6 +821,18 @@ export function AIDesign({ language }: AIDesignProps) {
                   >
                     <Sparkles className="w-2.5 h-2.5" />
                     {l('Бренд-стиль', 'Бренд-стиль', 'Brand kit')}
+                  </span>
+                )}
+                {/* Niche-hint badge — transparent indicator that we're
+                    appending a product-focus phrase tailored to this team's
+                    niche so the AI keeps their product prominent. */}
+                {nicheHint && finalPrompt && (
+                  <span
+                    className="px-2 py-0.5 bg-violet-100/70 text-violet-700 rounded-full text-[10px] normal-case tracking-normal ring-1 ring-white/40 flex items-center gap-1"
+                    title={nicheHint}
+                  >
+                    <Info className="w-2.5 h-2.5" />
+                    {niche.icon} {niche.name[language]}
                   </span>
                 )}
               </div>
@@ -764,9 +845,22 @@ export function AIDesign({ language }: AIDesignProps) {
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
               <span>{l('Обычно 10–60 секунд', '10–60 секунд алады', 'Usually 10–60s')}</span>
+              {/* Approximate cost — rough USD per image so users have an
+                  expectation before spending the team quota. Source:
+                  OpenAI / Google / Anthropic public pricing as of June
+                  2026. Updated when providers change tiers. */}
+              <span
+                className="px-2 py-0.5 bg-white/60 text-slate-500 rounded-full text-[10px] ring-1 ring-white/40"
+                title={l('Оценочная стоимость одной генерации', 'Бір генерацияның болжамды құны', 'Approximate cost per image')}
+              >
+                ≈ {selectedProvider === 'gemini' ? '$0.04'
+                  : selectedProvider === 'claude' ? '$0.10'
+                  : selectedProvider === 'chatgpt' ? '$0.16'
+                  : '$0.10'}
+              </span>
               {usage && (
                 <span className={`px-2 py-0.5 rounded-full text-[10px] ring-1 ring-white/40 ${
                   usage.limit === null
@@ -782,10 +876,16 @@ export function AIDesign({ language }: AIDesignProps) {
                     : `${usage.used} / ${usage.limit} ${l('в этом месяце', 'осы айда', 'this month')}`}
                 </span>
               )}
+              {!canGenerateByRole && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] ring-1 ring-amber-200/60 bg-amber-100/60 text-amber-700">
+                  {l('Только просмотр', 'Тек көру', 'View only')}
+                </span>
+              )}
             </div>
             <button
               onClick={generate}
               disabled={!canGenerate}
+              title={!canGenerateByRole ? l('Нет прав на генерацию', 'Генерация құқығы жоқ', 'No generate permission') : undefined}
               className="group flex items-center gap-2 px-5 py-2.5 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-sm shadow-[0_8px_24px_-8px_var(--accent-shadow)] hover:shadow-[0_12px_32px_-8px_var(--accent-shadow)] hover:bg-emerald-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ring-1 ring-white/10"
             >
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 transition-transform group-hover:scale-110" />}
@@ -1171,6 +1271,28 @@ export function AIDesign({ language }: AIDesignProps) {
                     >
                       <LinkIcon className="w-3.5 h-3.5" />
                       {l('К сделке', 'Мәмілеге', 'To deal')}
+                    </button>
+                  )}
+                  {/* Hand off the image + prompt to the in-app Chats module
+                      so a manager can drop it straight into the client
+                      conversation. The Chats page listens for this event
+                      and pre-fills the composer with an image attachment. */}
+                  {viewing.imageUrl && (
+                    <button
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent('chats:share-image', { detail: {
+                          imageUrl: viewing.imageUrl,
+                          caption: viewing.prompt || viewing.enhancedPrompt || '',
+                          provider: viewing.provider,
+                        }}));
+                        window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'chats' } }));
+                        setViewing(null);
+                        showFlash(l('Откройте чат и вставьте изображение', 'Чатты ашып, суретті қойыңыз', 'Open the chat and paste the image'));
+                      }}
+                      className="col-span-2 flex items-center justify-center gap-2 px-3 py-2.5 bg-violet-50/80 hover:bg-violet-100/80 ring-1 ring-violet-200/60 text-violet-700 rounded-2xl text-xs transition-colors"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      {l('Отправить в чат клиенту', 'Клиентке чатқа жіберу', 'Send to client chat')}
                     </button>
                   )}
                   {viewing.id && isAdmin && (
