@@ -1129,6 +1129,23 @@ function TeamMetrics({ language }: { language: 'kz' | 'ru' | 'eng' }) {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-gray-900 truncate">{r.emp.name}</div>
                   <div className="text-[11px] text-gray-400 truncate">{r.emp.role} · {r.emp.email}</div>
+                  {/* Niche-assignment chips — only when (a) team is
+                      multi-niche AND (b) this teammate has explicit
+                      direction(s) set. Missing = "works on everything",
+                      which matches the default and renders nothing. */}
+                  {store.secondaryNiches.length > 0 && Array.isArray((r.emp as any).nicheAssignments) && (r.emp as any).nicheAssignments.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {((r.emp as any).nicheAssignments as string[]).map(nid => {
+                        const n = getNiche(nid);
+                        return (
+                          <span key={nid} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[9px] ring-1 ring-emerald-100/60">
+                            <span>{n.icon}</span>
+                            <span>{n.name[language]}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 

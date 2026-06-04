@@ -108,6 +108,14 @@ export interface Employee {
   avatar: string;
   permissions: { sales: boolean; finance: boolean; warehouse: boolean; chats: boolean; analytics: boolean; settings: boolean; };
   performance: { ordersCompleted: number; rating: number; efficiency: number; };
+  // Niche assignments — for multi-niche businesses where specific
+  // teammates only handle certain directions (e.g. one master only does
+  // doors, another only stairs). Empty / undefined means "works across
+  // all team niches" — the default. Stored as niche ids; resolved to
+  // names + icons at render time. Used by Analytics team metrics to
+  // tag who works on what, and by NewDealModal to suggest the right
+  // owner when a deal niche is picked.
+  nicheAssignments?: string[];
 }
 
 // Role → per-module permission level. Stored in localStorage so Admin can tune.

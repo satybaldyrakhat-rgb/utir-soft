@@ -599,6 +599,12 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
     setBusy(true);
     try {
       const pdf = await import('../utils/pdfReports');
+      // Niche label for multi-niche teams — printed under the PDF header
+      // so the accountant can see at a glance which line of business.
+      // Single-niche teams: undefined, so the line is omitted entirely.
+      const nicheLabel = store.secondaryNiches.length > 0
+        ? getNiche(selected.niche || store.niche).name.ru
+        : undefined;
       if (docKind === 'invoice') {
         const paidAmount = Math.round((selected.amount || 0) * (selected.progress || 0) / 100);
         await pdf.generateInvoicePDF({
@@ -610,6 +616,7 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
           product: selected.product,
           amount: selected.amount || 0,
           paidAmount,
+          nicheLabel,
         }, requisites || {}, number ? { invoiceNumber: number } : undefined);
       } else {
         // Akt — uses the full deal amount (act = work completed in full).
@@ -620,6 +627,7 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
           customerAddress: selected.address,
           product: selected.product,
           amount: selected.amount || 0,
+          nicheLabel,
         }, requisites || {}, number ? { actNumber: number } : undefined);
       }
       onClose();

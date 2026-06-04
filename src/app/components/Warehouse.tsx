@@ -394,18 +394,30 @@ export function Warehouse({ language }: WarehouseProps) {
   // defaults (all pending).
   const prodOrders: ProdOrder[] = store.deals
     .filter(d => ['production', 'assembly', 'contract', 'project-agreed', 'manufacturing', 'installation', 'measured'].includes(d.status))
-    .map((d, i) => ({
-      id: i + 1, dealId: d.id,
-      name: d.product, client: d.customerName.split(' ')[0] + ' ' + (d.customerName.split(' ')[1]?.[0] || '') + '.',
-      master: d.measurer || 'Не назначен',
-      daysLeft: d.completionDate ? Math.max(0, Math.ceil((new Date(d.completionDate).getTime() - Date.now()) / 86400000)) : 0,
-      progress: d.progress,
-      status: d.progress >= 100 ? 'done' as const : d.progress > 50 ? 'working' as const : d.progress > 0 ? 'started' as const : 'paused' as const,
-      start: d.measurementDate || d.date, end: d.completionDate || '',
-      materials: d.materials ? d.materials.split(', ').slice(0, 3) : [],
-      stages: ((d as any).stages as DealStage[] | undefined) || makeDefaultStages(niche.productionStages),
-      consumed: ((d as any).consumed as ConsumedMaterial[] | undefined) || [],
-    }));
+    .map((d, i) => {
+      // Each deal carries its own niche template so a multi-niche team
+      // shows the right pipeline per row: a furniture deal gets
+      // Распил → Кромка → Сборка, a doors deal gets Резка → …, etc.
+      // Single-niche teams continue using the team's primary niche.
+      const dealNicheConfig = getNiche(d.niche || store.niche);
+      return {
+        id: i + 1, dealId: d.id,
+        name: d.product, client: d.customerName.split(' ')[0] + ' ' + (d.customerName.split(' ')[1]?.[0] || '') + '.',
+        master: d.measurer || 'Не назначен',
+        daysLeft: d.completionDate ? Math.max(0, Math.ceil((new Date(d.completionDate).getTime() - Date.now()) / 86400000)) : 0,
+        progress: d.progress,
+        status: d.progress >= 100 ? 'done' as const : d.progress > 50 ? 'working' as const : d.progress > 0 ? 'started' as const : 'paused' as const,
+        start: d.measurementDate || d.date, end: d.completionDate || '',
+        materials: d.materials ? d.materials.split(', ').slice(0, 3) : [],
+        // Stages built from the DEAL's niche template, not the team primary
+        stages: ((d as any).stages as DealStage[] | undefined) || makeDefaultStages(dealNicheConfig.productionStages),
+        consumed: ((d as any).consumed as ConsumedMaterial[] | undefined) || [],
+        // Carry the niche template forward so the renderer can show the
+        // right stage labels per row without re-deriving from deal.niche.
+        nicheStages: dealNicheConfig.productionStages,
+        nicheId: d.niche || store.niche,
+      } as ProdOrder & { nicheStages: typeof dealNicheConfig.productionStages; nicheId: string };
+    });
 
   // ─── Material consumption ────────────────────────────────────────
   // Single source of truth for the «Списать материалы» modal — captures
@@ -469,7 +481,11 @@ export function Warehouse({ language }: WarehouseProps) {
   // 5 stages and broke for niches with fewer/more.
   async function cycleStage(order: ProdOrder, stageId: string) {
     if (!canWrite) return; // permission gate
-    const stageTemplate = niche.productionStages;
+    // Use the deal's own niche template so multi-niche teams cycle
+    // stages by the right pipeline (door deal → door stages, furniture
+    // deal → furniture stages). The template was attached when we
+    // built prodOrders above.
+    const stageTemplate = (order as any).nicheStages || niche.productionStages;
     const current = order.stages || makeDefaultStages(stageTemplate);
     const now = new Date().toISOString();
     const nextStatus = (s: StageStatus): StageStatus =>
@@ -529,7 +545,8 @@ export function Warehouse({ language }: WarehouseProps) {
       // Closing the order from outside the stage strip — also mark every
       // stage 'done' so the chip strip / reports reflect reality.
       const now = new Date().toISOString();
-      const allDone = (order.stages || makeDefaultStages(niche.productionStages)).map(s =>
+      const stageTemplate = (order as any).nicheStages || niche.productionStages;
+      const allDone = (order.stages || makeDefaultStages(stageTemplate)).map(s =>
         s.status === 'done' ? s : { ...s, status: 'done' as StageStatus, completedAt: now },
       );
       patch = { progress: 100, status: 'completed', stages: allDone };
@@ -774,12 +791,20 @@ export function Warehouse({ language }: WarehouseProps) {
               return (
                 <div key={o.id} onClick={() => setSelectedOrder(o)} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 hover:shadow-sm transition-all cursor-pointer group">
                   {/* Header */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-900">{o.name}</span>
+                  <div className="flex items-center justify-between mb-3 gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                      <span className="text-sm text-gray-900 truncate">{o.name}</span>
                       <span className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg ${conf.color}`}><Icon className="w-3 h-3" />{conf.label}</span>
+                      {/* Niche chip — only for multi-niche teams so the
+                          shop floor knows which pipeline to follow when
+                          a row sits next to one from a different direction. */}
+                      {store.secondaryNiches.length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-emerald-50/80 text-emerald-700 ring-1 ring-emerald-100/60">
+                          {getNiche((o as any).nicheId).icon} {getNiche((o as any).nicheId).name[language]}
+                        </span>
+                      )}
                     </div>
-                    <span className="text-[10px] text-slate-400">#{o.id}</span>
+                    <span className="text-[10px] text-slate-400 flex-shrink-0">#{o.id}</span>
                   </div>
 
                   {/* Info grid */}
@@ -809,10 +834,10 @@ export function Warehouse({ language }: WarehouseProps) {
                       Click cycles: pending → in-progress → done → pending. */}
                   <div
                     className="mt-3 grid gap-1"
-                    style={{ gridTemplateColumns: `repeat(${niche.productionStages.length}, minmax(0, 1fr))` }}
+                    style={{ gridTemplateColumns: `repeat(${(o as any).nicheStages.length}, minmax(0, 1fr))` }}
                     onClick={e => e.stopPropagation()}
                   >
-                    {niche.productionStages.map((tpl: NicheStage) => {
+                    {((o as any).nicheStages as NicheStage[]).map((tpl: NicheStage) => {
                       const stage = (o.stages || []).find(s => s.id === tpl.id);
                       const status = stage?.status || 'pending';
                       const label = tpl[language];
@@ -1066,6 +1091,11 @@ export function Warehouse({ language }: WarehouseProps) {
                   { header: 'Цена',      value: 'cost' },
                   { header: 'Мин',       value: 'minQty' },
                   { header: 'Статус',    value: 'status' },
+                  // Niche column always present in the export so the
+                  // file round-trips cleanly (export → edit → re-import)
+                  // even for single-niche teams. Value is the niche id
+                  // (furniture / windows / …) or blank for shared.
+                  { header: 'Направление', value: (p: Product) => p.niche || '' },
                 ];
                 downloadCsv(todayStampedName('materials'), rowsToCsv(store.products as any[], cols));
               }}
@@ -1232,11 +1262,39 @@ export function Warehouse({ language }: WarehouseProps) {
             { key: 'supplier', headers: ['Поставщик', 'Supplier'] },
             { key: 'cost',     headers: ['Цена', 'Price', 'Cost'], transform: (v) => Number(String(v).replace(/[^0-9.-]/g, '')) || 0 },
             { key: 'minQty',   headers: ['Мин', 'Min', 'MinQty'], transform: (v) => Number(String(v).replace(/[^0-9.-]/g, '')) || 0 },
+            // Niche column — accepts either the niche id (furniture, windows,
+            // doors, …) or its localized name (Мебель / Windows). Empty cell
+            // means "applies to all directions" — same as in the UI dropdown.
+            // Multi-niche teams can prepare a single import file split by
+            // direction column instead of importing per-niche separately.
+            { key: 'niche',    headers: ['Направление', 'Direction', 'Niche', 'Ниша'] },
           ] as CsvFieldSpec[]}
           onImport={async (rec) => {
             const quantity = Number(rec.quantity) || 0;
             const minQty = Number(rec.minQty) || 10;
             const status = quantity === 0 ? 'outofstock' : quantity < minQty ? 'low' : 'instock';
+            // Resolve the niche cell: accept id directly OR match against
+            // the team's allNiches by RU/KZ/EN name (case-insensitive).
+            // Anything we can't recognise is silently dropped — never write
+            // garbage into the column.
+            const rawNiche = String(rec.niche || '').trim();
+            let resolvedNiche: string | undefined;
+            if (rawNiche) {
+              if (store.allNiches.includes(rawNiche)) {
+                resolvedNiche = rawNiche;
+              } else {
+                const lower = rawNiche.toLowerCase();
+                for (const id of store.allNiches) {
+                  const n = getNiche(id);
+                  if (n.name.ru.toLowerCase() === lower ||
+                      n.name.kz.toLowerCase() === lower ||
+                      n.name.eng.toLowerCase() === lower) {
+                    resolvedNiche = id;
+                    break;
+                  }
+                }
+              }
+            }
             await store.addProduct({
               name: String(rec.name),
               category: String(rec.category || niche.materialCategories[0] || 'Прочее'),
@@ -1246,7 +1304,8 @@ export function Warehouse({ language }: WarehouseProps) {
               cost: Number(rec.cost) || 0,
               status: status as any,
               minQty,
-            });
+              niche: resolvedNiche,
+            } as any);
           }}
           onClose={() => setShowProductImport(false)}
         />

@@ -451,6 +451,11 @@ export interface InvoiceDeal {
   // VAT mode: 'with' = в т.ч. НДС 12% (КЗ-стандарт, по умолчанию),
   //          'without' = без НДС, 'exempt' = освобождён от НДС.
   vatMode?: 'with' | 'without' | 'exempt';
+  // Direction tag — for multi-niche companies. Printed under the
+  // header as a small "Направление: ..." line so the accountant can
+  // see at a glance whether this invoice is for the furniture / doors
+  // / stairs side of the business. Plain text; no emoji in PDFs.
+  nicheLabel?: string;
 }
 
 export async function generateInvoicePDF(deal: InvoiceDeal, requisites: CompanyRequisites = {}, opts?: { invoiceNumber?: string }) {
@@ -460,6 +465,16 @@ export async function generateInvoicePDF(deal: InvoiceDeal, requisites: CompanyR
   drawHeader(doc, `Счёт на оплату № ${num}`, `от ${fmtDate()}`, requisites.legalName);
 
   let y = 38;
+
+  // Niche line — only when the seller works in multiple niches and the
+  // deal carries a niche label. Compact "Направление: Двери" line so
+  // the accountant immediately sees which line of business.
+  if (deal.nicheLabel) {
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Направление: ${deal.nicheLabel}`, 14, y);
+    y += 6;
+  }
 
   // ─── Seller block ─────────────────────────────────────────────
   doc.setFontSize(10);
@@ -839,6 +854,8 @@ export interface ActDeal {
   amount: number;
   // Optional override of the act date; defaults to today.
   date?: string;
+  // Direction label for multi-niche companies — same as InvoiceDeal.
+  nicheLabel?: string;
 }
 
 export async function generateActPDF(deal: ActDeal, requisites: CompanyRequisites = {}, opts?: { actNumber?: string }) {
@@ -849,6 +866,15 @@ export async function generateActPDF(deal: ActDeal, requisites: CompanyRequisite
   drawHeader(doc, `Акт выполненных работ № ${num}`, `от ${fmtDate(actDate)}`, requisites.legalName);
 
   let y = 38;
+
+  // Niche line — printed once under the header for multi-niche shops
+  // so the act mirrors the invoice's "Направление" tag.
+  if (deal.nicheLabel) {
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Направление: ${deal.nicheLabel}`, 14, y);
+    y += 6;
+  }
 
   // Party blocks — Исполнитель (we) + Заказчик (client)
   doc.setFontSize(10); doc.setTextColor(120, 120, 120);

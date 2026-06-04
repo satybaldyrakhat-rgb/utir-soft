@@ -10,6 +10,7 @@ import { CatalogsSettings } from './CatalogsSettings';
 import { GeneralSettings } from './GeneralSettings';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
 import { useDataStore, ALL_MODULES, ALL_ROLES, MODULE_GROUPS, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
+import { getNiche } from '../utils/niches';
 import { api } from '../utils/api';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { t } from '../utils/translations';
@@ -227,6 +228,12 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
     const phone = empPhone.trim();
     const profileChanged = name !== (editingEmployee.name || '') || phone !== (editingEmployee.phone || '');
     const roleChanged = editingEmployee.role !== empRole;
+    // Niche assignments — multi-niche teams only. Empty array reset to
+    // undefined so single-niche teams stay clean in the DB.
+    const currentNiches: string[] = Array.isArray(editingEmployee.nicheAssignments) ? editingEmployee.nicheAssignments : [];
+    const sortedNew = [...empNiches].sort().join(',');
+    const sortedCur = [...currentNiches].sort().join(',');
+    const nichesChanged = sortedNew !== sortedCur;
 
     // Self-protection mirrors the backend rule.
     const isSelf = !!currentUserEmail && editingEmployee.email.toLowerCase() === currentUserEmail.toLowerCase();
@@ -235,13 +242,18 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
       return;
     }
 
-    if (!profileChanged && !roleChanged) { closeEmployeeModal(); return; }
+    if (!profileChanged && !roleChanged && !nichesChanged) { closeEmployeeModal(); return; }
 
     setRoleSaving(true);
     try {
-      // Profile fields go through the generic employees PATCH endpoint.
-      if (profileChanged) {
-        store.updateEmployee(editingEmployee.id, { name, phone });
+      // Profile fields + niche assignments go through the generic
+      // employees PATCH endpoint. Empty array → undefined so the field
+      // is dropped from the row (cleaner for single-niche teams).
+      if (profileChanged || nichesChanged) {
+        const patch: any = {};
+        if (profileChanged) { patch.name = name; patch.phone = phone; }
+        if (nichesChanged) { patch.nicheAssignments = empNiches.length > 0 ? empNiches : undefined; }
+        store.updateEmployee(editingEmployee.id, patch);
       }
       // Role goes through the dedicated endpoint so it also updates users.team_role.
       if (roleChanged) {
@@ -378,6 +390,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
     setEmpName(editingEmployee?.name || '');
     setEmpEmail(editingEmployee?.email || '');
     setEmpPhone(editingEmployee?.phone || '');
+    setEmpNiches(Array.isArray(editingEmployee?.nicheAssignments) ? editingEmployee.nicheAssignments : []);
   }, [editingEmployee]);
   const [empRole, setEmpRole] = useState<string>('manager');
   // Controlled state for the edit-employee modal. Initialised from
@@ -385,6 +398,11 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
   const [empName, setEmpName] = useState('');
   const [empEmail, setEmpEmail] = useState('');
   const [empPhone, setEmpPhone] = useState('');
+  // Niche assignments for multi-niche teams. Empty array = the
+  // employee works across every direction (the default). Otherwise
+  // limits which niches this teammate handles — used by team metrics
+  // and deal-owner suggestions.
+  const [empNiches, setEmpNiches] = useState<string[]>([]);
 
   return (
     <div
@@ -965,6 +983,54 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
                   )}
                 </div>
               </div>
+
+              {/* Niche assignments — only for multi-niche teams. If
+                  empty, the teammate is treated as working across
+                  every niche (default). Multi-niche teams use this to
+                  say "Иван работает только по дверям, Айгуль — по
+                  лестницам", which drives Analytics filtering. */}
+              {store.secondaryNiches.length > 0 && (
+                <div className="border border-gray-100 rounded-2xl p-4 space-y-3">
+                  <div>
+                    <div className="text-[11px] text-gray-500">
+                      {l('Направления работы', 'Жұмыс бағыттары', 'Work directions')}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-1 leading-relaxed">
+                      {l(
+                        'Если ничего не выбрано — сотрудник работает по всем направлениям. Иначе — только по выбранным.',
+                        'Бос болса — барлық бағыттар бойынша жұмыс істейді.',
+                        'Empty = works across every direction. Otherwise limits to the picked ones.',
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {store.allNiches.map(nid => {
+                      const n = getNiche(nid);
+                      const active = empNiches.includes(nid);
+                      return (
+                        <button
+                          key={nid}
+                          type="button"
+                          onClick={() => {
+                            setEmpNiches(prev => active
+                              ? prev.filter(x => x !== nid)
+                              : [...prev, nid]);
+                          }}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] border transition-all ${
+                            active
+                              ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
+                              : 'border-gray-100 hover:border-emerald-200 text-gray-500'
+                          }`}
+                        >
+                          {active && <Check className="w-3 h-3 text-emerald-700" />}
+                          <span>{n.icon}</span>
+                          <span>{n.name[language]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             {roleError && (
               <div className="mx-5 mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-lg text-xs text-red-700">{roleError}</div>
