@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Send, Paperclip, MessageCircle, Bot, Check, CheckCheck, Plus, X, Play, Pause, Edit2, Trash2, Copy, Users, TrendingUp, Calendar, Clock, Zap, MessageSquare, Settings, BarChart3, Eye, ArrowRight, Circle, ShoppingCart, ExternalLink, Phone, Mic, FileText, Image as ImageIcon, Film, StopCircle, Sparkles, Key, Heart, Hand, AlarmClock } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { TextMessage, ImageMessage, FileMessage, VoiceMessage, CallMessage } from './ChatMessageTypes';
 import { PlatformIcon } from './PlatformLogos';
+import { useDataStore } from '../utils/dataStore';
+import { getNiche } from '../utils/niches';
 
 interface Message {
   id: string;
@@ -35,31 +37,85 @@ const mockChats: Chat[] = [];
 
 interface ChatsProps { language: 'kz' | 'ru' | 'eng'; }
 
+// Niche-keyword bank used to suggest the "ключевое слово → запись на замер"
+// scenario trigger. The trigger word for furniture is «кухня», for windows
+// it's «окно», for ceilings «потолок», etc. We just pick the first niche
+// product-type option as the example.
+const NICHE_KEYWORD: Record<string, string> = {
+  furniture: 'кухня', windows: 'окно', ceilings: 'потолок',
+  blinds: 'жалюзи', doors: 'дверь', stairs: 'лестница',
+  flooring: 'ламинат', construction: 'ремонт', custom: 'заказ',
+};
+
+// Scenario titles use placeholders that we replace with niche-specific
+// nouns at render-time. Was hardcoded "кейсы / кухня / модели" before —
+// which read fine for a furniture team but broken for windows/doors.
 const scenariosData = [
-  { id: 'comment_dm', icon: MessageCircle, title: 'Комментарий → DM с прайсом', desc: 'Когда кто-то комментирует пост — автоматически отправляем прайс в Direct' },
-  { id: 'story_dm', icon: Heart, title: 'Реакция на сторис → DM с кейсами', desc: 'Когда подписчик реагирует на сторис — отправляем подборку наших работ' },
-  { id: 'keyword_measure', icon: Key, title: 'Ключевое слово → запись на замер', desc: 'Когда в сообщении есть слова «замер», «цена», «кухня» — предлагаем записаться' },
-  { id: 'new_follower', icon: Hand, title: 'Новый подписчик → приветствие', desc: 'Здороваемся с новыми подписчиками и отправляем подборку п��пулярных моделей' },
-  { id: 'abandoned', icon: AlarmClock, title: 'Брошенный диалог → напоминание', desc: 'Если клиент не ответил 24 часа — отправляем дружелюбное напоминание' },
+  { id: 'comment_dm',     icon: MessageCircle, titleKey: { ru: 'Комментарий → DM с прайсом', kz: 'Пікір → прайс DM', eng: 'Comment → DM with pricing' },
+    descKey: { ru: 'Когда кто-то комментирует пост — автоматически отправляем прайс в Direct', kz: 'Постқа пікір жазғанда прайсты автоматты түрде Direct-ке жібереміз', eng: 'When someone comments on a post, auto-send the pricing in Direct' } },
+  { id: 'story_dm',       icon: Heart, titleKey: { ru: 'Реакция на сторис → DM с кейсами', kz: 'Сторис реакциясы → DM', eng: 'Story reaction → DM with cases' },
+    descKey: { ru: 'Когда подписчик реагирует на сторис — отправляем подборку наших работ', kz: 'Сторис реакциясы кезінде жұмыс портфолиосын жібереміз', eng: 'When a follower reacts to a story — send a portfolio selection' } },
+  { id: 'keyword_measure',icon: Key, titleKey: { ru: 'Ключевое слово → запись на замер', kz: 'Кілт сөз → өлшеу жазу', eng: 'Keyword → measurement booking' },
+    descKey: { ru: 'Когда в сообщении есть слова «замер», «цена», «{NICHE_KEYWORD}» — предлагаем записаться', kz: '«өлшеу», «бағасы», «{NICHE_KEYWORD}» сөздері кезінде өлшеуге жазылуды ұсынамыз', eng: 'When the message contains "measurement", "price" or "{NICHE_KEYWORD}" — offer to book' } },
+  { id: 'new_follower',   icon: Hand, titleKey: { ru: 'Новый подписчик → приветствие', kz: 'Жаңа жазылушы → сәлемдесу', eng: 'New follower → greeting' },
+    descKey: { ru: 'Здороваемся с новыми подписчиками и отправляем подборку популярных работ', kz: 'Жаңа жазылушылармен амандасып, танымал жұмыстарды жібереміз', eng: 'Welcome new followers and send a popular-works selection' } },
+  { id: 'abandoned',      icon: AlarmClock, titleKey: { ru: 'Брошенный диалог → напоминание', kz: 'Тасталған диалог → еске салу', eng: 'Abandoned dialog → reminder' },
+    descKey: { ru: 'Если клиент не ответил 24 часа — отправляем дружелюбное напоминание', kz: 'Клиент 24 сағат жауап бермесе — досмен еске салу жібереміз', eng: 'If a client hasn\'t replied for 24h — send a friendly reminder' } },
 ];
 
 export function Chats({ language }: ChatsProps) {
+  const store = useDataStore();
+  const niche = getNiche(store.niche);
+  const chatsLevel = store.getModuleLevel('chats');
+  const canWrite = chatsLevel === 'full';
+  const nicheKeyword = NICHE_KEYWORD[store.niche] || 'заказ';
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+
+  // Niche-aware default for the AI agent's "additional instructions"
+  // textarea. Each niche gets a different first sentence so the agent
+  // sounds like it actually knows what the team sells. The user can
+  // override — this is just the starting point.
+  const defaultAiInstructions = (() => {
+    const installerRole = niche.roleLabels.installer[language];
+    const measurerRole = niche.roleLabels.measurer[language];
+    return l(
+      `Всегда уточняй параметры заказа (размеры, материалы). При вопросе о цене — отправляй прайс. Если клиент готов к замеру — передавай ${measurerRole.toLowerCase()}у или менеджеру. Готовый заказ — на ${installerRole.toLowerCase()}а.`,
+      `Тапсырыс параметрлерін (өлшем, материал) нақтыла. Баға сұрағанда прайсты жібер. Клиент дайын болса — менеджерге бер.`,
+      `Always clarify order parameters (sizes, materials). When asked about price — send pricing. When the client is ready — hand off to a manager.`,
+    );
+  })();
+
   const [activeTab, setActiveTab] = useState<'chats' | 'ai-agent' | 'automation'>('chats');
   const [aiAgentSubTab, setAiAgentSubTab] = useState<'agent' | 'scenarios'>('agent');
   const [aiAgentEnabled, setAiAgentEnabled] = useState(true);
   const [aiChannels, setAiChannels] = useState({ whatsapp: true, instagram: true, telegram: false });
   const [aiTone, setAiTone] = useState<'professional' | 'friendly' | 'casual'>('friendly');
-  const [aiInstructions, setAiInstructions] = useState('Всегда уточняй размеры комнаты. При вопросе о цене — отправляй прайс. Если клиент готов к замеру — передавай менеджеру.');
-  const [aiKnowledgeFiles] = useState(['Прайс-2026.pdf', 'Каталог кухонь.pdf']);
+  const [aiInstructions, setAiInstructions] = useState(defaultAiInstructions);
+  // Knowledge files are niche-neutral now ("Прайс / Каталог" instead of
+  // "Каталог кухонь.pdf"). Real files come from upload — this is only
+  // the placeholder shown when nothing has been uploaded yet.
+  const [aiKnowledgeFiles] = useState([l('Прайс-2026.pdf', 'Прайс-2026.pdf', 'Pricing-2026.pdf'), l('Каталог.pdf', 'Каталог.pdf', 'Catalog.pdf')]);
   const [aiTransferConditions, setAiTransferConditions] = useState({ measurement: true, discount: true, unknown: true, longChat: false });
   const [activeScenarios, setActiveScenarios] = useState<Record<string, boolean>>({ comment_dm: true, story_dm: false, keyword_measure: true, new_follower: false, abandoned: false });
   const [scenarioModal, setScenarioModal] = useState<string | null>(null);
+  // Default scenario texts are niche-aware. "Мы производим мебель" was
+  // hardcoded — now it reads "we make {windows/ceilings/doors/etc}".
   const [scenarioTexts, setScenarioTexts] = useState<Record<string, string>>({
-    comment_dm: 'Привет! 👋 Спасибо за комментарий. Отправляем вам наш актуальный прайс. Если есть вопросы — пишите!',
-    story_dm: 'Привет! Рады, что вам понравилось 😊 Вот наши лучшие реализованные проекты:',
-    keyword_measure: 'Здравствуйте! Я вижу, вы интересуетесь замером. Хотите записаться на бесплатный замер и консультацию?',
-    new_follower: 'Добро пожаловать! 🏠 Мы производим мебель под заказ. Вот наши популярные модели:',
-    abandoned: 'Здравствуйте! Мы заметили, что наш разговор прервался. Можем ли мы помочь вам с выбором мебели? 😊',
+    comment_dm: l('Здравствуйте! 👋 Спасибо за комментарий. Отправляем вам наш актуальный прайс. Если есть вопросы — пишите!',
+                  'Сәлеметсіз бе! 👋 Пікіріңізге рахмет. Прайсты жібереміз.',
+                  'Hi! 👋 Thanks for the comment. Sending you our current pricing. Questions? Just ask!'),
+    story_dm:   l('Здравствуйте! Рады, что вам понравилось 😊 Вот наши лучшие реализованные проекты:',
+                  'Сәлеметсіз бе! Ұнағанына қуаныштымыз 😊 Жұмыстарымыздан көрсетейік:',
+                  'Hi! Glad you liked it 😊 Here are some of our best projects:'),
+    keyword_measure: l('Здравствуйте! Я вижу, вы интересуетесь замером. Хотите записаться на бесплатный замер и консультацию?',
+                       'Сәлеметсіз бе! Өлшеуге қызығатыныңызды көрдім. Тегін өлшеу мен кеңеске жазылғыңыз келе ме?',
+                       'Hi! I see you\'re interested in a measurement. Want to book a free measurement & consultation?'),
+    new_follower: l(`Добро пожаловать! 🏠 Мы — ${niche.name.ru.toLowerCase()} под заказ. Вот наши популярные работы:`,
+                    `Қош келдіңіз! 🏠 Біз — ${niche.name.kz.toLowerCase()}. Танымал жұмыстар:`,
+                    `Welcome! 🏠 We make custom ${niche.name.eng.toLowerCase()}. Here are popular works:`),
+    abandoned: l('Здравствуйте! Мы заметили, что разговор прервался. Можем ли мы помочь вам с выбором? 😊',
+                 'Сәлеметсіз бе! Әңгіме үзіліп қалғанын байқадық. Таңдауыңызға көмектесейік пе? 😊',
+                 'Hi! We noticed our chat got interrupted. Can we help you with your choice? 😊'),
   });
 
   const [chats] = useState<Chat[]>(mockChats);
@@ -77,13 +133,75 @@ export function Chats({ language }: ChatsProps) {
   const [callDuration, setCallDuration] = useState(0);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
 
-  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  // Pending hand-off from AIDesign — when AI Design fires
+  // chats:share-image, we capture the image + caption and hold it as a
+  // "draft attachment" until the user picks a chat. As soon as they
+  // open a chat, we drop the image+caption into the composer for them.
+  const [pendingShare, setPendingShare] = useState<{ imageUrl: string; caption: string; provider: string } | null>(null);
+  const [shareBanner, setShareBanner] = useState('');
+
+  // Listen for chats:share-image dispatched by AIDesign lightbox.
+  // Stores the image as a "pending share" so the user can pick which
+  // chat to send it to. When they open a chat, we drop it in as an
+  // image message + prefill the composer with the caption.
+  useEffect(() => {
+    const onShare = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {};
+      if (!detail.imageUrl) return;
+      setPendingShare({
+        imageUrl: String(detail.imageUrl),
+        caption:  String(detail.caption || ''),
+        provider: String(detail.provider || ''),
+      });
+      setActiveTab('chats');
+      setShareBanner(l(
+        'Концепт готов к отправке. Откройте диалог с клиентом — изображение прикрепится автоматически.',
+        'Концепт жіберуге дайын. Клиентпен диалогты ашыңыз.',
+        'Concept ready to send. Open a client conversation — the image will attach automatically.',
+      ));
+    };
+    window.addEventListener('chats:share-image', onShare);
+    return () => window.removeEventListener('chats:share-image', onShare);
+  }, [language]);
+
+  // When a chat is selected and we have a pending share — drop the
+  // image into the message list and prefill the composer with the
+  // caption so the user just clicks Send.
+  const dropPendingShare = (chat: Chat) => {
+    if (!pendingShare) return;
+    setMessages(prev => [
+      ...prev,
+      {
+        id: String(Date.now()) + '-share',
+        text: '',
+        time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+        isUser: false,
+        read: false,
+        type: 'image',
+        fileUrl: pendingShare.imageUrl,
+        fileName: `concept-${pendingShare.provider || 'design'}.png`,
+      },
+    ]);
+    if (pendingShare.caption) setNewMessage(pendingShare.caption);
+    setPendingShare(null);
+    setShareBanner('');
+  };
 
   const platformDot = (p: Chat['platform']) => <PlatformIcon platform={p} size="sm" />;
   const platformName = (p: Chat['platform']) => ({ whatsapp: 'WhatsApp', instagram: 'Instagram', telegram: 'Telegram', tiktok: 'TikTok' }[p]);
   const platformBadge = (p: Chat['platform']) => ({ whatsapp: 'bg-green-50 text-green-700 border-green-200', instagram: 'bg-pink-50 text-pink-700 border-pink-200', telegram: 'bg-blue-50 text-blue-700 border-blue-200', tiktok: 'bg-gray-50 text-slate-700 border-gray-200' }[p]);
 
-  const handleChatSelect = (chat: Chat) => { setSelectedChat(chat); setMessages(chat.messages); };
+  const handleChatSelect = (chat: Chat) => {
+    setSelectedChat(chat);
+    setMessages(chat.messages);
+    // If AIDesign handed us a concept while we were on the list — drop
+    // it into this chat as the first thing the user sees.
+    if (pendingShare) {
+      // Defer one tick so the messages state update from this same call
+      // doesn't race the share-drop.
+      setTimeout(() => dropPendingShare(chat), 0);
+    }
+  };
   const handleSendMessage = () => {
     if (newMessage.trim() && selectedChat) {
       setMessages([...messages, { id: String(Date.now()), text: newMessage, time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), isUser: false, read: false }]);
@@ -126,13 +244,46 @@ export function Chats({ language }: ChatsProps) {
 
   const currentScenario = scenariosData.find(s => s.id === scenarioModal);
 
+  // ─── Defensive view-gate ────────────────────────────────────────
+  // Sidebar hides the link when matrix says 'none' — but deeplinks
+  // bypass the sidebar, so render a clean no-access screen instead of
+  // a broken composer.
+  if (chatsLevel === 'none') {
+    return (
+      <div className="flex flex-col h-[calc(100vh-56px)] items-center justify-center p-8">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-10 max-w-md text-center">
+          <Eye className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-lg text-slate-900 mb-1 tracking-tight">
+            {l('Нет доступа', 'Қол жетімсіз', 'No access')}
+          </h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            {l(
+              'У вашей роли нет прав на чаты с клиентами. Попросите администратора открыть модуль.',
+              'Сіздің рөліңізде чат құқығы жоқ.',
+              'Your role does not have access to client chats. Ask an admin to enable it.',
+            )}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex flex-col h-[calc(100vh-56px)] relative"
     >
-      {/* Header */}
+      {/* Header — now carries the niche tag so the user knows which
+          business profile drives default scenario texts and AI tone. */}
       <div className="px-4 md:px-6 py-3 border-b border-white/60 bg-white/40 backdrop-blur-2xl flex items-center justify-between gap-3 flex-shrink-0">
-        <div className="text-sm text-slate-900">{l('Омниканальные чаты', 'Омниканалды чаттар', 'Omnichannel Chats')}</div>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="text-sm text-slate-900 truncate">{l('Омниканальные чаты', 'Омниканалды чаттар', 'Omnichannel Chats')}</div>
+          <span className="text-[11px] text-slate-500 whitespace-nowrap hidden sm:inline">· {niche.icon} {niche.name[language]}</span>
+          {!canWrite && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100/60 text-amber-700 ring-1 ring-amber-200/60 whitespace-nowrap">
+              {l('Только просмотр', 'Тек көру', 'View only')}
+            </span>
+          )}
+        </div>
         <div className="flex gap-1.5 flex-wrap">
           {tabItems.map(t => (
             <button
@@ -149,6 +300,22 @@ export function Chats({ language }: ChatsProps) {
           ))}
         </div>
       </div>
+
+      {/* Hand-off banner from AIDesign — guide the user to pick a chat */}
+      {shareBanner && (
+        <div className="px-4 md:px-6 py-2.5 bg-violet-50/70 border-b border-violet-100/60 flex items-center justify-between gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <ImageIcon className="w-3.5 h-3.5 text-violet-600 flex-shrink-0" />
+            <div className="text-[11px] text-violet-700 truncate">{shareBanner}</div>
+          </div>
+          <button
+            onClick={() => { setPendingShare(null); setShareBanner(''); }}
+            className="text-[11px] text-violet-700 hover:text-violet-900 whitespace-nowrap"
+          >
+            {l('Отменить', 'Бас тарту', 'Cancel')}
+          </button>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
@@ -173,8 +340,31 @@ export function Chats({ language }: ChatsProps) {
               <div className="flex-1 overflow-y-auto">
                 {filteredChats.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                    <MessageCircle className="w-10 h-10 text-gray-200 mb-2" />
-                    <p className="text-xs text-slate-400">{l('Чатов не найдено', 'Чаттар табылмады', 'No chats found')}</p>
+                    <MessageCircle className="w-10 h-10 text-gray-200 mb-3" />
+                    <p className="text-sm text-slate-700 mb-1">
+                      {chats.length === 0
+                        ? l('Подключите мессенджеры', 'Мессенджерлерді қосыңыз', 'Connect messengers')
+                        : l('Чатов не найдено', 'Чаттар табылмады', 'No chats found')}
+                    </p>
+                    {chats.length === 0 ? (
+                      <>
+                        <p className="text-[11px] text-slate-400 max-w-[240px] leading-relaxed mb-3">
+                          {l(
+                            'WhatsApp, Instagram, Telegram — заявки клиентов из всех каналов в одной ленте.',
+                            'WhatsApp, Instagram, Telegram — клиенттердің барлық арналары бір лентада.',
+                            'WhatsApp, Instagram, Telegram — leads from all channels in one feed.',
+                          )}
+                        </p>
+                        <button
+                          onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'settings', tab: 'integrations' } }))}
+                          className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[11px] hover:bg-emerald-700 ring-1 ring-white/10 transition-all"
+                        >
+                          {l('Открыть Интеграции', 'Интеграциялар', 'Open Integrations')}
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">{l('Сбросьте фильтры', 'Сүзгілерді тастаңыз', 'Reset filters')}</p>
+                    )}
                   </div>
                 ) : filteredChats.map(chat => (
                   <button key={chat.id} onClick={() => handleChatSelect(chat)} className={`w-full px-3 py-3 border-b border-white/60 hover:bg-white/30 transition-colors text-left ${selectedChat?.id === chat.id ? 'bg-gray-50' : ''}`}>
@@ -260,18 +450,34 @@ export function Chats({ language }: ChatsProps) {
                         </div>
                       )}
                     </div>
-                    <textarea value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={l('Сообщение...', 'Хабарлама...', 'Message...')} rows={1} className="flex-1 px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none" style={{ minHeight: '38px', maxHeight: '100px' }} />
-                    <button onClick={isRecording ? stopRecording : startRecording} className={`p-2 rounded-lg transition-all ${isRecording ? 'bg-red-500 text-white' : 'hover:bg-white/50 text-gray-400'}`}>{isRecording ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}</button>
-                    <button onClick={handleSendMessage} disabled={!newMessage.trim()} className={`p-2 rounded-lg transition-all ${newMessage.trim() ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-300'}`}><Send className="w-4 h-4" /></button>
+                    <textarea
+                      value={newMessage}
+                      onChange={e => setNewMessage(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                      placeholder={canWrite ? l('Сообщение...', 'Хабарлама...', 'Message...') : l('Только просмотр', 'Тек көру', 'View only')}
+                      readOnly={!canWrite}
+                      rows={1}
+                      className="flex-1 px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none"
+                      style={{ minHeight: '38px', maxHeight: '100px' }}
+                    />
+                    <button onClick={isRecording ? stopRecording : startRecording} disabled={!canWrite} className={`p-2 rounded-lg transition-all ${isRecording ? 'bg-red-500 text-white' : 'hover:bg-white/50 text-gray-400'} disabled:opacity-40 disabled:cursor-not-allowed`}>{isRecording ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}</button>
+                    <button onClick={handleSendMessage} disabled={!newMessage.trim() || !canWrite} className={`p-2 rounded-lg transition-all ${newMessage.trim() && canWrite ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-300'}`}><Send className="w-4 h-4" /></button>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="flex-1 hidden md:flex items-center justify-center">
-                <div className="text-center">
+                <div className="text-center max-w-sm">
                   <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3"><MessageCircle className="w-6 h-6 text-slate-300" /></div>
                   <div className="text-sm text-slate-400">{l('Выберите чат', 'Чат таңдаңыз', 'Select a chat')}</div>
-                  <div className="text-xs text-slate-300 mt-1">{l('Выберите диалог слева', 'Сол жақтан таңдаңыз', 'Pick a conversation')}</div>
+                  <div className="text-xs text-slate-300 mt-1">
+                    {pendingShare
+                      ? l('Откройте чат — концепт автоматически прикрепится', 'Чатты ашыңыз — концепт автоматты қосылады', 'Open a chat — the concept will attach automatically')
+                      : l('Выберите диалог слева', 'Сол жақтан таңдаңыз', 'Pick a conversation')}
+                  </div>
+                  {pendingShare && (
+                    <img src={pendingShare.imageUrl} alt="" className="mt-4 mx-auto max-h-40 rounded-2xl ring-1 ring-white/60 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18)]" />
+                  )}
                 </div>
               </div>
             )}
@@ -284,7 +490,10 @@ export function Chats({ language }: ChatsProps) {
             <div className="max-w-3xl mx-auto">
               {/* Sub-tabs */}
               <div className="flex gap-1.5 mb-6">
-                {([['agent', 'AI-агент'], ['scenarios', 'Сценарии Instagram']] as [typeof aiAgentSubTab, string][]).map(([id, label]) => (
+                {([
+                  ['agent',     l('AI-агент', 'AI-агент', 'AI Agent')],
+                  ['scenarios', l('Сценарии Instagram', 'Instagram сценарийлері', 'Instagram scenarios')],
+                ] as [typeof aiAgentSubTab, string][]).map(([id, label]) => (
                   <button key={id} onClick={() => setAiAgentSubTab(id)} className={`px-4 py-2 rounded-xl text-xs transition-all ${aiAgentSubTab === id ? 'bg-gray-900 text-white' : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-400 hover:text-gray-600'}`}>{label}</button>
                 ))}
               </div>
@@ -299,22 +508,24 @@ export function Chats({ language }: ChatsProps) {
                         <Sparkles className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <div className="text-sm text-gray-900">AI-агент Utir</div>
+                        <div className="text-sm text-gray-900">{l('AI-агент Utir', 'AI-агент Utir', 'Utir AI Agent')}</div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className={`w-1.5 h-1.5 rounded-full ${aiAgentEnabled ? 'bg-green-500' : 'bg-gray-300'}`} />
-                          <span className={`text-[11px] ${aiAgentEnabled ? 'text-green-600' : 'text-gray-400'}`}>{aiAgentEnabled ? 'Активен' : 'Отключён'}</span>
+                          <span className={`text-[11px] ${aiAgentEnabled ? 'text-green-600' : 'text-gray-400'}`}>
+                            {aiAgentEnabled ? l('Активен', 'Белсенді', 'Active') : l('Отключён', 'Өшірілген', 'Disabled')}
+                          </span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-400">Включить AI-агент</span>
-                      <Toggle value={aiAgentEnabled} onChange={() => setAiAgentEnabled(!aiAgentEnabled)} />
+                      <span className="text-[11px] text-slate-400">{l('Включить AI-агент', 'AI-агентті қосу', 'Enable AI Agent')}</span>
+                      <Toggle value={aiAgentEnabled} onChange={() => canWrite && setAiAgentEnabled(!aiAgentEnabled)} />
                     </div>
                   </div>
 
                   {/* Channels */}
                   <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
-                    <div className="text-[11px] text-slate-400 mb-3">Каналы работы</div>
+                    <div className="text-[11px] text-slate-400 mb-3">{l('Каналы работы', 'Жұмыс арналары', 'Active channels')}</div>
                     <div className="flex gap-4">
                       {([['whatsapp', 'WhatsApp', 'bg-green-50 text-green-700'], ['instagram', 'Instagram', 'bg-pink-50 text-pink-700'], ['telegram', 'Telegram', 'bg-blue-50 text-blue-700']] as [keyof typeof aiChannels, string, string][]).map(([key, name, cls]) => (
                         <label key={key} className="flex items-center gap-2 cursor-pointer">
@@ -327,10 +538,14 @@ export function Chats({ language }: ChatsProps) {
 
                   {/* Tone */}
                   <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
-                    <div className="text-[11px] text-slate-400 mb-3">Тон общения</div>
+                    <div className="text-[11px] text-slate-400 mb-3">{l('Тон общения', 'Сөйлесу тоны', 'Conversation tone')}</div>
                     <div className="grid grid-cols-3 gap-2">
-                      {[{ id: 'professional' as const, emoji: '🎩', label: 'Профессиональный' }, { id: 'friendly' as const, emoji: '😊', label: 'Дружелюбный' }, { id: 'casual' as const, emoji: '✌️', label: 'Неформальный' }].map(t => (
-                        <button key={t.id} onClick={() => setAiTone(t.id)} className={`p-3 rounded-xl border text-center transition-all ${aiTone === t.id ? 'border-gray-900 bg-gray-50' : 'border-gray-100'}`}>
+                      {[
+                        { id: 'professional' as const, emoji: '🎩', label: l('Профессиональный', 'Кәсіби', 'Professional') },
+                        { id: 'friendly'     as const, emoji: '😊', label: l('Дружелюбный',     'Достасу',  'Friendly') },
+                        { id: 'casual'       as const, emoji: '✌️', label: l('Неформальный',    'Бейресми', 'Casual') },
+                      ].map(t => (
+                        <button key={t.id} onClick={() => canWrite && setAiTone(t.id)} className={`p-3 rounded-xl border text-center transition-all ${aiTone === t.id ? 'border-gray-900 bg-gray-50' : 'border-gray-100'} ${!canWrite ? 'opacity-60 cursor-not-allowed' : ''}`}>
                           <div className="text-lg mb-1">{t.emoji}</div>
                           <div className="text-[10px] text-gray-600">{t.label}</div>
                         </button>
@@ -340,9 +555,12 @@ export function Chats({ language }: ChatsProps) {
 
                   {/* Knowledge base */}
                   <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
-                    <div className="text-[11px] text-slate-400 mb-3">База знаний</div>
-                    <button className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-200 rounded-xl text-xs text-slate-400 hover:border-gray-300 mb-3">
-                      <Plus className="w-3.5 h-3.5" />Загрузить файлы (PDF, DOCX, TXT)
+                    <div className="text-[11px] text-slate-400 mb-3">{l('База знаний', 'Білім базасы', 'Knowledge base')}</div>
+                    <button
+                      disabled={!canWrite}
+                      className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-200 rounded-xl text-xs text-slate-400 hover:border-gray-300 mb-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="w-3.5 h-3.5" />{l('Загрузить файлы (PDF, DOCX, TXT)', 'Файлдарды жүктеу (PDF, DOCX, TXT)', 'Upload files (PDF, DOCX, TXT)')}
                     </button>
                     <div className="space-y-1.5 mb-3">
                       {aiKnowledgeFiles.map((f, i) => (
@@ -354,36 +572,67 @@ export function Chats({ language }: ChatsProps) {
                       ))}
                     </div>
                     <div>
-                      <div className="text-[11px] text-slate-400 mb-1">Дополнительные инструкции</div>
-                      <textarea value={aiInstructions} onChange={e => setAiInstructions(e.target.value)} rows={3} className="w-full px-3 py-2.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none" />
-                      <div className="text-[10px] text-slate-400 mt-1">Например: Всегда уточняй размеры комнаты. При вопросе о цене — отправляй прайс. Если клиент готов к замеру — передавай менеджеру.</div>
+                      <div className="text-[11px] text-slate-400 mb-1">{l('Дополнительные инструкции', 'Қосымша нұсқаулықтар', 'Additional instructions')}</div>
+                      <textarea
+                        value={aiInstructions}
+                        onChange={e => canWrite && setAiInstructions(e.target.value)}
+                        readOnly={!canWrite}
+                        rows={3}
+                        className="w-full px-3 py-2.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none"
+                      />
+                      <div className="text-[10px] text-slate-400 mt-1">
+                        {l(`Подсказки берутся из ниши «${niche.name.ru}» — можно дописать свои правила.`,
+                           `«${niche.name.kz}» салаға бейімделген нұсқаулықтар — өзіңіздікін қосуға болады.`,
+                           `Hints come from your niche "${niche.name.eng}" — feel free to add your own.`)}
+                      </div>
                     </div>
                   </div>
 
                   {/* Transfer conditions */}
                   <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
-                    <div className="text-[11px] text-slate-400 mb-3">Передача менеджеру</div>
+                    <div className="text-[11px] text-slate-400 mb-3">{l('Передача менеджеру', 'Менеджерге беру', 'Hand off to manager')}</div>
                     <div className="space-y-1">
-                      {([['measurement', 'Клиент просит замер'], ['discount', 'Клиент спрашивает скидку больше 10%'], ['unknown', 'AI не знает ответ'], ['longChat', 'Клиент пишет более 5 минут']] as [keyof typeof aiTransferConditions, string][]).map(([key, label]) => (
+                      {([
+                        ['measurement', l('Клиент просит замер',         'Клиент өлшеу сұрайды',     'Client asks for measurement')],
+                        ['discount',    l('Клиент спрашивает скидку больше 10%', 'Клиент 10%-дан жоғары жеңілдік сұрайды', 'Client asks for >10% discount')],
+                        ['unknown',     l('AI не знает ответ',             'AI жауап білмейді',         'AI does not know the answer')],
+                        ['longChat',    l('Клиент пишет более 5 минут',    'Клиент 5 минуттан көп жазады','Client typing for over 5 min')],
+                      ] as [keyof typeof aiTransferConditions, string][]).map(([key, label]) => (
                         <label key={key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl cursor-pointer hover:bg-white/50">
-                          <input type="checkbox" checked={aiTransferConditions[key]} onChange={e => setAiTransferConditions({ ...aiTransferConditions, [key]: e.target.checked })} className="w-3.5 h-3.5 rounded accent-gray-900" />
+                          <input type="checkbox" disabled={!canWrite} checked={aiTransferConditions[key]} onChange={e => canWrite && setAiTransferConditions({ ...aiTransferConditions, [key]: e.target.checked })} className="w-3.5 h-3.5 rounded accent-gray-900" />
                           <span className="text-xs text-slate-700">{label}</span>
                         </label>
                       ))}
                     </div>
-                    <div className="mt-3 p-2.5 bg-gray-50 rounded-xl text-[10px] text-slate-400">При срабатывании условия диалог переходит в раздел «Диалоги» с меткой <span className="text-orange-500">Требует внимания</span></div>
+                    <div className="mt-3 p-2.5 bg-gray-50 rounded-xl text-[10px] text-slate-400">
+                      {l('При срабатывании условия диалог переходит в раздел «Диалоги» с меткой', 'Шарт іске қосылса диалог «Диалогтар» бөліміне көшеді', 'When the condition is met, the dialog moves to "Dialogs" with a label')}
+                      {' '}<span className="text-orange-500">{l('Требует внимания', 'Назар аударыңыз', 'Needs attention')}</span>
+                    </div>
                   </div>
 
-                  {/* Stats */}
+                  {/* Stats — labels niche-aware. "Записано на замер" is
+                      furniture/windows speak; for blinds/ceilings/floors
+                      it's still "measurement" in spirit. We just call it
+                      "Бронирований/Bookings" so it reads cleanly everywhere. */}
                   <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
-                    <div className="text-[11px] text-slate-400 mb-3">Статистика за 30 дней</div>
+                    <div className="text-[11px] text-slate-400 mb-3">{l('Статистика за 30 дней', '30 күнге статистика', '30-day stats')}</div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {[{ label: 'Диалогов обработано', value: '1 247' }, { label: 'Передано менеджеру', value: '89' }, { label: 'Записано на замер', value: '156' }, { label: 'Конверсия', value: '12.5%' }].map((s, i) => (
+                      {[
+                        { label: l('Диалогов обработано', 'Өңделген диалогтар',  'Dialogs handled'),    value: '0' },
+                        { label: l('Передано менеджеру',  'Менеджерге берілді',   'Passed to manager'),  value: '0' },
+                        { label: l('Заявок на замер',      'Өлшеуге өтінімдер',    'Measurement requests'), value: '0' },
+                        { label: l('Конверсия',            'Конверсия',            'Conversion'),           value: '—' },
+                      ].map((s, i) => (
                         <div key={i} className="bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3 text-center">
                           <div className="text-lg text-gray-900">{s.value}</div>
                           <div className="text-[10px] text-slate-400 mt-0.5">{s.label}</div>
                         </div>
                       ))}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-2 text-center">
+                      {l('Реальные цифры появятся после подключения каналов в Настройках.',
+                         'Арналар қосылғаннан кейін нақты сандар шығады.',
+                         'Real numbers appear once channels are connected in Settings.')}
                     </div>
                   </div>
                 </div>
@@ -392,10 +641,18 @@ export function Chats({ language }: ChatsProps) {
               {/* ── Sub-tab 2: Сценарии Instagram ── */}
               {aiAgentSubTab === 'scenarios' && (
                 <div>
-                  <p className="text-xs text-slate-400 mb-4">Автоматические сценарии для Instagram. Нажмите на карточку для настройки.</p>
+                  <p className="text-xs text-slate-400 mb-4">
+                    {l('Автоматические сценарии для Instagram. Нажмите на карточку для настройки.',
+                       'Instagram үшін автоматты сценарийлер.',
+                       'Automatic scenarios for Instagram. Click a card to configure.')}
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {scenariosData.map(sc => {
                       const isActive = activeScenarios[sc.id];
+                      // Resolve title/desc for the current language and
+                      // substitute the niche-keyword placeholder.
+                      const title = (sc.titleKey[language] || sc.titleKey.ru).replace('{NICHE_KEYWORD}', nicheKeyword);
+                      const desc  = (sc.descKey[language]  || sc.descKey.ru ).replace('{NICHE_KEYWORD}', nicheKeyword);
                       return (
                         <div
                           key={sc.id}
@@ -406,13 +663,16 @@ export function Chats({ language }: ChatsProps) {
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${isActive ? 'bg-green-50' : 'bg-gray-50'}`}>
                             <sc.icon className={`w-4 h-4 ${isActive ? 'text-green-600' : 'text-gray-400'}`} />
                           </div>
-                          <div className="text-sm text-slate-900 mb-1">{sc.title}</div>
-                          <div className="text-[11px] text-slate-400 mb-3">{sc.desc}</div>
+                          <div className="text-sm text-slate-900 mb-1">{title}</div>
+                          <div className="text-[11px] text-slate-400 mb-3">{desc}</div>
                           <button
-                            onClick={e => { e.stopPropagation(); setActiveScenarios(prev => ({ ...prev, [sc.id]: !prev[sc.id] })); }}
-                            className={`px-3 py-1.5 rounded-lg text-[11px] transition-all ${isActive ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-slate-500 border border-gray-100'}`}
+                            onClick={e => { e.stopPropagation(); if (canWrite) setActiveScenarios(prev => ({ ...prev, [sc.id]: !prev[sc.id] })); }}
+                            disabled={!canWrite}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] transition-all disabled:opacity-50 disabled:cursor-not-allowed ${isActive ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-slate-500 border border-gray-100'}`}
                           >
-                            {isActive ? '✓ Включён' : 'Включить'}
+                            {isActive
+                              ? l('✓ Включён', '✓ Қосулы', '✓ On')
+                              : l('Включить', 'Қосу', 'Enable')}
                           </button>
                         </div>
                       );
@@ -444,7 +704,9 @@ export function Chats({ language }: ChatsProps) {
       </div>
 
       {/* ===== SCENARIO MODAL ===== */}
-      {scenarioModal && currentScenario && (
+      {scenarioModal && currentScenario && (() => {
+        const title = (currentScenario.titleKey[language] || currentScenario.titleKey.ru).replace('{NICHE_KEYWORD}', nicheKeyword);
+        return (
         <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setScenarioModal(null)}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
@@ -452,38 +714,47 @@ export function Chats({ language }: ChatsProps) {
                 <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
                   <currentScenario.icon className="w-4 h-4 text-slate-500" />
                 </div>
-                <span className="text-sm text-gray-900">{currentScenario.title}</span>
+                <span className="text-sm text-gray-900">{title}</span>
               </div>
               <button onClick={() => setScenarioModal(null)} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-400" /></button>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1">Текст сообщения</label>
+                <label className="block text-[11px] text-slate-400 mb-1">{l('Текст сообщения', 'Хабарлама мәтіні', 'Message text')}</label>
                 <textarea
                   value={scenarioTexts[scenarioModal] || ''}
-                  onChange={e => setScenarioTexts(prev => ({ ...prev, [scenarioModal]: e.target.value }))}
+                  onChange={e => canWrite && setScenarioTexts(prev => ({ ...prev, [scenarioModal]: e.target.value }))}
+                  readOnly={!canWrite}
                   rows={4}
                   className="w-full px-3 py-2.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none"
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-slate-400 mb-2">Статус сценария</label>
+                <label className="block text-[11px] text-slate-400 mb-2">{l('Статус сценария', 'Сценарий күйі', 'Scenario status')}</label>
                 <button
-                  onClick={() => setActiveScenarios(prev => ({ ...prev, [scenarioModal]: !prev[scenarioModal] }))}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all ${activeScenarios[scenarioModal] ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-slate-500 border-gray-100'}`}
+                  onClick={() => canWrite && setActiveScenarios(prev => ({ ...prev, [scenarioModal]: !prev[scenarioModal] }))}
+                  disabled={!canWrite}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all disabled:opacity-50 ${activeScenarios[scenarioModal] ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-slate-500 border-gray-100'}`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${activeScenarios[scenarioModal] ? 'bg-green-500' : 'bg-gray-300'}`} />
-                  {activeScenarios[scenarioModal] ? 'Сценарий включён' : 'Сценарий выключен'}
+                  {activeScenarios[scenarioModal]
+                    ? l('Сценарий включён', 'Сценарий қосулы', 'Scenario enabled')
+                    : l('Сценарий выключен', 'Сценарий өшірулі', 'Scenario disabled')}
                 </button>
               </div>
             </div>
             <div className="p-5 pt-0 flex gap-2">
-              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">Отмена</button>
-              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">Сохранить</button>
+              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">
+                {l('Отмена', 'Бас тарту', 'Cancel')}
+              </button>
+              <button onClick={() => setScenarioModal(null)} disabled={!canWrite} className="flex-1 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                {l('Сохранить', 'Сақтау', 'Save')}
+              </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Call Modal */}
       {showCallModal && (
