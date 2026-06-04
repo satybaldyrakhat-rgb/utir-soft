@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   User, Building2, Globe, Camera, Check, X, Mail, Phone, Briefcase, MapPin, Hash,
   LogOut, Download, Lock, AlertCircle, Image as ImageIcon, ShieldCheck, Loader2,
-  Palette,
+  Palette, Factory, AlertTriangle,
 } from 'lucide-react';
 import { useDataStore, type UserProfile } from '../utils/dataStore';
+import { NICHES, type NicheId, getNiche } from '../utils/niches';
 import { THEMES, type ThemeId, loadTheme, saveTheme } from '../utils/theme';
 
 interface Props {
@@ -328,6 +329,14 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
       {/* ─── Requisites (banking) ─── slot passed in from Settings.tsx */}
       {requisitesSlot}
 
+      {/* ─── Niche switcher ────────────────────────────────────── */}
+      {/* Lets the team change their business niche after onboarding so
+          status labels, role names, material categories, AI prompts and
+          empty-state hero icons all re-key to the new business profile.
+          Confirms because switching mid-flight reformats how active deals
+          read in Kanban/Production/Invoices — no data loss, just labels. */}
+      <NicheSwitcherCard language={language} />
+
       {/* ─── Localization ──────────────────────────────────────── */}
       <SectionCard icon={Globe} cls="bg-emerald-50 text-emerald-700" title={l('Язык и часовой пояс', 'Тіл және уақыт белдеуі', 'Language & timezone')}
         subtitle={l('Применяется ко всему интерфейсу и расчётам времени (например, налоги КЗ)', 'Барлық интерфейске және уақыт есептеуіне қолданылады (мысалы, ҚР салықтары)', 'Applies across the UI and time calculations')}>
@@ -533,5 +542,152 @@ function Field({
         className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200"
       />
     </div>
+  );
+}
+
+// ─── NicheSwitcherCard ──────────────────────────────────────────
+// Lets the team switch business niche after onboarding. The active
+// niche shows its icon + name + production stages + role labels so
+// admins can see exactly what's about to change. Switching is gated
+// behind a confirm because every status label / role / material
+// category / AI prompt across the app rebinds to the new niche.
+//
+// Admin-only: setting niche affects the entire team. The setNiche
+// store method already PATCHes /api/team/profile so it persists for
+// everyone, not just the current session.
+function NicheSwitcherCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const store = useDataStore();
+  const isAdmin = store.currentUserRole === 'admin';
+  const current = getNiche(store.niche);
+  const [pending, setPending] = useState<NicheId | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const niches = useMemo(() => (Object.values(NICHES) as Array<typeof NICHES[NicheId]>), []);
+
+  const confirmSwitch = async () => {
+    if (!pending) return;
+    setSaving(true);
+    try {
+      await store.setNiche(pending);
+      setPending(null);
+    } catch (e) {
+      // The store already console.errors — keep the modal open so the
+      // admin can retry without re-picking.
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <SectionCard
+      icon={Factory}
+      cls="bg-amber-50 text-amber-700"
+      title={l('Ниша бизнеса', 'Бизнес саласы', 'Business niche')}
+      subtitle={l(
+        'Управляет лейблами статусов, ролями команды, типами материалов и AI-подсказками по всему CRM.',
+        'Барлық CRM бойынша мәртебелер, рөлдер, материалдар және AI-кеңестерді басқарады.',
+        'Drives status labels, team roles, material categories and AI hints across the CRM.',
+      )}
+    >
+      {/* Current niche card */}
+      <div className="flex items-center gap-3 p-4 mb-4 bg-amber-50/60 ring-1 ring-amber-100/60 rounded-2xl">
+        <div className="text-4xl">{current.icon}</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm text-gray-900">{current.name[language]}</div>
+          <div className="text-[11px] text-gray-500 mt-0.5 leading-relaxed line-clamp-2">
+            {l('Этапы производства:', 'Өндіріс кезеңдері:', 'Production stages:')}
+            {' '}
+            {current.productionStages.map(s => s[language] || s.ru).join(' → ')}
+          </div>
+          <div className="text-[10px] text-gray-400 mt-1">
+            {l('Роль исполнителя:', 'Орындаушы рөлі:', 'Installer role:')} <b>{current.roleLabels.installer[language]}</b>
+            {' · '}
+            {l('Материалы:', 'Материалдар:', 'Materials:')} {current.materialCategories.slice(0, 4).join(', ')}
+            {current.materialCategories.length > 4 ? '…' : ''}
+          </div>
+        </div>
+      </div>
+
+      {!isAdmin ? (
+        <div className="text-[11px] text-gray-500 flex items-center gap-2">
+          <Lock className="w-3.5 h-3.5 text-gray-300" />
+          {l('Только админ может изменить нишу команды.',
+             'Команданың салаасын тек әкімші өзгерте алады.',
+             'Only the admin can change the team niche.')}
+        </div>
+      ) : (
+        <div>
+          <div className="text-[10px] text-gray-400 mb-2 uppercase tracking-wide">
+            {l('Переключить', 'Ауыстыру', 'Switch to')}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+            {niches.map(n => {
+              const active = n.id === store.niche;
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => !active && setPending(n.id)}
+                  disabled={active}
+                  className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all ${
+                    active
+                      ? 'border-amber-300 bg-amber-50/80 cursor-default'
+                      : 'border-gray-100 hover:border-amber-200 hover:bg-amber-50/40'
+                  }`}
+                >
+                  <span className="text-2xl">{n.icon}</span>
+                  <span className="text-[11px] text-gray-700 leading-tight">{n.name[language]}</span>
+                  {active && (
+                    <span className="text-[9px] text-amber-600 flex items-center gap-0.5">
+                      <Check className="w-2.5 h-2.5" /> {l('сейчас', 'қазір', 'now')}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation modal */}
+      {pending && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => !saving && setPending(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-xl p-6" onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-2xl bg-amber-100/70 text-amber-700 flex items-center justify-center mx-auto mb-3">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <h3 className="text-center text-sm text-gray-900 mb-1">
+              {l('Сменить нишу на', 'Саланы ауыстыру:', 'Switch niche to')}
+              {' '}
+              <b>{getNiche(pending).icon} {getNiche(pending).name[language]}</b>?
+            </h3>
+            <p className="text-center text-[11px] text-gray-500 leading-relaxed mb-4">
+              {l(
+                'Все активные сделки и заказы сохранятся, но названия статусов, ролей и категорий материалов поменяются. AI-подсказки тоже подстроятся.',
+                'Барлық белсенді мәмілелер сақталады, бірақ мәртебелер, рөлдер және материалдар атаулары өзгереді.',
+                'All active deals stay, but status labels, role names and material categories will change. AI hints will rebind too.',
+              )}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                disabled={saving}
+                onClick={() => setPending(null)}
+                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-xs hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                {l('Отмена', 'Бас тарту', 'Cancel')}
+              </button>
+              <button
+                disabled={saving}
+                onClick={confirmSwitch}
+                className="px-3 py-2.5 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 transition-colors shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {saving && <Loader2 className="w-3 h-3 animate-spin" />}
+                {l('Сменить', 'Ауыстыру', 'Switch')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </SectionCard>
   );
 }

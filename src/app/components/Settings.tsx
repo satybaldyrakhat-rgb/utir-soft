@@ -89,6 +89,29 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
   };
   const tt = (key: Parameters<typeof t>[0]) => t(key, language);
 
+  // Honour app:navigate { page: 'settings', tab: '<id>' } deeplinks
+  // dispatched from other modules (Analytics → team, Chats → integrations,
+  // AIDesign → ai-assistant, etc). Aliases let callers say 'team' or
+  // 'integrations' without knowing the internal sub-tab keys.
+  useEffect(() => {
+    const onNav = (e: Event) => {
+      const detail = (e as CustomEvent<{ page?: string; tab?: string }>).detail || {};
+      if (detail.page !== 'settings' || !detail.tab) return;
+      const alias: Record<string, SettingsTab> = {
+        team: 'employees', employees: 'employees',
+        integrations: 'integrations',
+        catalogs: 'catalogs',
+        modules: 'modules',
+        'ai-client': 'ai-client', 'ai-assistant': 'ai-assistant',
+        activity: 'activity', general: 'general',
+      };
+      const t = alias[detail.tab.toLowerCase()];
+      if (t) setActiveTab(t);
+    };
+    window.addEventListener('app:navigate', onNav as EventListener);
+    return () => window.removeEventListener('app:navigate', onNav as EventListener);
+  }, []);
+
   // Avatar upload, profile-save flash, and Input helper used to live here
   // for the inline General tab. They moved into GeneralSettings.tsx along
   // with the rest of the «Основные» block — keep this file focused on team,
