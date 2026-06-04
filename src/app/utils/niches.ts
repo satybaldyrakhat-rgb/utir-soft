@@ -351,3 +351,16 @@ export function getNiche(id: string | undefined | null): NicheConfig {
   if (!id) return NICHES.furniture;
   return (NICHES as Record<string, NicheConfig>)[id] || NICHES.furniture;
 }
+
+// Resolve the effective niche for a deal in a multi-niche team. The
+// deal's own niche field wins; falls back to the team's primary niche
+// when not set (which is every deal created before the multi-niche
+// feature shipped). Status labels / production stages / role names /
+// material categories shown on the deal card / detail modal / PDFs
+// should all key off this resolved niche.
+export function getDealNiche(
+  deal: { niche?: string | null } | null | undefined,
+  teamNiche: string | undefined | null,
+): NicheConfig {
+  return getNiche(deal?.niche || teamNiche);
+}

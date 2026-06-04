@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
 import { api, getToken } from './api';
 
 const newId = (prefix: string) => prefix + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -50,6 +50,13 @@ export interface Deal {
   // Lets the team show the client a gallery of design options in the deal
   // modal and keeps every render tied to its source CRM record.
   designIds?: string[];
+  // Per-deal niche override — used by teams that work in multiple niches
+  // (e.g. furniture + doors + stairs). When set, the deal's status labels,
+  // production stages, role names and material categories all follow this
+  // niche instead of the team's primary one. Falls back to team niche.
+  // Stored as the niche id (furniture / windows / ceilings / blinds /
+  // doors / stairs / flooring / construction / custom).
+  niche?: string;
 }
 
 // RoleKey is now a free-form string id (e.g. 'admin', 'manager', 'accountant').
@@ -537,6 +544,16 @@ interface DataStore {
   // for backwards compat. Set via Onboarding wizard or Settings.
   niche: string;
   setNiche: (niche: string) => Promise<void>;
+  // Secondary niches — for multi-niche businesses (e.g. furniture +
+  // doors + stairs). Each deal can be tagged with one of (primary +
+  // secondary) niches so its labels follow the correct profile. Empty
+  // array = single-niche team.
+  secondaryNiches: string[];
+  setSecondaryNiches: (next: string[]) => Promise<void>;
+  // All niches the team can pick from when creating a deal — primary
+  // first, then secondaries. Use this in pickers so users don't see
+  // the order shuffle around.
+  allNiches: string[];
   // Onboarding state — first-time setup wizard. completed=false → show
   // the wizard on next page load. Persisted server-side.
   onboarding: { completed: boolean; step?: string; completedAt?: string };
@@ -648,13 +665,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Default 'furniture' matches the original product positioning so
   // pre-niche-feature teams behave identically until they switch.
   const [niche, setNicheState] = useState<string>('furniture');
+  // Secondary niches — multi-niche teams (e.g. furniture + doors).
+  // Empty array means single-niche team; no per-deal niche picker shown.
+  const [secondaryNiches, setSecondaryNichesState] = useState<string[]>([]);
   const [onboarding, setOnboardingState] = useState<{ completed: boolean; step?: string; completedAt?: string }>({ completed: false });
   const [loaded, setLoaded] = useState(false);
 
   // Niche setter — optimistic UI update, then PATCH /api/team/profile.
   // Throws on failure so the caller can show a toast and rollback.
+  // Side effect: also drops the new primary from secondaryNiches so we
+  // never duplicate it (server enforces this too but matching client
+  // state immediately makes the UI behave predictably).
   const setNiche = useCallback(async (next: string) => {
     setNicheState(next);
+    setSecondaryNichesState(prev => prev.filter(n => n !== next));
     try {
       await api.patch('/api/team/profile', { niche: next });
     } catch (e) {
@@ -662,6 +686,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
       throw e;
     }
   }, []);
+
+  // Secondary-niche setter — replaces the whole list (multi-select UI
+  // pushes the full set on every toggle). Drops the primary from input
+  // so the UI can naively send everything that's checked.
+  const setSecondaryNiches = useCallback(async (rawNext: string[]) => {
+    const cleaned = Array.from(new Set(rawNext.filter(n => n && n !== niche)));
+    setSecondaryNichesState(cleaned);
+    try {
+      await api.patch('/api/team/profile', { secondaryNiches: cleaned });
+    } catch (e) {
+      console.error('[setSecondaryNiches] failed', e);
+      throw e;
+    }
+  }, [niche]);
+
+  // Union of primary + secondaries, primary first — used by pickers.
+  const allNiches = useMemo(() => [niche, ...secondaryNiches.filter(n => n !== niche)], [niche, secondaryNiches]);
 
   // Onboarding setter — merges the patch into existing state then PATCHes.
   // Component typically calls setOnboarding({ completed: true }) after
@@ -1046,7 +1087,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         // Team profile — niche + onboarding state. Both drive default
         // labels and the first-run wizard. Swallow errors to null so
         // a missing endpoint doesn't break the whole reload.
-        api.get<{ niche: string; onboarding: { completed: boolean; step?: string; completedAt?: string } } | null>('/api/team/profile').catch(() => null),
+        api.get<{ niche: string; secondaryNiches?: string[]; onboarding: { completed: boolean; step?: string; completedAt?: string } } | null>('/api/team/profile').catch(() => null),
       ]);
       setDeals(d); setEmployees(e); setTasks(t); setProducts(p);
       setTransactions(tx); setIntegrations(ig); setActivityLogs(al);
@@ -1054,6 +1095,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // when missing so legacy teams keep working unchanged.
       if (prof) {
         setNicheState(prof.niche || 'furniture');
+        setSecondaryNichesState(Array.isArray(prof.secondaryNiches) ? prof.secondaryNiches : []);
         setOnboardingState(prof.onboarding || { completed: false });
       }
       // If backend returned catalogs, use them as the source of truth (team-wide).
@@ -1124,6 +1166,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // Reset niche to default + clear onboarding state so the next user
     // who logs in on this device sees their own wizard run if needed.
     setNicheState('furniture');
+    setSecondaryNichesState([]);
     setOnboardingState({ completed: false });
     try { localStorage.removeItem(PROFILE_STORAGE_KEY); } catch {}
     try { localStorage.removeItem(CATALOGS_STORAGE_KEY); } catch {}
@@ -1327,7 +1370,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // Niche + onboarding — read-only state from /api/team/profile,
     // plus setters that PATCH the server. See setNiche / setOnboarding
     // above for the optimistic-update pattern.
-    niche, setNiche, onboarding, setOnboarding,
+    niche, setNiche, secondaryNiches, setSecondaryNiches, allNiches, onboarding, setOnboarding,
     currentUserRole, setCurrentUserRole, getModuleLevel, canWriteModule,
     addDeal, updateDeal, deleteDeal,
     addEmployee, updateEmployee, deleteEmployee,

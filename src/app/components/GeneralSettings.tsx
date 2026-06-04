@@ -619,9 +619,9 @@ function NicheSwitcherCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
       ) : (
         <div>
           <div className="text-[10px] text-gray-400 mb-2 uppercase tracking-wide">
-            {l('Переключить', 'Ауыстыру', 'Switch to')}
+            {l('Переключить основную', 'Негізгіні ауыстыру', 'Switch primary')}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-5">
             {niches.map(n => {
               const active = n.id === store.niche;
               return (
@@ -645,6 +645,60 @@ function NicheSwitcherCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
                 </button>
               );
             })}
+          </div>
+
+          {/* ─── Multi-niche: secondary niches ──────────────────── */}
+          {/* For businesses that work in several niches at once (e.g.
+              furniture + doors + stairs). Each toggled niche becomes
+              selectable in the "Тип проекта" dropdown when creating a
+              new deal — that deal then follows its niche's status
+              labels, production stages and material categories. */}
+          <div className="pt-4 border-t border-gray-100">
+            <div className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide">
+              {l('Дополнительные ниши', 'Қосымша салалар', 'Secondary niches')}
+            </div>
+            <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+              {l(
+                'Включите, если компания работает в нескольких направлениях. При создании сделки появится выбор «Тип проекта», и каждая сделка будет работать по правилам своей ниши.',
+                'Бірнеше бағытта жұмыс істесеңіз қосыңыз. Жаңа мәміле жасағанда «Жоба түрі» таңдауы пайда болады.',
+                'Enable if the company works in multiple directions. New deals will get a "Project type" picker and each deal follows its own niche rules.',
+              )}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {niches.filter(n => n.id !== store.niche).map(n => {
+                const active = store.secondaryNiches.includes(n.id);
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => {
+                      const next = active
+                        ? store.secondaryNiches.filter(x => x !== n.id)
+                        : [...store.secondaryNiches, n.id];
+                      void store.setSecondaryNiches(next);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] border transition-all ${
+                      active
+                        ? 'border-emerald-300 bg-emerald-50/80 text-emerald-800'
+                        : 'border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/40 text-gray-600'
+                    }`}
+                  >
+                    {active && <Check className="w-3 h-3 text-emerald-700" />}
+                    <span>{n.icon}</span>
+                    <span>{n.name[language]}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {store.secondaryNiches.length > 0 && (
+              <div className="mt-3 text-[10px] text-emerald-700 flex items-center gap-1.5 px-3 py-2 bg-emerald-50/60 rounded-xl ring-1 ring-emerald-100/60">
+                <Check className="w-3 h-3" />
+                {l(
+                  `Активно направлений: ${1 + store.secondaryNiches.length}. При создании сделки появится «Тип проекта».`,
+                  `Бағыттар саны: ${1 + store.secondaryNiches.length}. Мәміле жасағанда таңдау пайда болады.`,
+                  `Active directions: ${1 + store.secondaryNiches.length}. Deal creation will show "Project type".`,
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

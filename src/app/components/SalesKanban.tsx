@@ -26,7 +26,7 @@ import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
 import { useAutoRefresh } from '../utils/useAutoRefresh';
 import { t } from '../utils/translations';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo } from './PlatformLogos';
-import { getNiche } from '../utils/niches';
+import { getNiche, getDealNiche } from '../utils/niches';
 
 interface SalesKanbanProps {
   language: 'kz' | 'ru' | 'eng';
@@ -709,6 +709,8 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                   isMobile={true}
                   language={language}
                   l={l}
+                  teamNiche={store.niche}
+                  showNicheChip={store.secondaryNiches.length > 0}
                 />
               ))}
               {(dealsByStage[mobileStage] || []).length === 0 && (
@@ -824,6 +826,8 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                           isMobile={false}
                           language={language}
                           l={l}
+                          teamNiche={store.niche}
+                          showNicheChip={store.secondaryNiches.length > 0}
                         />
                       ))}
                     </div>
@@ -1042,12 +1046,23 @@ function DealCard(props: {
   isMobile: boolean;
   language: 'kz' | 'ru' | 'eng';
   l: (ru: string, kz: string, eng: string) => string;
+  // When the team has secondary niches and this deal belongs to a
+  // non-primary one, we render a small icon+name chip so the manager
+  // can scan the board and immediately tell which order is for which
+  // direction (e.g. furniture team also doing doors — door deals get a
+  // 🚪 chip). Undefined / equal-to-primary → no chip.
+  teamNiche: string;
+  showNicheChip: boolean;
 }) {
   const { deal, selected, onToggleSelect, onOpen, onReject, onDelete, onMove,
-          onDragStart, onDragEnd, iconMap, priorityConf, canWrite, isMobile, language, l } = props;
+          onDragStart, onDragEnd, iconMap, priorityConf, canWrite, isMobile, language, l,
+          teamNiche, showNicheChip } = props;
   const [moveOpen, setMoveOpen] = useState(false);
   const currentStage = statusToStage(deal.status);
   const priority = priorityConf(deal.priority);
+  // Resolved niche for this deal — falls back to team's primary so
+  // single-niche teams get a stable chip-free render.
+  const dealNiche = getDealNiche(deal, teamNiche);
 
   return (
     <div
@@ -1125,6 +1140,15 @@ function DealCard(props: {
           </div>
         )}
       </div>
+
+      {/* Niche chip — only on multi-niche teams. Tells the manager
+          which direction this deal is for at a glance. */}
+      {showNicheChip && (
+        <div className="mb-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50/70 text-emerald-700 text-[10px] ring-1 ring-emerald-100/60">
+          <span>{dealNiche.icon}</span>
+          <span className="truncate">{dealNiche.name[language]}</span>
+        </div>
+      )}
 
       {/* Product + Amount */}
       <div className="mb-2.5">

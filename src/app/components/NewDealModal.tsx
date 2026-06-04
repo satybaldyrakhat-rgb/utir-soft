@@ -40,7 +40,16 @@ export function NewDealModal({ language, onClose, seed, defaultStatus }: Props) 
   const tt = (key: Parameters<typeof t>[0]) => t(key, language);
   const store = useDataStore();
   const catalogs = store.catalogs;
-  const niche = getNiche(store.niche);
+  // Per-deal niche — for multi-niche teams (e.g. furniture + doors +
+  // stairs). Defaults to the team's primary niche so single-niche teams
+  // see no UI change. Niche change re-keys the product-type dropdown
+  // and the materials picker below to that niche's catalog.
+  const [dealNiche, setDealNiche] = useState<string>(store.niche);
+  const niche = getNiche(dealNiche);
+  // When the team has secondary niches, render the "Тип проекта" picker
+  // at the top of tab 0 so the user picks the niche FIRST and the rest
+  // of the form re-keys accordingly. Single-niche teams never see it.
+  const isMultiNiche = store.secondaryNiches.length > 0;
   // When opened from a BOM template we jump straight to the «Product»
   // tab so the user sees the pre-filled fields immediately and only needs
   // to fill in client info on tab 0. Plain «Новая сделка» starts on tab 0.
@@ -120,7 +129,11 @@ export function NewDealModal({ language, onClose, seed, defaultStatus }: Props) 
       siteAddress: client.siteAddress || undefined,
       // workType derives from the team's niche — no more hardcoded
       // 'furniture' for non-furniture businesses.
-      workType: (store.niche || 'furniture') as any,
+      workType: (dealNiche || store.niche || 'furniture') as any,
+      // Per-deal niche tag — only persisted when it differs from the
+      // team's primary so we don't bloat every row with a redundant
+      // field. Multi-niche teams will have it set on every deal.
+      niche: dealNiche && dealNiche !== store.niche ? dealNiche : undefined,
       product: product.template || (product.type ? `${product.type} ${product.l}×${product.w}×${product.h}м` : `${product.l}×${product.w}×${product.h}м`),
       furnitureType: product.type,
       amount: term.amount,
@@ -212,6 +225,47 @@ export function NewDealModal({ language, onClose, seed, defaultStatus }: Props) 
         {/* Scrollable body */}
         <div className="p-6 overflow-y-auto flex-1 space-y-4">
           {tab === 0 && (<>
+            {/* ─── Тип проекта (только для мульти-нишевых команд) ─── */}
+            {/* Renders only when the team has secondary niches set up in
+                Settings. Picking a niche here re-keys the product-type
+                and material dropdowns on tab 1 so the deal works by its
+                niche's catalog instead of being forced into the primary. */}
+            {isMultiNiche && (
+              <div className="bg-emerald-50/60 ring-1 ring-emerald-100/60 rounded-2xl p-3">
+                <label className={LABEL}>
+                  {l('Тип проекта', 'Жоба түрі', 'Project type')}
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {store.allNiches.map(nid => {
+                    const n = getNiche(nid);
+                    const active = dealNiche === nid;
+                    return (
+                      <button
+                        key={nid}
+                        type="button"
+                        onClick={() => setDealNiche(nid)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] border transition-all ${
+                          active
+                            ? 'border-emerald-400 bg-white text-emerald-800'
+                            : 'border-gray-100 bg-white/60 hover:border-emerald-200 text-gray-600'
+                        }`}
+                      >
+                        <span>{n.icon}</span>
+                        <span>{n.name[language]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="text-[10px] text-emerald-700 mt-2 leading-relaxed">
+                  {l(
+                    `Сделка будет работать по правилам ниши «${niche.name.ru}». Этапы: ${niche.productionStages.map(s => s.ru).slice(0, 3).join(' → ')}…`,
+                    `Мәміле «${niche.name.kz}» салаға бейімделеді.`,
+                    `Deal will follow "${niche.name.eng}" niche rules.`,
+                  )}
+                </div>
+              </div>
+            )}
+
             <div>
               <label className={LABEL}>{l('Имя клиента', 'Клиент аты', 'Client Name')}</label>
               <input value={client.name} onChange={e => setClient({ ...client, name: e.target.value })} placeholder={tt('customerNameMask')} className={INPUT} />

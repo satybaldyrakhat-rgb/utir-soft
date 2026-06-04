@@ -308,6 +308,12 @@ migrateColumn('team_settings', 'catalogs', 'TEXT');
 // across the whole platform. Defaults to 'furniture' for legacy teams
 // when no value is set (preserves the original product positioning).
 migrateColumn('team_settings', 'niche', 'TEXT');
+// Secondary niches — JSON array of niche ids for multi-niche businesses
+// (e.g. a company doing furniture + doors + stairs). Each deal can then
+// be tagged with one of (primary niche + secondaryNiches) so its status
+// labels / production stages / material categories follow the right
+// niche instead of being forced into the primary one.
+migrateColumn('team_settings', 'secondary_niches', 'TEXT');
 // Onboarding state — JSON { completed: bool, step?: string, completedAt?: ISO }.
 // Drives whether we show the first-time setup wizard. Once completed=true
 // the user won't see the wizard again unless explicitly reset.
@@ -2053,28 +2059,47 @@ app.use('/api/team/catalogs', catalogsRouter);
 const profileRouter = express.Router();
 profileRouter.use(authMiddleware);
 
+// Whitelist of valid niche ids — kept here in sync with
+// src/app/utils/niches.ts so an admin can't write garbage into the row.
+const ALLOWED_NICHES = ['furniture','windows','ceilings','blinds','doors','stairs','flooring','construction','custom'];
+
 profileRouter.get('/', (req: AuthedRequest, res) => {
-  const row = db.prepare('SELECT niche, onboarding FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+  const row = db.prepare('SELECT niche, secondary_niches, onboarding FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
   const niche = (row?.niche as string) || 'furniture';  // legacy default
+  let secondaryNiches: string[] = [];
+  try { if (row?.secondary_niches) secondaryNiches = JSON.parse(row.secondary_niches); } catch { /* keep empty */ }
+  // Defensive: filter out unknown ids and the primary niche so the
+  // client never has to dedupe.
+  secondaryNiches = secondaryNiches.filter(n => ALLOWED_NICHES.includes(n) && n !== niche);
   let onboarding: any = { completed: false };
   try { if (row?.onboarding) onboarding = JSON.parse(row.onboarding); } catch { /* keep default */ }
-  res.json({ niche, onboarding });
+  res.json({ niche, secondaryNiches, onboarding });
 });
 
 profileRouter.patch('/', (req: AuthedRequest, res) => {
   const patch = req.body || {};
-  // Only the admin can change the niche — it has platform-wide effects
-  // (stage names, default categories) so a junior employee shouldn't
-  // be able to flip it.
-  if (patch.niche !== undefined && req.teamRole !== 'admin') {
+  // Only the admin can change the niche or its secondaries — these have
+  // platform-wide effects (stage names, category lists, AI prompts) so
+  // a junior employee shouldn't be able to flip them.
+  if ((patch.niche !== undefined || patch.secondaryNiches !== undefined) && req.teamRole !== 'admin') {
     return res.status(403).json({ error: 'only admin can change niche' });
   }
-  const cur = db.prepare('SELECT niche, onboarding FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
-  const next: { niche?: string; onboarding?: string } = {};
+  const cur = db.prepare('SELECT niche, secondary_niches, onboarding FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+  const next: { niche?: string; secondary_niches?: string; onboarding?: string } = {};
   if (patch.niche !== undefined) {
-    const allowed = ['furniture','windows','ceilings','blinds','doors','stairs','flooring','construction','custom'];
-    if (!allowed.includes(String(patch.niche))) return res.status(400).json({ error: 'invalid niche' });
+    if (!ALLOWED_NICHES.includes(String(patch.niche))) return res.status(400).json({ error: 'invalid niche' });
     next.niche = String(patch.niche);
+  }
+  if (patch.secondaryNiches !== undefined) {
+    if (!Array.isArray(patch.secondaryNiches)) return res.status(400).json({ error: 'secondaryNiches must be an array' });
+    const primary = next.niche ?? cur?.niche ?? 'furniture';
+    // Dedupe + filter unknown ids + drop the primary so we never store it twice.
+    const cleaned = Array.from(new Set(
+      patch.secondaryNiches
+        .map((x: unknown) => String(x))
+        .filter((n: string) => ALLOWED_NICHES.includes(n) && n !== primary),
+    ));
+    next.secondary_niches = JSON.stringify(cleaned);
   }
   if (patch.onboarding !== undefined) {
     let existing: any = {};
@@ -2082,22 +2107,26 @@ profileRouter.patch('/', (req: AuthedRequest, res) => {
     next.onboarding = JSON.stringify({ ...existing, ...patch.onboarding });
   }
   db.prepare(`
-    INSERT INTO team_settings (team_id, niche, onboarding, updated_at)
-    VALUES (?, ?, ?, datetime('now'))
+    INSERT INTO team_settings (team_id, niche, secondary_niches, onboarding, updated_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
     ON CONFLICT(team_id) DO UPDATE SET
       niche = COALESCE(excluded.niche, team_settings.niche),
+      secondary_niches = COALESCE(excluded.secondary_niches, team_settings.secondary_niches),
       onboarding = COALESCE(excluded.onboarding, team_settings.onboarding),
       updated_at = excluded.updated_at
   `).run(
     req.teamId!,
     next.niche ?? cur?.niche ?? null,
+    next.secondary_niches ?? cur?.secondary_niches ?? null,
     next.onboarding ?? cur?.onboarding ?? null,
   );
   // Read back so caller has the merged state.
-  const fresh = db.prepare('SELECT niche, onboarding FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+  const fresh = db.prepare('SELECT niche, secondary_niches, onboarding FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
   let ob: any = { completed: false };
   try { if (fresh?.onboarding) ob = JSON.parse(fresh.onboarding); } catch { /* keep default */ }
-  res.json({ niche: fresh?.niche || 'furniture', onboarding: ob });
+  let secondary: string[] = [];
+  try { if (fresh?.secondary_niches) secondary = JSON.parse(fresh.secondary_niches); } catch { /* keep empty */ }
+  res.json({ niche: fresh?.niche || 'furniture', secondaryNiches: secondary, onboarding: ob });
 });
 
 app.use('/api/team/profile', profileRouter);
