@@ -13,6 +13,9 @@ import { transcribeAudio, isWhisperReady } from './whisper.js';
 
 const TG_API = 'https://api.telegram.org';
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+// Bot username for building deep-link invites (t.me/<username>?start=...).
+// Falls back to the known handle; override via env if the bot is renamed.
+const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'utirsoftbot';
 
 export function isTelegramReady() {
   return !!TOKEN;
@@ -197,6 +200,165 @@ function consumeLinkCode(db: Database.Database, code: string, chatId: number, us
   if (dup) return { ok: false, reason: 'chat_already_linked' };
   db.prepare(`UPDATE telegram_links SET chat_id = ?, linked_at = datetime('now'), link_code = NULL, code_expires_at = NULL, username = ? WHERE user_id = ?`).run(chatId, username || null, row.user_id);
   return { ok: true, userId: row.user_id, userName: row.name };
+}
+
+// ─── Team Telegram invite (Этап 1 — onboard field workers by link) ──
+// A reusable, team-level code shared once with masters / measurers /
+// installers. The deep link opens the bot, which collects name + role
+// and auto-creates the worker's account so they never touch the web.
+
+function newInviteCode() {
+  const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 8; i++) s += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+  return s;
+}
+
+export function teamInviteLink(code: string): string {
+  return `https://t.me/${BOT_USERNAME}?start=join_${code}`;
+}
+
+export function getOrCreateTeamInviteCode(db: Database.Database, teamId: string): string {
+  const row = db.prepare('SELECT tg_invite_code FROM team_settings WHERE team_id = ?').get(teamId) as any;
+  if (row?.tg_invite_code) return row.tg_invite_code as string;
+  const code = newInviteCode();
+  db.prepare(`
+    INSERT INTO team_settings (team_id, tg_invite_code, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET tg_invite_code = excluded.tg_invite_code, updated_at = excluded.updated_at
+  `).run(teamId, code);
+  return code;
+}
+
+export function rotateTeamInviteCode(db: Database.Database, teamId: string): string {
+  const code = newInviteCode();
+  db.prepare(`
+    INSERT INTO team_settings (team_id, tg_invite_code, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET tg_invite_code = excluded.tg_invite_code, updated_at = excluded.updated_at
+  `).run(teamId, code);
+  return code;
+}
+
+function findTeamByInviteCode(db: Database.Database, code: string): { teamId: string } | null {
+  const row = db.prepare('SELECT team_id FROM team_settings WHERE tg_invite_code = ?').get(code.toUpperCase()) as any;
+  return row ? { teamId: row.team_id } : null;
+}
+
+// ─── Worker onboarding state machine (chat-level, pre-account) ──────
+// Stored in its own table because the chat has no user_id yet — the
+// account is created only after name + role are collected.
+type OnboardingStep = 'name' | 'role';
+interface OnboardingState { teamId: string; step: OnboardingStep; draftName?: string; username?: string }
+
+function getOnboarding(db: Database.Database, chatId: number): OnboardingState | null {
+  const row = db.prepare('SELECT team_id, step, draft_name, username FROM telegram_onboarding WHERE chat_id = ?').get(chatId) as any;
+  if (!row) return null;
+  return { teamId: row.team_id, step: row.step, draftName: row.draft_name || undefined, username: row.username || undefined };
+}
+function setOnboarding(db: Database.Database, chatId: number, s: OnboardingState) {
+  db.prepare(`
+    INSERT INTO telegram_onboarding (chat_id, team_id, step, draft_name, username, created_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(chat_id) DO UPDATE SET team_id = excluded.team_id, step = excluded.step, draft_name = excluded.draft_name, username = excluded.username
+  `).run(chatId, s.teamId, s.step, s.draftName || null, s.username || null);
+}
+function clearOnboarding(db: Database.Database, chatId: number) {
+  db.prepare('DELETE FROM telegram_onboarding WHERE chat_id = ?').run(chatId);
+}
+
+// The four worker roles we offer at onboarding. `botRole` is stored on
+// the employee record and drives the role-specific menu (Этап 2-4).
+// `teamRole` maps into the existing permission system: workers are
+// 'employee' (limited), the foreman/manager is 'manager'.
+interface BotRoleDef { botRole: string; teamRole: string; label: string; emoji: string; department: string }
+const BOT_ROLES: BotRoleDef[] = [
+  { botRole: 'measurer',   teamRole: 'employee', label: 'Замерщик',    emoji: '📐', department: 'Замеры' },
+  { botRole: 'production', teamRole: 'employee', label: 'Мастер цеха', emoji: '🪚', department: 'Производство' },
+  { botRole: 'installer',  teamRole: 'employee', label: 'Монтажник',   emoji: '🔧', department: 'Монтаж' },
+  { botRole: 'manager',    teamRole: 'manager',  label: 'Менеджер',    emoji: '👔', department: 'Продажи' },
+];
+function findBotRoleByLabel(text: string): BotRoleDef | null {
+  const t = text.replace(/^[^a-zа-яё]+/i, '').trim().toLowerCase();
+  return BOT_ROLES.find(r => r.label.toLowerCase() === t) || null;
+}
+// Reply keyboard shown during the role step.
+const KB_ROLES = [
+  ['📐 Замерщик', '🪚 Мастер цеха'],
+  ['🔧 Монтажник', '👔 Менеджер'],
+];
+
+// Role-specific persistent menu (Этап 2-4 fill these in with real
+// handlers). Foundation here: every worker gets a bottom keyboard so
+// they tap, never type commands. Returned as a Telegram reply_markup.
+export function roleMenuKeyboard(botRole: string): { keyboard: string[][]; resize_keyboard: boolean; is_persistent: boolean } {
+  const menus: Record<string, string[][]> = {
+    measurer:   [['📋 Мои замеры', '🎤 Записать замер'], ['📷 Фото объекта', '💰 Моя выручка']],
+    production: [['📋 Мои заказы', '📷 Фото-отчёт'], ['💰 Зарплата', '✅ Мои задачи']],
+    installer:  [['📋 Мои монтажи', '📷 Фото работы'], ['💰 Зарплата', '✅ Мои задачи']],
+    manager:    [['📊 Сегодня', '✅ Задачи'], ['💰 Выручка', '🎨 AI Дизайн']],
+  };
+  return {
+    keyboard: menus[botRole] || menus.manager,
+    resize_keyboard: true,
+    is_persistent: true,
+  };
+}
+
+// Create a Telegram-native worker account: a synthetic users row (no
+// web password — they log in only via the bot), an employees row with
+// the picked botRole, and the chat↔user link. Returns the new ids.
+function createWorkerAccount(
+  db: Database.Database,
+  teamId: string,
+  name: string,
+  roleDef: BotRoleDef,
+  chatId: number,
+  username?: string,
+): { userId: string; employeeId: string } {
+  const userId = newId('u_');
+  const employeeId = newId('e_');
+  // Synthetic email + unusable password hash — the worker never logs in
+  // to the web, so these just satisfy NOT NULL constraints.
+  const email = `tg${chatId}@telegram.local`;
+  const pwHash = 'tg-only-' + Math.random().toString(36).slice(2);
+  const initial = (name.charAt(0) || '?').toUpperCase();
+
+  const tx = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO users (id, email, password_hash, name, team_id, team_role, email_verified, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))
+    `).run(userId, email, pwHash, name, teamId, roleDef.teamRole);
+
+    const empData = {
+      id: employeeId,
+      name,
+      email,
+      phone: '',
+      role: roleDef.teamRole,
+      botRole: roleDef.botRole,          // ← drives the bot menu
+      department: roleDef.department,
+      status: 'active',
+      salary: 0,
+      joinDate: new Date().toISOString().slice(0, 10),
+      lastActive: new Date().toISOString(),
+      avatar: initial,
+      source: 'telegram',                // ← onboarded via bot, not web
+      permissions: { sales: true, finance: false, warehouse: roleDef.botRole !== 'manager', chats: true, analytics: roleDef.teamRole === 'manager', settings: false },
+      performance: { ordersCompleted: 0, rating: 0, efficiency: 0 },
+    };
+    db.prepare('INSERT INTO employees (id, user_id, team_id, data) VALUES (?, ?, ?, ?)')
+      .run(employeeId, userId, teamId, JSON.stringify(empData));
+
+    // Link the chat. Use INSERT OR REPLACE so a re-join overwrites cleanly.
+    db.prepare(`
+      INSERT INTO telegram_links (user_id, chat_id, linked_at, username)
+      VALUES (?, ?, datetime('now'), ?)
+      ON CONFLICT(user_id) DO UPDATE SET chat_id = excluded.chat_id, linked_at = excluded.linked_at, username = excluded.username
+    `).run(userId, chatId, username || null);
+  });
+  tx();
+  return { userId, employeeId };
 }
 
 // ─── Pending tool confirmation state (persisted in telegram_links.pending_action) ────
@@ -596,7 +758,97 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
 
   // ── Text message? Continue with the regular handler.
   if (!msg.text) return;
-  const text = msg.text.trim();
+  // `let` because the role-menu router below may rewrite a button label
+  // into its slash-command equivalent before the command branch runs.
+  let text = msg.text.trim();
+
+  // ── Worker onboarding continuation (Этап 1) ──────────────────────
+  // If this chat is mid-onboarding (collecting name → role), handle the
+  // step here before anything else. /cancel aborts. /start re-enters the
+  // slash branch below (so a fresh join link can restart cleanly).
+  {
+    const ob = getOnboarding(db, chatId);
+    if (ob && text.toLowerCase() !== '/cancel' && !text.toLowerCase().startsWith('/start')) {
+      if (ob.step === 'name') {
+        const name = text.replace(/\s+/g, ' ').trim().slice(0, 60);
+        if (name.length < 2) {
+          await sendMessage(chatId, 'Напишите, пожалуйста, ваше имя (например: Канат).');
+          return;
+        }
+        setOnboarding(db, chatId, { ...ob, step: 'role', draftName: name });
+        await tg('sendMessage', {
+          chat_id: chatId, parse_mode: 'HTML',
+          text: `Приятно познакомиться, <b>${name}</b>! 👋\n\nВыберите вашу роль:`,
+          reply_markup: { keyboard: KB_ROLES, resize_keyboard: true, one_time_keyboard: true },
+        });
+        return;
+      }
+      if (ob.step === 'role') {
+        const roleDef = findBotRoleByLabel(text);
+        if (!roleDef) {
+          await tg('sendMessage', {
+            chat_id: chatId, parse_mode: 'HTML',
+            text: 'Выберите роль кнопкой ниже 👇',
+            reply_markup: { keyboard: KB_ROLES, resize_keyboard: true, one_time_keyboard: true },
+          });
+          return;
+        }
+        const name = ob.draftName || (msg.from?.first_name || 'Сотрудник');
+        const { userId } = createWorkerAccount(db, ob.teamId, name, roleDef, chatId, username);
+        clearOnboarding(db, chatId);
+        logActivity(userId, {
+          user: name, actor: 'human',
+          action: `Присоединился через Telegram как «${roleDef.label}»`,
+          target: username ? '@' + username : `chat ${chatId}`,
+          type: 'invite', page: 'team',
+        });
+        await tg('sendMessage', {
+          chat_id: chatId, parse_mode: 'HTML',
+          text:
+            `✅ Готово, <b>${name}</b>! Вы в команде как <b>${roleDef.emoji} ${roleDef.label}</b>.\n\n` +
+            `Пользуйтесь меню внизу 👇 или просто пишите/говорите мне голосом — я пойму.\n\n` +
+            `Например: <i>«Сегодня поставил окна у Айгуль, клиент доплатил 100 тысяч»</i>`,
+          reply_markup: roleMenuKeyboard(roleDef.botRole),
+        });
+        return;
+      }
+    }
+  }
+
+  // ── Role-menu button router (Этап 1 foundation) ──────────────────
+  // The persistent reply keyboard sends its label as plain text. Map
+  // the labels whose features already exist onto their slash command;
+  // the field-flow buttons (замеры / фото / заказы) land in Этап 2-4 —
+  // for now they get a friendly "coming soon, describe it instead" so
+  // the menu never feels broken. We rewrite `text` so the slash branch
+  // below picks it up.
+  {
+    const menuMap: Record<string, string> = {
+      '📊 сегодня': '/today',
+      '✅ задачи': '/tasks',
+      '✅ мои задачи': '/tasks',
+      '💰 выручка': '/revenue',
+      '💰 зарплата': '/revenue',
+      '💰 моя выручка': '/revenue',
+      '🎨 ai дизайн': '/design',
+    };
+    const soon: Record<string, string> = {
+      '📋 мои замеры':   '📐 Раздел «Мои замеры» скоро появится. А пока просто опишите замер словами или голосом — я запишу.',
+      '🎤 записать замер':'🎤 Запишите голосом: что замеряли, размеры, материал — я structurирую в сделку.',
+      '📷 фото объекта': '📷 Пришлите фото — скоро смогу привязать к сделке. Пока опишите объект словами.',
+      '📋 мои заказы':   '📋 Раздел «Мои заказы» в работе. Пока спросите меня: «что у меня в работе?»',
+      '📷 фото-отчёт':   '📷 Фото-отчёты подключаем. Пока пришлите фото с подписью — кому относится.',
+      '📋 мои монтажи':  '📋 Раздел «Мои монтажи» скоро. Пока спросите: «какие у меня монтажи сегодня?»',
+      '📷 фото работы':  '📷 Фото готовой работы скоро можно будет привязать к заказу. Пока пришлите с подписью.',
+    };
+    const low = text.toLowerCase();
+    if (menuMap[low]) {
+      text = menuMap[low];
+    } else if (soon[low]) {
+      await sendMessage(chatId, soon[low]);
+      return;
+    }
+  }
 
   // --- Slash commands ------------------------------------------------
   if (text.startsWith('/')) {
@@ -607,6 +859,25 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       clearHistory(db, chatId);
       clearDesignState(db, chatId);
       const paired = findUserByChat(db, chatId);
+      // Deep-link invite: /start join_CODE → onboard a new field worker.
+      // Telegram passes the payload after /start when the user taps
+      // t.me/<bot>?start=join_CODE. Only honoured when the chat isn't
+      // already paired to an account.
+      const startPayload = (args[0] || '').trim();
+      if (!paired && startPayload.toLowerCase().startsWith('join_')) {
+        const code = startPayload.slice(5);
+        const team = findTeamByInviteCode(db, code);
+        if (!team) {
+          await sendMessage(chatId, '⚠️ Ссылка-приглашение недействительна или устарела. Попросите у руководителя новую.');
+          return;
+        }
+        setOnboarding(db, chatId, { teamId: team.teamId, step: 'name', username });
+        await sendMessage(chatId,
+          `Здравствуйте! 👋 Вас пригласили в команду на платформе <b>Utir Soft</b>.\n\n` +
+          `Давайте познакомимся. <b>Как вас зовут?</b>`,
+        );
+        return;
+      }
       if (paired) {
         await sendMessage(chatId,
           `Здравствуйте, <b>${paired.name}</b>!\n\n` +

@@ -4,6 +4,7 @@ import { ModulesSettings } from './ModulesSettings';
 import { ActivityLog } from './ActivityLog';
 import { TelegramPairing } from './TelegramPairing';
 import { TeamInvitePanel } from './TeamInvitePanel';
+import { TelegramInvitePanel } from './TelegramInvitePanel';
 import { WebhooksPanel } from './WebhooksPanel';
 import { IntegrationsPanel } from './IntegrationsPanel';
 import { CatalogsSettings } from './CatalogsSettings';
@@ -453,6 +454,11 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
       {/* ===== EMPLOYEES — invite-only (no manual add until invite flow ships) ===== */}
       {activeTab === 'employees' && isAdmin && (
         <div className="space-y-5">
+          {/* Telegram worker invite (Этап 1) — onboard field workers who
+              live in the bot. Sits above the web-invite panel because for
+              furniture/windows/doors teams MOST of the team is field staff. */}
+          <TelegramInvitePanel language={language} />
+
           {/* Invitation links (Block C.2 / P4) — visible to admins only.
               Non-admins get a 403 inside and the panel quietly hides itself. */}
           <TeamInvitePanel language={language} />

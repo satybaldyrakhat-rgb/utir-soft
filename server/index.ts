@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands } from './telegram.js';
+import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink } from './telegram.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
@@ -255,6 +255,21 @@ migrateColumn('telegram_links', 'pending_action', 'TEXT');
 migrateColumn('telegram_links', 'chat_history', 'TEXT');
 // Multi-turn /design wizard state — JSON with current step + answers so far.
 migrateColumn('telegram_links', 'design_state', 'TEXT');
+// Telegram-native worker onboarding — masters / measurers / installers who
+// join via a deep-link invite and never touch the web. The reusable team
+// invite code lives on team_settings; the per-chat onboarding state (name +
+// role collection before a real account exists) lives in its own table.
+migrateColumn('team_settings', 'tg_invite_code', 'TEXT');
+db.exec(`
+  CREATE TABLE IF NOT EXISTS telegram_onboarding (
+    chat_id INTEGER PRIMARY KEY,
+    team_id TEXT NOT NULL,
+    step TEXT NOT NULL,           -- 'name' | 'role'
+    draft_name TEXT,
+    username TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`);
 migrateColumn('users', 'company', "TEXT DEFAULT ''");
 migrateColumn('users', 'verification_code', 'TEXT');
 const verifiedJustAdded = migrateColumn('users', 'email_verified', 'INTEGER DEFAULT 0');
@@ -2598,6 +2613,22 @@ app.get('/api/telegram/link/status', authMiddleware, (req: AuthedRequest, res) =
 app.delete('/api/telegram/link', authMiddleware, (req: AuthedRequest, res) => {
   unlink(db, req.userId!);
   res.json({ ok: true });
+});
+
+// ─── Team Telegram invite (Этап 1 — onboard field workers) ────────
+// A reusable, team-level deep link the owner shares with masters /
+// measurers / installers. Tapping it opens the bot which collects the
+// worker's name + role and auto-creates their account — they never
+// touch the web platform. Manager-or-above only (it can create team
+// members). The code is reusable so the owner shares it once in a
+// team WhatsApp/Telegram group.
+app.get('/api/telegram/team-invite', authMiddleware, (req: AuthedRequest, res) => {
+  const code = getOrCreateTeamInviteCode(db, req.teamId!);
+  res.json({ code, link: teamInviteLink(code), botReady: isTelegramReady() });
+});
+app.post('/api/telegram/team-invite/rotate', authMiddleware, requireRole('manager'), (req: AuthedRequest, res) => {
+  const code = rotateTeamInviteCode(db, req.teamId!);
+  res.json({ code, link: teamInviteLink(code), botReady: isTelegramReady() });
 });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, telegram: isTelegramReady(), claude: isClaudeReady() }));
