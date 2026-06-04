@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sparkles, X, Send, ChevronRight, ChevronDown, Check, AlertCircle, Loader2, Trash2, Mic, Square } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
+import { getNiche } from '../utils/niches';
 import { api } from '../utils/api';
 
 // ─── Provider catalog ────────────────────────────────────────────────
@@ -70,37 +71,74 @@ const contextRoles: Record<string, Record<string, string>> = {
 // AI answers (visible in the header subline). Layout, copy, and example
 // prompts stay the same so the user gets a consistent surface.
 //
-// No human names anywhere — examples reference «клиента», «сделка»,
-// «задачу» so the buttons stay useful regardless of who the team
-// actually serves and don't accidentally suggest fake personalities.
-const UNIVERSAL_GREETING: Record<string, string> = {
-  ru:  'Здравствуйте! Помогу управлять платформой и отвечу на любые вопросы. Опишите задачу свободным текстом — создам сделку, запишу оплату, поставлю задачу, найду клиента.',
-  kz:  'Сәлем! Платформаны басқаруға және сұрақтарға жауап беруге көмектесемін. Тапсырманы еркін мәтінмен жазыңыз.',
-  eng: 'Hi! I can help run the platform and answer questions. Describe the task in plain words — I\'ll create deals, log payments, add tasks, look up clients.',
-};
-
-const QUICK_ACTIONS: Record<string, string[]> = {
-  ru:  ['Создать новую сделку', 'Записать оплату', 'Поставить задачу', 'Найти клиента'],
-  kz:  ['Жаңа мәміле жасау',    'Төлемді жазу',  'Тапсырма қою',     'Клиентті табу'],
-  eng: ['Create new deal',      'Log a payment', 'Add a task',       'Find a client'],
-};
-
-function getGreeting(language: 'kz' | 'ru' | 'eng'): string {
-  return UNIVERSAL_GREETING[language] || UNIVERSAL_GREETING.ru;
+// Quick actions now reference the team's niche — a windows business
+// sees "Create an order for windows" instead of a generic "Create a
+// new deal". Keeps the suggestions practically useful right after
+// onboarding instead of forcing the user to translate generic verbs
+// into their actual product line.
+function getGreeting(language: 'kz' | 'ru' | 'eng', nicheRu: string): string {
+  if (language === 'kz') {
+    return `Сәлем! Платформаны басқаруға және сұрақтарға жауап беруге көмектесемін. Тапсырманы еркін мәтінмен жазыңыз — мәмілені жасаймын, төлемді жазамын, тапсырма қоямын, клиентті табамын.`;
+  }
+  if (language === 'eng') {
+    return `Hi! I can help run the platform and answer questions. Describe the task in plain words — I'll create deals, log payments, add tasks, look up clients.`;
+  }
+  return `Здравствуйте! Помогу управлять платформой по нише «${nicheRu}» и отвечу на любые вопросы. Опишите задачу свободным текстом — создам сделку, запишу оплату, поставлю задачу, найду клиента.`;
 }
-function getQuickActions(language: 'kz' | 'ru' | 'eng'): string[] {
-  return QUICK_ACTIONS[language] || QUICK_ACTIONS.ru;
+
+function getQuickActions(language: 'kz' | 'ru' | 'eng', nicheRu: string, nicheKeyword: string): string[] {
+  // First action references the niche product type to give a real
+  // starting point. The rest stay generic verbs because they apply
+  // to every business (payment / task / search).
+  if (language === 'kz') {
+    return [
+      `${nicheKeyword || 'мәміле'} бойынша жаңа тапсырыс жасау`,
+      'Төлемді жазу',
+      'Тапсырма қою',
+      'Клиентті табу',
+    ];
+  }
+  if (language === 'eng') {
+    return [
+      `Create an order for ${nicheKeyword || 'a deal'}`,
+      'Log a payment',
+      'Add a task',
+      'Find a client',
+    ];
+  }
+  return [
+    `Создать заказ на ${nicheKeyword || 'сделку'}`,
+    'Записать оплату',
+    'Поставить задачу',
+    'Найти клиента',
+  ];
 }
+
+// Maps a niche to a short product-type word used by getQuickActions.
+const NICHE_QUICK_NOUN: Record<string, string> = {
+  furniture:    'мебель',
+  windows:      'окна',
+  ceilings:     'натяжной потолок',
+  blinds:       'жалюзи',
+  doors:        'дверь',
+  stairs:       'лестницу',
+  flooring:     'пол',
+  construction: 'отделку',
+  custom:       'заказ',
+};
 
 const now = () => new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 const newId = () => 'm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 export function AIAssistant({ context, language }: AIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
 
   // Live Telegram-activity feed — shows admin what the team is doing through
   // the bot. Filters the global activity log to source === 'telegram'.
   const store = useDataStore();
+  const niche = getNiche(store.niche);
+  const nicheNoun = NICHE_QUICK_NOUN[store.niche] || 'заказ';
   const telegramFeed = (store.activityLogs || [])
     .filter(a => (a as any).source === 'telegram')
     .slice(0, 5);
@@ -178,7 +216,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
         hist.push({
           id: 'greet',
           role: 'assistant',
-          content: getGreeting(language),
+          content: getGreeting(language, niche.name.ru),
           timestamp: now(),
         });
       }
@@ -187,7 +225,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
       setMessages([{
         id: 'greet',
         role: 'assistant',
-        content: getGreeting(language),
+        content: getGreeting(language, niche.name.ru),
         timestamp: now(),
       }]);
     });
@@ -220,9 +258,9 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
       } else if (resp?.kind === 'reply') {
         setMessages(prev => [...prev, { id: newId(), role: 'assistant', content: resp.text, timestamp: now() }]);
       } else if (resp?.kind === 'error') {
-        setError(resp.error || 'Ошибка провайдера');
+        setError(resp.error || l('Ошибка провайдера', 'Провайдер қатесі', 'Provider error'));
       } else {
-        setError('Не удалось получить ответ');
+        setError(l('Не удалось получить ответ', 'Жауап алу мүмкін болмады', 'No response received'));
       }
     } catch (e: any) {
       setError(String(e?.message || e));
@@ -254,7 +292,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
 
   function cancelTool(msg: AIMessage) {
     setMessages(prev => prev.map(m => m.id === msg.id
-      ? { ...m, content: '✕ Действие отменено.', pendingTool: undefined }
+      ? { ...m, content: '✕ ' + l('Действие отменено.', 'Әрекет тоқтатылды.', 'Action cancelled.'), pendingTool: undefined }
       : m,
     ));
   }
@@ -266,7 +304,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
     setMessages([{
       id: 'greet',
       role: 'assistant',
-      content: getGreeting(language),
+      content: getGreeting(language, niche.name.ru),
       timestamp: now(),
     }]);
   }
@@ -296,7 +334,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
         stream.getTracks().forEach(t => t.stop());
         const blob = new Blob(recordChunksRef.current, { type: mr.mimeType || 'audio/webm' });
         recordChunksRef.current = [];
-        if (blob.size < 800) { setError('Запись слишком короткая.'); return; }
+        if (blob.size < 800) { setError(l('Запись слишком короткая.', 'Жазба тым қысқа.', 'Recording too short.')); return; }
         await sendForTranscription(blob);
       };
       mediaRecorderRef.current = mr;
@@ -306,8 +344,10 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
       recordTimerRef.current = window.setInterval(() => setRecordSec(s => s + 1), 1000);
     } catch (e: any) {
       setError(e?.name === 'NotAllowedError'
-        ? 'Браузер не дал доступ к микрофону. Разрешите в настройках сайта.'
-        : `Микрофон недоступен: ${String(e?.message || e)}`);
+        ? l('Браузер не дал доступ к микрофону. Разрешите в настройках сайта.',
+            'Браузер микрофонға рұқсат бермеді. Сайт баптауларынан рұқсат беріңіз.',
+            'Browser denied microphone access. Allow it in site settings.')
+        : `${l('Микрофон недоступен', 'Микрофон қол жетімсіз', 'Mic unavailable')}: ${String(e?.message || e)}`);
     }
   }
 
@@ -341,7 +381,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
         // Append to whatever the user might have typed already.
         setInputValue(v => (v ? v.trim() + ' ' : '') + r.text);
       } else {
-        setError(r.error || 'Не получилось распознать речь.');
+        setError(r.error || l('Не получилось распознать речь.', 'Сөзді тану мүмкін болмады.', 'Could not transcribe speech.'));
       }
     } catch (e: any) {
       setError(String(e?.message || e));
@@ -401,7 +441,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
             <div className="flex items-center gap-1">
               <button
                 onClick={clearHistory}
-                title="Очистить историю чата"
+                title={l('Очистить историю чата', 'Чат тарихын тазалау', 'Clear chat history')}
                 className="w-8 h-8 hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl flex items-center justify-center transition-all"
               >
                 <Trash2 className="w-3.5 h-3.5 text-slate-500" />
@@ -415,7 +455,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
             </div>
             {showModelMenu && (
               <div className="absolute top-full left-4 mt-1 bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-2xl shadow-[0_12px_32px_-12px_rgba(15,23,42,0.25)] py-1 z-20 w-[340px] max-h-[400px] overflow-y-auto">
-                <div className="px-3 py-2 text-[10px] text-slate-500 uppercase tracking-wide">Модель AI</div>
+                <div className="px-3 py-2 text-[10px] text-slate-500 uppercase tracking-wide">{l('Модель AI', 'AI моделі', 'AI Model')}</div>
                 {AI_MODELS.map(m => {
                   const status = providers.find(p => p.id === m.id);
                   const enabled = status?.enabled !== false;
@@ -435,7 +475,9 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5">{m.desc}</div>
                         {!enabled && status?.envVar && (
-                          <div className="text-[10px] text-amber-700 mt-0.5">Подключите {status.envVar} в Railway</div>
+                          <div className="text-[10px] text-amber-700 mt-0.5">
+                            {l('Подключите', 'Қосыңыз', 'Add')} {status.envVar} {l('в Railway', 'Railway ішінде', 'in Railway')}
+                          </div>
                         )}
                       </div>
                       {providerId === m.id && <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />}
@@ -452,7 +494,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
           {telegramFeed.length > 0 && (
             <div className="px-4 pt-3 pb-2 border-b border-white/60 bg-sky-100/30 backdrop-blur-xl">
               <div className="flex items-center justify-between text-[10px] text-sky-700 mb-1.5">
-                <span className="flex items-center gap-1"><b>Из Telegram-бота</b></span>
+                <span className="flex items-center gap-1"><b>{l('Из Telegram-бота', 'Telegram-боттан', 'From Telegram bot')}</b></span>
                 <span className="text-slate-500 tabular-nums">{telegramFeed.length}</span>
               </div>
               <div className="space-y-1">
@@ -508,14 +550,14 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                         className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl text-[11px] flex items-center gap-1 shadow-[0_4px_12px_-2px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
                       >
                         {executingToolId === msg.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                        Выполнить
+                        {l('Выполнить', 'Орындау', 'Execute')}
                       </button>
                       <button
                         disabled={executingToolId === msg.id}
                         onClick={() => cancelTool(msg)}
                         className="px-3 py-1.5 bg-white/60 hover:bg-white ring-1 ring-white/60 text-slate-700 rounded-xl text-[11px] backdrop-blur-xl transition-all"
                       >
-                        Отмена
+                        {l('Отмена', 'Бас тарту', 'Cancel')}
                       </button>
                     </div>
                   )}
@@ -544,8 +586,11 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
             {/* Quick actions on empty state — only when just the greeting is shown */}
             {messages.length === 1 && messages[0].id === 'greet' && !isTyping && (
               <div className="space-y-1.5 pt-1">
-                <p className="text-[10px] text-slate-500 px-1 uppercase tracking-wide">Быстро начать</p>
-                {getQuickActions(language).map((text, idx) => (
+                <p className="text-[10px] text-slate-500 px-1 uppercase tracking-wide">
+                  {l('Быстро начать', 'Жылдам бастау', 'Quick start')}
+                  <span className="normal-case tracking-normal text-slate-400 ml-1">· {niche.icon} {niche.name[language]}</span>
+                </p>
+                {getQuickActions(language, niche.name.ru, nicheNoun).map((text, idx) => (
                   <button
                     key={idx}
                     onClick={() => sendMessage(text)}
@@ -578,13 +623,13 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
               <div className="flex items-center gap-2 px-3 py-2 bg-rose-100/70 ring-1 ring-rose-200/60 rounded-2xl backdrop-blur-xl">
                 <span className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
                 <div className="flex-1 text-[12px] text-rose-700">
-                  Идёт запись… <span className="font-mono tabular-nums">{Math.floor(recordSec / 60)}:{(recordSec % 60).toString().padStart(2, '0')}</span>
+                  {l('Идёт запись…', 'Жазу жүріп жатыр…', 'Recording…')} <span className="font-mono tabular-nums">{Math.floor(recordSec / 60)}:{(recordSec % 60).toString().padStart(2, '0')}</span>
                 </div>
                 <button
                   onClick={stopRecording}
                   className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[11px] flex items-center gap-1 shadow-[0_4px_12px_-2px_rgba(225,29,72,0.4)] ring-1 ring-white/10"
                 >
-                  <Square className="w-3 h-3 fill-current" /> Стоп
+                  <Square className="w-3 h-3 fill-current" /> {l('Стоп', 'Тоқтату', 'Stop')}
                 </button>
               </div>
             ) : (
@@ -597,17 +642,19 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                   disabled={isTyping || transcribing || selectedProvider?.enabled === false}
                   placeholder={
                     transcribing
-                      ? 'Распознаю речь…'
+                      ? l('Распознаю речь…', 'Сөзді танып жатырмын…', 'Transcribing…')
                       : selectedProvider?.enabled === false
-                        ? `Подключите ${selectedProvider?.envVar || 'API key'} в Railway`
-                        : language === 'ru' ? 'Сообщение или голос…' : language === 'kz' ? 'Хабар немесе дауыс…' : 'Message or voice…'
+                        ? l(`Подключите ${selectedProvider?.envVar || 'API key'} в Railway`,
+                            `${selectedProvider?.envVar || 'API key'} Railway-да қосыңыз`,
+                            `Add ${selectedProvider?.envVar || 'API key'} in Railway`)
+                        : l('Сообщение или голос…', 'Хабар немесе дауыс…', 'Message or voice…')
                   }
                   className="flex-1 px-3 py-2 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 disabled:opacity-50 placeholder:text-slate-400 transition-all"
                 />
                 <button
                   onClick={startRecording}
                   disabled={isTyping || transcribing || selectedProvider?.enabled === false}
-                  title={language === 'ru' ? 'Записать голосовое' : language === 'kz' ? 'Дауыс жазу' : 'Record voice'}
+                  title={l('Записать голосовое', 'Дауыс жазу', 'Record voice')}
                   className="w-8 h-8 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-xl flex items-center justify-center transition-all disabled:opacity-30 backdrop-blur-xl"
                 >
                   {transcribing ? <Loader2 className="w-3.5 h-3.5 text-slate-600 animate-spin" /> : <Mic className="w-3.5 h-3.5 text-slate-600" />}
@@ -624,7 +671,11 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
             {/* Same hint regardless of model — non-UTIR providers will just
                 politely redirect to UTIR AI when asked to write data. */}
             <p className="text-[10px] text-slate-500 mt-1.5 px-1">
-              Можно создавать сделки, оплаты, задачи и менять статусы — спросит подтверждение перед записью.
+              {l(
+                'Можно создавать сделки, оплаты, задачи и менять статусы — спросит подтверждение перед записью.',
+                'Мәмілелер, төлемдер, тапсырмалар жасауға және мәртебелерді өзгертуге болады — жазудан бұрын растайды.',
+                'Can create deals, payments, tasks and update statuses — will ask for confirmation before writing.',
+              )}
             </p>
           </div>
         </div>
