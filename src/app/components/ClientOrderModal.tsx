@@ -5,6 +5,7 @@ import { useDataStore, type Deal } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
 import { api } from '../utils/api';
 import { toast } from '../utils/toast';
+import { confirmDialog } from '../utils/confirm';
 import { DEFAULT_STAGES_TEMPLATE, type DealStage, type ConsumedMaterial } from './Warehouse';
 
 type Lang = 'kz' | 'ru' | 'eng';
@@ -335,11 +336,11 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   // the rollback row appears at the top of the timeline).
   const [rollingBackId, setRollingBackId] = useState<string | null>(null);
   const rollbackEntry = async (entryId: string) => {
-    if (!confirm(l(
+    if (!(await confirmDialog({ message: l(
       'Откатить это изменение? Поля вернутся к значениям до этой правки. Операция запишется в историю.',
       'Бұл өзгерісті қайтару керек пе? Өрістер бұрынғы мәндерге оралады. Әрекет тарихқа жазылады.',
       'Roll this change back? Fields will be restored to their previous values. The rollback is recorded in the history.',
-    ))) return;
+    ), danger: true }))) return;
     setRollingBackId(entryId);
     try {
       await api.post(`/api/deals/${deal.id}/history/${entryId}/rollback`, {});
@@ -487,12 +488,12 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
   // Wrap onClose with an unsaved-changes guard. Avoids silently losing
   // edits when the user clicks the backdrop / X / ESC mid-edit.
-  const handleClose = useCallback(() => {
-    if (dirty && !confirm(l(
+  const handleClose = useCallback(async () => {
+    if (dirty && !(await confirmDialog({ message: l(
       'Есть несохранённые изменения. Закрыть без сохранения?',
       'Сақталмаған өзгерістер бар. Сақтамай жабу керек пе?',
       'Unsaved changes. Close without saving?',
-    ))) return;
+    ) }))) return;
     onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dirty, onClose, language]);

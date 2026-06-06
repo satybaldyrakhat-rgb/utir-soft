@@ -4,6 +4,7 @@ import {
   Copy, ExternalLink, Lock, Settings as SettingsIcon, Power, Search, KeyRound, ShieldCheck, Trash2,
 } from 'lucide-react';
 import { api } from '../utils/api';
+import { confirmDialog } from '../utils/confirm';
 import { BrandLogo, hasBrandLogo } from './BrandLogo';
 
 interface Props { language: 'kz' | 'ru' | 'eng'; canEdit: boolean }
@@ -98,7 +99,7 @@ export function IntegrationsPanel({ language, canEdit }: Props) {
   }, [catalog, statuses]);
 
   async function disconnect(d: IntegrationDef) {
-    if (!confirm(l(`Отключить «${d.name}»? Сохранённые ключи будут удалены.`, `«${d.name}» өшіру керек пе? Сақталған кілттер жойылады.`, `Disconnect ${d.name}? Stored keys will be removed.`))) return;
+    if (!(await confirmDialog({ message: l(`Отключить «${d.name}»? Сохранённые ключи будут удалены.`, `«${d.name}» өшіру керек пе? Сақталған кілттер жойылады.`, `Disconnect ${d.name}? Stored keys will be removed.`), danger: true }))) return;
     try {
       await api.delete(`/api/integrations/v2/${d.id}`);
       setToast(l('Интеграция отключена', 'Өшірілді', 'Disconnected'));

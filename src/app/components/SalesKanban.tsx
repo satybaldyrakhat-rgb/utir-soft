@@ -21,6 +21,7 @@ import {
 import { ClientOrderModal } from './ClientOrderModal';
 import { NewDealModal } from './NewDealModal';
 import { useDataStore, type Deal } from '../utils/dataStore';
+import { confirmDialog } from '../utils/confirm';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
 import { useAutoRefresh } from '../utils/useAutoRefresh';
@@ -316,8 +317,8 @@ export function SalesKanban({ language }: SalesKanbanProps) {
     clearBulk();
     setBulkMoveOpen(false);
   };
-  const bulkDelete = () => {
-    if (!confirm(l(`Удалить ${bulkSelected.size} сделок?`, `${bulkSelected.size} мәмілені жою?`, `Delete ${bulkSelected.size} deals?`))) return;
+  const bulkDelete = async () => {
+    if (!(await confirmDialog({ message: l(`Удалить ${bulkSelected.size} сделок?`, `${bulkSelected.size} мәмілені жою?`, `Delete ${bulkSelected.size} deals?`), danger: true }))) return;
     for (const id of bulkSelected) store.deleteDeal(id);
     clearBulk();
   };

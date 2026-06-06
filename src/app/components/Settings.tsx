@@ -13,6 +13,7 @@ import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, Freed
 import { useDataStore, ALL_MODULES, ALL_ROLES, MODULE_GROUPS, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
 import { toast } from '../utils/toast';
+import { confirmDialog } from '../utils/confirm';
 import { api } from '../utils/api';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { t } from '../utils/translations';
@@ -281,7 +282,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
     }
   };
 
-  const deleteEmployee = (id: string) => {
+  const deleteEmployee = async (id: string) => {
     const emp = employees.find(e => e.id === id);
     if (!emp) return;
     const isSelf = !!currentUserEmail && emp.email.toLowerCase() === currentUserEmail.toLowerCase();
@@ -298,7 +299,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
       `${emp.name} командадан жойылсын ба? Қызметкер деректерге қол жеткізе алмайды және кіре алмайды.`,
       `Remove ${emp.name} from the team? They will lose access to all data and won't be able to sign in.`,
     );
-    if (confirm(msg)) store.deleteEmployee(id);
+    if (await confirmDialog({ message: msg, danger: true })) store.deleteEmployee(id);
   };
 
   // Inverse: restore a previously-kicked teammate. Calls the POST /restore
@@ -307,11 +308,11 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
   const restoreEmployee = async (id: string) => {
     const emp = removedEmployees.find(e => e.id === id);
     if (!emp) return;
-    if (!confirm(l(
+    if (!(await confirmDialog({ message: l(
       `Восстановить ${emp.name} в команде? Сотрудник снова сможет войти со своими прежними правами.`,
       `${emp.name} командаға қайта қосылсын ба? Қызметкер бұрынғы рұқсаттарымен қайта кіре алады.`,
       `Restore ${emp.name} to the team? They will be able to sign in again with their previous role.`,
-    ))) return;
+    ) }))) return;
     try {
       await api.post(`/api/employees/${id}/restore`, {});
       await store.reloadAll();
@@ -1133,7 +1134,7 @@ function RoleRow({
     setEditing(false);
   };
 
-  const askDelete = () => {
+  const askDelete = async () => {
     if (role.system) return;
     if (inUseBy > 0) {
       toast(l(
@@ -1143,7 +1144,7 @@ function RoleRow({
       ), 'error');
       return;
     }
-    if (confirm(l(`Удалить роль «${role.name}»?`, `«${role.name}» рөлін жою керек пе?`, `Delete role "${role.name}"?`))) {
+    if (await confirmDialog({ message: l(`Удалить роль «${role.name}»?`, `«${role.name}» рөлін жою керек пе?`, `Delete role "${role.name}"?`), danger: true })) {
       onDelete();
     }
   };

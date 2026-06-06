@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, ArrowDownRight, ArrowUpRight, X, Receipt, Wallet, Plus, Edit2, Trash2, Banknote, Landmark, Smartphone } from 'lucide-react';
 import { useDataStore, type FinanceTransaction } from '../../utils/dataStore';
 import { toast } from '../../utils/toast';
+import { confirmDialog } from '../../utils/confirm';
 
 type Cat = 'income' | 'expense' | 'tax' | 'salary' | 'planned';
 // kind tells us whether a row is a real DB transaction (editable) or
@@ -277,8 +278,8 @@ export function PaymentCalendar() {
                         className="w-7 h-7 hover:bg-gray-100 rounded-lg flex items-center justify-center"
                       ><Edit2 className="w-3 h-3 text-gray-500" /></button>
                       <button
-                        onClick={() => {
-                          if (confirm(`Удалить платёж ${fmt(p.amount)}?`)) store.deleteTransaction(p.id);
+                        onClick={async () => {
+                          if (await confirmDialog({ message: `Удалить платёж ${fmt(p.amount)}?`, danger: true })) store.deleteTransaction(p.id);
                         }}
                         title="Удалить"
                         className="w-7 h-7 hover:bg-rose-50 rounded-lg flex items-center justify-center"

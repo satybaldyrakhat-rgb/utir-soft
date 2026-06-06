@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Package, TrendingUp, AlertTriangle, ShoppingCart, Wrench, Users, Clock, CheckCircle, Plus, X, Search, Edit2, Eye, Truck, Calendar, BarChart3, ArrowUpDown, MapPin, FileText, Trash2, Loader2, Copy, PlayCircle, Download, Upload, ArrowUp, ArrowDown } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
+import { confirmDialog } from '../utils/confirm';
 import { Calculator } from './Calculator';
 import { api } from '../utils/api';
 import { getNiche, type NicheStage } from '../utils/niches';
@@ -223,7 +224,7 @@ export function Warehouse({ language }: WarehouseProps) {
 
   async function deleteSupplier(id: string) {
     const sup = suppliers.find(s => s.id === id);
-    if (!confirm(l('Удалить поставщика?', 'Жеткізушіні жою?', 'Delete supplier?'))) return;
+    if (!(await confirmDialog({ message: l('Удалить поставщика?', 'Жеткізушіні жою?', 'Delete supplier?'), danger: true }))) return;
     try {
       await api.delete(`/api/suppliers/${id}`);
       setSuppliers(prev => prev.filter(x => x.id !== id));
@@ -312,7 +313,7 @@ export function Warehouse({ language }: WarehouseProps) {
 
   async function deletePo(id: string) {
     const po = purchaseOrders.find(p => p.id === id);
-    if (!confirm(l('Удалить закупку?', 'Сатып алуды жою?', 'Delete PO?'))) return;
+    if (!(await confirmDialog({ message: l('Удалить закупку?', 'Сатып алуды жою?', 'Delete PO?'), danger: true }))) return;
     try {
       await api.delete(`/api/purchase-orders/${id}`);
       setPurchaseOrders(prev => prev.filter(x => x.id !== id));
@@ -1574,7 +1575,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
     finally { setBusy(false); }
   }
   async function remove(id: string) {
-    if (!confirm('Удалить шаблон?')) return;
+    if (!(await confirmDialog({ message: 'Удалить шаблон?', danger: true }))) return;
     setBusy(true);
     try { await api.delete(`/api/bom-templates/${id}`); refresh(); }
     catch (e: any) { setError(String(e?.message || e)); }

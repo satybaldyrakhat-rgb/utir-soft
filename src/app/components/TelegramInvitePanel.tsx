@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import { Copy, Check, Link as LinkIcon, RefreshCw, Send, QrCode, Loader2, AlertCircle } from 'lucide-react';
 import { api } from '../utils/api';
+import { confirmDialog } from '../utils/confirm';
 import { useDataStore } from '../utils/dataStore';
 
 interface Props {
@@ -60,11 +61,11 @@ export function TelegramInvitePanel({ language }: Props) {
 
   const rotate = async () => {
     if (!canManage) return;
-    if (!confirm(l(
+    if (!(await confirmDialog({ message: l(
       'Сбросить ссылку? Старая перестанет работать — кто ещё не присоединился, не сможет по ней войти.',
       'Сілтемені қайта жасау керек пе? Ескісі жұмыс істемейді.',
       'Reset the link? The old one stops working for anyone who hasn\'t joined yet.',
-    ))) return;
+    ), danger: true }))) return;
     setRotating(true);
     try {
       const r = await api.post<InviteResp>('/api/telegram/team-invite/rotate', {});

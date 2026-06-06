@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import { Copy, Trash2, Plus, Check, Link as LinkIcon } from 'lucide-react';
 import { api } from '../utils/api';
+import { confirmDialog } from '../utils/confirm';
 import { useDataStore } from '../utils/dataStore';
 
 interface Invitation {
@@ -109,7 +110,7 @@ export function TeamInvitePanel({ language }: Props) {
   };
 
   const revoke = async (id: string) => {
-    if (!confirm(l('Отозвать приглашение?', 'Шақыруды кері қайтару керек пе?', 'Revoke this invitation?'))) return;
+    if (!(await confirmDialog({ message: l('Отозвать приглашение?', 'Шақыруды кері қайтару керек пе?', 'Revoke this invitation?'), danger: true }))) return;
     try {
       await api.delete(`/api/invitations/${id}`);
       await load();

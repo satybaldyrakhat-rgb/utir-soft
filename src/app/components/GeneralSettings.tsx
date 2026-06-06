@@ -5,6 +5,7 @@ import {
   Palette, Factory, AlertTriangle, Sun, Moon, Monitor,
 } from 'lucide-react';
 import { useDataStore, type UserProfile } from '../utils/dataStore';
+import { confirmDialog } from '../utils/confirm';
 import { NICHES, type NicheId, getNiche } from '../utils/niches';
 import { THEMES, type ThemeId, loadTheme, saveTheme, type ColorMode, loadMode, saveMode } from '../utils/theme';
 import { toast } from '../utils/toast';
@@ -488,7 +489,7 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
           </button>
           {onLogout && (
             <button
-              onClick={() => { if (confirm(l('Выйти из аккаунта?', 'Шығу?', 'Sign out?'))) onLogout(); }}
+              onClick={async () => { if (await confirmDialog({ message: l('Выйти из аккаунта?', 'Шығу?', 'Sign out?') })) onLogout(); }}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-rose-50 hover:bg-rose-100 rounded-xl text-xs text-rose-700 border border-rose-100"
             >
               <LogOut className="w-3.5 h-3.5" /> {l('Выйти', 'Шығу', 'Sign out')}

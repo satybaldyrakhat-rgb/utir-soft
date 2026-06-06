@@ -15,6 +15,7 @@ import { CustomModulePage } from './components/CustomModulePage';
 import { CustomIcon } from './components/CustomIcons';
 import { AIAssistant } from './components/AIAssistant';
 import { Toaster } from './utils/toast';
+import { ConfirmHost } from './utils/confirm';
 import { Auth } from './components/Auth';
 import { ComingSoon } from './components/ComingSoon';
 import { Terms } from './components/Terms';
@@ -364,6 +365,8 @@ function AppContent() {
       {/* Themable global page backdrop — paints once, every page renders
           on top. Theme changes recolour orbs instantly via CSS vars. */}
       <div className="app-backdrop" aria-hidden="true" />
+      {/* Global confirm dialog — fed by confirmDialog() from anywhere (Д7). */}
+      <ConfirmHost language={language} />
       {/* Invite link held by a logged-in user — modal explaining what it's for. */}
       {heldInviteCode && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-center justify-center p-4" onClick={dismissHeldInvite}>

@@ -4,6 +4,7 @@ import {
   Download, Upload, Check, AlertTriangle, Loader2, RotateCcw,
 } from 'lucide-react';
 import { useDataStore, type CatalogKey } from '../utils/dataStore';
+import { confirmDialog } from '../utils/confirm';
 import { t } from '../utils/translations';
 
 interface Props { language: 'kz' | 'ru' | 'eng' }
@@ -115,8 +116,8 @@ export function CatalogsSettings({ language }: Props) {
     flash(l('Добавлено', 'Қосылды', 'Added'));
   }
 
-  function remove(key: CatalogKey, value: string) {
-    if (!confirm(l(`Удалить «${value}»?`, 'Жоюға?', `Delete «${value}»?`))) return;
+  async function remove(key: CatalogKey, value: string) {
+    if (!(await confirmDialog({ message: l(`Удалить «${value}»?`, 'Жоюға?', `Delete «${value}»?`), danger: true }))) return;
     store.removeCatalogItem(key, value);
     flash(l('Удалено', 'Жойылды', 'Removed'));
   }
@@ -131,8 +132,8 @@ export function CatalogsSettings({ language }: Props) {
     setEditing(null);
   }
 
-  function clearAll(key: CatalogKey, title: string) {
-    if (!confirm(l(`Очистить весь справочник «${title}»? Действие не отменить.`, `«${title}» анықтамалығын толық тазалау керек пе? Әрекетті қайтаруға болмайды.`, `Clear all from «${title}»? Cannot be undone.`))) return;
+  async function clearAll(key: CatalogKey, title: string) {
+    if (!(await confirmDialog({ message: l(`Очистить весь справочник «${title}»? Действие не отменить.`, `«${title}» анықтамалығын толық тазалау керек пе? Әрекетті қайтаруға болмайды.`, `Clear all from «${title}»? Cannot be undone.`), danger: true }))) return;
     store.replaceCatalog(key, []);
     flash(l('Справочник очищен', 'Анықтамалық тазартылды', 'Catalog cleared'));
   }

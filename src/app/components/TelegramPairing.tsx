@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Send, Copy, Check, X, RefreshCw, Loader2 } from 'lucide-react';
 import { api } from '../utils/api';
+import { confirmDialog } from '../utils/confirm';
 
 interface Props {
   language: 'kz' | 'ru' | 'eng';
@@ -57,7 +58,7 @@ export function TelegramPairing({ language }: Props) {
   };
 
   const unlinkBot = async () => {
-    if (!confirm(l('Отвязать Telegram-бот?', 'Telegram-ботты ажырату?', 'Unlink Telegram bot?'))) return;
+    if (!(await confirmDialog({ message: l('Отвязать Telegram-бот?', 'Telegram-ботты ажырату?', 'Unlink Telegram bot?'), danger: true }))) return;
     await api.delete('/api/telegram/link');
     setCode('');
     refresh();

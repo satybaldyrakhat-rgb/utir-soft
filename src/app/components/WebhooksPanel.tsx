@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Send, Copy, Check, Zap } from 'lucide-react';
 import { api } from '../utils/api';
+import { confirmDialog } from '../utils/confirm';
 
 interface Webhook {
   id: string;
@@ -88,7 +89,7 @@ export function WebhooksPanel({ language }: Props) {
   };
 
   const remove = async (id: string) => {
-    if (!confirm(l('Удалить webhook?', 'Webhook жойылсын ба?', 'Delete webhook?'))) return;
+    if (!(await confirmDialog({ message: l('Удалить webhook?', 'Webhook жойылсын ба?', 'Delete webhook?'), danger: true }))) return;
     try { await api.delete(`/api/webhooks/${id}`); await load(); }
     catch (e: any) { setError(String(e?.message || 'delete failed')); }
   };

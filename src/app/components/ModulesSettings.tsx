@@ -5,6 +5,7 @@ import {
   Search, ExternalLink, Download, Upload, ChevronRight, ChevronDown, Power, Wallet, FilePlus2, AlertCircle,
 } from 'lucide-react';
 import { useDataStore, ALL_ROLES, type RoleKey, type PlatformModule } from '../utils/dataStore';
+import { confirmDialog } from '../utils/confirm';
 import { t } from '../utils/translations';
 import { CustomIcon } from './CustomIcons';
 import { ModuleBuilder } from './ModuleBuilder';
@@ -263,8 +264,8 @@ export function ModulesSettings({ language }: Props) {
                   <Edit2 className="w-3 h-3" /> {l('Изменить', 'Өзгерту', 'Edit')}
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm(tt('deleteCustomModuleConfirm'))) {
+                  onClick={async () => {
+                    if (await confirmDialog({ message: tt('deleteCustomModuleConfirm'), danger: true })) {
                       store.deleteCustomModule(m.id);
                       flash(l('Модуль удалён', 'Модуль жойылды', 'Module deleted'));
                     }
@@ -505,8 +506,8 @@ export function ModulesSettings({ language }: Props) {
           className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700">
           <Plus className="w-3.5 h-3.5" /> {tt('createCustomModule')}
         </button>
-        <button onClick={() => {
-            if (!confirm(l('Сбросить порядок модулей и роли к настройкам по умолчанию?', 'Модуль ретін және рөлдерді әдепкі баптауларға қайтару керек пе?', 'Reset module order and roles to defaults?'))) return;
+        <button onClick={async () => {
+            if (!(await confirmDialog({ message: l('Сбросить порядок модулей и роли к настройкам по умолчанию?', 'Модуль ретін және рөлдерді әдепкі баптауларға қайтару керек пе?', 'Reset module order and roles to defaults?'), danger: true }))) return;
             store.resetModules();
             flash(l('Сброшено к настройкам по умолчанию', 'Әдепкі бойынша қалпына келтірілді', 'Reset to defaults'));
           }}
