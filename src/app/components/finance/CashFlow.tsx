@@ -57,7 +57,7 @@ export function CashFlow() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between flex-wrap gap-3">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 flex items-center justify-between flex-wrap gap-3">
         <div className="text-[10px] text-gray-400 uppercase tracking-wider">Период анализа</div>
         <div className="flex gap-1 bg-gray-50 rounded-lg p-1">
           {([['day', 'День'], ['week', 'Неделя'], ['month', 'Месяц'], ['quarter', 'Квартал']] as const).map(([id, label]) => (
@@ -81,7 +81,7 @@ export function CashFlow() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="flex items-center justify-between mb-1">
             <div className="text-[10px] text-gray-400 uppercase tracking-wide">Притоки</div>
             <ArrowDownRight className="w-3.5 h-3.5 text-emerald-500" />
@@ -89,7 +89,7 @@ export function CashFlow() {
           <div className="text-base text-gray-900 tabular-nums">{fmt(totalIn)}</div>
           <div className="text-[10px] text-gray-500 mt-1">за {monthsBack} мес</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="flex items-center justify-between mb-1">
             <div className="text-[10px] text-gray-400 uppercase tracking-wide">Оттоки</div>
             <ArrowUpRight className="w-3.5 h-3.5 text-rose-500" />
@@ -97,7 +97,7 @@ export function CashFlow() {
           <div className="text-base text-gray-900 tabular-nums">{fmt(totalOut)}</div>
           <div className="text-[10px] text-gray-500 mt-1">за {monthsBack} мес</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="flex items-center justify-between mb-1">
             <div className="text-[10px] text-gray-400 uppercase tracking-wide">Чистый поток</div>
             {net >= 0 ? <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> : <TrendingDown className="w-3.5 h-3.5 text-rose-500" />}
@@ -107,7 +107,7 @@ export function CashFlow() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
         <div className="flex items-center justify-between mb-5">
           <div className="text-sm text-gray-900">Динамика притоков и оттоков</div>
           <div className="flex gap-1 bg-gray-50 rounded-lg p-1">
@@ -147,7 +147,7 @@ export function CashFlow() {
 
 function CategoryBlock({ title, categories, barClass }: { title: string; categories: { name: string; amount: number; pct: number }[]; barClass: string }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5">
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
       <div className="text-sm text-gray-900 mb-4">{title}</div>
       {categories.length === 0 ? (
         <div className="text-xs text-gray-400 py-6 text-center">Нет данных</div>

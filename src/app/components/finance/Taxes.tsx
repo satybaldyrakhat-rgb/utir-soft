@@ -339,7 +339,7 @@ export function Taxes() {
   return (
     <div className="space-y-4">
       {/* ─── Period bar (Month/Quarter + chevrons + PDF) ───────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-3 flex items-center justify-between flex-wrap gap-2">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-3 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <div className="flex gap-1 bg-gray-50 rounded-lg p-1">
             <button onClick={() => setKind('month')}   className={`px-3 py-1 rounded-md text-[11px] transition ${kind === 'month'   ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>Месяц</button>
@@ -379,22 +379,22 @@ export function Taxes() {
 
       {/* ─── KPI strip ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">К оплате</div>
           <div className="text-base text-gray-900 tabular-nums">{fmt(totalDue)}</div>
           <div className="text-[10px] text-amber-600 mt-1">{rows.filter(r => r.applicable && statusOf(r) !== 'paid').length} налогов</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Оплачено</div>
           <div className="text-base text-gray-900 tabular-nums">{fmt(totalPaid)}</div>
           <div className="text-[10px] text-emerald-600 mt-1">{rows.filter(r => r.applicable && statusOf(r) === 'paid').length} налогов</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Итого за период</div>
           <div className="text-base text-gray-900 tabular-nums">{fmt(totalAll)}</div>
           <div className="text-[10px] text-gray-500 mt-1">{revenueBase ? Math.round((totalAll / revenueBase) * 100) : 0}% от выручки</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Ближайший срок</div>
           <div className="text-base text-gray-900">{nearestDue ? nearestDue.due.slice(8, 10) + '.' + nearestDue.due.slice(5, 7) : '—'}</div>
           <div className="text-[10px] text-rose-600 mt-1">{nearestDue ? `${nearestDue.shortLabel} · ${fmt(nearestDue.amount)}` : 'Всё оплачено'}</div>
@@ -492,7 +492,7 @@ export function Taxes() {
                     <button
                       onClick={() => markPaid(r)}
                       disabled={isBusy}
-                      className="flex-1 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs hover:bg-gray-800 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                      className="flex-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs hover:bg-emerald-700 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
                     >
                       {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileCheck className="w-3 h-3" />}
                       Отметить уплату
@@ -515,7 +515,7 @@ export function Taxes() {
       </div>
 
       {/* ─── Reporting calendar (static reference) ─────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
         <div className="flex items-center gap-2 mb-3">
           <Receipt className="w-3.5 h-3.5 text-gray-400" />
           <div className="text-sm text-gray-900">Календарь сдачи отчётности РК</div>

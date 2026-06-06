@@ -76,7 +76,7 @@ export function Balance() {
             <input type="date" value={lockDraft} onChange={e => setLockDraft(e.target.value)}
               className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
             <button onClick={() => saveLock(lockDraft || null)} disabled={!lockDraft || lockDraft === lockDate}
-              className="px-2.5 py-1 bg-gray-900 text-white rounded-lg text-[11px] hover:bg-gray-800 disabled:opacity-40">Закрыть</button>
+              className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[11px] hover:bg-emerald-700 disabled:opacity-40">Закрыть</button>
             {lockDate && <button onClick={() => saveLock(null)} className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[11px] text-gray-600 hover:bg-gray-50">Открыть</button>}
           </div>
         )}
@@ -87,7 +87,7 @@ export function Balance() {
         {balances.map(a => {
           const Icon = a.icon;
           return (
-            <div key={a.id} className="bg-white rounded-2xl border border-gray-100 p-4">
+            <div key={a.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
               <div className="flex items-center justify-between mb-1">
                 <div className="text-[10px] text-gray-400 uppercase tracking-wide">{a.label}</div>
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${a.cls}`}><Icon className="w-3.5 h-3.5" /></div>
@@ -104,7 +104,7 @@ export function Balance() {
           <div className="text-[10px] text-white/60 uppercase tracking-wide mb-1">Всего денег</div>
           <div className="text-lg tabular-nums">{fmt(totalMoney)}</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="flex items-center justify-between mb-1">
             <div className="text-[10px] text-gray-400 uppercase tracking-wide">Дебиторка (нам должны)</div>
             <Users className="w-3.5 h-3.5 text-amber-500" />
@@ -112,7 +112,7 @@ export function Balance() {
           <div className="text-base text-gray-900 tabular-nums">{fmt(receivables)}</div>
           <div className="text-[10px] text-gray-400 mt-0.5">{receivableDeals.length} незакрытых заказов</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="flex items-center justify-between mb-1">
             <div className="text-[10px] text-gray-400 uppercase tracking-wide">Кредиторка (мы должны)</div>
             <CreditCard className="w-3.5 h-3.5 text-rose-500" />
@@ -123,7 +123,7 @@ export function Balance() {
       </div>
 
       {/* Inventory (informational) */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center"><Package className="w-3.5 h-3.5" /></div>
           <div>
@@ -135,7 +135,7 @@ export function Balance() {
       </div>
 
       {/* Cash-book */}
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
         <button onClick={() => setShowLedger(v => !v)} className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50">
           <div className="flex items-center gap-2">
             <BookOpen className="w-3.5 h-3.5 text-gray-400" />

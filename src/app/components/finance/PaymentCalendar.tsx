@@ -117,24 +117,24 @@ export function PaymentCalendar() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Поступления</div>
           <div className="text-base text-gray-900 tabular-nums mb-1">{fmt(incoming)}</div>
           <div className="inline-flex items-center gap-1 text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded"><ArrowDownRight className="w-3 h-3" />{all.filter(p => p.type === 'in').length} платежей</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Расходы</div>
           <div className="text-base text-gray-900 tabular-nums mb-1">{fmt(outgoing)}</div>
           <div className="inline-flex items-center gap-1 text-[10px] text-rose-600 bg-rose-50 px-2 py-0.5 rounded"><ArrowUpRight className="w-3 h-3" />{all.filter(p => p.type === 'out').length} платежей</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
           <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Просрочка</div>
           <div className="text-base text-gray-900 tabular-nums mb-1">{overdue}</div>
           <div className="inline-flex items-center gap-1 text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded">требуют внимания</div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-3 flex items-center justify-between flex-wrap gap-2">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-3 flex items-center justify-between flex-wrap gap-2">
         <div className="flex gap-1 bg-gray-50 rounded-lg p-1">
           {FILTERS.map(f => (
             <button
@@ -161,7 +161,7 @@ export function PaymentCalendar() {
               setInitialDate(selectedDay ? dayKey(selectedDay) : new Date().toISOString().slice(0, 10));
               setModalOpen(true);
             }}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-900 text-white rounded-md text-[10px] hover:bg-gray-800"
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 text-white rounded-md text-[10px] hover:bg-emerald-700"
           >
             <Plus className="w-3 h-3" /> Платёж
           </button>
@@ -169,7 +169,7 @@ export function PaymentCalendar() {
       </div>
 
       <div className="grid lg:grid-cols-5 gap-4">
-        <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="lg:col-span-3 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="text-sm text-gray-900 capitalize">{monthLabel}</div>
             <div className="flex gap-1">
@@ -205,7 +205,7 @@ export function PaymentCalendar() {
                 >
                   {/* Top row: day number + category dots cluster + today badge */}
                   <div className="flex items-start justify-between mb-1">
-                    <div className={`text-[10px] ${isToday ? 'text-white bg-gray-900 px-1.5 py-0.5 rounded-full' : 'text-gray-500'}`}>{day}</div>
+                    <div className={`text-[10px] ${isToday ? 'text-white bg-emerald-600 px-1.5 py-0.5 rounded-full' : 'text-gray-500'}`}>{day}</div>
                     {cats.length > 0 && (
                       <div className="flex gap-0.5">
                         {cats.slice(0, 3).map(c => (
@@ -230,7 +230,7 @@ export function PaymentCalendar() {
           </div>
         </div>
 
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="lg:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
           <div className="p-3 border-b border-gray-50 flex items-center justify-between gap-2">
             <div className="text-sm text-gray-900 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-gray-400" />
@@ -444,7 +444,7 @@ function PaymentModal({ initialDate, editing, onClose, onSave }: {
 
         <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
           <button onClick={onClose} className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900">Отмена</button>
-          <button onClick={commit} className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs">
+          <button onClick={commit} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs">
             {editing ? 'Сохранить' : 'Создать'}
           </button>
         </div>

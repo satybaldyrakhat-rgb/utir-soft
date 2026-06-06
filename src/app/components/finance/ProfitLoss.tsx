@@ -122,7 +122,7 @@ export function ProfitLoss() {
       <div className="flex items-center gap-1 flex-wrap">
         {PERIODS.map(([p, lbl]) => (
           <button key={p} onClick={() => setPeriod(p)}
-            className={`px-3 py-1.5 rounded-2xl text-[11px] transition-all ${period === p ? 'bg-gray-900 text-white' : 'bg-white/60 ring-1 ring-white/60 text-slate-500 hover:bg-white'}`}>
+            className={`px-3 py-1.5 rounded-2xl text-[11px] transition-all ${period === p ? 'bg-emerald-600 text-white' : 'bg-white/60 ring-1 ring-white/60 text-slate-500 hover:bg-white'}`}>
             {lbl}
           </button>
         ))}
@@ -133,14 +133,14 @@ export function ProfitLoss() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {cards.map((k, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4">
+          <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
             <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">{k.label}</div>
             <div className="text-base text-gray-900 tabular-nums mb-1">{k.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
         <div className="px-5 py-3.5 border-b border-gray-50 flex items-center justify-between">
           <div className="text-sm text-gray-900">Отчёт о прибылях и убытках</div>
           <span className="text-[10px] text-gray-400">{PERIODS.find(([p]) => p === period)?.[1]}</span>
@@ -165,7 +165,7 @@ export function ProfitLoss() {
 
       {/* P&L by niche (multi-niche only) */}
       {byNiche.length > 1 && (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
           <div className="px-5 py-3.5 border-b border-gray-50 text-sm text-gray-900">Прибыль по направлениям</div>
           <div className="divide-y divide-gray-50">
             {byNiche.map(n => (
