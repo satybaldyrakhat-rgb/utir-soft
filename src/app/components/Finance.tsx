@@ -5,10 +5,11 @@ import { Taxes } from './finance/Taxes';
 import { CashFlow } from './finance/CashFlow';
 import { ProfitLoss } from './finance/ProfitLoss';
 import { Balance } from './finance/Balance';
+import { Payroll } from './finance/Payroll';
 import {
   ShoppingBag, Calendar, Receipt, ArrowDownUp, TrendingUp, Wallet,
   ArrowUpRight, ArrowDownRight, Download, Clock, AlertCircle, FileText, Sparkles, ChevronDown,
-  Loader2,
+  Loader2, Users,
 } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { api } from '../utils/api';
@@ -31,11 +32,12 @@ const TAB_GROUPS = [
       { id: 'profitloss' as const, icon: TrendingUp, ru: 'Прибыль', kz: 'Пайда', eng: 'P&L' },
       { id: 'balance' as const, icon: Wallet, ru: 'Баланс', kz: 'Баланс', eng: 'Balance' },
       { id: 'taxes' as const, icon: Receipt, ru: 'Налоги', kz: 'Салық', eng: 'Taxes' },
+      { id: 'payroll' as const, icon: Users, ru: 'Зарплаты', kz: 'Жалақы', eng: 'Payroll' },
     ],
   },
 ];
 
-type TabId = 'orders' | 'calendar' | 'cashflow' | 'profitloss' | 'balance' | 'taxes';
+type TabId = 'orders' | 'calendar' | 'cashflow' | 'profitloss' | 'balance' | 'taxes' | 'payroll';
 
 // Localized month labels — chart axis was always Cyrillic regardless of
 // user language. EN/KZ users see their own short month forms.
@@ -555,6 +557,7 @@ export function Finance({ language }: FinanceProps) {
         {activeTab === 'cashflow' && <CashFlow />}
         {activeTab === 'profitloss' && <ProfitLoss />}
         {activeTab === 'balance' && <Balance />}
+        {activeTab === 'payroll' && <Payroll language={language} />}
       </div>
       {showInvoice && <InvoiceModal onClose={() => setShowInvoice(false)} language={language} />}
     </div>

@@ -116,6 +116,10 @@ export interface Employee {
   // tag who works on what, and by NewDealModal to suggest the right
   // owner when a deal niche is picked.
   nicheAssignments?: string[];
+  // Piece-rate commission — % of revenue from this employee's completed
+  // deals, paid on top of the base salary. Used by the Payroll sheet.
+  // 0 / undefined = salary-only (managers, admins typically).
+  commissionPct?: number;
 }
 
 // Role → per-module permission level. Stored in localStorage so Admin can tune.
