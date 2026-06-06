@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Banknote, Landmark, Smartphone, Package, Users, CreditCard, BookOpen } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Banknote, Landmark, Smartphone, Package, Users, CreditCard, BookOpen, Lock, Unlock } from 'lucide-react';
 import { useDataStore } from '../../utils/dataStore';
+import { api } from '../../utils/api';
 
 const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
 
@@ -17,6 +18,21 @@ const ACCOUNTS: { id: 'cash' | 'bank' | 'kaspi'; label: string; icon: any; cls: 
 export function Balance() {
   const store = useDataStore();
   const [showLedger, setShowLedger] = useState(false);
+  const isAdmin = store.currentUserRole === 'admin';
+
+  // Finance period lock — operations dated on/before this are frozen.
+  const [lockDate, setLockDate] = useState<string | null>(null);
+  const [lockDraft, setLockDraft] = useState('');
+  useEffect(() => {
+    api.get<{ lockDate: string | null }>('/api/team/finance-lock')
+      .then(r => { setLockDate(r.lockDate); setLockDraft(r.lockDate || ''); })
+      .catch(() => {});
+  }, []);
+  const saveLock = (date: string | null) => {
+    api.put<{ lockDate: string | null }>('/api/team/finance-lock', { lockDate: date })
+      .then(r => { setLockDate(r.lockDate); setLockDraft(r.lockDate || ''); })
+      .catch(e => alert(String(e?.message || e)));
+  };
 
   // Per-account balance from completed transactions (missing account → bank).
   const completed = store.transactions.filter(t => t.status === 'completed');
@@ -47,6 +63,25 @@ export function Balance() {
 
   return (
     <div className="space-y-4">
+      {/* Period lock (закрытие периода) */}
+      <div className={`rounded-2xl border p-3 flex items-center justify-between flex-wrap gap-2 ${lockDate ? 'bg-amber-50/60 border-amber-100' : 'bg-white border-gray-100'}`}>
+        <div className="flex items-center gap-2 text-xs">
+          {lockDate ? <Lock className="w-3.5 h-3.5 text-amber-600" /> : <Unlock className="w-3.5 h-3.5 text-gray-300" />}
+          <span className={lockDate ? 'text-amber-800' : 'text-gray-500'}>
+            {lockDate ? `Период закрыт по ${lockDate} — операции этой даты и раньше заморожены` : 'Период не закрыт — все операции редактируемы'}
+          </span>
+        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-1.5">
+            <input type="date" value={lockDraft} onChange={e => setLockDraft(e.target.value)}
+              className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+            <button onClick={() => saveLock(lockDraft || null)} disabled={!lockDraft || lockDraft === lockDate}
+              className="px-2.5 py-1 bg-gray-900 text-white rounded-lg text-[11px] hover:bg-gray-800 disabled:opacity-40">Закрыть</button>
+            {lockDate && <button onClick={() => saveLock(null)} className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[11px] text-gray-600 hover:bg-gray-50">Открыть</button>}
+          </div>
+        )}
+      </div>
+
       {/* Money accounts */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {balances.map(a => {

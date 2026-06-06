@@ -261,6 +261,9 @@ migrateColumn('telegram_links', 'pending_photo', 'TEXT');
 // Daily owner summary state — JSON { enabled?: bool, lastSent?: 'YYYY-MM-DD' }.
 // Drives the 09:00 Almaty morning digest pushed to admins/managers.
 migrateColumn('team_settings', 'daily_summary', 'TEXT');
+// Finance lock — 'YYYY-MM-DD'. Transactions dated on/before this are frozen
+// (no edit/delete) so a closed/reported period can't be changed задним числом.
+migrateColumn('team_settings', 'finance_lock_date', 'TEXT');
 // Telegram-native worker onboarding — masters / measurers / installers who
 // join via a deep-link invite and never touch the web. The reusable team
 // invite code lives on team_settings; the per-chat onboarding state (name +
@@ -904,9 +907,25 @@ app.get('/api/auth/check-reset-token', (req, res) => {
 // Filters by team_id, not user_id — every team member sees the same data.
 // user_id is still recorded on INSERT as audit (who created the row), but
 // access checks all go through team_id.
-function makeCrud(table: string, idPrefix: string) {
+// Read the team's finance lock date (or null).
+function financeLock(teamId: string): string | null {
+  try {
+    const row = db.prepare('SELECT finance_lock_date FROM team_settings WHERE team_id = ?').get(teamId) as any;
+    return row?.finance_lock_date || null;
+  } catch { return null; }
+}
+// A YYYY-MM-DD date is frozen when it falls on/before the lock date.
+function isDateLocked(teamId: string, date: string | undefined): boolean {
+  const lock = financeLock(teamId);
+  if (!lock || !date) return false;
+  return String(date).slice(0, 10) <= lock;
+}
+
+function makeCrud(table: string, idPrefix: string, opts?: { lockable?: boolean }) {
   const r = express.Router();
   r.use(authMiddleware);
+  const lockable = !!opts?.lockable;
+  const LOCK_MSG = 'period locked';
 
   r.get('/', (req: AuthedRequest, res) => {
     const rows = db.prepare(`SELECT id, data FROM ${table} WHERE team_id = ? ORDER BY rowid DESC`).all(req.teamId!) as any[];
@@ -915,6 +934,8 @@ function makeCrud(table: string, idPrefix: string) {
 
   r.post('/', (req: AuthedRequest, res) => {
     const body = req.body || {};
+    // Can't backdate a new record into a locked (closed) period.
+    if (lockable && isDateLocked(req.teamId!, body.date)) return res.status(409).json({ error: LOCK_MSG });
     const id = body.id || newId(idPrefix);
     const data = { ...body, id };
     db.prepare(`INSERT INTO ${table} (id, user_id, team_id, data) VALUES (?, ?, ?, ?)`).run(id, req.userId!, req.teamId!, JSON.stringify(data));
@@ -924,12 +945,21 @@ function makeCrud(table: string, idPrefix: string) {
   r.patch('/:id', (req: AuthedRequest, res) => {
     const row = db.prepare(`SELECT data FROM ${table} WHERE id = ? AND team_id = ?`).get(req.params.id, req.teamId!) as any;
     if (!row) return res.status(404).json({ error: 'not found' });
-    const updated = { ...JSON.parse(row.data), ...req.body, id: req.params.id };
+    const prev = JSON.parse(row.data);
+    // Frozen if either the existing OR the new date sits in a locked period.
+    if (lockable && (isDateLocked(req.teamId!, prev.date) || isDateLocked(req.teamId!, req.body?.date))) {
+      return res.status(409).json({ error: LOCK_MSG });
+    }
+    const updated = { ...prev, ...req.body, id: req.params.id };
     db.prepare(`UPDATE ${table} SET data = ? WHERE id = ? AND team_id = ?`).run(JSON.stringify(updated), req.params.id, req.teamId!);
     res.json(updated);
   });
 
   r.delete('/:id', (req: AuthedRequest, res) => {
+    if (lockable) {
+      const row = db.prepare(`SELECT data FROM ${table} WHERE id = ? AND team_id = ?`).get(req.params.id, req.teamId!) as any;
+      if (row && isDateLocked(req.teamId!, JSON.parse(row.data).date)) return res.status(409).json({ error: LOCK_MSG });
+    }
     db.prepare(`DELETE FROM ${table} WHERE id = ? AND team_id = ?`).run(req.params.id, req.teamId!);
     res.json({ ok: true });
   });
@@ -1426,7 +1456,22 @@ app.use('/api/tasks', makeCrud('tasks', 't'));
 app.use('/api/products', authMiddleware, requirePermission('production'), makeCrud('products', 'p'));
 // Finance gated by the matrix (was requireRole('manager') — now matrix-driven
 // so admin can hand finance to specific roles without touching code).
-app.use('/api/transactions', authMiddleware, requirePermission('finance'), makeCrud('transactions', 'f'));
+app.use('/api/transactions', authMiddleware, requirePermission('finance'), makeCrud('transactions', 'f', { lockable: true }));
+
+// ─── Finance period lock (закрытие периода) ───────────────────────
+app.get('/api/team/finance-lock', authMiddleware, (req: AuthedRequest, res) => {
+  res.json({ lockDate: financeLock(req.teamId!) });
+});
+app.put('/api/team/finance-lock', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
+  const raw = req.body?.lockDate;
+  const lockDate = raw && /^\d{4}-\d{2}-\d{2}$/.test(String(raw)) ? String(raw) : null;
+  db.prepare(`
+    INSERT INTO team_settings (team_id, finance_lock_date, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET finance_lock_date = excluded.finance_lock_date, updated_at = excluded.updated_at
+  `).run(req.teamId!, lockDate);
+  res.json({ lockDate });
+});
 
 // ─── AI SETTINGS (per-user JSON blob, Block F.4) ──────────────────
 // The Telegram bot reads `assistant.modulePermissions` from here to decide
