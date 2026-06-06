@@ -420,7 +420,7 @@ export function ModulesSettings({ language }: Props) {
       </div>
 
       {/* ─── Search bar ─────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-2 flex items-center gap-2">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-2 flex items-center gap-2">
         <Search className="w-3.5 h-3.5 text-gray-300 ml-2" />
         <input
           value={search}
@@ -484,7 +484,7 @@ export function ModulesSettings({ language }: Props) {
                        'Create your own section with custom fields — e.g. Suppliers, Warranties, Sites.')}
                   </div>
                   <button onClick={() => setBuilderOpen({})}
-                    className="px-3.5 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 inline-flex items-center gap-1.5">
+                    className="px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 inline-flex items-center gap-1.5">
                     <Plus className="w-3.5 h-3.5" /> {tt('createCustomModule')}
                   </button>
                 </>
@@ -502,7 +502,7 @@ export function ModulesSettings({ language }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-3 pt-2 mt-2 border-t border-gray-100">
         <button
           onClick={() => setBuilderOpen({})}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700">
           <Plus className="w-3.5 h-3.5" /> {tt('createCustomModule')}
         </button>
         <button onClick={() => {
@@ -582,7 +582,7 @@ export function ModulesSettings({ language }: Props) {
               <div className="px-5 pb-5">
                 <button
                   onClick={() => { setPermsFor(null); flash(l('Доступы сохранены', 'Қатынау сақталды', 'Access saved')); }}
-                  className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800">
+                  className="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700">
                   {l('Готово', 'Дайын', 'Done')}
                 </button>
               </div>

@@ -211,7 +211,7 @@ export function CatalogsSettings({ language }: Props) {
       </div>
 
       {/* ─── Search ─────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-2 flex items-center gap-2">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-2 flex items-center gap-2">
         <Search className="w-3.5 h-3.5 text-gray-300 ml-2" />
         <input
           value={search}
@@ -250,7 +250,7 @@ export function CatalogsSettings({ language }: Props) {
           : all;
         const title = meta.titles[language];
         return (
-          <div key={meta.key} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div key={meta.key} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-50 flex items-start justify-between gap-3 flex-wrap">
               <div className="flex items-start gap-3 min-w-0">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.cls}`}>
@@ -366,7 +366,7 @@ export function CatalogsSettings({ language }: Props) {
                 <button
                   onClick={() => add(meta.key)}
                   disabled={!drafts[meta.key].trim()}
-                  className="px-3 py-2 bg-gray-900 text-white rounded-xl text-xs hover:bg-gray-800 disabled:opacity-30 flex items-center gap-1"
+                  className="px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 disabled:opacity-30 flex items-center gap-1"
                 >
                   <Plus className="w-3 h-3" /> {l('Добавить', 'Қосу', 'Add')}
                 </button>

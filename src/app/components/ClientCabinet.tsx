@@ -613,7 +613,7 @@ function ChatsPage({ lang }: { lang: Lang }) {
             <button className="w-9 h-9 hover:bg-white/50 rounded-xl flex items-center justify-center text-slate-400"><Paperclip className="w-4 h-4" /></button>
             <input placeholder={tl(lang, 'Сообщение...', 'Хабарлама...', 'Message...')} className="flex-1 px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
             <button className="w-9 h-9 hover:bg-white/50 rounded-xl flex items-center justify-center text-slate-400"><Mic className="w-4 h-4" /></button>
-            <button className="w-9 h-9 bg-gray-900 text-white rounded-xl flex items-center justify-center hover:bg-gray-800"><Send className="w-4 h-4" /></button>
+            <button className="w-9 h-9 bg-emerald-600 text-white rounded-xl flex items-center justify-center hover:bg-emerald-700"><Send className="w-4 h-4" /></button>
           </div>
         </div>
       </div>
@@ -925,7 +925,7 @@ function SupportPage({ lang }: { lang: Lang }) {
           <div className="grid grid-cols-3 gap-1.5">
             <button className="py-1.5 bg-emerald-500 text-white rounded-lg text-[10px] hover:bg-emerald-600 transition-colors">WhatsApp</button>
             <button className="py-1.5 bg-sky-500 text-white rounded-lg text-[10px] hover:bg-sky-600 transition-colors">Telegram</button>
-            <button className="py-1.5 bg-gray-900 text-white rounded-lg text-[10px] hover:bg-gray-800 transition-colors">{tl(lang, 'Звонок', 'Қоңырау', 'Call')}</button>
+            <button className="py-1.5 bg-emerald-600 text-white rounded-lg text-[10px] hover:bg-emerald-700 transition-colors">{tl(lang, 'Звонок', 'Қоңырау', 'Call')}</button>
           </div>
         </div>
 

@@ -108,7 +108,7 @@ export function IntegrationsPanel({ language, canEdit }: Props) {
 
   if (!loaded) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 p-8 flex items-center justify-center text-gray-400 text-sm">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 flex items-center justify-center text-gray-400 text-sm">
         <Loader2 className="w-4 h-4 animate-spin mr-2" /> {l('Загружаю…', 'Жүктеуде…', 'Loading…')}
       </div>
     );
@@ -151,7 +151,7 @@ export function IntegrationsPanel({ language, canEdit }: Props) {
       </div>
 
       {/* Search */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-2 flex items-center gap-2">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-2 flex items-center gap-2">
         <Search className="w-3.5 h-3.5 text-gray-300 ml-2" />
         <input
           value={search}
@@ -286,7 +286,7 @@ export function IntegrationsPanel({ language, canEdit }: Props) {
                                 className={`text-[11px] px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1 ${
                                   connected
                                     ? 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                                    : 'bg-gray-900 text-white hover:bg-gray-800'
+                                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
                                 }`}
                               >
                                 {connected ? <SettingsIcon className="w-3 h-3" /> : <KeyRound className="w-3 h-3" />}
@@ -508,7 +508,7 @@ function IntegrationModal({
             <button
               onClick={save}
               disabled={busy}
-              className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs disabled:opacity-50 inline-flex items-center gap-1.5"
+              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs disabled:opacity-50 inline-flex items-center gap-1.5"
             >
               {busy && <Loader2 className="w-3 h-3 animate-spin" />}
               {l('Сохранить', 'Сақтау', 'Save')}

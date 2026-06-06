@@ -912,7 +912,7 @@ export function Warehouse({ language }: WarehouseProps) {
                        progress used to wipe real stage work). */}
                   <div className="flex items-center gap-1.5 mt-3" onClick={e => e.stopPropagation()}>
                     {o.status === 'paused' && (
-                      <button onClick={() => setOrderState(o, 'started')} className="flex-1 inline-flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800">
+                      <button onClick={() => setOrderState(o, 'started')} className="flex-1 inline-flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
                         <PlayCircle className="w-3 h-3" /> {l('Старт', 'Бастау', 'Start')}
                       </button>
                     )}
@@ -1629,7 +1629,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
         </div>
         <button
           onClick={() => setEditing(blankTemplate(typeOptions[0]?.id))}
-          className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded-xl hover:bg-gray-800 inline-flex items-center gap-1.5"
+          className="text-xs px-3 py-1.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 inline-flex items-center gap-1.5"
         >
           <Plus className="w-3 h-3" /> {l('Создать шаблон', 'Шаблон жасау', 'Create template')}
         </button>
@@ -1663,7 +1663,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
                   {t.materials.length} {l('материалов', 'материал', 'materials')} · {l('работа', 'жұмыс', 'labour')} {Math.round(totals.labour).toLocaleString('ru-RU')} ₸
                 </div>
                 <div className="flex gap-1.5">
-                  <button onClick={() => useInOrder(t)} className="flex-1 text-[11px] px-2.5 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800">
+                  <button onClick={() => useInOrder(t)} className="flex-1 text-[11px] px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
                     {l('В заказ', 'Тапсырысқа', 'Use')}
                   </button>
                   <button onClick={() => setEditing(t)} title="Редактировать" className="w-7 h-7 hover:bg-white/50 border border-gray-100 rounded-lg flex items-center justify-center"><Edit2 className="w-3 h-3 text-slate-500" /></button>

@@ -775,7 +775,7 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
           <button
             onClick={generate}
             disabled={!selected || busy}
-            className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs disabled:opacity-50 inline-flex items-center gap-1.5"
+            className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs disabled:opacity-50 inline-flex items-center gap-1.5"
           >
             {busy && <Loader2 className="w-3 h-3 animate-spin" />}
             {l('Скачать PDF', 'PDF жүктеу', 'Download PDF')}

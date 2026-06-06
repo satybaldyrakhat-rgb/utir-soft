@@ -155,7 +155,7 @@ export function TelegramBotPanel({ onClose }: Props) {
                       <div className="text-xs text-gray-900">{s.name}</div>
                       <div className="text-[10px] text-rose-500">{s.qty} шт · мин {s.min}</div>
                     </div>
-                    <button className="px-2.5 py-1.5 bg-gray-900 text-white rounded-lg text-[10px] hover:bg-gray-800">Заказать</button>
+                    <button className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-[10px] hover:bg-emerald-700">Заказать</button>
                   </div>
                 ))}
               </div>
