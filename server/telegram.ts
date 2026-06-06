@@ -819,6 +819,27 @@ function appendNote(existing: string | undefined, line: string): string {
 }
 
 // ─── «Мои замеры» — measurer's assigned, not-yet-finished deals ─────
+// Build a single measurement card (text + inline keyboard). Reused by
+// the «Мои замеры» list AND the assignment push from the web.
+function measureCard(dd: any, dealId: string): { text: string; inline_keyboard: any[] } {
+  const addr = dd.siteAddress || dd.address || '';
+  const lines = [
+    `<b>${dd.customerName || 'Без имени'}</b>`,
+    dd.phone ? `📞 ${dd.phone}` : '',
+    addr ? `📍 ${addr}` : '',
+    (dd.furnitureType || dd.product) ? `🔧 ${dd.furnitureType || dd.product}` : '',
+    dd.measurementDate ? `🗓 ${dd.measurementDate}` : '',
+    `${statusLabelRu(dd.status)}`,
+  ].filter(Boolean);
+  const rows: any[] = [];
+  if (addr) rows.push([{ text: '📍 Маршрут (2ГИС)', url: routeUrl(addr) }]);
+  rows.push([
+    { text: '🚗 Выехал', callback_data: `dep|${dealId}` },
+    { text: '✅ Замер готов', callback_data: `msd|${dealId}` },
+  ]);
+  return { text: lines.join('\n'), inline_keyboard: rows };
+}
+
 async function sendMeasurements(db: Database.Database, chatId: number, teamId: string, emp: { id: string; name: string }) {
   const deals = loadDeals(db, teamId)
     .filter(d => isAssignedTo(d.data, emp))
@@ -832,26 +853,8 @@ async function sendMeasurements(db: Database.Database, chatId: number, teamId: s
   }
   await sendMessage(chatId, `📐 <b>Ваши замеры (${deals.length}):</b>`);
   for (const d of deals) {
-    const dd = d.data;
-    const addr = dd.siteAddress || dd.address || '';
-    const lines = [
-      `<b>${dd.customerName || 'Без имени'}</b>`,
-      dd.phone ? `📞 ${dd.phone}` : '',
-      addr ? `📍 ${addr}` : '',
-      (dd.furnitureType || dd.product) ? `🔧 ${dd.furnitureType || dd.product}` : '',
-      `${statusLabelRu(dd.status)}`,
-    ].filter(Boolean);
-    const buttonRows: any[] = [];
-    if (addr) buttonRows.push([{ text: '📍 Маршрут (2ГИС)', url: routeUrl(addr) }]);
-    buttonRows.push([
-      { text: '🚗 Выехал', callback_data: `dep|${d.id}` },
-      { text: '✅ Замер готов', callback_data: `msd|${d.id}` },
-    ]);
-    await tg('sendMessage', {
-      chat_id: chatId, parse_mode: 'HTML',
-      text: lines.join('\n'),
-      reply_markup: { inline_keyboard: buttonRows },
-    });
+    const card = measureCard(d.data, d.id);
+    await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML', text: card.text, reply_markup: { inline_keyboard: card.inline_keyboard } });
   }
 }
 
@@ -932,6 +935,28 @@ async function sendOrders(db: Database.Database, chatId: number, teamId: string,
 // ─── «Мои монтажи» — installer's ready-to-install / installing deals (Этап 4) ──
 const INSTALL_STATUSES = ['production', 'assembly', 'manufacturing', 'installation'];
 
+// Single install card (text + inline keyboard) — reused by the list AND
+// the assignment push.
+function installCard(dd: any, dealId: string): { text: string; inline_keyboard: any[] } {
+  const addr = dd.siteAddress || dd.address || '';
+  const lines = [
+    `<b>${dd.customerName || 'Без имени'}</b>`,
+    dd.phone ? `📞 ${dd.phone}` : '',
+    addr ? `📍 ${addr}` : '',
+    (dd.product || dd.furnitureType) ? `🔧 ${dd.product || dd.furnitureType}` : '',
+    dd.installationDate ? `🗓 ${dd.installationDate}` : '',
+    `${statusLabelRu(dd.status)}`,
+  ].filter(Boolean);
+  const rows: any[] = [];
+  if (addr) rows.push([{ text: '📍 Маршрут (2ГИС)', url: routeUrl(addr) }]);
+  rows.push([
+    { text: '🚗 Выехал', callback_data: `dep|${dealId}` },
+    { text: '🔧 Начал монтаж', callback_data: `ist|${dealId}` },
+  ]);
+  rows.push([{ text: '✅ Завершил монтаж', callback_data: `idn|${dealId}` }]);
+  return { text: lines.join('\n'), inline_keyboard: rows };
+}
+
 async function sendInstalls(db: Database.Database, chatId: number, teamId: string, emp: { id: string; name: string }) {
   const deals = loadDeals(db, teamId)
     .filter(d => INSTALL_STATUSES.includes(d.data.status))
@@ -944,30 +969,42 @@ async function sendInstalls(db: Database.Database, chatId: number, teamId: strin
   }
   await sendMessage(chatId, `🔧 <b>Монтажи (${deals.length}):</b>`);
   for (const d of deals) {
-    const dd = d.data;
-    const addr = dd.siteAddress || dd.address || '';
-    const when = dd.installationDate ? `🗓 ${dd.installationDate}` : '';
-    const lines = [
-      `<b>${dd.customerName || 'Без имени'}</b>`,
-      dd.phone ? `📞 ${dd.phone}` : '',
-      addr ? `📍 ${addr}` : '',
-      (dd.product || dd.furnitureType) ? `🔧 ${dd.product || dd.furnitureType}` : '',
-      when,
-      `${statusLabelRu(dd.status)}`,
-    ].filter(Boolean);
-    const buttonRows: any[] = [];
-    if (addr) buttonRows.push([{ text: '📍 Маршрут (2ГИС)', url: routeUrl(addr) }]);
-    buttonRows.push([
-      { text: '🚗 Выехал', callback_data: `dep|${d.id}` },
-      { text: '🔧 Начал монтаж', callback_data: `ist|${d.id}` },
-    ]);
-    buttonRows.push([{ text: '✅ Завершил монтаж', callback_data: `idn|${d.id}` }]);
-    await tg('sendMessage', {
-      chat_id: chatId, parse_mode: 'HTML',
-      text: lines.join('\n'),
-      reply_markup: { inline_keyboard: buttonRows },
-    });
+    const card = installCard(d.data, d.id);
+    await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML', text: card.text, reply_markup: { inline_keyboard: card.inline_keyboard } });
   }
+}
+
+// ─── Assignment push (Этап 5) — web → worker bridge ────────────────
+// Called from the deals PATCH endpoint when a worker is freshly assigned
+// to a deal (measurer / owner / etc.). Resolves the assignee's paired
+// Telegram chat and pushes the right action card so the field worker
+// gets the job the instant the manager assigns it — no web, no polling.
+// `empId` is the employees.id of the newly-assigned worker.
+export async function notifyAssignment(db: Database.Database, teamId: string, dealId: string, empId: string): Promise<boolean> {
+  if (!TOKEN) return false;
+  const empRow = db.prepare('SELECT data FROM employees WHERE id = ? AND team_id = ?').get(empId, teamId) as any;
+  if (!empRow) return false;
+  let empData: any; try { empData = JSON.parse(empRow.data); } catch { return false; }
+  const email = (empData.email || '').toLowerCase();
+  if (!email) return false;
+  const userRow = db.prepare('SELECT id FROM users WHERE email = ? AND team_id = ?').get(email, teamId) as any;
+  if (!userRow) return false;
+  const link = db.prepare('SELECT chat_id FROM telegram_links WHERE user_id = ? AND chat_id IS NOT NULL').get(userRow.id) as any;
+  if (!link?.chat_id) return false;
+  const d = findDeal(db, teamId, dealId);
+  if (!d) return false;
+  // Pick the card by the deal's stage + the worker's botRole.
+  const isInstall = INSTALL_STATUSES.includes(d.data.status) || empData.botRole === 'installer';
+  const card = isInstall ? installCard(d.data, d.id) : measureCard(d.data, d.id);
+  const header = isInstall ? '📌 <b>Вам назначен монтаж</b>' : '📌 <b>Вам назначен замер</b>';
+  try {
+    await tg('sendMessage', {
+      chat_id: link.chat_id, parse_mode: 'HTML',
+      text: `${header}\n\n${card.text}`,
+      reply_markup: { inline_keyboard: card.inline_keyboard },
+    });
+    return true;
+  } catch { return false; }
 }
 
 // ─── Inline-button tap handler (Этап 2) ────────────────────────────

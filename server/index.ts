@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink } from './telegram.js';
+import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment } from './telegram.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
@@ -1027,6 +1027,35 @@ app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (
   // in deal_history) so integrations that want all changes can subscribe once.
   if (Object.keys(changes).length > 0) {
     emitEvent(req.teamId!, 'deal.updated', { dealId: req.params.id, changes, deal: updated });
+  }
+
+  // ─── Assignment push (Этап 5 — web → worker bridge) ──────────────
+  // When a worker is freshly assigned to this deal (ownerId set, or a
+  // role field like measurer/designer/foreman changed to a non-empty
+  // name), DM them their action card on Telegram so the job lands the
+  // instant the manager assigns it — no web, no polling.
+  if (isTelegramReady()) {
+    try {
+      const assignEmpIds = new Set<string>();
+      if (changes.ownerId && updated.ownerId) assignEmpIds.add(String(updated.ownerId));
+      const nameFields = ['measurer', 'designer', 'foreman', 'architect'] as const;
+      const changedNames = nameFields.filter(f => changes[f] && updated[f]).map(f => String(updated[f]));
+      if (changedNames.length > 0) {
+        const allEmps = db.prepare('SELECT id, data FROM employees WHERE team_id = ?').all(req.teamId!) as any[];
+        for (const r of allEmps) {
+          try {
+            const d = JSON.parse(r.data);
+            const nameLow = (d.name || '').toLowerCase(); if (!nameLow) continue;
+            const firstLow = nameLow.split(/\s+/)[0] || '';
+            const hit = changedNames.some(v => { const vl = v.toLowerCase(); return vl.includes(nameLow) || (firstLow.length > 2 && vl.includes(firstLow)); });
+            if (hit) assignEmpIds.add(r.id);
+          } catch { /* skip */ }
+        }
+      }
+      for (const empId of assignEmpIds) {
+        await notifyAssignment(db, req.teamId!, req.params.id, empId);
+      }
+    } catch (e) { console.warn('[deals] assignment notify failed', e); }
   }
 
   res.json(updated);
