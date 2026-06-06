@@ -101,6 +101,7 @@ export async function registerBotCommands(): Promise<void> {
         { command: 'start',   description: '🚀 Начать / приветствие' },
         { command: 'measures',description: '📐 Мои замеры' },
         { command: 'orders',  description: '🪚 Мои заказы (этапы цеха)' },
+        { command: 'installs',description: '🔧 Мои монтажи' },
         { command: 'design',  description: '🎨 AI Дизайн интерьера (мастер)' },
         { command: 'today',   description: '📊 Что было сегодня' },
         { command: 'tasks',   description: '✅ Мои задачи' },
@@ -928,6 +929,47 @@ async function sendOrders(db: Database.Database, chatId: number, teamId: string,
   }
 }
 
+// ─── «Мои монтажи» — installer's ready-to-install / installing deals (Этап 4) ──
+const INSTALL_STATUSES = ['production', 'assembly', 'manufacturing', 'installation'];
+
+async function sendInstalls(db: Database.Database, chatId: number, teamId: string, emp: { id: string; name: string }) {
+  const deals = loadDeals(db, teamId)
+    .filter(d => INSTALL_STATUSES.includes(d.data.status))
+    .slice(0, 8);
+  if (deals.length === 0) {
+    await sendMessage(chatId,
+      `🔧 <b>${emp.name}</b>, монтажей пока нет.\n\n` +
+      `Когда заказ будет готов к установке — он появится здесь с кнопками «Маршрут», «Выехал», «Начал монтаж» и «Завершил».`);
+    return;
+  }
+  await sendMessage(chatId, `🔧 <b>Монтажи (${deals.length}):</b>`);
+  for (const d of deals) {
+    const dd = d.data;
+    const addr = dd.siteAddress || dd.address || '';
+    const when = dd.installationDate ? `🗓 ${dd.installationDate}` : '';
+    const lines = [
+      `<b>${dd.customerName || 'Без имени'}</b>`,
+      dd.phone ? `📞 ${dd.phone}` : '',
+      addr ? `📍 ${addr}` : '',
+      (dd.product || dd.furnitureType) ? `🔧 ${dd.product || dd.furnitureType}` : '',
+      when,
+      `${statusLabelRu(dd.status)}`,
+    ].filter(Boolean);
+    const buttonRows: any[] = [];
+    if (addr) buttonRows.push([{ text: '📍 Маршрут (2ГИС)', url: routeUrl(addr) }]);
+    buttonRows.push([
+      { text: '🚗 Выехал', callback_data: `dep|${d.id}` },
+      { text: '🔧 Начал монтаж', callback_data: `ist|${d.id}` },
+    ]);
+    buttonRows.push([{ text: '✅ Завершил монтаж', callback_data: `idn|${d.id}` }]);
+    await tg('sendMessage', {
+      chat_id: chatId, parse_mode: 'HTML',
+      text: lines.join('\n'),
+      reply_markup: { inline_keyboard: buttonRows },
+    });
+  }
+}
+
 // ─── Inline-button tap handler (Этап 2) ────────────────────────────
 async function handleCallback(
   db: Database.Database,
@@ -1020,6 +1062,54 @@ async function handleCallback(
     clearPendingPhoto(db, chatId);
     await answerCallback(cq.id, 'Отменено');
     if (messageId) await editReplyMarkupClear(chatId, messageId);
+    return;
+  }
+
+  // Installer started the on-site installation (Этап 4).
+  if (action === 'ist' && dealId) {
+    const d = findDeal(db, user.teamId, dealId);
+    if (!d) { await answerCallback(cq.id, 'Заказ не найден'); return; }
+    d.data.status = 'installation';
+    d.data.progress = Math.max(88, Number(d.data.progress) || 0);
+    d.data.notes = appendNote(d.data.notes, `🔧 ${nowHM()} — начал монтаж (${emp?.name || 'монтажник'})`);
+    saveDeal(db, dealId, d.data);
+    await answerCallback(cq.id, 'Монтаж начат 🔧');
+    if (messageId) await editReplyMarkupClear(chatId, messageId);
+    await sendMessage(chatId, `🔧 Монтаж у <b>${d.data.customerName || 'клиента'}</b> начат. Как закончите — нажмите «✅ Завершил монтаж» в списке /монтажи.`);
+    logActivity(user.id, {
+      user: emp?.name || user.name, actor: 'human',
+      action: 'Начал монтаж', target: d.data.customerName || dealId,
+      type: 'update', page: 'sales',
+    });
+    return;
+  }
+
+  // Installer finished the installation → close the deal + warranty + photo nudge.
+  if (action === 'idn' && dealId) {
+    const d = findDeal(db, user.teamId, dealId);
+    if (!d) { await answerCallback(cq.id, 'Заказ не найден'); return; }
+    d.data.status = 'completed';
+    d.data.progress = 100;
+    d.data.installationDate = d.data.installationDate || new Date().toISOString().slice(0, 10);
+    // Warranty — start today, 12 months default. Stored on the deal so
+    // the web card / acceptance act can print it.
+    const start = new Date();
+    const end = new Date(start); end.setFullYear(end.getFullYear() + 1);
+    d.data.warranty = { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10), months: 12 };
+    d.data.notes = appendNote(d.data.notes, `✅ ${nowHM()} — монтаж завершён (${emp?.name || 'монтажник'}). Гарантия 12 мес. до ${d.data.warranty.endDate}`);
+    saveDeal(db, dealId, d.data);
+    await answerCallback(cq.id, 'Монтаж завершён ✅');
+    if (messageId) await editReplyMarkupClear(chatId, messageId);
+    await sendMessage(chatId,
+      `🎉 Монтаж у <b>${d.data.customerName || 'клиента'}</b> завершён!\n` +
+      `Гарантия 12 мес. до <b>${d.data.warranty.endDate}</b>.\n\n` +
+      `📷 Пришлите фото готовой работы — прикреплю к заказу.\n` +
+      `Акт приёмки и гарантийный талон можно распечатать на платформе → Финансы → Документы.`);
+    logActivity(user.id, {
+      user: emp?.name || user.name, actor: 'human',
+      action: 'Завершил монтаж', target: d.data.customerName || dealId,
+      type: 'update', page: 'sales',
+    });
     return;
   }
 
@@ -1241,9 +1331,10 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       '💰 зарплата': '/revenue',
       '💰 моя выручка': '/revenue',
       '🎨 ai дизайн': '/design',
-      // Этап 2 — measurer/installer measurement list.
+      // Этап 2 — measurer measurement list.
       '📋 мои замеры': '/замеры',
-      '📋 мои монтажи': '/замеры',
+      // Этап 4 — installer's monitoring queue.
+      '📋 мои монтажи': '/монтажи',
       // Этап 3 — production master's order list with stage chain.
       '📋 мои заказы': '/заказы',
     };
@@ -1424,12 +1515,23 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
 
     // /замеры — measurer/installer's assigned active deals with inline
     // [Маршрут][Выехал][Замер готов] buttons. The field worker's home screen.
-    if (cmd === '/замеры' || cmd === '/measures' || cmd === '/мои_замеры' || cmd === '/монтажи') {
+    if (cmd === '/замеры' || cmd === '/measures' || cmd === '/мои_замеры') {
       const user = findUserByChat(db, chatId);
       if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт по ссылке-приглашению от руководителя.'); return; }
       const emp = findEmployeeForUser(db, user.id, user.teamId);
       if (!emp) { await sendMessage(chatId, 'Ваш профиль не привязан к карточке сотрудника. Попросите админа.'); return; }
       await sendMeasurements(db, chatId, user.teamId, emp);
+      return;
+    }
+
+    // /монтажи — installer's ready-to-install queue with
+    // [Маршрут][Выехал][Начал монтаж][Завершил] buttons (Этап 4).
+    if (cmd === '/монтажи' || cmd === '/installs') {
+      const user = findUserByChat(db, chatId);
+      if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт по ссылке-приглашению от руководителя.'); return; }
+      const emp = findEmployeeForUser(db, user.id, user.teamId);
+      if (!emp) { await sendMessage(chatId, 'Ваш профиль не привязан к карточке сотрудника. Попросите админа.'); return; }
+      await sendInstalls(db, chatId, user.teamId, emp);
       return;
     }
 
