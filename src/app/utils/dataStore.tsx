@@ -222,6 +222,9 @@ export interface FinanceTransaction {
   description: string;
   dealId?: string;
   status: 'completed' | 'pending' | 'overdue';
+  // Money account the payment went through — drives the cash/bank/Kaspi
+  // split and the кассовая книга. Missing → treated as 'bank'.
+  account?: 'cash' | 'bank' | 'kaspi';
 }
 
 export interface Integration {

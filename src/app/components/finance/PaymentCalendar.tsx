@@ -341,6 +341,7 @@ function PaymentModal({ initialDate, editing, onClose, onSave }: {
   const [category,    setCategory]    = useState<string>(editing?.category                  || INCOME_CATEGORIES[0]);
   const [description, setDescription] = useState<string>(editing?.description               || '');
   const [status,      setStatus]      = useState<FinanceTransaction['status']>(editing?.status || 'completed');
+  const [account,     setAccount]     = useState<'cash' | 'bank' | 'kaspi'>(editing?.account || 'bank');
 
   // When the user flips income↔expense, the category list changes — reset
   // category to the first of the new list if it's not in there.
@@ -359,6 +360,7 @@ function PaymentModal({ initialDate, editing, onClose, onSave }: {
       type, date, amount: amt, category,
       description: description.trim(),
       status,
+      account,
       // Keep dealId on edit (linked to a sale we don't want to break),
       // empty on create.
       dealId: editing?.dealId,
@@ -409,6 +411,16 @@ function PaymentModal({ initialDate, editing, onClose, onSave }: {
             <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200">
               {catList.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+          </div>
+
+          <div>
+            <div className="text-[10px] text-gray-400 mb-1.5">Счёт (куда/откуда деньги)</div>
+            <div className="flex gap-1 bg-gray-50 rounded-xl p-1">
+              {([['cash', '💵 Касса'], ['bank', '🏦 Счёт'], ['kaspi', '🔴 Kaspi']] as const).map(([id, lbl]) => (
+                <button key={id} onClick={() => setAccount(id)}
+                  className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] transition ${account === id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>{lbl}</button>
+              ))}
+            </div>
           </div>
 
           <div>

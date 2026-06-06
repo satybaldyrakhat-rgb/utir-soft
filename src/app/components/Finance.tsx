@@ -30,7 +30,7 @@ const TAB_GROUPS = [
     titleRu: 'Отчётность', titleKz: 'Есеп', titleEng: 'Reports',
     tabs: [
       { id: 'profitloss' as const, icon: TrendingUp, ru: 'Прибыль', kz: 'Пайда', eng: 'P&L' },
-      { id: 'balance' as const, icon: Wallet, ru: 'Баланс', kz: 'Баланс', eng: 'Balance' },
+      { id: 'balance' as const, icon: Wallet, ru: 'Деньги', kz: 'Ақша', eng: 'Money' },
       { id: 'taxes' as const, icon: Receipt, ru: 'Налоги', kz: 'Салық', eng: 'Taxes' },
       { id: 'payroll' as const, icon: Users, ru: 'Зарплаты', kz: 'Жалақы', eng: 'Payroll' },
     ],
