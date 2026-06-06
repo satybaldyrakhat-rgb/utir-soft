@@ -6,6 +6,7 @@ import { CashFlow } from './finance/CashFlow';
 import { ProfitLoss } from './finance/ProfitLoss';
 import { Balance } from './finance/Balance';
 import { Payroll } from './finance/Payroll';
+import { BankImportModal } from './finance/BankImportModal';
 import {
   ShoppingBag, Calendar, Receipt, ArrowDownUp, TrendingUp, Wallet,
   ArrowUpRight, ArrowDownRight, Download, Clock, AlertCircle, FileText, Sparkles, ChevronDown,
@@ -146,6 +147,7 @@ export function Finance({ language }: FinanceProps) {
   });
   const [reportBusy, setReportBusy] = useState<ReportType | null>(null);
   const [showInvoice, setShowInvoice] = useState(false);
+  const [showBankImport, setShowBankImport] = useState(false);
 
   function setPreset(preset: string) {
     const now = new Date();
@@ -396,6 +398,16 @@ export function Finance({ language }: FinanceProps) {
           </div>
           {canWrite && (
             <button
+              onClick={() => setShowBankImport(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-2xl text-xs text-slate-600 hover:bg-white transition-all"
+              title={l('Импорт банковской выписки + сверка', 'Банк выпискасы', 'Import bank statement')}
+            >
+              <Download className="w-3.5 h-3.5 rotate-180" />
+              {l('Выписка', 'Выписка', 'Statement')}
+            </button>
+          )}
+          {canWrite && (
+            <button
               onClick={() => setShowInvoice(true)}
               className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all transition-colors"
             >
@@ -560,6 +572,7 @@ export function Finance({ language }: FinanceProps) {
         {activeTab === 'payroll' && <Payroll language={language} />}
       </div>
       {showInvoice && <InvoiceModal onClose={() => setShowInvoice(false)} language={language} />}
+      {showBankImport && <BankImportModal language={language} onClose={() => setShowBankImport(false)} />}
     </div>
   );
 }
