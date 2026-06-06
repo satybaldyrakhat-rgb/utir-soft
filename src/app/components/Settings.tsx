@@ -758,7 +758,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <div className="text-sm text-gray-900">{tt('aiAssistantHeader')}</div>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">{tt('aiTwoProductsBadge')}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">{tt('aiTwoProductsBadge')}</span>
                 </div>
                 <div className="text-[11px] text-gray-500 leading-relaxed">{tt('aiAssistantDesc')}</div>
               </div>
@@ -1684,9 +1684,9 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                 {l('AI-менеджер для клиентов', 'Клиенттерге арналған AI', 'AI client manager')}
               </div>
               {cfg.enabled
-                ? <span className="text-[9px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded uppercase tracking-wide">{l('Активен', 'Белсенді', 'Active')}</span>
-                : <span className="text-[9px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded uppercase tracking-wide">{l('Выключен', 'Өшірілген', 'Off')}</span>}
-              <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">BETA</span>
+                ? <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded uppercase tracking-wide">{l('Активен', 'Белсенді', 'Active')}</span>
+                : <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded uppercase tracking-wide">{l('Выключен', 'Өшірілген', 'Off')}</span>}
+              <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">BETA</span>
             </div>
             <div className="text-[11px] text-gray-500 leading-relaxed">
               {l('Отвечает клиентам в Instagram и WhatsApp в вашем стиле. Конфиг применится автоматически когда подключим каналы.',
@@ -1750,7 +1750,7 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                           {group.title}
                         </div>
                         {!familyEnabled && (
-                          <span className="text-[9px] uppercase tracking-wide text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] uppercase tracking-wide text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
                             {l('нужен ключ', 'кілт керек', 'needs key')}
                           </span>
                         )}
@@ -1774,7 +1774,7 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                               <div className="flex items-center justify-between mb-1 gap-2">
                                 <div className="text-[13px] text-gray-900 flex items-center gap-1.5 min-w-0">
                                   <span className="truncate">{m.name}</span>
-                                  {m.badge && <span className="text-[9px] px-1 py-0.5 bg-gray-100 text-gray-600 rounded">{m.badge}</span>}
+                                  {m.badge && <span className="text-[10px] px-1 py-0.5 bg-gray-100 text-gray-600 rounded">{m.badge}</span>}
                                 </div>
                                 {selected && familyEnabled && <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />}
                               </div>
@@ -1805,7 +1805,7 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                   onChange={e => upd({ creativity: Number(e.target.value) })}
                   className="w-full accent-emerald-600"
                 />
-                <div className="flex justify-between text-[9px] text-gray-400 mt-0.5">
+                <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
                   <span>0.0 точно</span><span>0.5</span><span>1.0 живо</span>
                 </div>
               </div>
@@ -2073,7 +2073,7 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <div className="text-sm text-gray-900">WhatsApp Business</div>
-                    <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded uppercase">{l('скоро', 'жақын арада', 'soon')}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded uppercase">{l('скоро', 'жақын арада', 'soon')}</span>
                   </div>
                   <div className="text-[11px] text-gray-500">{l('Авто-ответы клиентам в WhatsApp от вашего номера', 'WhatsApp-та авто-жауап', 'Auto-reply to customers in WhatsApp')}</div>
                 </div>
@@ -2091,7 +2091,7 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <div className="text-sm text-gray-900">Instagram Direct</div>
-                    <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded uppercase">{l('скоро', 'жақын арада', 'soon')}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded uppercase">{l('скоро', 'жақын арада', 'soon')}</span>
                   </div>
                   <div className="text-[11px] text-gray-500">{l('Авто-ответы в Direct-сообщениях Instagram Business', 'Instagram Direct авто-жауап', 'Auto-reply in Instagram Direct')}</div>
                 </div>
@@ -2186,7 +2186,7 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                         }`}>
                           {m.content}
                         </div>
-                        <div className={`mt-1 text-[9px] flex items-center gap-1 ${m.role === 'user' ? 'justify-end text-gray-400' : 'text-gray-400'}`}>
+                        <div className={`mt-1 text-[10px] flex items-center gap-1 ${m.role === 'user' ? 'justify-end text-gray-400' : 'text-gray-400'}`}>
                           {m.ts}
                           {m.handoff && <span className="px-1 py-0.5 bg-amber-100 text-amber-700 rounded">📞 HANDOFF</span>}
                           {m.outOfHours && <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded">🌙 вне часов</span>}

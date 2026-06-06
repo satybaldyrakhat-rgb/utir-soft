@@ -124,7 +124,7 @@ export function OrderManagement() {
               </div>
               <div className="col-span-3 md:col-span-1 text-xs text-gray-500 md:text-right tabular-nums">{o.hasRealExpenses ? `${o.margin}%` : '—'}</div>
               <div className="col-span-3 md:col-span-1 md:text-right">
-                <span className={`text-[10px] px-2 py-0.5 rounded-md ${STATUS[o.status].cls}`}>{STATUS[o.status].ru}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-lg ${STATUS[o.status].cls}`}>{STATUS[o.status].ru}</span>
               </div>
             </div>
           ))}

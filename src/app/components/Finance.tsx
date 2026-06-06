@@ -10,7 +10,7 @@ import { BankImportModal } from './finance/BankImportModal';
 import {
   ShoppingBag, Calendar, Receipt, ArrowDownUp, TrendingUp, Wallet,
   ArrowUpRight, ArrowDownRight, Download, Clock, AlertCircle, FileText, Sparkles, ChevronDown,
-  Loader2, Users,
+  Loader2, Users, ClipboardCheck, Package,
 } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { api } from '../utils/api';
@@ -374,24 +374,24 @@ export function Finance({ language }: FinanceProps) {
                 <div className="px-3 py-2 text-[10px] uppercase tracking-wide text-slate-400 border-b border-white/60">{l('PDF-шаблоны', 'PDF үлгілері', 'PDF templates')}</div>
                 <button onClick={() => downloadReport('finance')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
                   <span>📊 {l('Финансовый отчёт', 'Қаржы есебі', 'Finance report')}</span>
-                  <span className="text-[9px] text-slate-400">с журналом</span>
+                  <span className="text-[10px] text-slate-400">с журналом</span>
                 </button>
                 <button onClick={() => downloadReport('pl')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
                   <span>📈 {l('P&L (прибыль/убытки)', 'P&L', 'P&L statement')}</span>
-                  <span className="text-[9px] text-slate-400">бухгалтерский</span>
+                  <span className="text-[10px] text-slate-400">бухгалтерский</span>
                 </button>
                 <button onClick={() => downloadReport('aging')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
                   <span>⏰ {l('Дебиторка (aging)', 'Дебитор', 'Aging report')}</span>
-                  <span className="text-[9px] text-slate-400">0/30/60/90+</span>
+                  <span className="text-[10px] text-slate-400">0/30/60/90+</span>
                 </button>
                 <button onClick={() => downloadReport('forecast')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
                   <span>🔮 {l('Прогноз cash flow', 'Cash flow болжамы', 'Cash flow forecast')}</span>
-                  <span className="text-[9px] text-slate-400">3 месяца</span>
+                  <span className="text-[10px] text-slate-400">3 месяца</span>
                 </button>
                 <div className="px-3 py-2 text-[10px] uppercase tracking-wide text-slate-400 border-y border-gray-50">{l('Таблицы', 'Кесте', 'Tables')}</div>
                 <button onClick={downloadCSV} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
                   <span>📥 CSV (Excel)</span>
-                  <span className="text-[9px] text-slate-400">операции</span>
+                  <span className="text-[10px] text-slate-400">операции</span>
                 </button>
               </div>
             )}
@@ -509,7 +509,7 @@ export function Finance({ language }: FinanceProps) {
               <button
                 key={r}
                 onClick={() => setChartRange(r)}
-                className={`px-2.5 py-1 rounded-md text-[10px] transition-colors ${
+                className={`px-2.5 py-1 rounded-lg text-[10px] transition-colors ${
                   chartRange === r ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-400 hover:text-gray-700'
                 }`}
               >
@@ -681,16 +681,16 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
           <div className="flex gap-1 bg-gray-50 rounded-xl p-1">
             <button
               onClick={() => { setDocKind('invoice'); setNumber(''); }}
-              className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'invoice' ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-900'}`}
-            >📄 {l('Счёт на оплату', 'Шот', 'Invoice')}</button>
+              className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'invoice' ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-900'}`}
+            ><FileText className="w-3.5 h-3.5" strokeWidth={1.5} /> {l('Счёт', 'Шот', 'Invoice')}</button>
             <button
               onClick={() => { setDocKind('akt'); setNumber(''); }}
-              className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'akt' ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-900'}`}
-            >📋 {l('Акт', 'Акт', 'Act')}</button>
+              className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'akt' ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-900'}`}
+            ><ClipboardCheck className="w-3.5 h-3.5" strokeWidth={1.5} /> {l('Акт', 'Акт', 'Act')}</button>
             <button
               onClick={() => { setDocKind('waybill'); setNumber(''); }}
-              className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'waybill' ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-900'}`}
-            >📦 {l('Накладная', 'Жүкқұжат', 'Waybill')}</button>
+              className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'waybill' ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-900'}`}
+            ><Package className="w-3.5 h-3.5" strokeWidth={1.5} /> {l('Накладная', 'Жүкқұжат', 'Waybill')}</button>
           </div>
         </div>
 

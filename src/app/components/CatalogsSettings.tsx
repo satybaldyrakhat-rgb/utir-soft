@@ -220,7 +220,7 @@ export function CatalogsSettings({ language }: Props) {
           className="flex-1 bg-transparent text-xs focus:outline-none placeholder:text-gray-400"
         />
         {search && (
-          <button onClick={() => setSearch('')} className="w-6 h-6 hover:bg-gray-50 rounded-md flex items-center justify-center">
+          <button onClick={() => setSearch('')} className="w-6 h-6 hover:bg-gray-50 rounded-lg flex items-center justify-center">
             <X className="w-3 h-3 text-gray-400" />
           </button>
         )}

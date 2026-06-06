@@ -1309,7 +1309,7 @@ function DesignConcepts({ deal, language }: { deal: Deal; language: 'kz' | 'ru' 
               ) : (
                 <div className="w-full aspect-square bg-white/40 ring-1 ring-white/60 rounded-2xl flex items-center justify-center text-slate-400">—</div>
               )}
-              <div className="absolute bottom-1.5 left-1.5 right-1.5 px-2 py-0.5 bg-emerald-600/70 backdrop-blur-xl text-white text-[9px] rounded-full truncate ring-1 ring-white/20">
+              <div className="absolute bottom-1.5 left-1.5 right-1.5 px-2 py-0.5 bg-emerald-600/70 backdrop-blur-xl text-white text-[10px] rounded-full truncate ring-1 ring-white/20">
                 {c.provider}
               </div>
               {canEdit && (
@@ -1463,7 +1463,7 @@ function RelatedView({ deal, language }: { deal: Deal; language: 'kz' | 'ru' | '
                         : `${tpl[language]} · ${l('не начат', 'басталмаған', 'not started')}`}
                   >
                     <Icon className="w-3 h-3" />
-                    <span className="text-[9px] leading-tight text-center px-1">{tpl[language]}</span>
+                    <span className="text-[10px] leading-tight text-center px-1">{tpl[language]}</span>
                   </div>
                 );
               })}
@@ -1615,7 +1615,7 @@ function RelatedView({ deal, language }: { deal: Deal; language: 'kz' | 'ru' | '
                     )}
                   </div>
                   {t.priority && t.priority !== 'medium' && (
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full ring-1 ring-white/40 flex-shrink-0 ${
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ring-1 ring-white/40 flex-shrink-0 ${
                       t.priority === 'urgent' ? 'bg-rose-100/70 text-rose-700' :
                       t.priority === 'high'   ? 'bg-amber-100/70 text-amber-700' :
                                                  'bg-emerald-100/70 text-emerald-700'
@@ -1684,7 +1684,7 @@ function RelatedView({ deal, language }: { deal: Deal; language: 'kz' | 'ru' | '
                     </div>
                   </div>
                   <span className="text-[11px] text-slate-700 tabular-nums flex-shrink-0">{fmt(p.totalCost || 0)}</span>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ring-1 ring-white/40 flex-shrink-0 ${statCls}`}>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ring-1 ring-white/40 flex-shrink-0 ${statCls}`}>
                     {statLabel}
                   </span>
                 </div>

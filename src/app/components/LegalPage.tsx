@@ -23,7 +23,7 @@ export function LegalPage({ language, onLanguageChange, title, updated, children
           {l('Назад', 'Артқа', 'Back')}
         </button>
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md overflow-hidden bg-white/60 ring-1 ring-white/60 backdrop-blur-xl">
+          <div className="w-7 h-7 rounded-lg overflow-hidden bg-white/60 ring-1 ring-white/60 backdrop-blur-xl">
             <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
           </div>
           <span className="text-xs text-slate-500">Utir Soft</span>

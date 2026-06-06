@@ -1394,7 +1394,7 @@ function ActionBtn({
   const inner = (
     <>
       <Icon className="w-4 h-4 flex-shrink-0" />
-      <span className="text-[9px] leading-none whitespace-nowrap truncate max-w-full">{label}</span>
+      <span className="text-[10px] leading-none whitespace-nowrap truncate max-w-full">{label}</span>
     </>
   );
   if (href) {

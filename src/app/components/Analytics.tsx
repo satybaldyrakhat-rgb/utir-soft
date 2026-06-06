@@ -1138,7 +1138,7 @@ function TeamMetrics({ language }: { language: 'kz' | 'ru' | 'eng' }) {
                       {((r.emp as any).nicheAssignments as string[]).map(nid => {
                         const n = getNiche(nid);
                         return (
-                          <span key={nid} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[9px] ring-1 ring-emerald-100/60">
+                          <span key={nid} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] ring-1 ring-emerald-100/60">
                             <span>{n.icon}</span>
                             <span>{n.name[language]}</span>
                           </span>

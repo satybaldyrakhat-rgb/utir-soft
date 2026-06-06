@@ -511,7 +511,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
               <div className="space-y-1">
                 {telegramFeed.map(a => (
                   <div key={a.id} className="text-[11px] text-slate-700 flex items-baseline gap-1.5">
-                    <span className="text-[9px] text-slate-500 font-mono flex-shrink-0 tabular-nums">
+                    <span className="text-[10px] text-slate-500 font-mono flex-shrink-0 tabular-nums">
                       {new Date(a.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     <span className="text-slate-900">{a.user}</span>

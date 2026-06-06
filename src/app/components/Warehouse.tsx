@@ -817,12 +817,12 @@ export function Warehouse({ language }: WarehouseProps) {
 
                   {/* Materials */}
                   <div className="flex flex-wrap gap-1 mb-3">
-                    {o.materials.map((m, i) => <span key={i} className="text-[9px] px-1.5 py-0.5 bg-gray-50 text-slate-400 rounded">{m}</span>)}
+                    {o.materials.map((m, i) => <span key={i} className="text-[10px] px-1.5 py-0.5 bg-gray-50 text-slate-400 rounded">{m}</span>)}
                   </div>
 
                   {/* Progress */}
                   <div>
-                    <div className="flex justify-between text-[9px] mb-1"><span className="text-slate-400">{l('Прогресс', 'Прогресс', 'Progress')}</span><span className="text-gray-900">{o.progress}%</span></div>
+                    <div className="flex justify-between text-[10px] mb-1"><span className="text-slate-400">{l('Прогресс', 'Прогресс', 'Progress')}</span><span className="text-gray-900">{o.progress}%</span></div>
                     <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${conf.bar} rounded-full transition-all`} style={{ width: `${o.progress}%` }} /></div>
                   </div>
 
@@ -1153,7 +1153,7 @@ export function Warehouse({ language }: WarehouseProps) {
                     <div className="col-span-2 text-center">
                       <span className="text-sm text-gray-900">{p.quantity}</span>
                       <span className="text-[10px] text-slate-400 ml-1">{p.unit}</span>
-                      {p.quantity < p.minQty && p.quantity > 0 && <div className="text-[9px] text-yellow-500">min: {p.minQty}</div>}
+                      {p.quantity < p.minQty && p.quantity > 0 && <div className="text-[10px] text-yellow-500">min: {p.minQty}</div>}
                     </div>
                     <div className="col-span-2 text-right text-xs text-gray-900 hidden sm:block">{p.cost.toLocaleString()} ₸</div>
                     <div className="col-span-2 flex items-center justify-end gap-1.5">
@@ -1651,7 +1651,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
               <div key={t.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 hover:shadow-sm transition-all">
                 <div className="w-full h-24 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center mb-3 relative">
                   <Package className="w-8 h-8 text-slate-300" />
-                  <span className="absolute top-2 right-2 text-[9px] px-1.5 py-0.5 bg-white/80 rounded text-gray-600">{labelFor(t.type)}</span>
+                  <span className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 bg-white/80 rounded text-gray-600">{labelFor(t.type)}</span>
                 </div>
                 <div className="text-sm text-slate-900 mb-1 truncate" title={t.name}>{t.name}</div>
                 <div className="flex items-center justify-between text-[11px] text-slate-400 mb-2">
@@ -1763,7 +1763,7 @@ function BomEditorModal({ initial, onClose, onSave, busy, language, typeOptions 
               <button onClick={addMat} className="text-[11px] text-emerald-600 hover:text-violet-800 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> {l('Добавить', 'Қосу', 'Add')}</button>
             </div>
             <div className="border border-gray-100 rounded-xl overflow-hidden">
-              <div className="grid grid-cols-12 gap-1 px-2 py-1.5 bg-gray-50 text-[9px] text-slate-400 uppercase tracking-wide">
+              <div className="grid grid-cols-12 gap-1 px-2 py-1.5 bg-gray-50 text-[10px] text-slate-400 uppercase tracking-wide">
                 <div className="col-span-4">Материал</div>
                 <div className="col-span-3">Поставщик</div>
                 <div className="col-span-1 text-right">Кол-во</div>
@@ -1924,7 +1924,7 @@ function NestingView({ language, prodOrders, deals }: {
                 <Package className="w-3 h-3 text-slate-400 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-gray-900 truncate">{p.name}</div>
-                  <div className="text-[9px] text-slate-400">{p.sizeMm} мм</div>
+                  <div className="text-[10px] text-slate-400">{p.sizeMm} мм</div>
                 </div>
                 <span className="text-slate-500">×{p.qty}</span>
               </div>
@@ -2275,7 +2275,7 @@ function PurchasesView({
                   <div className="flex items-center justify-between gap-3 mb-1.5">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-sm text-slate-900 truncate">{supName(p.supplierId)}</span>
-                      <span className={`text-[9px] px-2 py-0.5 rounded-full ring-1 ${meta.cls}`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ring-1 ${meta.cls}`}>
                         {meta[language]}
                       </span>
                     </div>

@@ -468,7 +468,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
             <div className="relative flex-1">
               <div className="text-sm text-slate-900 mb-0.5 flex items-center gap-2">
                 {l('Или попросите AI сделать всё за вас', 'Немесе AI-ге барлығын тапсырыңыз', 'Or have AI do it for you')}
-                <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase">live</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase">live</span>
               </div>
               <div className="text-[11px] text-slate-500">
                 {l('UTIR AI создаст сделку, материалы и сотрудников по вашему описанию.',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, ArrowDownRight, ArrowUpRight, X, Receipt, Wallet, Plus, Edit2, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, ArrowDownRight, ArrowUpRight, X, Receipt, Wallet, Plus, Edit2, Trash2, Banknote, Landmark, Smartphone } from 'lucide-react';
 import { useDataStore, type FinanceTransaction } from '../../utils/dataStore';
 
 type Cat = 'income' | 'expense' | 'tax' | 'salary' | 'planned';
@@ -140,7 +140,7 @@ export function PaymentCalendar() {
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className={`px-3 py-1 rounded-md text-[10px] transition-colors ${filter === f.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}
+              className={`px-3 py-1 rounded-lg text-[10px] transition-colors ${filter === f.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}
             >
               {f.label}
             </button>
@@ -161,7 +161,7 @@ export function PaymentCalendar() {
               setInitialDate(selectedDay ? dayKey(selectedDay) : new Date().toISOString().slice(0, 10));
               setModalOpen(true);
             }}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 text-white rounded-md text-[10px] hover:bg-emerald-700"
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[10px] hover:bg-emerald-700"
           >
             <Plus className="w-3 h-3" /> Платёж
           </button>
@@ -179,7 +179,7 @@ export function PaymentCalendar() {
           </div>
           <div className="grid grid-cols-7 gap-1 mb-1">
             {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(d => (
-              <div key={d} className="text-[9px] text-gray-300 text-center py-1">{d}</div>
+              <div key={d} className="text-[10px] text-gray-300 text-center py-1">{d}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -216,14 +216,14 @@ export function PaymentCalendar() {
                   </div>
                   {pays.slice(0, 2).map((p, idx) => (
                     p.amount > 0 ? (
-                      <div key={idx} className={`text-[9px] truncate tabular-nums ${p.type === 'in' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                      <div key={idx} className={`text-[10px] truncate tabular-nums ${p.type === 'in' ? 'text-emerald-600' : 'text-rose-500'}`}>
                         {p.type === 'in' ? '+' : '−'}{(p.amount / 1000).toFixed(0)}К
                       </div>
                     ) : (
-                      <div key={idx} className="text-[9px] text-sky-600 truncate">{p.method}</div>
+                      <div key={idx} className="text-[10px] text-sky-600 truncate">{p.method}</div>
                     )
                   ))}
-                  {pays.length > 2 && <div className="text-[9px] text-gray-400">+{pays.length - 2}</div>}
+                  {pays.length > 2 && <div className="text-[10px] text-gray-400">+{pays.length - 2}</div>}
                 </button>
               );
             })}
@@ -237,7 +237,7 @@ export function PaymentCalendar() {
               {selectedDay ? `${selectedDay} ${month.toLocaleDateString('ru-RU', { month: 'long' })}` : 'Выберите день'}
             </div>
             {selectedDay && (
-              <button onClick={() => setSelectedDay(null)} className="w-6 h-6 hover:bg-gray-50 rounded-md flex items-center justify-center">
+              <button onClick={() => setSelectedDay(null)} className="w-6 h-6 hover:bg-gray-50 rounded-lg flex items-center justify-center">
                 <X className="w-3.5 h-3.5 text-gray-400" />
               </button>
             )}
@@ -264,7 +264,7 @@ export function PaymentCalendar() {
                   </div>
                   <div className="text-right flex-shrink-0">
                     <div className={`text-xs tabular-nums ${p.type === 'in' ? 'text-emerald-600' : 'text-rose-500'}`}>{p.type === 'in' ? '+' : '−'}{fmt(p.amount)}</div>
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded ${STATUS[p.status].cls}`}>{STATUS[p.status].label}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS[p.status].cls}`}>{STATUS[p.status].label}</span>
                   </div>
                   {/* Edit / Delete shown only on real transactions (planned
                        deal milestones are edited from the deal itself). */}
@@ -273,14 +273,14 @@ export function PaymentCalendar() {
                       <button
                         onClick={() => { setEditingId(p.id); setInitialDate(p.date); setModalOpen(true); }}
                         title="Редактировать"
-                        className="w-7 h-7 hover:bg-gray-100 rounded-md flex items-center justify-center"
+                        className="w-7 h-7 hover:bg-gray-100 rounded-lg flex items-center justify-center"
                       ><Edit2 className="w-3 h-3 text-gray-500" /></button>
                       <button
                         onClick={() => {
                           if (confirm(`Удалить платёж ${fmt(p.amount)}?`)) store.deleteTransaction(p.id);
                         }}
                         title="Удалить"
-                        className="w-7 h-7 hover:bg-rose-50 rounded-md flex items-center justify-center"
+                        className="w-7 h-7 hover:bg-rose-50 rounded-lg flex items-center justify-center"
                       ><Trash2 className="w-3 h-3 text-rose-500" /></button>
                     </div>
                   )}
@@ -300,7 +300,7 @@ export function PaymentCalendar() {
                   </div>
                   <div className="text-right flex-shrink-0">
                     <div className={`text-xs tabular-nums ${p.type === 'in' ? 'text-emerald-600' : 'text-rose-500'}`}>{p.type === 'in' ? '+' : '−'}{fmt(p.amount)}</div>
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded ${STATUS[p.status].cls}`}>{STATUS[p.status].label}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS[p.status].cls}`}>{STATUS[p.status].label}</span>
                   </div>
                 </button>
               ))}
@@ -416,9 +416,11 @@ function PaymentModal({ initialDate, editing, onClose, onSave }: {
           <div>
             <div className="text-[10px] text-gray-400 mb-1.5">Счёт (куда/откуда деньги)</div>
             <div className="flex gap-1 bg-gray-50 rounded-xl p-1">
-              {([['cash', '💵 Касса'], ['bank', '🏦 Счёт'], ['kaspi', '🔴 Kaspi']] as const).map(([id, lbl]) => (
+              {([['cash', Banknote, 'Касса'], ['bank', Landmark, 'Счёт'], ['kaspi', Smartphone, 'Kaspi']] as const).map(([id, Icon, lbl]) => (
                 <button key={id} onClick={() => setAccount(id)}
-                  className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] transition ${account === id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>{lbl}</button>
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] transition ${account === id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+                  <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />{lbl}
+                </button>
               ))}
             </div>
           </div>

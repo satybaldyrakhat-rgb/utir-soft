@@ -1218,7 +1218,7 @@ function DealCard(props: {
               style={{ width: `${deal.progress}%` }}
             />
           </div>
-          <div className="text-[9px] text-slate-400 text-right mt-0.5 tabular-nums">{deal.progress}%</div>
+          <div className="text-[10px] text-slate-400 text-right mt-0.5 tabular-nums">{deal.progress}%</div>
         </div>
       )}
 

@@ -61,7 +61,7 @@ export function CashFlow() {
         <div className="text-[10px] text-gray-400 uppercase tracking-wider">Период анализа</div>
         <div className="flex gap-1 bg-gray-50 rounded-lg p-1">
           {([['day', 'День'], ['week', 'Неделя'], ['month', 'Месяц'], ['quarter', 'Квартал']] as const).map(([id, label]) => (
-            <button key={id} onClick={() => setScope(id)} className={`px-3 py-1 rounded-md text-[10px] transition-colors ${scope === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}>{label}</button>
+            <button key={id} onClick={() => setScope(id)} className={`px-3 py-1 rounded-lg text-[10px] transition-colors ${scope === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}>{label}</button>
           ))}
         </div>
       </div>
@@ -112,7 +112,7 @@ export function CashFlow() {
           <div className="text-sm text-gray-900">Динамика притоков и оттоков</div>
           <div className="flex gap-1 bg-gray-50 rounded-lg p-1">
             {(['3m', '6m', '12m'] as const).map(p => (
-              <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1 rounded-md text-[10px] ${period === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}>{p === '3m' ? '3 мес' : p === '6m' ? '6 мес' : '12 мес'}</button>
+              <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1 rounded-lg text-[10px] ${period === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}>{p === '3m' ? '3 мес' : p === '6m' ? '6 мес' : '12 мес'}</button>
             ))}
           </div>
         </div>
@@ -121,10 +121,10 @@ export function CashFlow() {
             <div key={i} className="flex-1 flex flex-col items-center gap-1">
               <div className="flex items-end gap-0.5 flex-1 w-full">
                 <div className="flex-1 bg-emerald-100 rounded-t-md relative group" style={{ height: `${(d.in / max) * 100}%` }}>
-                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] text-emerald-700 opacity-0 group-hover:opacity-100 whitespace-nowrap">{fmtShort(d.in)}</div>
+                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-emerald-700 opacity-0 group-hover:opacity-100 whitespace-nowrap">{fmtShort(d.in)}</div>
                 </div>
                 <div className="flex-1 bg-rose-100 rounded-t-md relative group" style={{ height: `${(d.out / max) * 100}%` }}>
-                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] text-rose-700 opacity-0 group-hover:opacity-100 whitespace-nowrap">{fmtShort(d.out)}</div>
+                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-rose-700 opacity-0 group-hover:opacity-100 whitespace-nowrap">{fmtShort(d.out)}</div>
                 </div>
               </div>
               <div className="text-[10px] text-gray-400">{d.m}</div>

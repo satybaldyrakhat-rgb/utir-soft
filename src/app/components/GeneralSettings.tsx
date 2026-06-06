@@ -299,7 +299,7 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
               ) : (
                 <span className="absolute inset-0 flex flex-col items-center justify-center text-gray-300">
                   <ImageIcon className="w-7 h-7 mb-1" />
-                  <span className="text-[9px]">LOGO</span>
+                  <span className="text-[10px]">LOGO</span>
                 </span>
               )}
               <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
@@ -638,7 +638,7 @@ function NicheSwitcherCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
                   <span className="text-2xl">{n.icon}</span>
                   <span className="text-[11px] text-gray-700 leading-tight">{n.name[language]}</span>
                   {active && (
-                    <span className="text-[9px] text-amber-600 flex items-center gap-0.5">
+                    <span className="text-[10px] text-amber-600 flex items-center gap-0.5">
                       <Check className="w-2.5 h-2.5" /> {l('сейчас', 'қазір', 'now')}
                     </span>
                   )}

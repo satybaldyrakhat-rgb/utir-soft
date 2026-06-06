@@ -242,11 +242,11 @@ export function ActivityLog({ language }: Props) {
                 <div className="col-span-2 text-slate-500 font-mono text-[11px]">{formatDateTime(log.timestamp, language)}</div>
                 <div className="col-span-2 truncate">
                   <span className={`${isAI ? 'text-emerald-600' : 'text-gray-900'}`}>{log.user || '—'}</span>
-                  {isAI && <span className="ml-1 text-[9px] text-violet-500 bg-violet-50 px-1 py-0.5 rounded">AI</span>}
+                  {isAI && <span className="ml-1 text-[10px] text-violet-500 bg-violet-50 px-1 py-0.5 rounded">AI</span>}
                   {/* Telegram origin badge — admin sees instantly that this
                       action came from the bot, not the platform UI. */}
                   {log.source === 'telegram' && (
-                    <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] text-[#2AABEE] bg-blue-50 px-1 py-0.5 rounded" title="Через Telegram-бот">
+                    <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-[#2AABEE] bg-blue-50 px-1 py-0.5 rounded" title="Через Telegram-бот">
                       ✈️ TG
                     </span>
                   )}

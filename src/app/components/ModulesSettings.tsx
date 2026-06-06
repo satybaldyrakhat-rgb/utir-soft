@@ -226,10 +226,10 @@ export function ModulesSettings({ language }: Props) {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-gray-900 truncate">{m.labels[language]}</span>
               {m.locked && <Lock className="w-3 h-3 text-gray-300" />}
-              {m.custom && <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-50 text-emerald-600">{l('Кастом', 'Кастом', 'Custom')}</span>}
-              {!m.enabled && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{l('Откл', 'Өшік', 'Off')}</span>}
+              {m.custom && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-emerald-600">{l('Кастом', 'Кастом', 'Custom')}</span>}
+              {!m.enabled && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{l('Откл', 'Өшік', 'Off')}</span>}
               {/* Role count — quick view of who can open this module */}
-              <span className={`text-[9px] px-1.5 py-0.5 rounded ${rc === 1 ? 'bg-rose-50 text-rose-600' : rc === 3 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded ${rc === 1 ? 'bg-rose-50 text-rose-600' : rc === 3 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}
                 title={`${rc} ${l('из 3 ролей', '/ 3 рөл', 'of 3 roles')}`}>
                 {rc}/3 {l('ролей', 'рөл', 'roles')}
               </span>
@@ -250,7 +250,7 @@ export function ModulesSettings({ language }: Props) {
               <button
                 onClick={() => openModule(m)}
                 title={l('Открыть модуль', 'Ашу', 'Open')}
-                className="w-7 h-7 hover:bg-gray-100 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-700 hidden sm:flex"
+                className="w-7 h-7 hover:bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 hidden sm:flex"
               >
                 <ExternalLink className="w-3 h-3" />
               </button>
@@ -333,7 +333,7 @@ export function ModulesSettings({ language }: Props) {
       <button onClick={onToggle} className="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-900">
         {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         <span className="uppercase tracking-wide">{label}</span>
-        {badge && <span className="text-[9px] px-1.5 py-0.5 bg-violet-50 text-emerald-600 rounded">{badge}</span>}
+        {badge && <span className="text-[10px] px-1.5 py-0.5 bg-violet-50 text-emerald-600 rounded">{badge}</span>}
         <span className="text-[10px] text-gray-400">· {count.on} / {count.total} {l('активны', 'белсенді', 'active')}</span>
       </button>
       {isOpen && count.total > 0 && (
@@ -341,7 +341,7 @@ export function ModulesSettings({ language }: Props) {
           <button
             onClick={() => setAllInGroup(group, true)}
             disabled={count.on === count.total}
-            className="text-[10px] text-gray-500 hover:text-emerald-600 inline-flex items-center gap-1 px-2 py-1 hover:bg-gray-50 rounded-md disabled:opacity-30"
+            className="text-[10px] text-gray-500 hover:text-emerald-600 inline-flex items-center gap-1 px-2 py-1 hover:bg-gray-50 rounded-lg disabled:opacity-30"
             title={l('Включить все в группе', 'Топтағы барлығын қосу', 'Enable all in group')}
           >
             <Power className="w-3 h-3" /> {l('Все', 'Барлығы', 'All on')}
@@ -349,7 +349,7 @@ export function ModulesSettings({ language }: Props) {
           <button
             onClick={() => setAllInGroup(group, false)}
             disabled={count.on === 0}
-            className="text-[10px] text-gray-500 hover:text-rose-600 inline-flex items-center gap-1 px-2 py-1 hover:bg-gray-50 rounded-md disabled:opacity-30"
+            className="text-[10px] text-gray-500 hover:text-rose-600 inline-flex items-center gap-1 px-2 py-1 hover:bg-gray-50 rounded-lg disabled:opacity-30"
             title={l('Отключить все в группе (кроме системных)', 'Топтағы барлығын өшіру (жүйелік емес)', 'Disable all (except locked)')}
           >
             <Power className="w-3 h-3" /> {l('Откл', 'Өшір', 'All off')}
@@ -429,7 +429,7 @@ export function ModulesSettings({ language }: Props) {
           className="flex-1 bg-transparent text-xs focus:outline-none placeholder:text-gray-400"
         />
         {search && (
-          <button onClick={() => setSearch('')} className="w-6 h-6 hover:bg-gray-50 rounded-md flex items-center justify-center">
+          <button onClick={() => setSearch('')} className="w-6 h-6 hover:bg-gray-50 rounded-lg flex items-center justify-center">
             <X className="w-3 h-3 text-gray-400" />
           </button>
         )}

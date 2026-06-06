@@ -342,8 +342,8 @@ export function Taxes() {
       <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-3 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <div className="flex gap-1 bg-gray-50 rounded-lg p-1">
-            <button onClick={() => setKind('month')}   className={`px-3 py-1 rounded-md text-[11px] transition ${kind === 'month'   ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>Месяц</button>
-            <button onClick={() => setKind('quarter')} className={`px-3 py-1 rounded-md text-[11px] transition ${kind === 'quarter' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>Квартал</button>
+            <button onClick={() => setKind('month')}   className={`px-3 py-1 rounded-lg text-[11px] transition ${kind === 'month'   ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>Месяц</button>
+            <button onClick={() => setKind('quarter')} className={`px-3 py-1 rounded-lg text-[11px] transition ${kind === 'quarter' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>Квартал</button>
           </div>
           <div className="flex items-center gap-1">
             <button onClick={() => shiftRef(-1)} className="w-7 h-7 hover:bg-gray-50 rounded-lg flex items-center justify-center"><ChevronLeft className="w-3.5 h-3.5 text-gray-500" /></button>

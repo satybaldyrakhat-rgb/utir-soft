@@ -166,7 +166,7 @@ export function Booking() {
                 {days.map((d, i) => (
                   <button key={i} onClick={() => setSelectedDate(i)}
                     className={`p-2 rounded-xl text-center ${selectedDate === i ? 'bg-gray-900 text-white' : 'bg-gray-50 text-slate-700 hover:bg-white/70'}`}>
-                    <div className="text-[9px] opacity-70">{['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][d.getDay()]}</div>
+                    <div className="text-[10px] opacity-70">{['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][d.getDay()]}</div>
                     <div className="text-xs">{d.getDate()}</div>
                   </button>
                 ))}

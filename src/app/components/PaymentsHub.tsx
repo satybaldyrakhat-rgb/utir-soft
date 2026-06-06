@@ -473,7 +473,7 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
           <div>
             <div className="text-sm text-gray-900 flex items-center gap-1.5">
               {l('AI Финансист', 'AI Қаржыгер', 'AI CFO')}
-              <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase tracking-wide">live</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase tracking-wide">live</span>
             </div>
             <div className="text-[10px] text-gray-500">{l('Анализирует ваши платежи и финансы по живым данным', 'Нақты деректер бойынша талдайды', 'Real-time analysis of live data')}</div>
           </div>
@@ -847,12 +847,12 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
             <button key={f.id} onClick={() => setFilter(f.id)}
               className={`px-2.5 py-1 rounded-full text-[10px] whitespace-nowrap transition-colors flex items-center gap-1.5 ring-1 ${filter === f.id ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow-sm)]' : `${f.cls} ring-white/40 hover:bg-white/70`}`}>
               {f[language]}
-              <span className={`px-1.5 py-0.5 rounded ${filter === f.id ? 'bg-white/20' : 'bg-gray-100'} text-[9px]`}>{counts[f.id]}</span>
+              <span className={`px-1.5 py-0.5 rounded ${filter === f.id ? 'bg-white/20' : 'bg-gray-100'} text-[10px]`}>{counts[f.id]}</span>
             </button>
           ))}
         </div>
 
-        <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-2 border-b border-white/60 bg-white/30 text-[9px] text-gray-400 uppercase tracking-wide">
+        <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-2 border-b border-white/60 bg-white/30 text-[10px] text-gray-400 uppercase tracking-wide">
           <button onClick={() => toggleSort('name')} className="col-span-3 text-left flex items-center gap-1 hover:text-gray-700 transition-colors">
             {l('Клиент', 'Клиент', 'Client')}
             {sortKey === 'name' && <ArrowUpDown className="w-2.5 h-2.5" />}
@@ -888,12 +888,12 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
                 <div className="md:col-span-3 min-w-0">
                   {/* Mobile label — on phones there's no column header so we
                       surface what this row segment IS under each value. */}
-                  <div className="md:hidden text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">{l('Продукт', 'Өнім', 'Product')}</div>
+                  <div className="md:hidden text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">{l('Продукт', 'Өнім', 'Product')}</div>
                   <div className="text-xs text-gray-700 truncate">{d.product || '—'}</div>
                   {d.furnitureType && <div className="text-[10px] text-gray-400">{d.furnitureType}</div>}
                 </div>
                 <div className="md:col-span-3">
-                  <div className="md:hidden text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">{l('Прогресс', 'Прогресс', 'Progress')}</div>
+                  <div className="md:hidden text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">{l('Прогресс', 'Прогресс', 'Progress')}</div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full transition-all ${d._pct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : d._pct > 0 ? 'bg-gradient-to-r from-sky-400 to-violet-400' : 'bg-amber-300'}`} style={{ width: `${Math.min(d._pct, 100)}%` }} />
@@ -905,7 +905,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
                   </div>
                 </div>
                 <div className="md:col-span-1 text-right">
-                  <div className="md:hidden text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">{l('Сумма', 'Сома', 'Amount')}</div>
+                  <div className="md:hidden text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">{l('Сумма', 'Сома', 'Amount')}</div>
                   <div className="text-xs text-gray-900 tabular-nums">{fmtShort(d._amount)} ₸</div>
                   {d._due > 0 && <div className="text-[10px] text-rose-500 tabular-nums">−{fmtShort(d._due)}</div>}
                 </div>
@@ -939,13 +939,13 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
                   <button
                     onClick={() => setPage(p => Math.max(0, p - 1))}
                     disabled={safePage === 0}
-                    className="w-6 h-6 hover:bg-gray-100 rounded-md flex items-center justify-center disabled:opacity-30"
+                    className="w-6 h-6 hover:bg-gray-100 rounded-lg flex items-center justify-center disabled:opacity-30"
                   ><ChevronLeft className="w-3 h-3" /></button>
                   <span className="text-gray-600 tabular-nums px-1">{safePage + 1} / {pageCount}</span>
                   <button
                     onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
                     disabled={safePage >= pageCount - 1}
-                    className="w-6 h-6 hover:bg-gray-100 rounded-md flex items-center justify-center disabled:opacity-30"
+                    className="w-6 h-6 hover:bg-gray-100 rounded-lg flex items-center justify-center disabled:opacity-30"
                   ><ChevronRight className="w-3 h-3" /></button>
                 </div>
               )}
