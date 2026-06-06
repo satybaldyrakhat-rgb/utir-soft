@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, Calendar, Receipt, FileCheck, ExternalLink, Star, ChevronLeft, ChevronRight, RotateCcw, Loader2, FileText } from 'lucide-react';
 import { useDataStore } from '../../utils/dataStore';
 import { api } from '../../utils/api';
+import { toast } from '../../utils/toast';
 
 // ─── KZ tax rates — FALLBACK only ────────────────────────────────
 // Real rates now live in team settings (Настройки → Реквизиты → Налоги)
@@ -268,7 +269,7 @@ export function Taxes() {
       await api.post('/api/taxes/payments', { periodKey: key, amount: r.amount });
       refreshPayments();
     } catch (e: any) {
-      alert(String(e?.message || e));
+      toast(String(e?.message || e), 'error');
     } finally { setBusyKey(null); }
   }
   async function undoPaid(r: TaxRow) {
@@ -278,7 +279,7 @@ export function Taxes() {
       await api.delete(`/api/taxes/payments/${encodeURIComponent(key)}`);
       refreshPayments();
     } catch (e: any) {
-      alert(String(e?.message || e));
+      toast(String(e?.message || e), 'error');
     } finally { setBusyKey(null); }
   }
 
@@ -305,7 +306,7 @@ export function Taxes() {
         company,
       });
     } catch (e: any) {
-      alert(String(e?.message || e));
+      toast(String(e?.message || e), 'error');
     } finally { setPdfBusy(null); }
   }
 
@@ -330,7 +331,7 @@ export function Taxes() {
         outgoing, incoming, company,
       });
     } catch (e: any) {
-      alert(String(e?.message || e));
+      toast(String(e?.message || e), 'error');
     } finally { setPdfBusy(null); }
   }
 

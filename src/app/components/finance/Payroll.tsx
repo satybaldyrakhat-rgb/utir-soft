@@ -15,6 +15,7 @@ import { useDataStore } from '../../utils/dataStore';
 import { getNiche } from '../../utils/niches';
 import { api } from '../../utils/api';
 import { rowsToCsv, downloadCsv, type CsvColumn } from '../../utils/csv';
+import { toast } from '../../utils/toast';
 
 interface Props { language: 'kz' | 'ru' | 'eng'; }
 
@@ -75,7 +76,7 @@ export function Payroll({ language }: Props) {
         oosms: r.oosms, so: r.so, opvr: r.opvr, sn: r.sn,
         employerCost: r.employerCost,
       }, { legalName: reqName });
-    } catch (e: any) { alert(String(e?.message || e)); }
+    } catch (e: any) { toast(String(e?.message || e), 'error'); }
   };
 
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));

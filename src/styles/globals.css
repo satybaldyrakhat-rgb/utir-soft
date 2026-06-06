@@ -187,3 +187,26 @@
 html {
   font-size: var(--font-size);
 }
+
+/* ─── Д3: toasts, focus, touch targets ──────────────────────────── */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Unified focus ring — one accent-tinted ring for keyboard users on any
+   focusable control. Keeps the UI calm (no ring on mouse click) while
+   staying accessible. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--accent-600, #059669);
+  border-radius: 0.5rem;
+}
+
+/* Touch targets — on touch devices give interactive controls a comfy
+   minimum hit area so field workers can tap accurately on a phone. */
+@media (pointer: coarse) {
+  button, a[role="button"], [role="tab"], label.cursor-pointer {
+    min-height: 40px;
+  }
+}

@@ -12,6 +12,7 @@ import { GeneralSettings } from './GeneralSettings';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
 import { useDataStore, ALL_MODULES, ALL_ROLES, MODULE_GROUPS, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
+import { toast } from '../utils/toast';
 import { api } from '../utils/api';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { t } from '../utils/translations';
@@ -285,11 +286,11 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
     if (!emp) return;
     const isSelf = !!currentUserEmail && emp.email.toLowerCase() === currentUserEmail.toLowerCase();
     if (isSelf) {
-      alert(l(
+      toast(l(
         'Нельзя удалить самого себя из команды. Передайте управление другому администратору, затем попросите его удалить вас.',
         'Командадан өзіңізді жоюға болмайды. Басқаруды басқа әкімшіге беріңіз, содан кейін олардан жоюды сұраңыз.',
         "You can't remove yourself from the team. Hand admin off first, then ask the other admin to remove you.",
-      ));
+      ), 'error');
       return;
     }
     const msg = l(
@@ -315,7 +316,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
       await api.post(`/api/employees/${id}/restore`, {});
       await store.reloadAll();
     } catch (e: any) {
-      alert(String(e?.message || 'restore failed'));
+      toast(String(e?.message || 'restore failed'), 'error');
     }
   };
 
@@ -1132,11 +1133,11 @@ function RoleRow({
   const askDelete = () => {
     if (role.system) return;
     if (inUseBy > 0) {
-      alert(l(
+      toast(l(
         `Нельзя удалить роль — она назначена ${inUseBy} сотрудник(ам). Сначала смените их роли.`,
         `Рөлді жоюға болмайды — ол ${inUseBy} қызметкерге тағайындалған. Алдымен олардың рөлдерін өзгертіңіз.`,
         `Can't delete this role — it's currently assigned to ${inUseBy} teammate(s). Change their role first.`,
-      ));
+      ), 'error');
       return;
     }
     if (confirm(l(`Удалить роль «${role.name}»?`, `«${role.name}» рөлін жою керек пе?`, `Delete role "${role.name}"?`))) {

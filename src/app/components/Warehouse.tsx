@@ -6,6 +6,7 @@ import { api } from '../utils/api';
 import { getNiche, type NicheStage } from '../utils/niches';
 import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
+import { toast } from '../utils/toast';
 
 interface Product {
   id: string; name: string; category: string; quantity: number; unit: string; supplier: string; cost: number; status: 'instock' | 'low' | 'outofstock'; minQty: number;
@@ -526,7 +527,7 @@ export function Warehouse({ language }: WarehouseProps) {
         type: 'update', page: 'warehouse',
       });
     } catch (e: any) {
-      alert('Не удалось обновить этап: ' + (e?.message || e));
+      toast('Не удалось обновить этап: ' + (e?.message || e), 'error');
     }
   }
 
@@ -565,7 +566,7 @@ export function Warehouse({ language }: WarehouseProps) {
         });
       }
     } catch (e: any) {
-      alert('Не удалось обновить заказ: ' + (e?.message || e));
+      toast('Не удалось обновить заказ: ' + (e?.message || e), 'error');
     }
   }
 
@@ -1716,7 +1717,7 @@ function BomEditorModal({ initial, onClose, onSave, busy, language, typeOptions 
   const removeMat = (idx: number) => setT(prev => ({ ...prev, materials: prev.materials.filter((_, i) => i !== idx) }));
 
   function commit() {
-    if (!t.name.trim()) { alert('Укажите название шаблона'); return; }
+    if (!t.name.trim()) { toast('Укажите название шаблона', 'error'); return; }
     onSave({ ...t, name: t.name.trim() });
   }
 

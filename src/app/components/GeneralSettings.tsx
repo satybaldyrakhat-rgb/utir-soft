@@ -7,6 +7,7 @@ import {
 import { useDataStore, type UserProfile } from '../utils/dataStore';
 import { NICHES, type NicheId, getNiche } from '../utils/niches';
 import { THEMES, type ThemeId, loadTheme, saveTheme } from '../utils/theme';
+import { toast } from '../utils/toast';
 
 interface Props {
   language: 'kz' | 'ru' | 'eng';
@@ -447,7 +448,7 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
             <Download className="w-3.5 h-3.5" /> {l('Экспорт моих данных', 'Деректерді экспорт', 'Export my data')}
           </button>
           <button
-            onClick={() => alert(l('Смена пароля скоро будет доступна. Пока — выйдите и используйте «Восстановить пароль».', 'Құпия сөзді ауыстыру жақын арада қол жетімді болады. Әзірге шығып, «Құпия сөзді қалпына келтіру» қолданыңыз.', 'Password change coming soon. For now sign out and use «Reset password».'))}
+            onClick={() => toast(l('Смена пароля скоро будет доступна. Пока — выйдите и используйте «Восстановить пароль».', 'Құпия сөзді ауыстыру жақын арада қол жетімді болады. Әзірге шығып, «Құпия сөзді қалпына келтіру» қолданыңыз.', 'Password change coming soon. For now sign out and use «Reset password».'))}
             className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs text-gray-700 border border-gray-100"
           >
             <Lock className="w-3.5 h-3.5" /> {l('Сменить пароль', 'Пароль ауыстыру', 'Change password')}

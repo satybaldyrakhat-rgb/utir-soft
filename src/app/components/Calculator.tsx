@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Pencil, Plus, Trash2, Check, X } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
+import { toast } from '../utils/toast';
 
 interface CalcProps {
   language: 'kz' | 'ru' | 'eng';
@@ -158,7 +159,7 @@ export function Calculator({ language }: CalcProps) {
       paymentMethods: { cash: false, kaspiGold: false, kaspiQR: false, cardTransfer: false, installment: false },
       notes: `${l('Расчёт', 'Есеп', 'Estimate')}: ${calc.total.toLocaleString('ru-RU')} ₸`,
     });
-    alert(l('Заказ создан и добавлен в воронку', 'Тапсырыс жасалды', 'Order created'));
+    toast(l('Заказ создан и добавлен в воронку', 'Тапсырыс жасалды', 'Order created'), 'success');
   };
 
   const fmt = (n: number) => n.toLocaleString('ru-RU');
@@ -369,7 +370,7 @@ export function Calculator({ language }: CalcProps) {
               {l('Создать заказ', 'Тапсырыс жасау', 'Create order')}
             </button>
             <button
-              onClick={() => alert(l('Шаблон сохранён', 'Шаблон сақталды', 'Template saved'))}
+              onClick={() => toast(l('Шаблон сохранён', 'Шаблон сақталды', 'Template saved'), 'success')}
               className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors"
             >
               {l('Сохранить как шаблон', 'Шаблон ретінде сақтау', 'Save as template')}

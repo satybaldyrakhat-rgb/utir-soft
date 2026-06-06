@@ -4,6 +4,7 @@ import { t } from '../utils/translations';
 import { useDataStore, type Deal } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
 import { api } from '../utils/api';
+import { toast } from '../utils/toast';
 import { DEFAULT_STAGES_TEMPLATE, type DealStage, type ConsumedMaterial } from './Warehouse';
 
 type Lang = 'kz' | 'ru' | 'eng';
@@ -197,7 +198,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         { counterpartyName: deal.customerName || '—', counterpartyBIN: deal.customerBIN, lines },
         req || {},
       );
-    } catch (e: any) { alert(String(e?.message || e)); }
+    } catch (e: any) { toast(String(e?.message || e), 'error'); }
     finally { setSverkaBusy(false); }
   };
 
@@ -347,7 +348,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       const rows = await api.get<HistoryEntry[]>(`/api/deals/${deal.id}/history`);
       setHistory(rows);
     } catch (e: any) {
-      alert(String(e?.message || 'rollback failed'));
+      toast(String(e?.message || 'rollback failed'), 'error');
     } finally {
       setRollingBackId(null);
     }

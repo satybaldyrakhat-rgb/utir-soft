@@ -14,6 +14,7 @@ import { Settings } from './components/Settings';
 import { CustomModulePage } from './components/CustomModulePage';
 import { CustomIcon } from './components/CustomIcons';
 import { AIAssistant } from './components/AIAssistant';
+import { Toaster } from './utils/toast';
 import { Auth } from './components/Auth';
 import { ComingSoon } from './components/ComingSoon';
 import { Terms } from './components/Terms';
@@ -754,6 +755,8 @@ export default function App() {
       <PublicRouter>
         <AppContent />
       </PublicRouter>
+      {/* Global toast stack — fed by toast() from anywhere (Д3). */}
+      <Toaster />
     </DataProvider>
   );
 }

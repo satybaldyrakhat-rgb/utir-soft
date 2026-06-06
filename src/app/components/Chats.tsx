@@ -5,6 +5,7 @@ import { TextMessage, ImageMessage, FileMessage, VoiceMessage, CallMessage } fro
 import { PlatformIcon } from './PlatformLogos';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
+import { toast } from '../utils/toast';
 
 interface Message {
   id: string;
@@ -405,7 +406,7 @@ export function Chats({ language }: ChatsProps) {
                     <div className="flex items-center gap-1.5 mt-0.5">{platformDot(selectedChat.platform)}<span className="text-[10px] text-slate-400">{platformName(selectedChat.platform)}</span>{selectedChat.online && <span className="text-[10px] text-green-500">• online</span>}</div>
                   </div>
                   <div className="flex items-center gap-1">
-                    {selectedChat.orderId && <button onClick={() => alert(`Заказ #${selectedChat.orderId}`)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-white/70 text-xs"><ShoppingCart className="w-3.5 h-3.5" />#{selectedChat.orderId}</button>}
+                    {selectedChat.orderId && <button onClick={() => toast(`Заказ #${selectedChat.orderId}`)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-white/70 text-xs"><ShoppingCart className="w-3.5 h-3.5" />#{selectedChat.orderId}</button>}
                     <button onClick={startCall} className="p-2 hover:bg-white/50 rounded-lg"><Phone className="w-4 h-4 text-slate-400" /></button>
                   </div>
                 </div>

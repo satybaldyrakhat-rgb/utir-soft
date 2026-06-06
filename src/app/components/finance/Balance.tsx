@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Banknote, Landmark, Smartphone, Package, Users, CreditCard, BookOpen, Lock, Unlock } from 'lucide-react';
 import { useDataStore } from '../../utils/dataStore';
 import { api } from '../../utils/api';
+import { toast } from '../../utils/toast';
 
 const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
 
@@ -31,7 +32,7 @@ export function Balance() {
   const saveLock = (date: string | null) => {
     api.put<{ lockDate: string | null }>('/api/team/finance-lock', { lockDate: date })
       .then(r => { setLockDate(r.lockDate); setLockDraft(r.lockDate || ''); })
-      .catch(e => alert(String(e?.message || e)));
+      .catch(e => toast(String(e?.message || e), 'error'));
   };
 
   // Per-account balance from completed transactions (missing account → bank).

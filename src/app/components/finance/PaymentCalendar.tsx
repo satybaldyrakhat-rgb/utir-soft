@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, ArrowDownRight, ArrowUpRight, X, Receipt, Wallet, Plus, Edit2, Trash2, Banknote, Landmark, Smartphone } from 'lucide-react';
 import { useDataStore, type FinanceTransaction } from '../../utils/dataStore';
+import { toast } from '../../utils/toast';
 
 type Cat = 'income' | 'expense' | 'tax' | 'salary' | 'planned';
 // kind tells us whether a row is a real DB transaction (editable) or
@@ -354,8 +355,8 @@ function PaymentModal({ initialDate, editing, onClose, onSave }: {
 
   function commit() {
     const amt = Number(amount);
-    if (!amt || amt <= 0) { alert('Укажите сумму'); return; }
-    if (!date) { alert('Укажите дату'); return; }
+    if (!amt || amt <= 0) { toast('Укажите сумму', 'error'); return; }
+    if (!date) { toast('Укажите дату', 'error'); return; }
     onSave({
       type, date, amount: amt, category,
       description: description.trim(),
