@@ -2101,12 +2101,37 @@ app.use('/api/team/client-ai', clientAiRouter);
 // right reqs), but only admin can mutate.
 const requisitesRouter = express.Router();
 requisitesRouter.use(authMiddleware);
+// KZ tax defaults (2025 known values — MUST be verified against the new
+// Tax Code effective 2026; that's exactly why they live in editable
+// settings instead of hardcoded in the component).
+const DEFAULT_TAX_RATES = {
+  simplified: 0.03,  // СНР 910.00 (упрощёнка): 3% от оборота (1.5% ИПН/КПН + 1.5% СН)
+  retail:     0.04,  // СНР 913.00 (розничный налог)
+  ipn:        0.10,  // ИПН (с ФОТ / доход ИП)
+  opv:        0.10,  // ОПВ (удержание у работника, в ЕНПФ)
+  vosms:      0.02,  // ВОСМС (удержание у работника)
+  oosms:      0.03,  // ООСМС (взнос работодателя)
+  so:         0.035, // СО — социальные отчисления (работодатель)
+  sn:         0.095, // СН — социальный налог (ОУР), за вычетом СО
+  opvr:       0.025, // ОПВР — обязательные пенс. взносы работодателя (поэтапно)
+  vat:        0.12,  // НДС
+  kpn:        0.20,  // КПН (ТОО на ОУР)
+  property:   0.015, // налог на имущество ТОО
+};
 const DEFAULT_REQ = {
   legalName: '', bin: '', address: '', bankName: '',
   iban: '', bik: '', kbe: '', director: '', phone: '', email: '',
   // KZ tax flags — affect which taxes Taxes.tsx calculates.
   vatPayer: false,   // плательщик НДС
-  entityType: 'too', // 'too' = ТОО → КПН 20%; 'ip' = ИП → ИПН 10% от дохода
+  entityType: 'too', // 'too' = ТОО; 'ip' = ИП
+  // Tax regime drives WHICH taxes apply. Most small furniture/windows/
+  // doors shops are on the simplified declaration (910.00).
+  taxRegime: 'simplified' as 'simplified' | 'retail' | 'general',
+  // Year constants — пороги и вычеты считаются от них. Verify yearly.
+  taxYear: 2026,
+  mrp: 3932,
+  mzp: 85000,
+  rates: DEFAULT_TAX_RATES,
 };
 requisitesRouter.get('/', (req: AuthedRequest, res) => {
   try {
@@ -2129,6 +2154,21 @@ requisitesRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
     email:     String(b.email     || '').slice(0, 100),
     vatPayer:  !!b.vatPayer,
     entityType: b.entityType === 'ip' ? 'ip' : 'too',
+    taxRegime: ['simplified', 'retail', 'general'].includes(b.taxRegime) ? b.taxRegime : 'simplified',
+    taxYear: Math.max(2020, Math.min(2100, Number(b.taxYear) || DEFAULT_REQ.taxYear)),
+    mrp: Math.max(0, Number(b.mrp) || DEFAULT_REQ.mrp),
+    mzp: Math.max(0, Number(b.mzp) || DEFAULT_REQ.mzp),
+    // Rates — merge over defaults, clamp each to [0,1]. Keeps unknown
+    // keys out and lets the admin tune a single rate without losing rest.
+    rates: (() => {
+      const r: Record<string, number> = { ...DEFAULT_TAX_RATES };
+      const inb = (b.rates && typeof b.rates === 'object') ? b.rates : {};
+      for (const k of Object.keys(DEFAULT_TAX_RATES)) {
+        const v = Number(inb[k]);
+        if (!Number.isNaN(v)) r[k] = Math.max(0, Math.min(1, v));
+      }
+      return r;
+    })(),
   };
   db.prepare(`
     INSERT INTO team_settings (team_id, company_requisites, updated_at)

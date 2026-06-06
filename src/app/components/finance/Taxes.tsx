@@ -3,22 +3,25 @@ import { AlertCircle, Calendar, Receipt, FileCheck, ExternalLink, Star, ChevronL
 import { useDataStore } from '../../utils/dataStore';
 import { api } from '../../utils/api';
 
-// ─── KZ tax rates (2026) ─────────────────────────────────────────
-// Rates can change year-to-year so keep them in one place. If KZ tax law
-// changes, edit this object and the rest of the file picks it up.
-const RATES = {
-  ipn:   0.10,   // ИПН: 10% от дохода физлица (для ИП — от дохода ИП)
-  sn:    0.095,  // СН (соцналог): 9.5% от ФОТ, МИНУС сумма ОПВ
-  opv:   0.10,   // ОПВ: 10% от ФОТ (на сотрудника)
-  osms:  0.03,   // ОСМС: 3% от ФОТ (на сотрудника)
-  vat:   0.12,   // НДС: 12% от облагаемого оборота
-  kpn:   0.20,   // КПН: 20% от налогооблагаемого дохода ТОО
-  property: 0.015, // Налог на имущество для ТОО — 1.5% от остаточной стоимости
+// ─── KZ tax rates — FALLBACK only ────────────────────────────────
+// Real rates now live in team settings (Настройки → Реквизиты → Налоги)
+// because the KZ Tax Code changed for 2026 and an accountant must be
+// able to tune them without a code release. These are just the defaults
+// used until the team saves their own.
+const DEFAULT_RATES = {
+  simplified: 0.03, retail: 0.04,
+  ipn: 0.10, opv: 0.10, vosms: 0.02, oosms: 0.03, so: 0.035, sn: 0.095,
+  opvr: 0.025, vat: 0.12, kpn: 0.20, property: 0.015,
 };
+type TaxRegime = 'simplified' | 'retail' | 'general';
 
 interface TaxPaymentRecord { id: string; periodKey: string; amount: number; paidAt: string; paidBy?: string }
 
-interface Requisites { vatPayer?: boolean; entityType?: 'too' | 'ip'; legalName?: string }
+interface Requisites {
+  vatPayer?: boolean; entityType?: 'too' | 'ip'; legalName?: string;
+  taxRegime?: TaxRegime; rates?: Partial<typeof DEFAULT_RATES>;
+  mrp?: number; mzp?: number; taxYear?: number;
+}
 
 type PeriodKind = 'month' | 'quarter';
 
@@ -126,17 +129,10 @@ export function Taxes() {
 
   const isIP = requisites.entityType === 'ip';
   const vatPayer = !!requisites.vatPayer;
-
-  // Standard KZ payroll-derived taxes — Same formulas for ИП / ТОО when
-  // there are employees. ОПВ first, then СН = 9.5%·ФОТ − ОПВ.
-  const opvAmount  = payrollBase * RATES.opv;
-  const osmsAmount = payrollBase * RATES.osms;
-  const ipnAmount  = payrollBase * RATES.ipn;
-  const snAmount   = Math.max(0, payrollBase * RATES.sn - opvAmount);
-  const vatAmount  = vatPayer ? Math.max(0, revenueBase * RATES.vat - 0) : 0;  // simplified — no input VAT credit yet
-  const kpnAmount  = !isIP ? taxableProfit * RATES.kpn : 0;
-  const ipIncomeTax = isIP ? revenueBase * RATES.ipn : 0; // ИП на ОУР: 10% от дохода
-  const propertyAmount = !isIP ? propertyBase * RATES.property : 0;
+  // Live rates + regime from team settings (with safe fallback).
+  const rates = { ...DEFAULT_RATES, ...(requisites.rates || {}) };
+  const regime: TaxRegime = requisites.taxRegime || 'simplified';
+  const pct = (r: number) => `${(r * 100).toFixed(r < 0.1 ? 1 : 0)}%`;
 
   // Due date — 25 числа следующего месяца (most KZ taxes work this way).
   const dueNextMonth = (offsetDays = 25) => {
@@ -146,51 +142,83 @@ export function Taxes() {
     return d.toISOString().slice(0, 10);
   };
   const due25 = dueNextMonth(25);
-  const due15 = dueNextMonth(15);
+
+  // ── Payroll-derived taxes (apply in every regime when there are
+  //    salaried employees). ОПВ/ИПН/ВОСМС — удержания у работника;
+  //    ООСМС/СО — взносы работодателя; СН — только на ОУР, за вычетом СО. ──
+  const payrollRows: TaxRow[] = [];
+  if (payrollBase > 0) {
+    const so = payrollBase * rates.so;
+    payrollRows.push(
+      { code: 'OPV',  shortLabel: 'ОПВ',  label: 'Обязательные пенсионные взносы (удержание)', rate: pct(rates.opv),  base: payrollBase, amount: payrollBase * rates.opv,  due: due25, icon: 'bg-emerald-50 text-emerald-700', applicable: true, note: 'Удерживается из зарплаты в ЕНПФ' },
+      { code: 'IPN',  shortLabel: 'ИПН',  label: 'ИПН с зарплаты (удержание)',                  rate: pct(rates.ipn),  base: payrollBase, amount: payrollBase * rates.ipn,  due: due25, icon: 'bg-violet-50 text-violet-700', applicable: true, note: 'Удерживается из зарплаты сотрудников' },
+      { code: 'VOSMS',shortLabel: 'ВОСМС',label: 'Взносы ОСМС (удержание у работника)',         rate: pct(rates.vosms),base: payrollBase, amount: payrollBase * rates.vosms,due: due25, icon: 'bg-sky-50 text-sky-700', applicable: true },
+      { code: 'OOSMS',shortLabel: 'ООСМС',label: 'Отчисления ОСМС (за счёт работодателя)',      rate: pct(rates.oosms),base: payrollBase, amount: payrollBase * rates.oosms,due: due25, icon: 'bg-cyan-50 text-cyan-700', applicable: true },
+      { code: 'SO',   shortLabel: 'СО',   label: 'Социальные отчисления (работодатель)',        rate: pct(rates.so),   base: payrollBase, amount: so, due: due25, icon: 'bg-teal-50 text-teal-700', applicable: true },
+    );
+    // СН только на общеустановленном режиме (на упрощёнке соцналог входит
+    // в 3% и отдельно не платится).
+    if (regime === 'general') {
+      payrollRows.push({ code: 'SN', shortLabel: 'СН', label: 'Социальный налог (за вычетом СО)', rate: `${pct(rates.sn)} − СО`, base: payrollBase, amount: Math.max(0, payrollBase * rates.sn - so), due: due25, icon: 'bg-rose-50 text-rose-700', applicable: true });
+    }
+  }
 
   const rows: TaxRow[] = [];
-  if (payrollBase > 0) {
-    rows.push(
-      { code: 'IPN',  shortLabel: 'ИПН',  label: 'Индивидуальный подоходный налог (с ФОТ)', rate: '10%',  base: payrollBase, amount: ipnAmount,  due: due25, icon: 'bg-violet-50 text-violet-700', highlight: true, applicable: true, note: 'Удерживается из зарплаты сотрудников' },
-      { code: 'OPV',  shortLabel: 'ОПВ',  label: 'Обязательные пенсионные взносы',          rate: '10%',  base: payrollBase, amount: opvAmount,  due: due25, icon: 'bg-emerald-50 text-emerald-700', applicable: true, note: 'Удерживается из зарплаты в ЕНПФ' },
-      { code: 'OSMS', shortLabel: 'ОСМС', label: 'Обязательное мед.страхование',            rate: '3%',   base: payrollBase, amount: osmsAmount, due: due25, icon: 'bg-sky-50 text-sky-700', applicable: true },
-      { code: 'SN',   shortLabel: 'СН',   label: 'Социальный налог',                        rate: '9.5% − ОПВ', base: payrollBase, amount: snAmount, due: due25, icon: 'bg-rose-50 text-rose-700', applicable: true, note: 'Начисляется на ФОТ за вычетом ОПВ' },
-    );
-  } else {
-    rows.push({ code: 'IPN', shortLabel: 'ИПН', label: 'Налоги с ФОТ', rate: '—', base: 0, amount: 0, due: due25, icon: 'bg-gray-50 text-gray-400', applicable: false, note: 'Нет активных сотрудников с зарплатой' });
-  }
 
-  if (!isIP) {
+  // ── Main income tax — depends on the regime ──
+  if (regime === 'simplified') {
     rows.push({
-      code: 'KPN', shortLabel: 'КПН', label: 'Корпоративный подоходный налог',
-      rate: '20%', base: taxableProfit, amount: kpnAmount,
-      due: kind === 'month' ? dueNextMonth(20) : due25,
-      icon: 'bg-indigo-50 text-indigo-700', highlight: kind === 'quarter',
-      applicable: taxableProfit > 0,
-      note: 'База = доходы − расходы за период',
+      code: 'SIMPLIFIED', shortLabel: 'СНР 910', label: 'Налог по упрощёнке (форма 910.00)',
+      rate: pct(rates.simplified), base: revenueBase, amount: revenueBase * rates.simplified,
+      due: due25, icon: 'bg-indigo-50 text-indigo-700', highlight: true, applicable: revenueBase > 0,
+      note: '3% от оборота (½ ИПН/КПН + ½ СН). Декларация раз в полугодие, уплата до 25-го.',
+    });
+  } else if (regime === 'retail') {
+    rows.push({
+      code: 'RETAIL', shortLabel: 'СНР 913', label: 'Розничный налог (форма 913.00)',
+      rate: pct(rates.retail), base: revenueBase, amount: revenueBase * rates.retail,
+      due: due25, icon: 'bg-indigo-50 text-indigo-700', highlight: true, applicable: revenueBase > 0,
+      note: 'Налог с оборота для розницы. Уплата ежеквартально.',
     });
   } else {
-    rows.push({
-      code: 'IPN_IP', shortLabel: 'ИПН ИП', label: 'ИПН ИП (10% с дохода)',
-      rate: '10%', base: revenueBase, amount: ipIncomeTax,
-      due: due25, icon: 'bg-indigo-50 text-indigo-700', applicable: revenueBase > 0,
-      note: 'ИП на общеустановленном режиме',
-    });
+    // ОУР
+    if (!isIP) {
+      rows.push({
+        code: 'KPN', shortLabel: 'КПН', label: 'Корпоративный подоходный налог',
+        rate: pct(rates.kpn), base: taxableProfit, amount: taxableProfit * rates.kpn,
+        due: kind === 'month' ? dueNextMonth(20) : due25,
+        icon: 'bg-indigo-50 text-indigo-700', highlight: kind === 'quarter',
+        applicable: taxableProfit > 0, note: 'База = доходы − расходы за период',
+      });
+    } else {
+      rows.push({
+        code: 'IPN_IP', shortLabel: 'ИПН ИП', label: 'ИПН ИП (с дохода)',
+        rate: pct(rates.ipn), base: revenueBase, amount: revenueBase * rates.ipn,
+        due: due25, icon: 'bg-indigo-50 text-indigo-700', applicable: revenueBase > 0,
+        note: 'ИП на общеустановленном режиме',
+      });
+    }
   }
 
+  // Payroll taxes after the main one.
+  rows.push(...payrollRows);
+  if (payrollBase === 0) {
+    rows.push({ code: 'PAYROLL0', shortLabel: 'ФОТ', label: 'Налоги с зарплаты', rate: '—', base: 0, amount: 0, due: due25, icon: 'bg-gray-50 text-gray-400', applicable: false, note: 'Нет активных сотрудников с окладом' });
+  }
+
+  // НДС — независимо от режима, если компания плательщик НДС.
   rows.push({
     code: 'NDS', shortLabel: 'НДС', label: 'Налог на добавленную стоимость',
-    rate: '12%', base: revenueBase, amount: vatAmount,
-    due: dueNextMonth(25),
-    icon: 'bg-amber-50 text-amber-700',
-    applicable: vatPayer,
-    note: vatPayer ? 'Налог за вычетом входящих ЭСФ' : 'Включите статус плательщика НДС в Настройки → Реквизиты',
+    rate: pct(rates.vat), base: revenueBase, amount: vatPayer ? revenueBase * rates.vat : 0,
+    due: dueNextMonth(25), icon: 'bg-amber-50 text-amber-700', applicable: vatPayer,
+    note: vatPayer ? 'За вычетом входящих ЭСФ (зачёт). Декларация 300.00 ежеквартально.' : 'Включите статус плательщика НДС в Настройки → Реквизиты',
   });
 
-  if (propertyBase > 0 && !isIP) {
+  // Налог на имущество — только ТОО на ОУР.
+  if (propertyBase > 0 && !isIP && regime === 'general') {
     rows.push({
       code: 'NI', shortLabel: 'НИ', label: 'Налог на имущество (ТОО)',
-      rate: '1.5%', base: propertyBase, amount: propertyAmount,
+      rate: pct(rates.property), base: propertyBase, amount: propertyBase * rates.property,
       due: dueNextMonth(25), icon: 'bg-purple-50 text-purple-700', applicable: true,
       note: 'Рассчитан по остаточной стоимости ТМЦ',
     });
@@ -275,12 +303,13 @@ export function Taxes() {
       try { company = JSON.parse(localStorage.getItem('utir_user_profile') || '{}')?.company || requisites.legalName || ''; } catch {}
       // Build outgoing (sales) and incoming (purchases) lists from
       // transactions in the period.
+      const vr = (requisites.rates?.vat ?? DEFAULT_RATES.vat);
       const outgoing = store.transactions
         .filter(t => t.type === 'income' && t.status === 'completed' && inWindow(t.date))
-        .map(t => ({ date: t.date, counterparty: t.description || t.category, amount: t.amount, vat: t.amount * RATES.vat / (1 + RATES.vat) }));
+        .map(t => ({ date: t.date, counterparty: t.description || t.category, amount: t.amount, vat: t.amount * vr / (1 + vr) }));
       const incoming = store.transactions
         .filter(t => t.type === 'expense' && t.status === 'completed' && inWindow(t.date))
-        .map(t => ({ date: t.date, counterparty: t.description || t.category, amount: t.amount, vat: t.amount * RATES.vat / (1 + RATES.vat) }));
+        .map(t => ({ date: t.date, counterparty: t.description || t.category, amount: t.amount, vat: t.amount * vr / (1 + vr) }));
       await pdf.generateVATReportPDF({
         period: { from: periodWindow.from, to: periodWindow.to },
         periodLabel: periodLabel(kind, ref),

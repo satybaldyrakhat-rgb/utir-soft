@@ -2276,7 +2276,31 @@ interface Requisites {
   // KZ tax flags — drive which taxes get calculated in Финансы → Налоги.
   vatPayer?: boolean;
   entityType?: 'too' | 'ip';
+  taxRegime?: 'simplified' | 'retail' | 'general';
+  taxYear?: number; mrp?: number; mzp?: number;
+  rates?: Record<string, number>;
 }
+
+// Editable rate rows shown in the collapsible "Ставки" block. Keys match
+// the server's DEFAULT_TAX_RATES so they round-trip cleanly.
+const RATE_FIELDS: { key: string; label: string }[] = [
+  { key: 'simplified', label: 'Упрощёнка 910 (% оборота)' },
+  { key: 'retail',     label: 'Розничный 913 (% оборота)' },
+  { key: 'opv',        label: 'ОПВ (удерж.)' },
+  { key: 'ipn',        label: 'ИПН (удерж.)' },
+  { key: 'vosms',      label: 'ВОСМС (удерж.)' },
+  { key: 'oosms',      label: 'ООСМС (раб-ль)' },
+  { key: 'so',         label: 'СО (раб-ль)' },
+  { key: 'sn',         label: 'СН (ОУР)' },
+  { key: 'opvr',       label: 'ОПВР (раб-ль)' },
+  { key: 'vat',        label: 'НДС' },
+  { key: 'kpn',        label: 'КПН (ТОО)' },
+  { key: 'property',   label: 'Налог на имущество' },
+];
+const RATE_DEFAULTS: Record<string, number> = {
+  simplified: 0.03, retail: 0.04, opv: 0.10, ipn: 0.10, vosms: 0.02, oosms: 0.03,
+  so: 0.035, sn: 0.095, opvr: 0.025, vat: 0.12, kpn: 0.20, property: 0.015,
+};
 
 function RequisitesCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
@@ -2385,6 +2409,75 @@ function RequisitesCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
             </div>
           </div>
         </div>
+
+        {/* Tax regime — the single most important setting: drives WHICH
+            taxes apply. Most small shops are on the simplified 910. */}
+        <div className="mt-3">
+          <div className="text-[10px] text-gray-400 mb-1.5">{l('Налоговый режим', 'Салық режимі', 'Tax regime')}</div>
+          <div className="grid grid-cols-3 gap-1 bg-gray-50 rounded-xl p-1">
+            {([
+              ['simplified', l('Упрощёнка 910', 'Оңайл. 910', 'Simplified 910')],
+              ['retail',     l('Розничный 913', 'Бөлшек 913', 'Retail 913')],
+              ['general',    l('ОУР', 'Жалпы', 'General')],
+            ] as const).map(([id, lbl]) => (
+              <button
+                key={id}
+                onClick={() => setR(prev => ({ ...prev, taxRegime: id }))}
+                className={`px-2 py-1.5 rounded-lg text-[11px] transition ${(r.taxRegime || 'simplified') === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              >{lbl}</button>
+            ))}
+          </div>
+          <div className="text-[10px] text-gray-400 mt-1.5">
+            {l('Большинство мебельщиков/окнщиков — на упрощёнке (3% от оборота, форма 910.00).',
+               'Көбі оңайлатылған режимде (айналымнан 3%).',
+               'Most small shops are on the simplified declaration (3% of turnover).')}
+          </div>
+        </div>
+
+        {/* Year constants + editable rates (collapsible) */}
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <div>
+            <div className="text-[10px] text-gray-400 mb-1">{l('Год', 'Жыл', 'Year')}</div>
+            <input type="number" value={r.taxYear ?? 2026} onChange={e => setR(prev => ({ ...prev, taxYear: Number(e.target.value) }))} className="w-full px-2 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+          </div>
+          <div>
+            <div className="text-[10px] text-gray-400 mb-1">МРП ₸</div>
+            <input type="number" value={r.mrp ?? 3932} onChange={e => setR(prev => ({ ...prev, mrp: Number(e.target.value) }))} className="w-full px-2 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+          </div>
+          <div>
+            <div className="text-[10px] text-gray-400 mb-1">МЗП ₸</div>
+            <input type="number" value={r.mzp ?? 85000} onChange={e => setR(prev => ({ ...prev, mzp: Number(e.target.value) }))} className="w-full px-2 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+          </div>
+        </div>
+
+        <details className="mt-3">
+          <summary className="text-[11px] text-gray-600 cursor-pointer hover:text-gray-900">
+            {l('Ставки налогов (можно подправить под НК РК 2026)', 'Салық мөлшерлемелері', 'Tax rates (tune to the 2026 Tax Code)')}
+          </summary>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+            {RATE_FIELDS.map(f => {
+              const val = (r.rates?.[f.key] ?? RATE_DEFAULTS[f.key]) * 100;
+              return (
+                <div key={f.key}>
+                  <div className="text-[10px] text-gray-400 mb-1">{f.label}</div>
+                  <div className="relative">
+                    <input
+                      type="number" step="0.1" value={Number(val.toFixed(2))}
+                      onChange={e => setR(prev => ({ ...prev, rates: { ...RATE_DEFAULTS, ...(prev.rates || {}), [f.key]: Math.max(0, Number(e.target.value)) / 100 } }))}
+                      className="w-full px-2 py-1.5 pr-5 bg-gray-50 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-gray-200"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-300">%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="text-[10px] text-amber-600 mt-2">
+            {l('⚠️ С 2026 действует новый Налоговый кодекс РК — сверьте ставки и пороги.',
+               '⚠️ 2026 жылдан жаңа Салық кодексі — мөлшерлемелерді тексеріңіз.',
+               '⚠️ A new KZ Tax Code applies from 2026 — verify rates.')}
+          </div>
+        </details>
       </div>
 
       <div className="flex items-center justify-between mt-4">
