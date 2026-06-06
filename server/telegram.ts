@@ -99,7 +99,8 @@ export async function registerBotCommands(): Promise<void> {
     await tg('setMyCommands', {
       commands: [
         { command: 'start',   description: '🚀 Начать / приветствие' },
-        { command: 'measures',description: '📐 Мои замеры / заказы' },
+        { command: 'measures',description: '📐 Мои замеры' },
+        { command: 'orders',  description: '🪚 Мои заказы (этапы цеха)' },
         { command: 'design',  description: '🎨 AI Дизайн интерьера (мастер)' },
         { command: 'today',   description: '📊 Что было сегодня' },
         { command: 'tasks',   description: '✅ Мои задачи' },
@@ -375,6 +376,11 @@ async function editReplyMarkupClear(chatId: number, messageId: number) {
   try { await tg('editMessageReplyMarkup', { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } }); }
   catch { /* ignore — message may be too old to edit */ }
 }
+// Re-render a card in place after a stage tap (text + keyboard).
+async function editMessageCard(chatId: number, messageId: number, text: string, inline_keyboard: any[]) {
+  try { await tg('editMessageText', { chat_id: chatId, message_id: messageId, parse_mode: 'HTML', text, reply_markup: { inline_keyboard } }); }
+  catch { /* ignore — message unchanged or too old */ }
+}
 
 // 2GIS is the default map app in KZ — build a search link by address.
 function routeUrl(address: string): string {
@@ -409,6 +415,65 @@ function findDeal(db: Database.Database, teamId: string, dealId: string): DealRo
 function saveDeal(db: Database.Database, dealId: string, data: any) {
   db.prepare('UPDATE deals SET data = ? WHERE id = ?').run(JSON.stringify(data), dealId);
 }
+// ─── Production stages per niche (Этап 3) ──────────────────────────
+// Mirror of src/app/utils/niches.ts productionStages (RU labels + ids).
+// The bot must write the SAME stage ids the web expects so the Склад →
+// Производство board renders the chain the master is ticking off.
+const NICHE_STAGES: Record<string, Array<{ id: string; ru: string }>> = {
+  furniture: [
+    { id: 'cutting', ru: 'Распил' }, { id: 'edging', ru: 'Кромка' }, { id: 'assembly', ru: 'Сборка' },
+    { id: 'packaging', ru: 'Упаковка' }, { id: 'delivery', ru: 'Доставка' },
+  ],
+  windows: [
+    { id: 'cutting', ru: 'Резка профиля' }, { id: 'welding', ru: 'Сварка' }, { id: 'glazing', ru: 'Остекление' },
+    { id: 'delivery', ru: 'Доставка' }, { id: 'installation', ru: 'Монтаж' },
+  ],
+  ceilings: [
+    { id: 'cutting', ru: 'Раскрой полотна' }, { id: 'preparation', ru: 'Подготовка' }, { id: 'installation', ru: 'Монтаж' },
+    { id: 'finishing', ru: 'Установка светильников' }, { id: 'handover', ru: 'Сдача объекта' },
+  ],
+  blinds: [
+    { id: 'cutting', ru: 'Раскрой' }, { id: 'sewing', ru: 'Пошив' }, { id: 'assembly', ru: 'Сборка' },
+    { id: 'delivery', ru: 'Доставка' }, { id: 'installation', ru: 'Монтаж' },
+  ],
+  doors: [
+    { id: 'order', ru: 'Заказ у поставщика' }, { id: 'delivery', ru: 'Доставка' }, { id: 'preparation', ru: 'Подготовка проёма' },
+    { id: 'installation', ru: 'Монтаж' }, { id: 'finishing', ru: 'Установка фурнитуры' },
+  ],
+  stairs: [
+    { id: 'design', ru: 'Проектирование' }, { id: 'cutting', ru: 'Заготовка' }, { id: 'production', ru: 'Производство' },
+    { id: 'delivery', ru: 'Доставка' }, { id: 'installation', ru: 'Монтаж' },
+  ],
+  flooring: [
+    { id: 'order', ru: 'Заказ материалов' }, { id: 'delivery', ru: 'Доставка' }, { id: 'preparation', ru: 'Подготовка основания' },
+    { id: 'installation', ru: 'Укладка' }, { id: 'finishing', ru: 'Финишная обработка' },
+  ],
+  construction: [
+    { id: 'design', ru: 'Проект' }, { id: 'demolition', ru: 'Демонтаж' }, { id: 'rough', ru: 'Черновые работы' },
+    { id: 'finishing', ru: 'Чистовая отделка' }, { id: 'handover', ru: 'Сдача объекта' },
+  ],
+  custom: [
+    { id: 'stage1', ru: 'Этап 1' }, { id: 'stage2', ru: 'Этап 2' }, { id: 'stage3', ru: 'Этап 3' },
+  ],
+};
+function stagesForNiche(nicheId: string) { return NICHE_STAGES[nicheId] || NICHE_STAGES.custom; }
+
+function getTeamNiche(db: Database.Database, teamId: string): string {
+  const row = db.prepare('SELECT niche FROM team_settings WHERE team_id = ?').get(teamId) as any;
+  return (row?.niche as string) || 'furniture';
+}
+
+type StageStatus = 'pending' | 'in-progress' | 'done';
+interface DealStage { id: string; status: StageStatus; startedAt?: string; completedAt?: string }
+
+// Ensure deal.stages exists and covers the template (adds any missing
+// stages as pending). Returns the normalised array.
+function ensureStages(deal: any, template: Array<{ id: string; ru: string }>): DealStage[] {
+  const existing: DealStage[] = Array.isArray(deal.stages) ? deal.stages : [];
+  const byId = new Map(existing.map(s => [s.id, s]));
+  return template.map(t => byId.get(t.id) || { id: t.id, status: 'pending' as StageStatus });
+}
+
 // True when this employee is the measurer/owner on the deal.
 function isAssignedTo(deal: any, emp: { id: string; name: string }): boolean {
   if (deal.ownerId && deal.ownerId === emp.id) return true;
@@ -789,6 +854,80 @@ async function sendMeasurements(db: Database.Database, chatId: number, teamId: s
   }
 }
 
+// ─── «Мои заказы» — production cards with tappable stage chain (Этап 3) ──
+// Statuses that count as "on the shop floor" — mirrors the web's
+// Warehouse → Производство filter.
+const PROD_STATUSES = ['project-agreed', 'contract', 'production', 'assembly', 'manufacturing', 'measured'];
+
+const STAGE_ICON: Record<StageStatus, string> = { done: '✅', 'in-progress': '🔄', pending: '⚪' };
+
+// Build the message body + inline keyboard for one production order.
+// Each stage is its own button: tap cycles pending → in-progress → done.
+function renderOrderCard(deal: any, template: Array<{ id: string; ru: string }>): { text: string; inline_keyboard: any[] } {
+  const stages = ensureStages(deal, template);
+  const done = stages.filter(s => s.status === 'done').length;
+  const head = [
+    `<b>${deal.product || deal.furnitureType || 'Заказ'}</b> · ${deal.customerName || ''}`.trim(),
+    `Готово этапов: <b>${done}/${stages.length}</b>`,
+  ].join('\n');
+  // One button per stage, two per row to keep the card compact.
+  const rows: any[] = [];
+  for (let i = 0; i < template.length; i += 2) {
+    const row = template.slice(i, i + 2).map(t => {
+      const st = stages.find(s => s.id === t.id)?.status || 'pending';
+      return { text: `${STAGE_ICON[st]} ${t.ru}`, callback_data: `stg|${deal.id}|${t.id}` };
+    });
+    rows.push(row);
+  }
+  return { text: head, inline_keyboard: rows };
+}
+
+// Cycle one stage and recompute progress/status. Mutates `deal`.
+function cycleDealStage(deal: any, stageId: string, template: Array<{ id: string; ru: string }>): { label: string; status: StageStatus } {
+  const stages = ensureStages(deal, template);
+  const now = new Date().toISOString();
+  const next = (s: StageStatus): StageStatus => s === 'pending' ? 'in-progress' : s === 'in-progress' ? 'done' : 'pending';
+  let changed: { label: string; status: StageStatus } = { label: stageId, status: 'pending' };
+  const updated = stages.map(s => {
+    if (s.id !== stageId) return s;
+    const ns = next(s.status);
+    changed = { label: template.find(t => t.id === stageId)?.ru || stageId, status: ns };
+    return {
+      ...s, status: ns,
+      startedAt: ns === 'in-progress' ? now : (ns === 'pending' ? undefined : s.startedAt),
+      completedAt: ns === 'done' ? now : (ns === 'pending' ? undefined : s.completedAt),
+    };
+  });
+  const total = template.length || 1;
+  const doneCount = updated.filter(s => s.status === 'done').length;
+  const inProg = updated.filter(s => s.status === 'in-progress').length;
+  const perStage = 100 / total;
+  deal.stages = updated;
+  deal.progress = Math.min(100, Math.round(doneCount * perStage + (inProg > 0 ? Math.min(perStage / 4, 5) : 0)));
+  if (doneCount === total) deal.status = 'completed';
+  else if (deal.status === 'measured' || deal.status === 'project-agreed' || deal.status === 'contract') deal.status = 'production';
+  return changed;
+}
+
+async function sendOrders(db: Database.Database, chatId: number, teamId: string, emp: { id: string; name: string }) {
+  const teamNiche = getTeamNiche(db, teamId);
+  const orders = loadDeals(db, teamId)
+    .filter(d => PROD_STATUSES.includes(d.data.status))
+    .slice(0, 8);
+  if (orders.length === 0) {
+    await sendMessage(chatId,
+      `🪚 <b>${emp.name}</b>, сейчас нет заказов в производстве.\n\n` +
+      `Когда менеджер переведёт сделку в работу — она появится здесь, и вы будете отмечать этапы кнопками.`);
+    return;
+  }
+  await sendMessage(chatId, `🪚 <b>Заказы в производстве (${orders.length}):</b>\nТапайте этап: ⚪ не начат → 🔄 в работе → ✅ готово.`);
+  for (const d of orders) {
+    const tpl = stagesForNiche(d.data.niche || teamNiche);
+    const card = renderOrderCard(d.data, tpl);
+    await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML', text: card.text, reply_markup: { inline_keyboard: card.inline_keyboard } });
+  }
+}
+
 // ─── Inline-button tap handler (Этап 2) ────────────────────────────
 async function handleCallback(
   db: Database.Database,
@@ -881,6 +1020,32 @@ async function handleCallback(
     clearPendingPhoto(db, chatId);
     await answerCallback(cq.id, 'Отменено');
     if (messageId) await editReplyMarkupClear(chatId, messageId);
+    return;
+  }
+
+  // Cycle a production stage: stg|dealId|stageId (Этап 3).
+  if (action === 'stg' && dealId) {
+    const stageId = data.split('|')[2];
+    const d = findDeal(db, user.teamId, dealId);
+    if (!d || !stageId) { await answerCallback(cq.id, 'Заказ не найден'); return; }
+    const tpl = stagesForNiche(d.data.niche || getTeamNiche(db, user.teamId));
+    const changed = cycleDealStage(d.data, stageId, tpl);
+    d.data.notes = appendNote(d.data.notes, `🪚 ${nowHM()} — ${changed.label}: ${changed.status === 'done' ? 'готово' : changed.status === 'in-progress' ? 'в работе' : 'сброшен'} (${emp?.name || 'мастер'})`);
+    saveDeal(db, dealId, d.data);
+    await answerCallback(cq.id, `${changed.label}: ${changed.status === 'done' ? 'готово ✅' : changed.status === 'in-progress' ? 'в работе 🔄' : 'сброшен ⚪'}`);
+    // Re-render the card in place so the chain reflects the new state.
+    const card = renderOrderCard(d.data, tpl);
+    if (messageId) await editMessageCard(chatId, messageId, card.text, card.inline_keyboard);
+    // When everything's done, congratulate + nudge for a finished-work photo.
+    if (d.data.status === 'completed') {
+      await sendMessage(chatId, `🎉 Заказ <b>${d.data.customerName || ''}</b> готов! Пришлите 📷 фото готовой работы — прикреплю к заказу.`);
+    }
+    logActivity(user.id, {
+      user: emp?.name || user.name, actor: 'human',
+      action: `Этап «${changed.label}» — ${changed.status === 'done' ? 'готово' : changed.status === 'in-progress' ? 'в работе' : 'сброшен'}`,
+      target: d.data.customerName || dealId,
+      type: 'update', page: 'warehouse',
+    });
     return;
   }
 
@@ -1076,10 +1241,11 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
       '💰 зарплата': '/revenue',
       '💰 моя выручка': '/revenue',
       '🎨 ai дизайн': '/design',
-      // Этап 2 — measurer / installer order lists route to /замеры.
+      // Этап 2 — measurer/installer measurement list.
       '📋 мои замеры': '/замеры',
       '📋 мои монтажи': '/замеры',
-      '📋 мои заказы': '/замеры',
+      // Этап 3 — production master's order list with stage chain.
+      '📋 мои заказы': '/заказы',
     };
     const soon: Record<string, string> = {
       // Photo buttons just guide the worker to send a photo — the attach
@@ -1258,12 +1424,23 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
 
     // /замеры — measurer/installer's assigned active deals with inline
     // [Маршрут][Выехал][Замер готов] buttons. The field worker's home screen.
-    if (cmd === '/замеры' || cmd === '/measures' || cmd === '/мои_замеры' || cmd === '/заказы' || cmd === '/монтажи') {
+    if (cmd === '/замеры' || cmd === '/measures' || cmd === '/мои_замеры' || cmd === '/монтажи') {
       const user = findUserByChat(db, chatId);
       if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт по ссылке-приглашению от руководителя.'); return; }
       const emp = findEmployeeForUser(db, user.id, user.teamId);
       if (!emp) { await sendMessage(chatId, 'Ваш профиль не привязан к карточке сотрудника. Попросите админа.'); return; }
       await sendMeasurements(db, chatId, user.teamId, emp);
+      return;
+    }
+
+    // /заказы — production master's orders with a tappable stage chain
+    // (Распил → Кромка → Сборка → …). The shop-floor home screen (Этап 3).
+    if (cmd === '/заказы' || cmd === '/orders') {
+      const user = findUserByChat(db, chatId);
+      if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт по ссылке-приглашению от руководителя.'); return; }
+      const emp = findEmployeeForUser(db, user.id, user.teamId);
+      if (!emp) { await sendMessage(chatId, 'Ваш профиль не привязан к карточке сотрудника. Попросите админа.'); return; }
+      await sendOrders(db, chatId, user.teamId, emp);
       return;
     }
 
