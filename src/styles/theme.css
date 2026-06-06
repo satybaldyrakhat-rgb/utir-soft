@@ -307,3 +307,123 @@
     linear-gradient(180deg, var(--orb-base-from) 0%, var(--orb-base-to) 100%);
   transition: background 0.4s ease;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DARK MODE (Д4)
+   ───────────────────────────────────────────────────────────────────
+   The app is authored in light-mode Tailwind utilities. Rather than add
+   `dark:` variants to thousands of class lists, we retint the handful of
+   NEUTRAL utilities (white / gray / slate surfaces, text, borders, rings)
+   when <html> carries the `.dark` class. Accent (emerald-*) utilities are
+   left to the accent-theme layer above — they read fine on dark — except
+   the near-black BLACK/SLATE accents, which we lift so primary buttons
+   stay visible against a dark backdrop.
+
+   Toggled by applyMode() in theme.ts (light / dark / system).
+   ═══════════════════════════════════════════════════════════════════ */
+
+.dark {
+  color-scheme: dark;            /* native date-pickers, scrollbars, etc. */
+}
+.dark body { background-color: #0b1120; color: #e2e8f0; }
+
+/* Solid surfaces (cards, modals, inputs use bg-white) */
+.dark .bg-white { background-color: #1e293b !important; }
+
+/* Liquid-glass surfaces — bg-white/NN → translucent slate-800 */
+.dark .bg-white\/10 { background-color: rgba(30,41,59,0.30) !important; }
+.dark .bg-white\/20 { background-color: rgba(30,41,59,0.35) !important; }
+.dark .bg-white\/30 { background-color: rgba(30,41,59,0.42) !important; }
+.dark .bg-white\/40 { background-color: rgba(30,41,59,0.48) !important; }
+.dark .bg-white\/50 { background-color: rgba(30,41,59,0.52) !important; }
+.dark .bg-white\/55 { background-color: rgba(30,41,59,0.55) !important; }
+.dark .bg-white\/60 { background-color: rgba(30,41,59,0.58) !important; }
+.dark .bg-white\/70 { background-color: rgba(30,41,59,0.64) !important; }
+.dark .bg-white\/80 { background-color: rgba(30,41,59,0.72) !important; }
+.dark .bg-white\/85 { background-color: rgba(30,41,59,0.80) !important; }
+.dark .bg-white\/90 { background-color: rgba(30,41,59,0.86) !important; }
+.dark .bg-white\/95 { background-color: rgba(30,41,59,0.92) !important; }
+
+/* Gray surfaces */
+.dark .bg-gray-50      { background-color: rgba(30,41,59,0.50) !important; }
+.dark .bg-gray-50\/50  { background-color: rgba(30,41,59,0.35) !important; }
+.dark .bg-gray-100     { background-color: rgba(51,65,85,0.55) !important; }
+.dark .bg-gray-200     { background-color: rgba(71,85,105,0.65) !important; }
+.dark .bg-gray-300     { background-color: #475569 !important; }
+.dark .bg-gray-400     { background-color: #64748b !important; }
+.dark .bg-gray-800     { background-color: #1e293b !important; }
+.dark .bg-gray-900     { background-color: #334155 !important; }
+.dark .bg-slate-50     { background-color: rgba(30,41,59,0.50) !important; }
+.dark .bg-slate-100    { background-color: rgba(51,65,85,0.55) !important; }
+.dark .bg-slate-300    { background-color: #475569 !important; }
+
+/* Hover surfaces */
+.dark .hover\:bg-gray-50:hover  { background-color: rgba(51,65,85,0.45) !important; }
+.dark .hover\:bg-gray-100:hover { background-color: rgba(51,65,85,0.70) !important; }
+.dark .hover\:bg-white:hover    { background-color: #1e293b !important; }
+.dark .hover\:bg-white\/70:hover { background-color: rgba(30,41,59,0.62) !important; }
+.dark .hover\:bg-white\/80:hover { background-color: rgba(30,41,59,0.72) !important; }
+
+/* Text — only the DARK neutrals need lifting; light greys (300/400)
+   already read fine on a dark surface, so we leave them. */
+.dark .text-gray-900, .dark .text-slate-900 { color: #f1f5f9 !important; }
+.dark .text-gray-800, .dark .text-slate-800 { color: #e2e8f0 !important; }
+.dark .text-gray-700, .dark .text-slate-700 { color: #cbd5e1 !important; }
+.dark .text-gray-600, .dark .text-slate-600 { color: #aab6c8 !important; }
+.dark .text-gray-500, .dark .text-slate-500 { color: #94a3b8 !important; }
+
+/* Borders */
+.dark .border-gray-50   { border-color: rgba(51,65,85,0.40) !important; }
+.dark .border-gray-100  { border-color: rgba(51,65,85,0.55) !important; }
+.dark .border-gray-200  { border-color: rgba(71,85,105,0.65) !important; }
+.dark .border-gray-300  { border-color: #475569 !important; }
+.dark .border-gray-900  { border-color: #334155 !important; }
+.dark .border-white\/60,
+.dark .border-white\/70 { border-color: rgba(148,163,184,0.16) !important; }
+
+/* Rings — glass top-edge highlight becomes a faint light edge */
+.dark .ring-white\/10 { --tw-ring-color: rgba(148,163,184,0.10) !important; }
+.dark .ring-white\/20 { --tw-ring-color: rgba(148,163,184,0.12) !important; }
+.dark .ring-white\/40 { --tw-ring-color: rgba(148,163,184,0.14) !important; }
+.dark .ring-white\/50 { --tw-ring-color: rgba(148,163,184,0.16) !important; }
+.dark .ring-white\/60 { --tw-ring-color: rgba(148,163,184,0.16) !important; }
+.dark .ring-white\/80 { --tw-ring-color: rgba(148,163,184,0.20) !important; }
+.dark .ring-gray-200  { --tw-ring-color: rgba(71,85,105,0.60) !important; }
+.dark .ring-slate-100 { --tw-ring-color: rgba(51,65,85,0.50) !important; }
+.dark .ring-slate-300 { --tw-ring-color: rgba(71,85,105,0.60) !important; }
+
+/* Dividers */
+.dark .divide-gray-50  > :not([hidden]) ~ :not([hidden]) { border-color: rgba(51,65,85,0.40) !important; }
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(51,65,85,0.50) !important; }
+
+/* Form fields — placeholder + value colour on the now-dark inputs */
+.dark input::placeholder,
+.dark textarea::placeholder { color: #64748b !important; }
+
+/* BLACK / SLATE accent in dark mode — the near-black accent-600 would be
+   invisible on a dark backdrop, so lift it to a readable mid-slate and
+   darken the chip tints (accent-50/100) so badges blend instead of glow. */
+.dark[data-theme="black"],
+.dark[data-theme="slate"] {
+  --accent-50:  rgba(51,65,85,0.45);
+  --accent-100: rgba(51,65,85,0.65);
+  --accent-200: #475569;
+  --accent-500: #64748b;
+  --accent-600: #475569;
+  --accent-700: #64748b;
+  --accent-shadow:    rgba(0,0,0,0.5);
+  --accent-shadow-sm: rgba(0,0,0,0.4);
+  --accent-100-60: rgba(51,65,85,0.5);
+  --accent-100-70: rgba(51,65,85,0.6);
+  --accent-100-80: rgba(51,65,85,0.7);
+}
+
+/* Dark app backdrop — subtle slate orbs over near-black */
+.dark .app-backdrop {
+  background:
+    radial-gradient(900px circle at 0% 0%,    rgba(51,65,85,0.55), transparent 45%),
+    radial-gradient(800px circle at 100% 0%,  rgba(30,41,59,0.55), transparent 45%),
+    radial-gradient(900px circle at 100% 80%, rgba(51,65,85,0.45), transparent 50%),
+    radial-gradient(900px circle at 0% 100%,  rgba(15,23,42,0.60), transparent 50%),
+    linear-gradient(180deg, #0b1120 0%, #060912 100%);
+}

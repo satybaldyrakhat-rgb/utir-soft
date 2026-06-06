@@ -66,3 +66,54 @@ export function applyTheme(id: ThemeId) {
   if (typeof document === 'undefined') return;
   document.documentElement.setAttribute('data-theme', id);
 }
+
+// ─── Light / Dark mode (orthogonal to the accent colour) ──────────
+// `accent` (above) tints buttons & badges; `mode` flips the whole
+// surface palette between light and dark. They're independent — any
+// accent works in either mode. Dark overrides live in theme.css under
+// the `.dark` class on <html>. 'system' follows the OS preference and
+// keeps tracking it live via matchMedia.
+
+export type ColorMode = 'light' | 'dark' | 'system';
+
+const MODE_KEY = 'utir_user_mode';
+
+export function loadMode(): ColorMode {
+  try {
+    const saved = localStorage.getItem(MODE_KEY);
+    if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
+  } catch { /* localStorage blocked */ }
+  return 'light';
+}
+
+export function saveMode(mode: ColorMode) {
+  try { localStorage.setItem(MODE_KEY, mode); } catch { /* ignore */ }
+  applyMode(mode);
+}
+
+// True when the OS currently asks for a dark UI.
+function systemPrefersDark(): boolean {
+  return typeof window !== 'undefined'
+    && !!window.matchMedia
+    && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+// Toggles the `.dark` class on <html>. For 'system' we resolve to the
+// OS value now and (re)attach a live listener so the app re-themes if
+// the user flips their OS appearance while the tab is open.
+let mqlListenerAttached = false;
+export function applyMode(mode: ColorMode) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  const isDark = mode === 'dark' || (mode === 'system' && systemPrefersDark());
+  root.classList.toggle('dark', isDark);
+
+  if (mode === 'system' && typeof window !== 'undefined' && window.matchMedia && !mqlListenerAttached) {
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => { if (loadMode() === 'system') root.classList.toggle('dark', mql.matches); };
+    // addEventListener is the modern API; older Safari needs addListener.
+    if (mql.addEventListener) mql.addEventListener('change', onChange);
+    else if ((mql as any).addListener) (mql as any).addListener(onChange);
+    mqlListenerAttached = true;
+  }
+}

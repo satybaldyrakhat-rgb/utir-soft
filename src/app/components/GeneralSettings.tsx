@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   User, Building2, Globe, Camera, Check, X, Mail, Phone, Briefcase, MapPin, Hash,
   LogOut, Download, Lock, AlertCircle, Image as ImageIcon, ShieldCheck, Loader2,
-  Palette, Factory, AlertTriangle,
+  Palette, Factory, AlertTriangle, Sun, Moon, Monitor,
 } from 'lucide-react';
 import { useDataStore, type UserProfile } from '../utils/dataStore';
 import { NICHES, type NicheId, getNiche } from '../utils/niches';
-import { THEMES, type ThemeId, loadTheme, saveTheme } from '../utils/theme';
+import { THEMES, type ThemeId, loadTheme, saveTheme, type ColorMode, loadMode, saveMode } from '../utils/theme';
 import { toast } from '../utils/toast';
 
 interface Props {
@@ -83,6 +83,13 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
   const pickTheme = (id: ThemeId) => {
     setThemeState(id);
     saveTheme(id);
+    setSavedFlash(true);
+  };
+  // Light / Dark / System — independent of the accent colour above.
+  const [mode, setModeState] = useState<ColorMode>(loadMode());
+  const pickMode = (m: ColorMode) => {
+    setModeState(m);
+    saveMode(m);
     setSavedFlash(true);
   };
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -394,6 +401,32 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
           'Each teammate picks their own accent — applied only for you',
         )}
       >
+        {/* Light / Dark / System segmented control */}
+        <div className="mb-4">
+          <div className="text-[11px] text-slate-500 mb-1.5">{l('Режим', 'Режим', 'Appearance')}</div>
+          <div className="inline-flex p-0.5 bg-gray-100 rounded-xl">
+            {([
+              { id: 'light',  icon: Sun,     label: l('Светлая', 'Жарық', 'Light') },
+              { id: 'dark',   icon: Moon,    label: l('Тёмная', 'Қараңғы', 'Dark') },
+              { id: 'system', icon: Monitor, label: l('Система', 'Жүйе', 'System') },
+            ] as { id: ColorMode; icon: any; label: string }[]).map(m => {
+              const MIcon = m.icon;
+              const active = mode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => pickMode(m.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
+                    active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <MIcon className="w-3.5 h-3.5" strokeWidth={1.5} /> {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="grid grid-cols-5 sm:grid-cols-10 gap-2.5">
           {THEMES.map(t => {
             const active = theme === t.id;
