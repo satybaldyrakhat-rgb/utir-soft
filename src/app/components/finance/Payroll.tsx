@@ -50,15 +50,33 @@ export function Payroll({ language }: Props) {
   const canWrite = store.canWriteModule('finance');
 
   const [cfg, setCfg] = useState<TaxCfg>({ rates: RATE_FALLBACK, mrp: 3932, regime: 'simplified' });
+  const [reqName, setReqName] = useState('');
   useEffect(() => {
     api.get<any>('/api/team/requisites')
-      .then(d => setCfg({
-        rates: { ...RATE_FALLBACK, ...(d?.rates || {}) },
-        mrp: Number(d?.mrp) || 3932,
-        regime: d?.taxRegime || 'simplified',
-      }))
+      .then(d => {
+        setCfg({
+          rates: { ...RATE_FALLBACK, ...(d?.rates || {}) },
+          mrp: Number(d?.mrp) || 3932,
+          regime: d?.taxRegime || 'simplified',
+        });
+        setReqName(d?.legalName || '');
+      })
       .catch(() => { /* keep fallback */ });
   }, []);
+
+  // Download a payslip (расчётный листок) PDF for one employee/month.
+  const downloadPayslip = async (r: typeof rows[number]) => {
+    try {
+      const pdf = await import('../../utils/pdfReports');
+      await pdf.generatePayslipPDF({
+        employeeName: r.emp.name, periodLabel: monthLabel,
+        base: r.base, commission: r.commission, gross: r.gross,
+        opv: r.opv, vosms: r.vosms, ipn: r.ipn, net: r.net,
+        oosms: r.oosms, so: r.so, opvr: r.opvr, sn: r.sn,
+        employerCost: r.employerCost,
+      }, { legalName: reqName });
+    } catch (e: any) { alert(String(e?.message || e)); }
+  };
 
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -255,7 +273,12 @@ export function Payroll({ language }: Props) {
                     {open && (
                       <tr className="bg-slate-50/60">
                         <td colSpan={8} className="px-6 py-3">
-                          <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-2">{l('Расчётный листок', 'Есеп парағы', 'Payslip')} · {monthLabel}</div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="text-[10px] text-slate-500 uppercase tracking-wide">{l('Расчётный листок', 'Есеп парағы', 'Payslip')} · {monthLabel}</div>
+                            <button onClick={() => downloadPayslip(r)} className="flex items-center gap-1 px-2 py-1 bg-white/70 ring-1 ring-white/60 rounded-lg text-[10px] text-slate-600 hover:bg-white">
+                              <Download className="w-3 h-3" /> {l('Скачать PDF', 'PDF жүктеу', 'Download PDF')}
+                            </button>
+                          </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-[11px]">
                             <Line label={l('Оклад', 'Айлық', 'Base')} v={fmt(r.base)} />
                             <Line label={l('Премия', 'Сыйақы', 'Commission')} v={fmt(r.commission)} />

@@ -173,6 +173,34 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   const [dirty, setDirty] = useState(false);
   // Client tracking link — minted on demand, copied to share with the
   // customer so they follow the order without a login.
+  // Акт сверки взаиморасчётов — across ALL deals of this customer.
+  const [sverkaBusy, setSverkaBusy] = useState(false);
+  const downloadSverka = async () => {
+    setSverkaBusy(true);
+    try {
+      const pdf = await import('../utils/pdfReports');
+      let req: any = {};
+      try { req = await api.get('/api/team/requisites'); } catch { /* best-effort */ }
+      // All non-rejected deals of the same customer → debit (начислено) /
+      // credit (оплачено) lines, oldest first.
+      const custLow = (deal.customerName || '').toLowerCase().trim();
+      const lines = store.deals
+        .filter(d => d.status !== 'rejected' && (d.customerName || '').toLowerCase().trim() === custLow)
+        .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+        .map(d => ({
+          date: (d.createdAt || '').slice(0, 10),
+          doc: `Заказ #${(d.id || '').slice(-6)} · ${d.product || ''}`.trim(),
+          debit: d.amount || 0,
+          credit: d.paidAmount || 0,
+        }));
+      await pdf.generateReconciliationPDF(
+        { counterpartyName: deal.customerName || '—', counterpartyBIN: deal.customerBIN, lines },
+        req || {},
+      );
+    } catch (e: any) { alert(String(e?.message || e)); }
+    finally { setSverkaBusy(false); }
+  };
+
   const [trackCopied, setTrackCopied] = useState(false);
   const copyTrackLink = async () => {
     try {
@@ -548,6 +576,16 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
             <div className="text-[11px] text-slate-500 mt-0.5 truncate">{deal.product} · <span className="tabular-nums">{(deal.amount || 0).toLocaleString('ru-RU')} ₸</span></div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Акт сверки взаиморасчётов по этому клиенту */}
+            <button
+              onClick={downloadSverka}
+              disabled={sverkaBusy}
+              title={l('Акт сверки взаиморасчётов', 'Есеп айырысу актісі', 'Reconciliation act')}
+              className="flex items-center gap-1.5 px-3 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl text-[11px] text-slate-600 transition-colors disabled:opacity-50"
+            >
+              {sverkaBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{l('Акт сверки', 'Сверка', 'Reconciliation')}</span>
+            </button>
             {/* Client tracking link — share so the customer follows the
                 order at utir.kz/#/track/<code> with no login. */}
             <button

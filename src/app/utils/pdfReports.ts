@@ -1298,3 +1298,129 @@ export async function generateVATReportPDF(opts: {
   drawFooter(doc);
   doc.save(`nds-esf-${todayStamp()}.pdf`);
 }
+
+// ─── Акт сверки взаиморасчётов ─────────────────────────────────────
+// KZ-standard reconciliation act between the company (Исполнитель) and a
+// client. Lists every charge (sale) and payment for the period, then the
+// closing balance ("задолженность в пользу ..."). Two signature lines.
+export interface ReconciliationLine { date: string; doc: string; debit: number; credit: number }
+export interface ReconciliationInput {
+  counterpartyName: string;
+  counterpartyBIN?: string;
+  lines: ReconciliationLine[];   // debit = начислено клиенту, credit = оплачено клиентом
+  openingBalance?: number;       // сальдо на начало (в пользу исполнителя +)
+  periodLabel?: string;
+}
+export async function generateReconciliationPDF(input: ReconciliationInput, requisites: CompanyRequisites = {}, opts?: { number?: string }) {
+  const doc = await newDoc();
+  const pageW = doc.internal.pageSize.getWidth();
+  const num = opts?.number || todayStamp();
+  drawHeader(doc, `Акт сверки № ${num}`, `Взаиморасчёты${input.periodLabel ? ' · ' + input.periodLabel : ''}`, requisites.legalName);
+
+  let y = 38;
+  doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+  doc.text(`Исполнитель: ${requisites.legalName || '—'}${requisites.bin ? `, БИН/ИИН ${requisites.bin}` : ''}`, 14, y); y += 5;
+  doc.text(`Заказчик: ${input.counterpartyName}${input.counterpartyBIN ? `, БИН/ИИН ${input.counterpartyBIN}` : ''}`, 14, y); y += 7;
+
+  const opening = input.openingBalance || 0;
+  let running = opening;
+  const body = input.lines.map(l => {
+    running += (l.debit || 0) - (l.credit || 0);
+    return [l.date || '', l.doc || '', l.debit ? KZT(l.debit) : '', l.credit ? KZT(l.credit) : '', KZT(running)];
+  });
+  const totalDebit = input.lines.reduce((s, l) => s + (l.debit || 0), 0);
+  const totalCredit = input.lines.reduce((s, l) => s + (l.credit || 0), 0);
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Дата', 'Документ', 'Начислено', 'Оплачено', 'Сальдо']],
+    body: opening ? [['', 'Сальдо на начало', '', '', KZT(opening)], ...body] : body,
+    foot: [['', 'Итого', KZT(totalDebit), KZT(totalCredit), KZT(running)]],
+    styles: { font: 'Roboto', fontSize: 8, cellPadding: 2 },
+    headStyles: { font: 'Roboto', fontStyle: 'bold', fillColor: [15, 23, 42], textColor: 255 },
+    footStyles: { font: 'Roboto', fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [15, 23, 42] },
+    columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+    margin: { left: 14, right: 14 },
+  });
+  let yy = (doc as any).lastAutoTable.finalY + 8;
+
+  const inFavor = running > 0 ? 'Исполнителя' : running < 0 ? 'Заказчика' : '—';
+  doc.setFontSize(10); doc.setTextColor(15, 23, 42);
+  doc.text(`Задолженность на конец периода: ${KZT(Math.abs(running))} в пользу ${inFavor}`, 14, yy); yy += 14;
+
+  // Signature lines
+  doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+  doc.text('От Исполнителя: __________________', 14, yy);
+  doc.text('От Заказчика: __________________', pageW / 2 + 6, yy); yy += 6;
+  doc.setFontSize(7); doc.setTextColor(120, 120, 120);
+  doc.text(`М.П.  ${requisites.director || ''}`, 14, yy);
+  doc.text('М.П.', pageW / 2 + 6, yy);
+
+  drawFooter(doc);
+  doc.save(`akt-sverki-${todayStamp()}.pdf`);
+}
+
+// ─── Расчётный листок (payslip) ────────────────────────────────────
+export interface PayslipInput {
+  employeeName: string;
+  periodLabel: string;
+  base: number; commission: number; gross: number;
+  opv: number; vosms: number; ipn: number; net: number;
+  oosms: number; so: number; opvr: number; sn: number;
+  employerCost: number;
+}
+export async function generatePayslipPDF(p: PayslipInput, requisites: CompanyRequisites = {}) {
+  const doc = await newDoc();
+  drawHeader(doc, 'Расчётный листок', `${p.employeeName} · ${p.periodLabel}`, requisites.legalName);
+  let y = 38;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Начисления', 'Сумма']],
+    body: [
+      ['Оклад', KZT(p.base)],
+      ['Премия (сделки)', KZT(p.commission)],
+      ['Начислено (gross)', KZT(p.gross)],
+    ],
+    styles: { font: 'Roboto', fontSize: 9, cellPadding: 2.5 },
+    headStyles: { font: 'Roboto', fontStyle: 'bold', fillColor: [16, 185, 129], textColor: 255 },
+    columnStyles: { 1: { halign: 'right' } },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as any).lastAutoTable.finalY + 4;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Удержания у работника', 'Сумма']],
+    body: [
+      ['ОПВ 10%', KZT(p.opv)],
+      ['ВОСМС 2%', KZT(p.vosms)],
+      ['ИПН 10% (с вычетом 14 МРП)', KZT(p.ipn)],
+      ['К выплате на руки', KZT(p.net)],
+    ],
+    styles: { font: 'Roboto', fontSize: 9, cellPadding: 2.5 },
+    headStyles: { font: 'Roboto', fontStyle: 'bold', fillColor: [225, 29, 72], textColor: 255 },
+    columnStyles: { 1: { halign: 'right' } },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as any).lastAutoTable.finalY + 4;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Взносы работодателя', 'Сумма']],
+    body: [
+      ['ООСМС 3%', KZT(p.oosms)],
+      ['СО 3.5%', KZT(p.so)],
+      ['ОПВР 2.5%', KZT(p.opvr)],
+      ...(p.sn > 0 ? [['СН', KZT(p.sn)]] : []),
+      ['Полная стоимость для бизнеса', KZT(p.employerCost)],
+    ],
+    styles: { font: 'Roboto', fontSize: 9, cellPadding: 2.5 },
+    headStyles: { font: 'Roboto', fontStyle: 'bold', fillColor: [15, 23, 42], textColor: 255 },
+    columnStyles: { 1: { halign: 'right' } },
+    margin: { left: 14, right: 14 },
+  });
+
+  drawFooter(doc);
+  doc.save(`payslip-${p.employeeName}-${todayStamp()}.pdf`);
+}
