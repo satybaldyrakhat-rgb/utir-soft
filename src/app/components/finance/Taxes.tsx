@@ -124,6 +124,12 @@ export function Taxes() {
   const expenseBase = store.transactions
     .filter(t => t.type === 'expense' && t.status === 'completed' && inWindow(t.date))
     .reduce((s, t) => s + t.amount, 0);
+  // VAT-bearing expenses for input-VAT credit (zachёt): purchases of
+  // goods/materials/services. Salaries and taxes carry no VAT.
+  const NON_VAT_CATS = new Set(['Зарплата', 'Налоги', 'Дивиденды', 'Штрафы']);
+  const vatableExpenseBase = store.transactions
+    .filter(t => t.type === 'expense' && t.status === 'completed' && inWindow(t.date) && !NON_VAT_CATS.has(t.category))
+    .reduce((s, t) => s + t.amount, 0);
   const taxableProfit = Math.max(0, revenueBase - expenseBase);
   const propertyBase = store.products.reduce((s, p) => s + (p.cost || 0) * (p.quantity || 0), 0);
 
@@ -207,11 +213,19 @@ export function Taxes() {
   }
 
   // НДС — независимо от режима, если компания плательщик НДС.
+  // Цены в РК обычно «в т.ч. НДС», поэтому НДС извлекается из суммы:
+  // НДС = сумма × ставка/(1+ставка). К уплате = исходящий − входящий (зачёт).
+  const vr = rates.vat;
+  const outVat = vatPayer ? revenueBase * vr / (1 + vr) : 0;        // с продаж (вкл. авансы)
+  const inVat = vatPayer ? vatableExpenseBase * vr / (1 + vr) : 0;  // входящий по ЭСФ-расходам
+  const vatNet = Math.max(0, outVat - inVat);
   rows.push({
-    code: 'NDS', shortLabel: 'НДС', label: 'Налог на добавленную стоимость',
-    rate: pct(rates.vat), base: revenueBase, amount: vatPayer ? revenueBase * rates.vat : 0,
+    code: 'NDS', shortLabel: 'НДС', label: 'НДС к уплате (исходящий − входящий)',
+    rate: pct(rates.vat), base: revenueBase, amount: vatPayer ? vatNet : 0,
     due: dueNextMonth(25), icon: 'bg-amber-50 text-amber-700', applicable: vatPayer,
-    note: vatPayer ? 'За вычетом входящих ЭСФ (зачёт). Декларация 300.00 ежеквартально.' : 'Включите статус плательщика НДС в Настройки → Реквизиты',
+    note: vatPayer
+      ? `Исходящий ${Math.round(outVat).toLocaleString('ru-RU')} − входящий ${Math.round(inVat).toLocaleString('ru-RU')} ₸. Авансы учтены в обороте. Декларация 300.00 ежеквартально.`
+      : 'Включите статус плательщика НДС в Настройки → Реквизиты',
   });
 
   // Налог на имущество — только ТОО на ОУР.
