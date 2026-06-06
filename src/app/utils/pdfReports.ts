@@ -1424,3 +1424,56 @@ export async function generatePayslipPDF(p: PayslipInput, requisites: CompanyReq
   drawFooter(doc);
   doc.save(`payslip-${p.employeeName}-${todayStamp()}.pdf`);
 }
+
+// ─── Накладная (товарная) ──────────────────────────────────────────
+// Goods-handover document — paired with the act/invoice. Lists the
+// delivered item(s) with qty/price/sum, total, and «отпустил/получил»
+// signature lines (cargo handover proof for KZ deliveries).
+export interface WaybillDeal {
+  id: string;
+  customerName: string;
+  customerBIN?: string;
+  product?: string;
+  amount: number;
+  date?: string;
+  nicheLabel?: string;
+}
+export async function generateWaybillPDF(deal: WaybillDeal, requisites: CompanyRequisites = {}, opts?: { number?: string }) {
+  const doc = await newDoc();
+  const pageW = doc.internal.pageSize.getWidth();
+  const num = opts?.number || todayStamp();
+  const d = deal.date ? new Date(deal.date) : new Date();
+  drawHeader(doc, `Накладная № ${num}`, `от ${fmtDate(d)}`, requisites.legalName);
+
+  let y = 38;
+  if (deal.nicheLabel) {
+    doc.setFontSize(9); doc.setTextColor(100, 116, 139);
+    doc.text(`Направление: ${deal.nicheLabel}`, 14, y); y += 6;
+  }
+  doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+  doc.text(`Отправитель: ${requisites.legalName || '—'}${requisites.bin ? `, БИН/ИИН ${requisites.bin}` : ''}`, 14, y); y += 5;
+  doc.text(`Получатель: ${deal.customerName}${deal.customerBIN ? `, БИН/ИИН ${deal.customerBIN}` : ''}`, 14, y); y += 7;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['№', 'Наименование', 'Кол-во', 'Цена', 'Сумма']],
+    body: [['1', deal.product || 'Изделие по заказу', '1', KZT(deal.amount), KZT(deal.amount)]],
+    foot: [['', '', '', 'Итого', KZT(deal.amount)]],
+    styles: { font: 'Roboto', fontSize: 9, cellPadding: 2.5 },
+    headStyles: { font: 'Roboto', fontStyle: 'bold', fillColor: [15, 23, 42], textColor: 255 },
+    footStyles: { font: 'Roboto', fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [15, 23, 42] },
+    columnStyles: { 2: { halign: 'center' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+    margin: { left: 14, right: 14 },
+  });
+  let yy = (doc as any).lastAutoTable.finalY + 14;
+
+  doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+  doc.text('Отпустил: __________________', 14, yy);
+  doc.text('Получил: __________________', pageW / 2 + 6, yy); yy += 6;
+  doc.setFontSize(7); doc.setTextColor(120, 120, 120);
+  doc.text(`М.П.  ${requisites.director || ''}`, 14, yy);
+  doc.text('М.П.', pageW / 2 + 6, yy);
+
+  drawFooter(doc);
+  doc.save(`nakladnaya-${todayStamp()}.pdf`);
+}

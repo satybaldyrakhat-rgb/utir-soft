@@ -583,7 +583,7 @@ export function Finance({ language }: FinanceProps) {
 // can edit the invoice number before generating (default: «YY-{last 6}»).
 // Doc kinds the modal can generate. Both reuse the same deal picker and
 // company requisites — only the PDF template differs.
-type DocKind = 'invoice' | 'akt';
+type DocKind = 'invoice' | 'akt' | 'waybill';
 
 function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'kz' | 'ru' | 'eng' }) {
   const store = useDataStore();
@@ -634,7 +634,7 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
           paidAmount,
           nicheLabel,
         }, requisites || {}, number ? { invoiceNumber: number } : undefined);
-      } else {
+      } else if (docKind === 'akt') {
         // Akt — uses the full deal amount (act = work completed in full).
         await pdf.generateActPDF({
           id: selected.id,
@@ -645,6 +645,16 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
           amount: selected.amount || 0,
           nicheLabel,
         }, requisites || {}, number ? { actNumber: number } : undefined);
+      } else {
+        // Накладная — goods handover.
+        await pdf.generateWaybillPDF({
+          id: selected.id,
+          customerName: selected.customerName,
+          customerBIN: selected.customerBIN,
+          product: selected.product,
+          amount: selected.amount || 0,
+          nicheLabel,
+        }, requisites || {}, number ? { number } : undefined);
       }
       onClose();
     } catch (e: any) {
@@ -676,7 +686,11 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
             <button
               onClick={() => { setDocKind('akt'); setNumber(''); }}
               className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'akt' ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-900'}`}
-            >📋 {l('Акт выполненных работ', 'Орындалған жұмыстар актісі', 'Work act')}</button>
+            >📋 {l('Акт', 'Акт', 'Act')}</button>
+            <button
+              onClick={() => { setDocKind('waybill'); setNumber(''); }}
+              className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition ${docKind === 'waybill' ? 'bg-white text-gray-900 shadow-sm' : 'text-slate-500 hover:text-gray-900'}`}
+            >📦 {l('Накладная', 'Жүкқұжат', 'Waybill')}</button>
           </div>
         </div>
 
