@@ -171,6 +171,21 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  // Client tracking link — minted on demand, copied to share with the
+  // customer so they follow the order without a login.
+  const [trackCopied, setTrackCopied] = useState(false);
+  const copyTrackLink = async () => {
+    try {
+      const r = await api.get<{ link: string }>(`/api/deals/${deal.id}/track-link`);
+      try { await navigator.clipboard.writeText(r.link); }
+      catch {
+        const ta = document.createElement('textarea'); ta.value = r.link; document.body.appendChild(ta);
+        ta.select(); try { document.execCommand('copy'); } catch { /* ignore */ } document.body.removeChild(ta);
+      }
+      setTrackCopied(true);
+      setTimeout(() => setTrackCopied(false), 2200);
+    } catch { /* ignore */ }
+  };
 
   // Payment methods: render whatever is on the deal; if none, seed default KZ enum.
   const initialPM: Record<string, boolean> = useMemo(() => {
@@ -532,9 +547,21 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
             <div className="text-lg text-slate-900 tracking-tight truncate">{deal.customerName}</div>
             <div className="text-[11px] text-slate-500 mt-0.5 truncate">{deal.product} · <span className="tabular-nums">{(deal.amount || 0).toLocaleString('ru-RU')} ₸</span></div>
           </div>
-          <button onClick={handleClose} className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center transition-colors flex-shrink-0">
-            <X className="w-4 h-4 text-slate-500" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Client tracking link — share so the customer follows the
+                order at utir.kz/#/track/<code> with no login. */}
+            <button
+              onClick={copyTrackLink}
+              title={l('Ссылка для клиента (статус заказа)', 'Клиентке сілтеме', 'Client tracking link')}
+              className="flex items-center gap-1.5 px-3 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl text-[11px] text-slate-600 transition-colors"
+            >
+              {trackCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <ExternalLink className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{trackCopied ? l('Скопировано', 'Көшірілді', 'Copied') : l('Ссылка клиенту', 'Сілтеме', 'Track link')}</span>
+            </button>
+            <button onClick={handleClose} className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center transition-colors">
+              <X className="w-4 h-4 text-slate-500" />
+            </button>
+          </div>
         </div>
 
         {/* Sync status (real 1C/ERP sync — coming later) */}

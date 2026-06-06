@@ -221,6 +221,23 @@ export function teamInviteLink(code: string): string {
   return `https://t.me/${BOT_USERNAME}?start=join_${code}`;
 }
 
+// ─── Public order-tracking link (Trackpage) ────────────────────────
+// Frontend base URL where the SPA serves the #/track/<code> route.
+const APP_URL = (process.env.PUBLIC_APP_URL || 'https://utir-soft.vercel.app').replace(/\/+$/, '');
+export function trackLink(code: string): string { return `${APP_URL}/#/track/${code}`; }
+// Get the deal's existing public track code or mint a new one. Used by
+// the web "Ссылка для клиента" button and the bot completion messages.
+export function ensureTrackCode(db: Database.Database, teamId: string, dealId: string): string {
+  const existing = db.prepare('SELECT code FROM track_links WHERE deal_id = ? AND team_id = ?').get(dealId, teamId) as any;
+  if (existing?.code) return existing.code as string;
+  // 7-char unambiguous code (no 0/O/1/I) — short enough to paste in chat.
+  const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 7; i++) code += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+  db.prepare('INSERT INTO track_links (code, deal_id, team_id) VALUES (?, ?, ?)').run(code, dealId, teamId);
+  return code;
+}
+
 export function getOrCreateTeamInviteCode(db: Database.Database, teamId: string): string {
   const row = db.prepare('SELECT tg_invite_code FROM team_settings WHERE team_id = ?').get(teamId) as any;
   if (row?.tg_invite_code) return row.tg_invite_code as string;
@@ -1137,11 +1154,13 @@ async function handleCallback(
     saveDeal(db, dealId, d.data);
     await answerCallback(cq.id, 'Монтаж завершён ✅');
     if (messageId) await editReplyMarkupClear(chatId, messageId);
+    const tlink = trackLink(ensureTrackCode(db, user.teamId, dealId));
     await sendMessage(chatId,
       `🎉 Монтаж у <b>${d.data.customerName || 'клиента'}</b> завершён!\n` +
       `Гарантия 12 мес. до <b>${d.data.warranty.endDate}</b>.\n\n` +
-      `📷 Пришлите фото готовой работы — прикреплю к заказу.\n` +
-      `Акт приёмки и гарантийный талон можно распечатать на платформе → Финансы → Документы.`);
+      `📷 Пришлите фото готовой работы — прикреплю к заказу.\n\n` +
+      `🔗 Ссылка для клиента (статус + гарантия):\n${tlink}\n\n` +
+      `Акт приёмки и гарантийный талон — на платформе → Финансы → Документы.`);
     logActivity(user.id, {
       user: emp?.name || user.name, actor: 'human',
       action: 'Завершил монтаж', target: d.data.customerName || dealId,

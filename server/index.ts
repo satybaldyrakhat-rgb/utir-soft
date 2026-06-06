@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment } from './telegram.js';
+import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink } from './telegram.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
@@ -272,6 +272,17 @@ db.exec(`
     username TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+`);
+// Public order-tracking links — short codes mapping to a deal so the
+// client can check status at utir.kz/#/track/<code> WITHOUT logging in.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS track_links (
+    code TEXT PRIMARY KEY,
+    deal_id TEXT NOT NULL,
+    team_id TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_track_deal ON track_links(deal_id);
 `);
 migrateColumn('users', 'company', "TEXT DEFAULT ''");
 migrateColumn('users', 'verification_code', 'TEXT');
@@ -1059,6 +1070,92 @@ app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (
   }
 
   res.json(updated);
+});
+
+// Get (or mint) the public tracking link for a deal — shown to the
+// client so they can follow their order without logging in.
+app.get('/api/deals/:id/track-link', authMiddleware, requirePermission('orders'), (req: AuthedRequest, res) => {
+  const own = db.prepare('SELECT 1 FROM deals WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!);
+  if (!own) return res.status(404).json({ error: 'not found' });
+  const code = ensureTrackCode(db, req.teamId!, req.params.id);
+  res.json({ code, link: trackLink(code) });
+});
+
+// ─── PUBLIC order tracking (no auth) ──────────────────────────────
+// GET /api/track/:code → sanitized snapshot of the deal for the client.
+// Deliberately omits internal data: costs breakdown, notes, БИН, other
+// clients. Shows what the customer legitimately needs: their order's
+// status, timeline, payment progress, and how to reach the manager.
+const TRACK_STAGE_LABEL: Record<string, string> = {
+  new: 'Заявка принята', measured: 'Замер выполнен', 'project-agreed': 'Проект согласован',
+  contract: 'Договор подписан', production: 'В производстве', assembly: 'Сборка',
+  manufacturing: 'Изготовление', installation: 'Монтаж', completed: 'Готово', rejected: 'Отменён',
+};
+const TRACK_STAGE_ORDER = ['new', 'measured', 'project-agreed', 'contract', 'production', 'installation', 'completed'];
+app.get('/api/track/:code', (req, res) => {
+  const link = db.prepare('SELECT deal_id, team_id FROM track_links WHERE code = ?').get(String(req.params.code || '').toUpperCase()) as any;
+  if (!link) return res.status(404).json({ error: 'not found' });
+  const row = db.prepare('SELECT data FROM deals WHERE id = ? AND team_id = ?').get(link.deal_id, link.team_id) as any;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  let d: any; try { d = JSON.parse(row.data); } catch { return res.status(404).json({ error: 'not found' }); }
+
+  // Manager contact — the assigned employee (owner → measurer → designer).
+  let manager: { name: string; phone: string } | null = null;
+  const tryEmp = (predicate: (e: any) => boolean) => {
+    if (manager) return;
+    const emps = db.prepare('SELECT data FROM employees WHERE team_id = ?').all(link.team_id) as any[];
+    for (const r of emps) { try { const e = JSON.parse(r.data); if (predicate(e)) { manager = { name: e.name || '', phone: e.phone || '' }; return; } } catch { /* skip */ } }
+  };
+  if (d.ownerId) tryEmp(e => e.id === d.ownerId);
+  if (!manager && d.designer) tryEmp(e => (e.name || '').toLowerCase() === String(d.designer).toLowerCase());
+  if (!manager && d.measurer) tryEmp(e => (e.name || '').toLowerCase() === String(d.measurer).toLowerCase());
+
+  // Company name + phone from team requisites (best-effort).
+  let company: { name: string; phone: string } = { name: 'Utir Soft', phone: '' };
+  try {
+    const ts = db.prepare('SELECT company_requisites FROM team_settings WHERE team_id = ?').get(link.team_id) as any;
+    if (ts?.company_requisites) {
+      const r = JSON.parse(ts.company_requisites);
+      company = { name: r.legalName || r.name || 'Utir Soft', phone: r.phone || '' };
+    }
+  } catch { /* keep default */ }
+
+  // Timeline — funnel stages with done/active flags + known dates.
+  const curIdx = Math.max(0, TRACK_STAGE_ORDER.indexOf(d.status));
+  const stages = TRACK_STAGE_ORDER.map((id, i) => ({
+    id, label: TRACK_STAGE_LABEL[id] || id,
+    done: i < curIdx || d.status === 'completed',
+    active: i === curIdx && d.status !== 'completed',
+    date: id === 'new' ? (d.createdAt || '').slice(0, 10)
+        : id === 'measured' ? (d.measurementDate || '')
+        : id === 'completed' ? (d.installationDate || '')
+        : '',
+  }));
+
+  // First name only — don't echo the full name on a shareable link.
+  const firstName = String(d.customerName || '').split(/\s+/)[0] || '';
+
+  res.json({
+    company,
+    order: {
+      ref: String(link.deal_id).slice(-6).toUpperCase(),
+      customerFirstName: firstName,
+      product: d.product || d.furnitureType || '',
+      status: d.status,
+      statusLabel: TRACK_STAGE_LABEL[d.status] || d.status,
+      progress: Number(d.progress) || 0,
+      rejected: d.status === 'rejected',
+    },
+    stages,
+    payment: d.amount > 0 ? {
+      amount: Number(d.amount) || 0,
+      paid: Number(d.paidAmount) || 0,
+      pct: d.amount ? Math.round(((d.paidAmount || 0) / d.amount) * 100) : 0,
+    } : null,
+    manager,
+    warranty: d.warranty || null,
+    installationDate: d.installationDate || '',
+  });
 });
 
 // Audit-trail readback. Returns the deal_history rows newest-first.
