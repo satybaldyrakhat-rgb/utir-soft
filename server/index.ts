@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink } from './telegram.js';
+import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, startDailySummaryScheduler } from './telegram.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
@@ -258,6 +258,9 @@ migrateColumn('telegram_links', 'design_state', 'TEXT');
 // Pending photo a field worker sent outside the design wizard — held as a
 // data URL until they pick which deal to attach it to (Этап 2).
 migrateColumn('telegram_links', 'pending_photo', 'TEXT');
+// Daily owner summary state — JSON { enabled?: bool, lastSent?: 'YYYY-MM-DD' }.
+// Drives the 09:00 Almaty morning digest pushed to admins/managers.
+migrateColumn('team_settings', 'daily_summary', 'TEXT');
 // Telegram-native worker onboarding — masters / measurers / installers who
 // join via a deep-link invite and never touch the web. The reusable team
 // invite code lives on team_settings; the per-chat onboarding state (name +
@@ -2769,5 +2772,7 @@ app.listen(PORT, () => {
   if (isTelegramReady()) {
     registerBotCommands().then(() => console.log('[server] telegram /design menu registered'))
       .catch(e => console.warn('[server] registerBotCommands failed', e));
+    // 09:00 Almaty morning digest to admins/managers.
+    startDailySummaryScheduler(db);
   }
 });

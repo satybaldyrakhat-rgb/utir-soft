@@ -103,6 +103,7 @@ export async function registerBotCommands(): Promise<void> {
         { command: 'orders',  description: '🪚 Мои заказы (этапы цеха)' },
         { command: 'installs',description: '🔧 Мои монтажи' },
         { command: 'design',  description: '🎨 AI Дизайн интерьера (мастер)' },
+        { command: 'summary', description: '☀️ Утренняя сводка' },
         { command: 'today',   description: '📊 Что было сегодня' },
         { command: 'tasks',   description: '✅ Мои задачи' },
         { command: 'revenue', description: '💰 Моя выручка' },
@@ -316,7 +317,7 @@ export function roleMenuKeyboard(botRole: string): { keyboard: string[][]; resiz
     measurer:   [['📋 Мои замеры', '🎤 Записать замер'], ['📷 Фото объекта', '💰 Моя выручка']],
     production: [['📋 Мои заказы', '📷 Фото-отчёт'], ['💰 Зарплата', '✅ Мои задачи']],
     installer:  [['📋 Мои монтажи', '📷 Фото работы'], ['💰 Зарплата', '✅ Мои задачи']],
-    manager:    [['📊 Сегодня', '✅ Задачи'], ['💰 Выручка', '🎨 AI Дизайн']],
+    manager:    [['☀️ Сводка', '📊 Сегодня'], ['✅ Задачи', '💰 Выручка'], ['🎨 AI Дизайн']],
   };
   return {
     keyboard: menus[botRole] || menus.manager,
@@ -500,6 +501,121 @@ function isAssignedTo(deal: any, emp: { id: string; name: string }): boolean {
   const first = nameLow.split(/\s+/)[0] || '';
   const test = (v: string | undefined) => !!v && (v.toLowerCase().includes(nameLow) || (first.length > 2 && v.toLowerCase().includes(first)));
   return test(deal.measurer) || test(deal.designer) || test(deal.foreman) || test(deal.architect);
+}
+
+// ─── Daily owner summary (Утренняя сводка) ─────────────────────────
+// A 09:00 (Asia/Almaty) digest pushed to a team's admins / managers so
+// the owner knows the state of the business without opening the web.
+// KZ-only product → fixed Almaty timezone (UTC+5, no DST).
+const SUMMARY_TZ = 'Asia/Almaty';
+const SUMMARY_HOUR = 9;
+
+function almatyToday(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: SUMMARY_TZ }); // YYYY-MM-DD
+}
+function almatyHour(): number {
+  return Number(new Date().toLocaleTimeString('en-GB', { timeZone: SUMMARY_TZ, hour12: false }).slice(0, 2));
+}
+
+// Build the digest text for a team. Pure read — safe to call on demand
+// (the /сводка command) or from the scheduler.
+export function buildDailySummary(db: Database.Database, teamId: string): string {
+  const today = almatyToday();
+  const deals = loadDeals(db, teamId).map(d => d.data);
+  const txRows = (db.prepare('SELECT data FROM transactions WHERE team_id = ?').all(teamId) as any[])
+    .map(r => { try { return JSON.parse(r.data); } catch { return null; } }).filter(Boolean);
+  const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
+  const now = Date.now();
+
+  const newToday = deals.filter(d => (d.createdAt || '').slice(0, 10) === today).length;
+  const revToday = txRows.filter(t => t.type === 'income' && t.status === 'completed' && (t.date || '').slice(0, 10) === today).reduce((s, t) => s + (t.amount || 0), 0);
+  const inProd = deals.filter(d => ['production', 'assembly', 'manufacturing'].includes(d.status)).length;
+  const onInstall = deals.filter(d => d.status === 'installation').length;
+  const measToday = deals.filter(d => d.measurementDate === today && d.status !== 'completed' && d.status !== 'rejected');
+  const instToday = deals.filter(d => d.installationDate === today && d.status !== 'completed' && d.status !== 'rejected');
+  const debtDeals = deals.filter(d => !['completed', 'rejected'].includes(d.status) && (d.amount || 0) > (d.paidAmount || 0));
+  const debt = debtDeals.reduce((s, d) => s + ((d.amount || 0) - (d.paidAmount || 0)), 0);
+  const stale = deals.filter(d => d.status === 'new' && d.createdAt && (now - new Date(d.createdAt).getTime()) > 3 * 86400000).length;
+
+  const dateNice = new Date().toLocaleDateString('ru-RU', { timeZone: SUMMARY_TZ, day: 'numeric', month: 'long' });
+  const lines: string[] = [`☀️ <b>Доброе утро! Сводка на ${dateNice}</b>`, ''];
+
+  lines.push(`📊 <b>Сегодня</b>`);
+  lines.push(`• Новых заявок: <b>${newToday}</b>`);
+  lines.push(`• Поступило: <b>${fmt(revToday)}</b>`);
+  lines.push(`• В производстве: <b>${inProd}</b> · на монтаже: <b>${onInstall}</b>`);
+
+  if (measToday.length || instToday.length) {
+    lines.push('', `🗓 <b>На сегодня запланировано</b>`);
+    measToday.slice(0, 5).forEach(d => lines.push(`• 📐 Замер — ${d.customerName || '—'}${d.siteAddress || d.address ? ' · ' + (d.siteAddress || d.address) : ''}`));
+    instToday.slice(0, 5).forEach(d => lines.push(`• 🔧 Монтаж — ${d.customerName || '—'}${d.siteAddress || d.address ? ' · ' + (d.siteAddress || d.address) : ''}`));
+  }
+
+  const attention: string[] = [];
+  if (debt > 0) attention.push(`• 💰 Дебиторка: <b>${fmt(debt)}</b> по ${debtDeals.length} сделкам`);
+  if (stale > 0) attention.push(`• ⏳ Без движения >3 дней: <b>${stale}</b> новых заявок`);
+  if (attention.length) { lines.push('', `⚠️ <b>Требует внимания</b>`, ...attention); }
+
+  lines.push('', `<i>Открыть платформу для деталей.</i>`);
+  return lines.join('\n');
+}
+
+// Recipients = paired admins / managers of the team.
+function summaryRecipients(db: Database.Database, teamId: string): number[] {
+  const rows = db.prepare(`
+    SELECT tl.chat_id FROM telegram_links tl JOIN users u ON u.id = tl.user_id
+    WHERE u.team_id = ? AND tl.chat_id IS NOT NULL AND u.team_role IN ('admin','manager')
+  `).all(teamId) as any[];
+  return rows.map(r => r.chat_id as number).filter(Boolean);
+}
+
+function getSummaryState(db: Database.Database, teamId: string): { enabled: boolean; lastSent?: string } {
+  const row = db.prepare('SELECT daily_summary FROM team_settings WHERE team_id = ?').get(teamId) as any;
+  if (!row?.daily_summary) return { enabled: true }; // on by default
+  try { const s = JSON.parse(row.daily_summary); return { enabled: s.enabled !== false, lastSent: s.lastSent }; }
+  catch { return { enabled: true }; }
+}
+function setSummaryLastSent(db: Database.Database, teamId: string, date: string) {
+  const cur = getSummaryState(db, teamId);
+  db.prepare(`
+    INSERT INTO team_settings (team_id, daily_summary, updated_at) VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET daily_summary = excluded.daily_summary, updated_at = excluded.updated_at
+  `).run(teamId, JSON.stringify({ enabled: cur.enabled, lastSent: date }));
+}
+
+// Scheduler tick — called every minute. Sends each team's digest once,
+// the first minute on/after 09:00 Almaty that we haven't sent today.
+async function dailySummaryTick(db: Database.Database) {
+  if (!TOKEN) return;
+  if (almatyHour() < SUMMARY_HOUR) return;
+  const today = almatyToday();
+  // Teams with at least one paired admin/manager.
+  const teams = db.prepare(`
+    SELECT DISTINCT u.team_id FROM telegram_links tl JOIN users u ON u.id = tl.user_id
+    WHERE tl.chat_id IS NOT NULL AND u.team_role IN ('admin','manager')
+  `).all() as any[];
+  for (const t of teams) {
+    const teamId = t.team_id;
+    if (!teamId) continue;
+    const state = getSummaryState(db, teamId);
+    if (!state.enabled || state.lastSent === today) continue;
+    try {
+      const text = buildDailySummary(db, teamId);
+      for (const chatId of summaryRecipients(db, teamId)) {
+        await sendMessage(chatId, text);
+      }
+      setSummaryLastSent(db, teamId, today);
+    } catch (e) { console.warn('[daily summary]', teamId, e); }
+  }
+}
+
+// Start the once-a-minute scheduler. Idempotent guard so a hot-reload
+// doesn't stack intervals.
+let summaryTimer: ReturnType<typeof setInterval> | null = null;
+export function startDailySummaryScheduler(db: Database.Database) {
+  if (summaryTimer || !TOKEN) return;
+  summaryTimer = setInterval(() => { void dailySummaryTick(db); }, 60 * 1000);
+  console.log('[telegram] daily summary scheduler started (09:00 Asia/Almaty)');
 }
 
 // ─── Pending tool confirmation state (persisted in telegram_links.pending_action) ────
@@ -1380,6 +1496,7 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
   // below picks it up.
   {
     const menuMap: Record<string, string> = {
+      '☀️ сводка': '/сводка',
       '📊 сегодня': '/today',
       '✅ задачи': '/tasks',
       '✅ мои задачи': '/tasks',
@@ -1522,6 +1639,15 @@ export async function handleUpdate(db: Database.Database, update: IncomingUpdate
         text: had || hadDesign ? 'Действие отменено. История диалога очищена.' : 'История диалога очищена.',
         reply_markup: { remove_keyboard: true },
       });
+      return;
+    }
+
+    // /сводка — owner morning digest on demand (same content as the
+    // scheduled 09:00 push). Lets the owner pull it any time / test it.
+    if (cmd === '/сводка' || cmd === '/summary') {
+      const user = findUserByChat(db, chatId);
+      if (!user) { await sendMessage(chatId, 'Сначала привяжите аккаунт по ссылке-приглашению от руководителя.'); return; }
+      await sendMessage(chatId, buildDailySummary(db, user.teamId));
       return;
     }
 
