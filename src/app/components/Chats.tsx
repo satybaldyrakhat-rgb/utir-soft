@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Send, Paperclip, MessageCircle, Bot, Check, CheckCheck, Plus, X, Play, Pause, Edit2, Trash2, Copy, Users, TrendingUp, Calendar, Clock, Zap, MessageSquare, Settings, BarChart3, Eye, ArrowRight, Circle, ShoppingCart, ExternalLink, Phone, Mic, FileText, Image as ImageIcon, Film, StopCircle, Sparkles, Key, Heart, Hand, AlarmClock } from 'lucide-react';
+import { Search, Send, Paperclip, MessageCircle, Bot, Check, CheckCheck, Plus, X, Play, Pause, Edit2, Trash2, Copy, Users, TrendingUp, Calendar, Clock, Zap, MessageSquare, Settings, BarChart3, Eye, ArrowRight, Circle, ShoppingCart, ExternalLink, Phone, Mic, FileText, Image as ImageIcon, Film, StopCircle, Sparkles, Key, Heart, Hand, AlarmClock, Briefcase, Smile } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { TextMessage, ImageMessage, FileMessage, VoiceMessage, CallMessage } from './ChatMessageTypes';
 import { PlatformIcon } from './PlatformLogos';
@@ -542,15 +542,18 @@ export function Chats({ language }: ChatsProps) {
                     <div className="text-[11px] text-slate-400 mb-3">{l('Тон общения', 'Сөйлесу тоны', 'Conversation tone')}</div>
                     <div className="grid grid-cols-3 gap-2">
                       {[
-                        { id: 'professional' as const, emoji: '🎩', label: l('Профессиональный', 'Кәсіби', 'Professional') },
-                        { id: 'friendly'     as const, emoji: '😊', label: l('Дружелюбный',     'Достасу',  'Friendly') },
-                        { id: 'casual'       as const, emoji: '✌️', label: l('Неформальный',    'Бейресми', 'Casual') },
-                      ].map(t => (
+                        { id: 'professional' as const, icon: Briefcase, label: l('Профессиональный', 'Кәсіби', 'Professional') },
+                        { id: 'friendly'     as const, icon: Smile,     label: l('Дружелюбный',     'Достасу',  'Friendly') },
+                        { id: 'casual'       as const, icon: Hand,      label: l('Неформальный',    'Бейресми', 'Casual') },
+                      ].map(t => {
+                        const ToneIcon = t.icon;
+                        return (
                         <button key={t.id} onClick={() => canWrite && setAiTone(t.id)} className={`p-3 rounded-xl border text-center transition-all ${aiTone === t.id ? 'border-gray-900 bg-gray-50' : 'border-gray-100'} ${!canWrite ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                          <div className="text-lg mb-1">{t.emoji}</div>
+                          <ToneIcon className="w-4 h-4 mx-auto mb-1 text-slate-500" strokeWidth={1.5} />
                           <div className="text-[10px] text-gray-600">{t.label}</div>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 

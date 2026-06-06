@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle, Bot, Sparkles, Users, Settings as SettingsIcon, Zap, Activity, Plus, Search, Edit2, Trash2, UserPlus, Star, CheckCircle, X, Shield, Check, Eye, ChevronDown, LayoutGrid, Camera, BookOpen, Send, Download, Brain, Palette, Sliders, Clock, ShieldOff, MessagesSquare, RotateCcw, Loader2, AlertCircle } from 'lucide-react';
+import { MessageCircle, Bot, Sparkles, Users, Settings as SettingsIcon, Zap, Activity, Plus, Search, Edit2, Trash2, UserPlus, Star, CheckCircle, X, Shield, Check, Eye, ChevronDown, LayoutGrid, Camera, BookOpen, Send, Download, Brain, Palette, Sliders, Clock, ShieldOff, MessagesSquare, RotateCcw, Loader2, AlertCircle, Briefcase, Smile, Hand, Heart, Gem, Ruler } from 'lucide-react';
 import { ModulesSettings } from './ModulesSettings';
 import { ActivityLog } from './ActivityLog';
 import { TelegramPairing } from './TelegramPairing';
@@ -776,19 +776,22 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
               <div className="text-sm text-gray-900 mb-3">{tt('aiClientTone')}</div>
               <div className="grid grid-cols-3 gap-2">
                 {([
-                  { id: 'professional' as const, emoji: '👔', label: tt('aiTonePro') },
-                  { id: 'friendly' as const,     emoji: '😊', label: tt('aiToneFriendly') },
-                  { id: 'casual' as const,       emoji: '✌️', label: tt('aiToneCasual') },
-                ]).map(opt => (
+                  { id: 'professional' as const, icon: Briefcase, label: tt('aiTonePro') },
+                  { id: 'friendly' as const,     icon: Smile,     label: tt('aiToneFriendly') },
+                  { id: 'casual' as const,       icon: Hand,      label: tt('aiToneCasual') },
+                ]).map(opt => {
+                  const ToneIcon = opt.icon;
+                  return (
                   <button
                     key={opt.id}
                     onClick={() => store.updateAIAssistant({ tone: opt.id })}
                     className={`p-3 rounded-xl border text-center transition ${aiAssistant.tone === opt.id ? 'border-violet-500 bg-violet-50' : 'border-gray-100 hover:bg-gray-50'}`}
                   >
-                    <div className="text-lg mb-1">{opt.emoji}</div>
+                    <ToneIcon className="w-4 h-4 mx-auto mb-1 text-slate-500" strokeWidth={1.5} />
                     <div className="text-[10px] text-gray-600">{opt.label}</div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
             <div>
@@ -1820,20 +1823,23 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                 <div className="text-xs text-gray-900 mb-2">{l('Тон общения', 'Сөйлеу мәнері', 'Tone of voice')}</div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {([
-                    { id: 'polite' as const,  emoji: '🙏', label: l('Вежливый', 'Сыпайы', 'Polite') },
-                    { id: 'casual' as const,  emoji: '✌️', label: l('Неформальный', 'Бейресми', 'Casual') },
-                    { id: 'premium' as const, emoji: '💎', label: l('Премиум', 'Премиум', 'Premium') },
-                    { id: 'strict' as const,  emoji: '📐', label: l('Строгий', 'Қатаң', 'Strict') },
-                  ]).map(opt => (
+                    { id: 'polite' as const,  icon: Heart, label: l('Вежливый', 'Сыпайы', 'Polite') },
+                    { id: 'casual' as const,  icon: Hand,  label: l('Неформальный', 'Бейресми', 'Casual') },
+                    { id: 'premium' as const, icon: Gem,   label: l('Премиум', 'Премиум', 'Premium') },
+                    { id: 'strict' as const,  icon: Ruler, label: l('Строгий', 'Қатаң', 'Strict') },
+                  ]).map(opt => {
+                    const ToneIcon = opt.icon;
+                    return (
                     <button
                       key={opt.id}
                       onClick={() => upd({ tone: opt.id })}
                       className={`p-2.5 rounded-xl border text-center transition ${cfg.tone === opt.id ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}
                     >
-                      <div className="text-lg mb-0.5">{opt.emoji}</div>
+                      <ToneIcon className="w-4 h-4 mx-auto mb-0.5 text-slate-500" strokeWidth={1.5} />
                       <div className="text-[10px] text-gray-600">{opt.label}</div>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

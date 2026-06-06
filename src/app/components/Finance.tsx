@@ -373,24 +373,24 @@ export function Finance({ language }: FinanceProps) {
               <div className="absolute right-0 mt-1.5 w-64 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-xl shadow-lg overflow-hidden z-10">
                 <div className="px-3 py-2 text-[10px] uppercase tracking-wide text-slate-400 border-b border-white/60">{l('PDF-шаблоны', 'PDF үлгілері', 'PDF templates')}</div>
                 <button onClick={() => downloadReport('finance')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
-                  <span>📊 {l('Финансовый отчёт', 'Қаржы есебі', 'Finance report')}</span>
+                  <span className="flex items-center gap-2"><FileText className="w-3.5 h-3.5 text-slate-400" strokeWidth={1.5} /> {l('Финансовый отчёт', 'Қаржы есебі', 'Finance report')}</span>
                   <span className="text-[10px] text-slate-400">с журналом</span>
                 </button>
                 <button onClick={() => downloadReport('pl')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
-                  <span>📈 {l('P&L (прибыль/убытки)', 'P&L', 'P&L statement')}</span>
+                  <span className="flex items-center gap-2"><TrendingUp className="w-3.5 h-3.5 text-slate-400" strokeWidth={1.5} /> {l('P&L (прибыль/убытки)', 'P&L', 'P&L statement')}</span>
                   <span className="text-[10px] text-slate-400">бухгалтерский</span>
                 </button>
                 <button onClick={() => downloadReport('aging')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
-                  <span>⏰ {l('Дебиторка (aging)', 'Дебитор', 'Aging report')}</span>
+                  <span className="flex items-center gap-2"><Clock className="w-3.5 h-3.5 text-slate-400" strokeWidth={1.5} /> {l('Дебиторка (aging)', 'Дебитор', 'Aging report')}</span>
                   <span className="text-[10px] text-slate-400">0/30/60/90+</span>
                 </button>
                 <button onClick={() => downloadReport('forecast')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
-                  <span>🔮 {l('Прогноз cash flow', 'Cash flow болжамы', 'Cash flow forecast')}</span>
+                  <span className="flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-slate-400" strokeWidth={1.5} /> {l('Прогноз cash flow', 'Cash flow болжамы', 'Cash flow forecast')}</span>
                   <span className="text-[10px] text-slate-400">3 месяца</span>
                 </button>
                 <div className="px-3 py-2 text-[10px] uppercase tracking-wide text-slate-400 border-y border-gray-50">{l('Таблицы', 'Кесте', 'Tables')}</div>
                 <button onClick={downloadCSV} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
-                  <span>📥 CSV (Excel)</span>
+                  <span className="flex items-center gap-2"><Download className="w-3.5 h-3.5 text-slate-400" strokeWidth={1.5} /> CSV (Excel)</span>
                   <span className="text-[10px] text-slate-400">операции</span>
                 </button>
               </div>

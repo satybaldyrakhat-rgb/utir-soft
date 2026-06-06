@@ -15,7 +15,7 @@
 // so the wizard never shows again.
 
 import { useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Loader2, Sparkles, Upload, Mail, Send } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Loader2, Sparkles, Upload, Mail, Send, Bot, CreditCard, MessageCircle, BarChart3 } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { NICHES, NICHE_ORDER, type NicheId } from '../utils/niches';
 import { api } from '../utils/api';
@@ -423,25 +423,28 @@ export function OnboardingWizard({ language, onDone, currentUserName, currentUse
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {[
-                  { emoji: '🤖', title: l('Telegram-бот', 'Telegram-бот', 'Telegram bot'),
+                  { icon: Bot, title: l('Telegram-бот', 'Telegram-бот', 'Telegram bot'),
                     desc: l('AI-помощник в мессенджере: «Закрыл клиента X на 500к»',
                             'Хабарламадағы AI: «X клиентті жаптым»',
                             'AI assistant in chat') },
-                  { emoji: '💳', title: 'Kaspi Pay',
+                  { icon: CreditCard, title: 'Kaspi Pay',
                     desc: l('Авто-сверка оплат с банка', 'Банк төлемдерін автоматты салыстыру', 'Auto-reconcile payments') },
-                  { emoji: '💬', title: 'WhatsApp / Instagram',
+                  { icon: MessageCircle, title: 'WhatsApp / Instagram',
                     desc: l('Заявки с мессенджеров в воронку', 'Хабарламалардан өтінімдер', 'Leads from messengers') },
-                  { emoji: '📊', title: '1С / Halyk Bank',
+                  { icon: BarChart3, title: '1С / Halyk Bank',
                     desc: l('Импорт выписок и бухучёт', 'Көшірмелерді импорттау', 'Statement import') },
-                ].map((it, i) => (
+                ].map((it, i) => {
+                  const TileIcon = it.icon;
+                  return (
                   <div key={i} className="p-3 bg-white/60 ring-1 ring-white/60 rounded-2xl">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">{it.emoji}</span>
+                      <TileIcon className="w-4 h-4 text-slate-500" strokeWidth={1.5} />
                       <span className="text-xs text-slate-900">{it.title}</span>
                     </div>
                     <div className="text-[11px] text-slate-500 leading-snug">{it.desc}</div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="mt-4 p-3 bg-emerald-50/80 ring-1 ring-emerald-200/60 rounded-2xl text-[11px] text-emerald-900">
                 {l('После завершения откроется ваш Dashboard. Все интеграции — в Настройках → Интеграции.',
