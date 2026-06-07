@@ -5,6 +5,7 @@ import { TextMessage, ImageMessage, FileMessage, VoiceMessage, CallMessage } fro
 import { PlatformIcon } from './PlatformLogos';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
+import { NicheIcon } from './NicheIcon';
 import { toast } from '../utils/toast';
 
 interface Message {
@@ -278,7 +279,7 @@ export function Chats({ language }: ChatsProps) {
       <div className="px-4 md:px-6 py-3 border-b border-white/60 bg-white/40 backdrop-blur-2xl flex items-center justify-between gap-3 flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <div className="text-sm text-slate-900 truncate">{l('Омниканальные чаты', 'Омниканалды чаттар', 'Omnichannel Chats')}</div>
-          <span className="text-[11px] text-slate-500 whitespace-nowrap hidden sm:inline">· {niche.icon} {niche.name[language]}</span>
+          <span className="text-[11px] text-slate-500 whitespace-nowrap hidden sm:inline-flex items-center gap-1">· <NicheIcon niche={niche} className="w-3 h-3" /> {niche.name[language]}</span>
           {!canWrite && (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100/60 text-amber-700 ring-1 ring-amber-200/60 whitespace-nowrap">
               {l('Только просмотр', 'Тек көру', 'View only')}

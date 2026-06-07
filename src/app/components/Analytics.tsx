@@ -6,6 +6,7 @@ import { AdAnalytics } from './AdAnalytics';
 import { t } from '../utils/translations';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
+import { NicheIcon } from './NicheIcon';
 
 type PeriodKey = 'month' | 'quarter' | 'year' | 'all';
 
@@ -264,7 +265,7 @@ export function Analytics({ language }: AnalyticsProps) {
           <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">
             {t('analytics', language)}
             {' · '}
-            <span className="normal-case tracking-normal text-slate-500">{niche.icon} {niche.name[language]}</span>
+            <span className="inline-flex items-center gap-1 normal-case tracking-normal text-slate-500"><NicheIcon niche={niche} className="w-3 h-3" /> {niche.name[language]}</span>
           </p>
           <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight mb-0">
             {language === 'kz' ? 'Сатылымдар мен тиімділік' : language === 'eng' ? 'Sales & Performance' : 'Продажи и эффективность'}
@@ -396,7 +397,7 @@ export function Analytics({ language }: AnalyticsProps) {
         // card instead of a wall of zeroed KPIs + broken donut + zero-
         // width funnel that looks like a load error.
         <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
-          <div className="text-5xl mb-3">{niche.icon}</div>
+          <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-white/60 ring-1 ring-white/60 shadow-[0_8px_24px_-10px_rgba(15,23,42,0.18)] flex items-center justify-center text-slate-500"><NicheIcon niche={niche} className="w-7 h-7" /></div>
           <h2 className="text-xl text-slate-900 mb-2 tracking-tight">
             {l('Графики и метрики появятся автоматически', 'Графиктер мен метрикалар автоматты түрде шығады', 'Charts appear automatically')}
           </h2>
@@ -504,7 +505,7 @@ export function Analytics({ language }: AnalyticsProps) {
                     >
                       <div className="flex items-center gap-1.5 mb-1.5">
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: palette[i % palette.length] }} />
-                        <span className="text-xs text-gray-700 truncate">{n.icon} {n.name}</span>
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-700 truncate"><NicheIcon id={n.id} className="w-3 h-3 flex-shrink-0" /> {n.name}</span>
                       </div>
                       <div className="text-sm text-gray-900 tabular-nums">
                         {n.revenue ? `${(n.revenue / 1000000).toFixed(1)}М ₸` : '0 ₸'}
@@ -1139,7 +1140,7 @@ function TeamMetrics({ language }: { language: 'kz' | 'ru' | 'eng' }) {
                         const n = getNiche(nid);
                         return (
                           <span key={nid} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] ring-1 ring-emerald-100/60">
-                            <span>{n.icon}</span>
+                            <NicheIcon niche={n} className="w-3 h-3" />
                             <span>{n.name[language]}</span>
                           </span>
                         );

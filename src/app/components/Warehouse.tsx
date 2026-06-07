@@ -5,6 +5,7 @@ import { confirmDialog } from '../utils/confirm';
 import { Calculator } from './Calculator';
 import { api } from '../utils/api';
 import { getNiche, type NicheStage } from '../utils/niches';
+import { NicheIcon } from './NicheIcon';
 import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { toast } from '../utils/toast';
@@ -630,7 +631,7 @@ export function Warehouse({ language }: WarehouseProps) {
           <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">
             {l('Производство', 'Өндіріс', 'Production')}
             {' · '}
-            <span className="normal-case tracking-normal text-slate-500">{niche.icon} {niche.name[language]}</span>
+            <span className="inline-flex items-center gap-1 normal-case tracking-normal text-slate-500"><NicheIcon niche={niche} className="w-3 h-3" /> {niche.name[language]}</span>
           </p>
           <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight">{l('Производство и склад', 'Өндіріс және қойма', 'Production & Warehouse')}</h1>
           {!canWrite && (
@@ -802,7 +803,7 @@ export function Warehouse({ language }: WarehouseProps) {
                           a row sits next to one from a different direction. */}
                       {store.secondaryNiches.length > 0 && (
                         <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-emerald-50/80 text-emerald-700 ring-1 ring-emerald-100/60">
-                          {getNiche((o as any).nicheId).icon} {getNiche((o as any).nicheId).name[language]}
+                          <NicheIcon id={(o as any).nicheId} className="w-3 h-3" /> {getNiche((o as any).nicheId).name[language]}
                         </span>
                       )}
                     </div>
@@ -962,7 +963,7 @@ export function Warehouse({ language }: WarehouseProps) {
           // with three clear paths: add manually, import CSV from Excel,
           // or ask AI to bulk-create from a free-text description.
           <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
-            <div className="text-4xl mb-3">{niche.icon}</div>
+            <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-white/60 ring-1 ring-white/60 shadow-[0_8px_24px_-10px_rgba(15,23,42,0.18)] flex items-center justify-center text-slate-500"><NicheIcon niche={niche} className="w-6 h-6" /></div>
             <h3 className="text-lg text-slate-900 mb-2 tracking-tight">
               {l('Здесь будут материалы', 'Материалдар осы жерде болады', 'Materials live here')}
             </h3>
@@ -1061,7 +1062,7 @@ export function Warehouse({ language }: WarehouseProps) {
                         : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
                     }`}
                   >
-                    <span>{n.icon}</span>
+                    <NicheIcon niche={n} className={`w-3.5 h-3.5 ${active ? 'text-white' : 'text-slate-400'}`} />
                     <span>{n.name[language]}</span>
                     <span className={`text-[10px] tabular-nums ${active ? 'text-white/70' : 'text-slate-400'}`}>{count}</span>
                   </button>

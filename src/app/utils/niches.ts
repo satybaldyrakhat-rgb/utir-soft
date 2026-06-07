@@ -17,6 +17,11 @@
 // LANGUAGE NOTE: all RU/KZ/EN trios are filled in. The platform's
 // `l(ru, kz, eng)` helper picks the right one at render time.
 
+import {
+  Armchair, Grid2x2, PanelTop, Blinds, DoorOpen, ChevronsUp,
+  Grid3x3, HardHat, Settings2, type LucideIcon,
+} from 'lucide-react';
+
 export type NicheId =
   | 'furniture'    // Мебель (кухни, шкафы, гардеробы, столы)
   | 'windows'      // Пластиковые окна / двери
@@ -46,7 +51,8 @@ export interface NicheConfig {
   id: NicheId;
   name:        { ru: string; kz: string; eng: string };
   description: { ru: string; kz: string; eng: string };
-  icon:        string;   // emoji or icon name — keep simple for now
+  icon:        string;     // emoji — kept for string contexts (CSV/PDF/Telegram)
+  lucide:      LucideIcon;  // minimalist line icon for the web UI
 
   // Production stage template — used by Warehouse → Заказы chip strip
   // and the deal lifecycle. 5 stages is the default; can be shorter
@@ -82,6 +88,7 @@ export const NICHES: Record<NicheId, NicheConfig> = {
                    kz: 'Ас үй, сырғымалы шкаф, гардероб, үстелдер',
                    eng: 'Kitchens, wardrobes, closets, tables, hallways' },
     icon: '🪑',
+    lucide: Armchair,
     productionStages: [
       { id: 'cutting',   ru: 'Распил',   kz: 'Кесу',     eng: 'Cutting' },
       { id: 'edging',    ru: 'Кромка',   kz: 'Жиектеу',  eng: 'Edging' },
@@ -111,6 +118,7 @@ export const NICHES: Record<NicheId, NicheConfig> = {
                    kz: 'Пластик/алюминий терезелер, балкон блогы, есіктер',
                    eng: 'PVC/aluminum windows, balcony units, doors' },
     icon: '🪟',
+    lucide: Grid2x2,
     productionStages: [
       { id: 'cutting',     ru: 'Резка профиля', kz: 'Профильді кесу', eng: 'Profile cutting' },
       { id: 'welding',     ru: 'Сварка',         kz: 'Дәнекерлеу',     eng: 'Welding' },
@@ -140,6 +148,7 @@ export const NICHES: Record<NicheId, NicheConfig> = {
                    kz: 'Кенептер, шамдар, профиль, монтаж',
                    eng: 'Canvases, lighting, profiles, install' },
     icon: '🏠',
+    lucide: PanelTop,
     // Ceilings don't have a "production" stage in the manufacturing
     // sense — they cut the canvas to size and install on site.
     productionStages: [
@@ -171,6 +180,7 @@ export const NICHES: Record<NicheId, NicheConfig> = {
                    kz: 'Орамдық, рим, көлденең, перделер',
                    eng: 'Roller, Roman, horizontal, day-night, curtains' },
     icon: '🪟',
+    lucide: Blinds,
     productionStages: [
       { id: 'cutting',     ru: 'Раскрой',  kz: 'Кесу',    eng: 'Cutting' },
       { id: 'sewing',      ru: 'Пошив',     kz: 'Тігу',    eng: 'Sewing' },
@@ -200,6 +210,7 @@ export const NICHES: Record<NicheId, NicheConfig> = {
                    kz: 'Бөлме аралық, кіреберіс, бүгілмелі',
                    eng: 'Interior, entrance, folding, sliding' },
     icon: '🚪',
+    lucide: DoorOpen,
     productionStages: [
       { id: 'order',       ru: 'Заказ у поставщика', kz: 'Жеткізушіге тапсырыс', eng: 'Order from supplier' },
       { id: 'delivery',    ru: 'Доставка',            kz: 'Жеткізу',                eng: 'Delivery' },
@@ -229,6 +240,7 @@ export const NICHES: Record<NicheId, NicheConfig> = {
                    kz: 'Ағаш, металл, бұрандалы',
                    eng: 'Wood, metal, spiral, straight' },
     icon: '🪜',
+    lucide: ChevronsUp,
     productionStages: [
       { id: 'design',      ru: 'Проектирование', kz: 'Жобалау',  eng: 'Design' },
       { id: 'cutting',     ru: 'Заготовка',       kz: 'Дайындау', eng: 'Preparation' },
@@ -258,6 +270,7 @@ export const NICHES: Record<NicheId, NicheConfig> = {
                    kz: 'Ламинат, паркет, линолеум, тақтайшалар',
                    eng: 'Laminate, parquet, linoleum, tiles' },
     icon: '🪵',
+    lucide: Grid3x3,
     productionStages: [
       { id: 'order',       ru: 'Заказ материалов', kz: 'Материал тапсырысы', eng: 'Material order' },
       { id: 'delivery',    ru: 'Доставка',           kz: 'Жеткізу',              eng: 'Delivery' },
@@ -287,6 +300,7 @@ export const NICHES: Record<NicheId, NicheConfig> = {
                    kz: 'Кілт ремонт, қасбеттер, шатыр',
                    eng: 'Turnkey renovation, facades, roofing, general works' },
     icon: '🏗',
+    lucide: HardHat,
     productionStages: [
       { id: 'design',      ru: 'Проект',         kz: 'Жоба',      eng: 'Project' },
       { id: 'demolition',  ru: 'Демонтаж',       kz: 'Бұзу',      eng: 'Demolition' },
@@ -317,6 +331,7 @@ export const NICHES: Record<NicheId, NicheConfig> = {
                    kz: 'Кезеңдерді, рөлдерді өз бизнесіңізге бейімдеңіз',
                    eng: 'Customize stages, roles and materials for your business' },
     icon: '⚙️',
+    lucide: Settings2,
     productionStages: [
       { id: 'stage1', ru: 'Этап 1', kz: '1-кезең', eng: 'Stage 1' },
       { id: 'stage2', ru: 'Этап 2', kz: '2-кезең', eng: 'Stage 2' },

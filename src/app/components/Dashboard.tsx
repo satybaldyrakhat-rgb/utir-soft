@@ -24,6 +24,7 @@ import {
 import { t } from '../utils/translations';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
+import { NicheIcon } from './NicheIcon';
 
 // Universal pipeline statuses — these are shared across niches (the
 // sales funnel itself doesn't change, only the production stages do).
@@ -395,7 +396,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
           {/* Niche badge */}
           <div className={`${GLASS} p-5 mb-6 flex items-center justify-between flex-wrap gap-3`}>
             <div className="flex items-center gap-3">
-              <span className="text-3xl">{niche.icon}</span>
+              <span className="w-12 h-12 rounded-2xl bg-white/60 ring-1 ring-white/60 shadow-[0_6px_16px_-8px_rgba(15,23,42,0.18)] flex items-center justify-center text-slate-600 flex-shrink-0"><NicheIcon niche={niche} className="w-5 h-5" /></span>
               <div>
                 <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-0.5">
                   {l('Ваша ниша', 'Сіздің сала', 'Your niche')}
@@ -534,7 +535,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
               <p className="text-[11px] text-slate-400 mb-2 capitalize tracking-widest uppercase">
                 {today}
                 {' · '}
-                <span className="normal-case tracking-normal text-slate-500">{niche.icon} {nicheName}</span>
+                <span className="inline-flex items-center gap-1 normal-case tracking-normal text-slate-500"><NicheIcon niche={niche} className="w-3 h-3" /> {nicheName}</span>
               </p>
               <h1 className="text-slate-900 mb-1 text-3xl md:text-4xl font-medium tracking-tight">
                 {getGreeting()}{firstName ? `, ${firstName}` : ''}

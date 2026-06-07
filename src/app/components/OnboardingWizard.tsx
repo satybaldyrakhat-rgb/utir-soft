@@ -16,6 +16,7 @@
 
 import { useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Loader2, Sparkles, Upload, Mail, Send, Bot, CreditCard, MessageCircle, BarChart3 } from 'lucide-react';
+import { NicheIcon } from './NicheIcon';
 import { useDataStore } from '../utils/dataStore';
 import { NICHES, NICHE_ORDER, type NicheId } from '../utils/niches';
 import { api } from '../utils/api';
@@ -211,8 +212,10 @@ export function OnboardingWizard({ language, onDone, currentUserName, currentUse
                           : 'bg-white/60 ring-white/60 hover:bg-white/85'
                       }`}
                     >
-                      <div className="flex items-start justify-between mb-1">
-                        <span className="text-2xl">{n.icon}</span>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${isSel ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                          <NicheIcon niche={n} className="w-5 h-5" />
+                        </div>
                         {isSel && <Check className="w-4 h-4 text-emerald-600" />}
                       </div>
                       <div className={`text-xs mb-0.5 ${isSel ? 'text-emerald-900' : 'text-slate-900'}`}>{n.name[language]}</div>

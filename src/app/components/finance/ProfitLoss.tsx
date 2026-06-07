@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useDataStore } from '../../utils/dataStore';
 import { getNiche } from '../../utils/niches';
+import { NicheIcon } from '../NicheIcon';
 
 const fmt = (n: number) => Math.abs(Math.round(n)).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
 const fmtM = (n: number) => `${(n / 1_000_000).toFixed(1)}М ₸`;
@@ -170,7 +171,7 @@ export function ProfitLoss() {
           <div className="divide-y divide-gray-50">
             {byNiche.map(n => (
               <div key={n.id} className="px-5 py-3 flex items-center justify-between">
-                <div className="text-xs text-gray-700">{n.icon} {n.name}</div>
+                <div className="inline-flex items-center gap-1 text-xs text-gray-700"><NicheIcon id={n.id} className="w-3 h-3" /> {n.name}</div>
                 <div className="flex items-center gap-4 text-[11px] tabular-nums">
                   <span className="text-slate-500">выручка {fmt(n.revenue)}</span>
                   <span className="text-rose-500">−{fmt(n.cogs)}</span>

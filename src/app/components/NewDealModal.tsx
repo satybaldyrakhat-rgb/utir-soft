@@ -3,6 +3,7 @@ import { X, ChevronLeft, ChevronRight, User, Package, CalendarClock, FileText, A
 import { useDataStore } from '../utils/dataStore';
 import { t } from '../utils/translations';
 import { getNiche } from '../utils/niches';
+import { NicheIcon } from './NicheIcon';
 
 // Seed shape — pre-fills the modal when opened from a BOM template.
 // All fields optional; whatever is supplied overrides the empty defaults.
@@ -250,7 +251,7 @@ export function NewDealModal({ language, onClose, seed, defaultStatus }: Props) 
                             : 'border-gray-100 bg-white/60 hover:border-emerald-200 text-gray-600'
                         }`}
                       >
-                        <span>{n.icon}</span>
+                        <NicheIcon niche={n} className={`w-3.5 h-3.5 ${active ? 'text-emerald-700' : 'text-slate-400'}`} />
                         <span>{n.name[language]}</span>
                       </button>
                     );

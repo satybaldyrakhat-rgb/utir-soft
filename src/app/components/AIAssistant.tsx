@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Sparkles, X, Send, ChevronRight, ChevronDown, Check, AlertCircle, Loader2, Trash2, Mic, Square } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
+import { NicheIcon } from './NicheIcon';
 import { api } from '../utils/api';
 
 // ─── Provider catalog ────────────────────────────────────────────────
@@ -599,11 +600,11 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
               <div className="space-y-1.5 pt-1">
                 <p className="text-[10px] text-slate-500 px-1 uppercase tracking-wide">
                   {l('Быстро начать', 'Жылдам бастау', 'Quick start')}
-                  <span className="normal-case tracking-normal text-slate-400 ml-1">
-                    · {niche.icon} {niche.name[language]}
+                  <span className="normal-case tracking-normal text-slate-400 ml-1 inline-flex items-center gap-1">
+                    · <NicheIcon niche={niche} className="w-3 h-3" /> {niche.name[language]}
                     {store.secondaryNiches.length > 0 && (
-                      <span className="ml-1">
-                        + {store.secondaryNiches.map(id => getNiche(id).icon).join(' ')}
+                      <span className="ml-1 inline-flex items-center gap-1">
+                        + {store.secondaryNiches.map(id => <NicheIcon key={id} niche={getNiche(id)} className="w-3 h-3" />)}
                       </span>
                     )}
                   </span>

@@ -22,6 +22,7 @@ import { ClientOrderModal } from './ClientOrderModal';
 import { NewDealModal } from './NewDealModal';
 import { useDataStore, type Deal } from '../utils/dataStore';
 import { confirmDialog } from '../utils/confirm';
+import { NicheIcon } from './NicheIcon';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
 import { useAutoRefresh } from '../utils/useAutoRefresh';
@@ -372,7 +373,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
               <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">
                 {l('Заказы', 'Тапсырыстар', 'Orders')}
                 {' · '}
-                <span className="normal-case tracking-normal text-slate-500">{niche.icon} {niche.name[language]}</span>
+                <span className="inline-flex items-center gap-1 normal-case tracking-normal text-slate-500"><NicheIcon niche={niche} className="w-3 h-3" /> {niche.name[language]}</span>
               </p>
               <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight">
                 {l('Воронка продаж', 'Сату воронкасы', 'Sales Funnel')}
@@ -546,7 +547,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                         : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
                     }`}
                   >
-                    <span>{n.icon}</span>
+                    <NicheIcon niche={n} className={`w-3.5 h-3.5 ${active ? 'text-white' : 'text-slate-400'}`} />
                     <span>{n.name[language]}</span>
                     <span className={`text-[10px] tabular-nums ${active ? 'text-white/70' : 'text-slate-400'}`}>{count}</span>
                   </button>
@@ -668,7 +669,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
         {showEmptyHero ? (
           <div className="flex-1 flex items-center justify-center px-4 pb-12 overflow-y-auto">
             <div className="text-center max-w-md">
-              <div className="text-5xl mb-4">{niche.icon}</div>
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/60 ring-1 ring-white/60 shadow-[0_8px_24px_-10px_rgba(15,23,42,0.18)] flex items-center justify-center text-slate-500"><NicheIcon niche={niche} className="w-7 h-7" /></div>
               <h2 className="text-xl text-slate-900 mb-2 tracking-tight">
                 {l(`Здесь будут ваши сделки`, 'Мәмілелер осы жерде болады', 'Your deals will live here')}
               </h2>
@@ -1195,7 +1196,7 @@ function DealCard(props: {
           which direction this deal is for at a glance. */}
       {showNicheChip && (
         <div className="mb-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50/70 text-emerald-700 text-[10px] ring-1 ring-emerald-100/60">
-          <span>{dealNiche.icon}</span>
+          <NicheIcon niche={dealNiche} className="w-3 h-3 flex-shrink-0" />
           <span className="truncate">{dealNiche.name[language]}</span>
         </div>
       )}

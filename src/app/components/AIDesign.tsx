@@ -21,6 +21,7 @@ import {
 import { api } from '../utils/api';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
+import { NicheIcon } from './NicheIcon';
 import utirLogo from '../../imports/utirsoft.png';
 
 // ─── Brand-icon SVGs (real provider logos, inline so no extra requests) ──
@@ -533,7 +534,7 @@ export function AIDesign({ language }: AIDesignProps) {
             <p className="text-[11px] text-slate-400 mb-2 tracking-widest uppercase">
               AI Дизайн
               {' · '}
-              <span className="normal-case tracking-normal text-slate-500">{niche.icon} {niche.name[language]}</span>
+              <span className="inline-flex items-center gap-1 normal-case tracking-normal text-slate-500"><NicheIcon niche={niche} className="w-3 h-3" /> {niche.name[language]}</span>
             </p>
             <h1 className="text-slate-900 text-3xl md:text-4xl font-medium tracking-tight mb-1">
               {l('Генерация интерьеров', 'Интерьер генерациясы', 'Interior generator')}
@@ -832,7 +833,7 @@ export function AIDesign({ language }: AIDesignProps) {
                     title={nicheHint}
                   >
                     <Info className="w-2.5 h-2.5" />
-                    {niche.icon} {niche.name[language]}
+                    <NicheIcon niche={niche} className="w-2.5 h-2.5" /> {niche.name[language]}
                   </span>
                 )}
               </div>

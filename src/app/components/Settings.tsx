@@ -14,6 +14,7 @@ import { useDataStore, ALL_MODULES, ALL_ROLES, MODULE_GROUPS, type CatalogKey, t
 import { getNiche } from '../utils/niches';
 import { toast } from '../utils/toast';
 import { confirmDialog } from '../utils/confirm';
+import { NicheIcon } from './NicheIcon';
 import { api } from '../utils/api';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { t } from '../utils/translations';
@@ -1033,9 +1034,9 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
                               : 'border-gray-100 hover:border-emerald-200 text-gray-500'
                           }`}
                         >
-                          {active && <Check className="w-3 h-3 text-emerald-700" />}
-                          <span>{n.icon}</span>
+                          <NicheIcon niche={n} className={`w-3.5 h-3.5 ${active ? 'text-emerald-700' : 'text-slate-400'}`} />
                           <span>{n.name[language]}</span>
+                          {active && <Check className="w-3 h-3 text-emerald-700" />}
                         </button>
                       );
                     })}

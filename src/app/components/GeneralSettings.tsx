@@ -9,6 +9,7 @@ import { confirmDialog } from '../utils/confirm';
 import { NICHES, type NicheId, getNiche } from '../utils/niches';
 import { THEMES, type ThemeId, loadTheme, saveTheme, type ColorMode, loadMode, saveMode } from '../utils/theme';
 import { toast } from '../utils/toast';
+import { NicheIcon } from './NicheIcon';
 
 interface Props {
   language: 'kz' | 'ru' | 'eng';
@@ -627,7 +628,9 @@ function NicheSwitcherCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
     >
       {/* Current niche card */}
       <div className="flex items-center gap-3 p-4 mb-4 bg-amber-50/60 ring-1 ring-amber-100/60 rounded-2xl">
-        <div className="text-4xl">{current.icon}</div>
+        <div className="w-12 h-12 rounded-2xl bg-white/70 ring-1 ring-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0 shadow-[0_6px_16px_-6px_rgba(217,119,6,0.30)]">
+          <NicheIcon niche={current} className="w-5 h-5" />
+        </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm text-gray-900">{current.name[language]}</div>
           <div className="text-[11px] text-gray-500 mt-0.5 leading-relaxed line-clamp-2">
@@ -664,14 +667,18 @@ function NicheSwitcherCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
                   key={n.id}
                   onClick={() => !active && setPending(n.id)}
                   disabled={active}
-                  className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all ${
+                  className={`group flex flex-col items-center gap-2 p-3.5 rounded-2xl ring-1 transition-all ${
                     active
-                      ? 'border-amber-300 bg-amber-50/80 cursor-default'
-                      : 'border-gray-100 hover:border-amber-200 hover:bg-amber-50/40'
+                      ? 'ring-amber-300 bg-amber-50/80 shadow-[0_8px_24px_-10px_rgba(217,119,6,0.40)] cursor-default'
+                      : 'ring-white/60 bg-white/55 hover:bg-white hover:ring-amber-200 hover:shadow-[0_10px_28px_-12px_rgba(15,23,42,0.18)] hover:-translate-y-0.5'
                   }`}
                 >
-                  <span className="text-2xl">{n.icon}</span>
-                  <span className="text-[11px] text-gray-700 leading-tight">{n.name[language]}</span>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                    active ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500 group-hover:bg-amber-50 group-hover:text-amber-600'
+                  }`}>
+                    <NicheIcon niche={n} className="w-5 h-5" />
+                  </div>
+                  <span className="text-[11px] text-gray-700 leading-tight text-center">{n.name[language]}</span>
                   {active && (
                     <span className="text-[10px] text-amber-600 flex items-center gap-0.5">
                       <Check className="w-2.5 h-2.5" /> {l('сейчас', 'қазір', 'now')}
@@ -711,15 +718,15 @@ function NicheSwitcherCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
                         : [...store.secondaryNiches, n.id];
                       void store.setSecondaryNiches(next);
                     }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] border transition-all ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] ring-1 transition-all ${
                       active
-                        ? 'border-emerald-300 bg-emerald-50/80 text-emerald-800'
-                        : 'border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/40 text-gray-600'
+                        ? 'ring-emerald-300 bg-emerald-50/80 text-emerald-800 shadow-[0_4px_14px_-6px_var(--accent-shadow-sm)]'
+                        : 'ring-white/60 bg-white/55 hover:bg-white hover:ring-emerald-200 text-gray-600'
                     }`}
                   >
-                    {active && <Check className="w-3 h-3 text-emerald-700" />}
-                    <span>{n.icon}</span>
+                    <NicheIcon niche={n} className={`w-3.5 h-3.5 ${active ? 'text-emerald-700' : 'text-slate-400'}`} />
                     <span>{n.name[language]}</span>
+                    {active && <Check className="w-3 h-3 text-emerald-700" />}
                   </button>
                 );
               })}
@@ -748,7 +755,7 @@ function NicheSwitcherCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
             <h3 className="text-center text-sm text-gray-900 mb-1">
               {l('Сменить нишу на', 'Саланы ауыстыру:', 'Switch niche to')}
               {' '}
-              <b>{getNiche(pending).icon} {getNiche(pending).name[language]}</b>?
+              <b>{getNiche(pending).name[language]}</b>?
             </h3>
             <p className="text-center text-[11px] text-gray-500 leading-relaxed mb-4">
               {l(
