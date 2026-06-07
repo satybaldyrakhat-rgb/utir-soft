@@ -19,16 +19,20 @@ interface AIModelDef {
   name: string;
   short: string;
   desc: string;
+  // Localized descriptions for the model dropdown. `desc` stays as the RU
+  // default for any consumer that doesn't pass a language.
+  descKz: string;
+  descEng: string;
 }
 
 // Display names must match what server/aiChat.ts actually requests from each
 // provider's API — keep these in sync when bumping model versions.
 export const AI_MODELS: AIModelDef[] = [
-  { id: 'utir-ai',  name: 'UTIR AI',           short: 'UTIR AI',   desc: 'Управляет платформой · Claude Opus 4.7 + инструменты' },
-  { id: 'gemini',   name: 'Gemini 2.5 Pro',    short: 'Gemini 2.5', desc: 'Google · gemini-2.5-pro, мультимодальный' },
-  { id: 'claude',   name: 'Claude Opus 4.7',   short: 'Opus 4.7',   desc: 'Anthropic · claude-opus-4-7, 1M контекст, флагман' },
-  { id: 'chatgpt',  name: 'GPT-5',             short: 'GPT-5',      desc: 'OpenAI · gpt-5, флагман, мультимодальный' },
-  { id: 'deepseek', name: 'DeepSeek V3',       short: 'DeepSeek V3', desc: 'DeepSeek · deepseek-chat, лучший баланс цена/качество' },
+  { id: 'utir-ai',  name: 'UTIR AI',           short: 'UTIR AI',   desc: 'Управляет платформой · Claude Opus 4.7 + инструменты', descKz: 'Платформаны басқарады · Claude Opus 4.7 + құралдар', descEng: 'Runs the platform · Claude Opus 4.7 + tools' },
+  { id: 'gemini',   name: 'Gemini 2.5 Pro',    short: 'Gemini 2.5', desc: 'Google · gemini-2.5-pro, мультимодальный', descKz: 'Google · gemini-2.5-pro, мультимодалды', descEng: 'Google · gemini-2.5-pro, multimodal' },
+  { id: 'claude',   name: 'Claude Opus 4.7',   short: 'Opus 4.7',   desc: 'Anthropic · claude-opus-4-7, 1M контекст, флагман', descKz: 'Anthropic · claude-opus-4-7, 1M контекст, флагман', descEng: 'Anthropic · claude-opus-4-7, 1M context, flagship' },
+  { id: 'chatgpt',  name: 'GPT-5',             short: 'GPT-5',      desc: 'OpenAI · gpt-5, флагман, мультимодальный', descKz: 'OpenAI · gpt-5, флагман, мультимодалды', descEng: 'OpenAI · gpt-5, flagship, multimodal' },
+  { id: 'deepseek', name: 'DeepSeek V3',       short: 'DeepSeek V3', desc: 'DeepSeek · deepseek-chat, лучший баланс цена/качество', descKz: 'DeepSeek · deepseek-chat, баға/сапа теңгерімі', descEng: 'DeepSeek · deepseek-chat, best price/quality balance' },
 ];
 
 interface ProviderStatus {
@@ -485,7 +489,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                             <span className="ml-1 inline-flex px-1.5 py-0.5 rounded-full text-[8px] bg-emerald-100/70 text-emerald-700 ring-1 ring-white/40 uppercase tracking-wide">tools</span>
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">{m.desc}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">{l(m.desc, m.descKz, m.descEng)}</div>
                         {!enabled && status?.envVar && (
                           <div className="text-[10px] text-amber-700 mt-0.5">
                             {l('Подключите', 'Қосыңыз', 'Add')} {status.envVar} {l('в Railway', 'Railway ішінде', 'in Railway')}

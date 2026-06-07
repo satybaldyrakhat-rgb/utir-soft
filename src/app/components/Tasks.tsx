@@ -70,18 +70,22 @@ const UNASSIGNED: Employee = {
   telegramUsername: '', telegramConnected: false, tasksToday: 0, tasksDone: 0,
 };
 
+type Lang = 'kz' | 'ru' | 'eng';
+const pickLang = (t: { ru: string; kz: string; eng: string }, language: Lang) =>
+  language === 'kz' ? t.kz : language === 'eng' ? t.eng : t.ru;
+
 const columns = [
-  { id: 'new' as const, title: 'Новые', icon: Circle, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-200' },
-  { id: 'in_progress' as const, title: 'В работе', icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200' },
-  { id: 'review' as const, title: 'На проверке', icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', border: 'border-purple-200' },
-  { id: 'done' as const, title: 'Выполнено', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50', border: 'border-green-200' },
+  { id: 'new' as const, title: { ru: 'Новые', kz: 'Жаңа', eng: 'New' }, icon: Circle, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-200' },
+  { id: 'in_progress' as const, title: { ru: 'В работе', kz: 'Жұмыста', eng: 'In progress' }, icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200' },
+  { id: 'review' as const, title: { ru: 'На проверке', kz: 'Тексеруде', eng: 'In review' }, icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', border: 'border-purple-200' },
+  { id: 'done' as const, title: { ru: 'Выполнено', kz: 'Орындалды', eng: 'Done' }, icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50', border: 'border-green-200' },
 ];
 
-const priorityConfig: Record<string, { label: string; color: string; bg: string }> = {
-  low: { label: 'Низкий', color: 'text-gray-500', bg: 'bg-gray-100' },
-  medium: { label: 'Средний', color: 'text-blue-600', bg: 'bg-blue-50' },
-  high: { label: 'Высокий', color: 'text-orange-600', bg: 'bg-orange-50' },
-  urgent: { label: 'Срочно', color: 'text-red-600', bg: 'bg-red-50' },
+const priorityConfig: Record<string, { label: { ru: string; kz: string; eng: string }; color: string; bg: string }> = {
+  low: { label: { ru: 'Низкий', kz: 'Төмен', eng: 'Low' }, color: 'text-gray-500', bg: 'bg-gray-100' },
+  medium: { label: { ru: 'Средний', kz: 'Орташа', eng: 'Medium' }, color: 'text-blue-600', bg: 'bg-blue-50' },
+  high: { label: { ru: 'Высокий', kz: 'Жоғары', eng: 'High' }, color: 'text-orange-600', bg: 'bg-orange-50' },
+  urgent: { label: { ru: 'Срочно', kz: 'Шұғыл', eng: 'Urgent' }, color: 'text-red-600', bg: 'bg-red-50' },
 };
 
 interface TasksProps {
@@ -91,6 +95,7 @@ interface TasksProps {
 type ViewMode = 'board' | 'list' | 'employees';
 
 export function Tasks({ language }: TasksProps) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const store = useDataStore();
   // Poll backend every 15s so tasks created via Telegram bot show up without manual reload.
   useAutoRefresh(store.reloadAll, 15000);
@@ -197,9 +202,9 @@ export function Tasks({ language }: TasksProps) {
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
         <div>
-          <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">Задачи</p>
-          <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight mb-1">Задачи команды</h1>
-          <p className="text-sm text-slate-500">Ежедневные задачи сотрудников через Telegram-бот</p>
+          <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Задачи', 'Тапсырмалар', 'Tasks')}</p>
+          <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight mb-1">{l('Задачи команды', 'Команда тапсырмалары', 'Team tasks')}</h1>
+          <p className="text-sm text-slate-500">{l('Ежедневные задачи сотрудников через Telegram-бот', 'Қызметкерлердің күнделікті тапсырмалары Telegram-бот арқылы', 'Daily employee tasks via Telegram bot')}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -207,7 +212,7 @@ export function Tasks({ language }: TasksProps) {
             className="flex items-center gap-2 px-3 py-2 bg-[#2AABEE] text-white rounded-lg text-sm hover:bg-[#229ED9] transition-colors"
           >
             <Send className="w-4 h-4" />
-            Telegram-бот
+            {l('Telegram-бот', 'Telegram-бот', 'Telegram bot')}
           </button>
           <button
             onClick={() => {
@@ -226,25 +231,25 @@ export function Tasks({ language }: TasksProps) {
               downloadCsv(todayStampedName('tasks'), rowsToCsv(store.tasks, cols));
             }}
             className="flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs text-slate-600 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl transition-all"
-            title="Скачать задачи в CSV"
+            title={l('Скачать задачи в CSV', 'Тапсырмаларды CSV-ге жүктеу', 'Download tasks as CSV')}
           >
             <Download className="w-4 h-4" />
-            Экспорт
+            {l('Экспорт', 'Экспорт', 'Export')}
           </button>
           <button
             onClick={() => setShowImport(true)}
             className="flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs text-slate-600 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl transition-all"
-            title="Загрузить задачи из CSV"
+            title={l('Загрузить задачи из CSV', 'Тапсырмаларды CSV-ден жүктеу', 'Import tasks from CSV')}
           >
             <Upload className="w-4 h-4" />
-            Импорт
+            {l('Импорт', 'Импорт', 'Import')}
           </button>
           <button
             onClick={() => setShowNewTaskModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
           >
             <Plus className="w-4 h-4" />
-            Новая задача
+            {l('Новая задача', 'Жаңа тапсырма', 'New task')}
           </button>
         </div>
       </div>
@@ -259,15 +264,15 @@ export function Tasks({ language }: TasksProps) {
                 <Bot className="w-5 h-5 text-[#2AABEE]" />
               </div>
               <div>
-                <div className="text-sm text-gray-900">Telegram-бот платформы</div>
+                <div className="text-sm text-gray-900">{l('Telegram-бот платформы', 'Платформаның Telegram-боты', 'Platform Telegram bot')}</div>
                 <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
                   <span className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
-                  Не подключён
+                  {l('Не подключён', 'Қосылмаған', 'Not connected')}
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowBotSettings(true)} className="px-3 py-1.5 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-xl text-xs hover:bg-white">Настройки</button>
+              <button onClick={() => setShowBotSettings(true)} className="px-3 py-1.5 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-xl text-xs hover:bg-white">{l('Настройки', 'Баптаулар', 'Settings')}</button>
               <button onClick={() => setShowTelegramPanel(false)} className="w-8 h-8 bg-white/60 ring-1 ring-white/60 rounded-2xl flex items-center justify-center hover:bg-white transition-colors">
                 <X className="w-3.5 h-3.5 text-gray-400" />
               </button>
@@ -278,13 +283,13 @@ export function Tasks({ language }: TasksProps) {
           <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* How it will work */}
             <section>
-              <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">Как это будет работать</div>
+              <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Как это будет работать', 'Бұл қалай жұмыс істейді', 'How it will work')}</div>
               <ol className="space-y-2.5">
                 {[
-                  'Сотрудник пишет боту свои задачи на день',
-                  'Бот форматирует список и просит подтверждения',
-                  'Сотрудник подтверждает — задачи попадают на платформу',
-                  'По завершении сотрудник пишет отчёт боту',
+                  l('Сотрудник пишет боту свои задачи на день', 'Қызметкер ботқа күнделікті тапсырмаларын жазады', 'Employee writes their tasks for the day to the bot'),
+                  l('Бот форматирует список и просит подтверждения', 'Бот тізімді құрастырып, растауды сұрайды', 'The bot formats the list and asks for confirmation'),
+                  l('Сотрудник подтверждает — задачи попадают на платформу', 'Қызметкер растайды — тапсырмалар платформаға түседі', 'Employee confirms — tasks appear on the platform'),
+                  l('По завершении сотрудник пишет отчёт боту', 'Аяқталған соң қызметкер ботқа есеп жазады', 'When finished, the employee sends a report to the bot'),
                 ].map((step, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-xs text-gray-600">
                     <span className="w-5 h-5 flex-shrink-0 rounded-lg bg-gray-50 text-gray-500 text-[10px] flex items-center justify-center tabular-nums">{i + 1}</span>
@@ -296,14 +301,14 @@ export function Tasks({ language }: TasksProps) {
 
             {/* Connected employees — empty state */}
             <section>
-              <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">Подключённые сотрудники</div>
+              <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Подключённые сотрудники', 'Қосылған қызметкерлер', 'Connected employees')}</div>
               <div className="bg-white/40 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-6 text-center">
                 <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-white border border-gray-100 flex items-center justify-center">
                   <Send className="w-4 h-4 text-gray-300" />
                 </div>
-                <div className="text-xs text-gray-700 mb-1">Пока никто не подключён</div>
+                <div className="text-xs text-gray-700 mb-1">{l('Пока никто не подключён', 'Әзірге ешкім қосылмаған', 'No one is connected yet')}</div>
                 <div className="text-[11px] text-gray-400 leading-relaxed max-w-[260px] mx-auto">
-                  Сотрудники появятся здесь после того, как Админ настроит Telegram-бот и пригласит команду.
+                  {l('Сотрудники появятся здесь после того, как Админ настроит Telegram-бот и пригласит команду.', 'Әкімші Telegram-ботты баптап, командаға шақыру жібергеннен кейін қызметкерлер осында пайда болады.', 'Employees will appear here after the Admin sets up the Telegram bot and invites the team.')}
                 </div>
               </div>
             </section>
@@ -312,7 +317,7 @@ export function Tasks({ language }: TasksProps) {
           {/* Footer hint */}
           <div className="px-5 py-3 border-t border-gray-50 text-[11px] text-gray-400 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 bg-amber-400 rounded-full" />
-            Полная интеграция Telegram-бота — в следующем обновлении. Сейчас задачи добавляются вручную.
+            {l('Полная интеграция Telegram-бота — в следующем обновлении. Сейчас задачи добавляются вручную.', 'Telegram-боттың толық интеграциясы — келесі жаңартуда. Қазір тапсырмалар қолмен қосылады.', 'Full Telegram bot integration is coming in the next update. For now, tasks are added manually.')}
           </div>
         </div>
       )}
@@ -320,23 +325,23 @@ export function Tasks({ language }: TasksProps) {
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
-          <div className="text-xs text-gray-500 mb-1">Всего на сегодня</div>
+          <div className="text-xs text-gray-500 mb-1">{l('Всего на сегодня', 'Барлығы бүгінге', 'Total for today')}</div>
           <div className="text-2xl text-gray-900">{stats.total}</div>
         </div>
         <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
-          <div className="text-xs text-blue-500 mb-1">Новые</div>
+          <div className="text-xs text-blue-500 mb-1">{l('Новые', 'Жаңа', 'New')}</div>
           <div className="text-2xl text-gray-900">{stats.newCount}</div>
         </div>
         <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
-          <div className="text-xs text-yellow-500 mb-1">В работе</div>
+          <div className="text-xs text-yellow-500 mb-1">{l('В работе', 'Жұмыста', 'In progress')}</div>
           <div className="text-2xl text-gray-900">{stats.inProgress}</div>
         </div>
         <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
-          <div className="text-xs text-purple-500 mb-1">На проверке</div>
+          <div className="text-xs text-purple-500 mb-1">{l('На проверке', 'Тексеруде', 'In review')}</div>
           <div className="text-2xl text-gray-900">{stats.review}</div>
         </div>
         <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
-          <div className="text-xs text-green-500 mb-1">Выполнено</div>
+          <div className="text-xs text-green-500 mb-1">{l('Выполнено', 'Орындалды', 'Done')}</div>
           <div className="text-2xl text-gray-900">{stats.done}</div>
           <div className="w-full h-1.5 bg-gray-100 rounded-full mt-2 overflow-hidden">
             <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: stats.total > 0 ? `${(stats.done / stats.total) * 100}%` : '0%' }} />
@@ -350,9 +355,9 @@ export function Tasks({ language }: TasksProps) {
           {/* View mode */}
           <div className="flex bg-gray-100 rounded-lg p-1">
             {([
-              { key: 'board' as ViewMode, label: 'Доска' },
-              { key: 'list' as ViewMode, label: 'Список' },
-              { key: 'employees' as ViewMode, label: 'Сотрудники' },
+              { key: 'board' as ViewMode, label: l('Доска', 'Тақта', 'Board') },
+              { key: 'list' as ViewMode, label: l('Список', 'Тізім', 'List') },
+              { key: 'employees' as ViewMode, label: l('Сотрудники', 'Қызметкерлер', 'Employees') },
             ]).map(v => (
               <button
                 key={v.key}
@@ -369,7 +374,7 @@ export function Tasks({ language }: TasksProps) {
             onChange={e => setFilterEmployee(e.target.value)}
             className="px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
           >
-            <option value="all">Все сотрудники</option>
+            <option value="all">{l('Все сотрудники', 'Барлық қызметкерлер', 'All employees')}</option>
             {teamEmployees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
 
@@ -378,11 +383,11 @@ export function Tasks({ language }: TasksProps) {
             onChange={e => setFilterPriority(e.target.value)}
             className="px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
           >
-            <option value="all">Все приоритеты</option>
-            <option value="urgent">Срочно</option>
-            <option value="high">Высокий</option>
-            <option value="medium">Средний</option>
-            <option value="low">Низкий</option>
+            <option value="all">{l('Все приоритеты', 'Барлық басымдықтар', 'All priorities')}</option>
+            <option value="urgent">{l('Срочно', 'Шұғыл', 'Urgent')}</option>
+            <option value="high">{l('Высокий', 'Жоғары', 'High')}</option>
+            <option value="medium">{l('Средний', 'Орташа', 'Medium')}</option>
+            <option value="low">{l('Низкий', 'Төмен', 'Low')}</option>
           </select>
 
           <select
@@ -390,7 +395,7 @@ export function Tasks({ language }: TasksProps) {
             onChange={e => setFilterCategory(e.target.value)}
             className="px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
           >
-            <option value="all">Все категории</option>
+            <option value="all">{l('Все категории', 'Барлық санаттар', 'All categories')}</option>
             {taskCategories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
 
@@ -399,10 +404,10 @@ export function Tasks({ language }: TasksProps) {
             onChange={e => setFilterDue(e.target.value as any)}
             className="px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
           >
-            <option value="all">Все сроки</option>
-            <option value="overdue">Просроченные</option>
-            <option value="today">На сегодня</option>
-            <option value="week">На неделю</option>
+            <option value="all">{l('Все сроки', 'Барлық мерзімдер', 'All due dates')}</option>
+            <option value="overdue">{l('Просроченные', 'Мерзімі өткен', 'Overdue')}</option>
+            <option value="today">{l('На сегодня', 'Бүгінге', 'Today')}</option>
+            <option value="week">{l('На неделю', 'Аптаға', 'This week')}</option>
           </select>
         </div>
 
@@ -410,7 +415,7 @@ export function Tasks({ language }: TasksProps) {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Поиск задач..."
+            placeholder={l('Поиск задач...', 'Тапсырмаларды іздеу...', 'Search tasks...')}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="pl-9 pr-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm w-56 focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
@@ -423,17 +428,20 @@ export function Tasks({ language }: TasksProps) {
       {viewMode === 'board' && tasks.length === 0 && (
         <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
           <CheckCircle2 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-lg text-slate-900 mb-1 tracking-tight">Здесь будут задачи команды</h3>
+          <h3 className="text-lg text-slate-900 mb-1 tracking-tight">{l('Здесь будут задачи команды', 'Мұнда команда тапсырмалары болады', 'Team tasks will appear here')}</h3>
           <p className="text-xs text-slate-500 mb-5 max-w-md mx-auto leading-relaxed">
-            Канбан-доска: Новые → В работе → На проверке → Выполнено. Привязывайте задачи к сделкам,
-            назначайте сотрудников, ставьте сроки. Категории — под нишу «{niche.name[language]}».
+            {l(
+              'Канбан-доска: Новые → В работе → На проверке → Выполнено. Привязывайте задачи к сделкам, назначайте сотрудников, ставьте сроки. Категории — под нишу',
+              'Канбан-тақта: Жаңа → Жұмыста → Тексеруде → Орындалды. Тапсырмаларды мәмілелерге байланыстырыңыз, қызметкерлерді тағайындаңыз, мерзім қойыңыз. Санаттар — сала бойынша',
+              'Kanban board: New → In progress → In review → Done. Link tasks to deals, assign employees, set due dates. Categories match the niche',
+            )} «{niche.name[language]}».
           </p>
           <div className="flex items-center gap-2 justify-center flex-wrap">
             <button
               onClick={() => setShowNewTaskModal(true)}
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
             >
-              <Plus className="w-3.5 h-3.5" /> Создать первую задачу
+              <Plus className="w-3.5 h-3.5" /> {l('Создать первую задачу', 'Алғашқы тапсырманы жасау', 'Create the first task')}
             </button>
             <button
               onClick={() => {
@@ -443,7 +451,7 @@ export function Tasks({ language }: TasksProps) {
               }}
               className="flex items-center gap-2 px-4 py-2.5 bg-violet-600/90 hover:bg-violet-700 text-white rounded-2xl text-xs ring-1 ring-white/10 transition-all"
             >
-              ✨ Через AI
+              ✨ {l('Через AI', 'AI арқылы', 'Via AI')}
             </button>
           </div>
         </div>
@@ -459,7 +467,7 @@ export function Tasks({ language }: TasksProps) {
               <div key={col.id} className="min-h-[200px]">
                 <div className={`flex items-center gap-2 mb-3 px-1`}>
                   <Icon className={`w-4 h-4 ${col.color}`} />
-                  <span className="text-sm text-gray-700">{col.title}</span>
+                  <span className="text-sm text-gray-700">{pickLang(col.title, language)}</span>
                   <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded ml-1">{colTasks.length}</span>
                 </div>
                 <div className="space-y-3">
@@ -468,6 +476,7 @@ export function Tasks({ language }: TasksProps) {
                       key={task.id}
                       task={task}
                       categories={taskCategories}
+                      language={language}
                       onClick={() => setSelectedTask(task)}
                       onMove={moveTask}
                     />
@@ -485,13 +494,13 @@ export function Tasks({ language }: TasksProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/60 bg-white/30">
-                <th className="px-4 py-3 text-left text-xs text-gray-500">Задача</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">Категория</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">Исполнитель</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">Приоритет</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">Статус</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">Источник</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">Срок</th>
+                <th className="px-4 py-3 text-left text-xs text-gray-500">{l('Задача', 'Тапсырма', 'Task')}</th>
+                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Категория', 'Санат', 'Category')}</th>
+                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Исполнитель', 'Орындаушы', 'Assignee')}</th>
+                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Приоритет', 'Басымдық', 'Priority')}</th>
+                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Статус', 'Күй', 'Status')}</th>
+                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Источник', 'Дереккөз', 'Source')}</th>
+                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Срок', 'Мерзім', 'Due')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -513,7 +522,7 @@ export function Tasks({ language }: TasksProps) {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded ${pr.bg} ${pr.color}`}>{pr.label}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${pr.bg} ${pr.color}`}>{pickLang(pr.label, language)}</span>
                     </td>
                     <td className="px-3 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -522,7 +531,7 @@ export function Tasks({ language }: TasksProps) {
                         task.status === 'in_progress' ? 'bg-yellow-50 text-yellow-700' :
                         'bg-blue-50 text-blue-700'
                       }`}>
-                        {columns.find(c => c.id === task.status)?.title}
+                        {(() => { const c = columns.find(c => c.id === task.status); return c ? pickLang(c.title, language) : ''; })()}
                       </span>
                     </td>
                     <td className="px-3 py-3">
@@ -532,11 +541,11 @@ export function Tasks({ language }: TasksProps) {
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[10px] text-gray-500">
-                          <Smartphone className="w-3 h-3" /> Платформа
+                          <Smartphone className="w-3 h-3" /> {l('Платформа', 'Платформа', 'Platform')}
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-xs text-gray-600 whitespace-nowrap">{task.dueDate === today ? 'Сегодня' : task.dueDate}</td>
+                    <td className="px-3 py-3 text-xs text-gray-600 whitespace-nowrap">{task.dueDate === today ? l('Сегодня', 'Бүгін', 'Today') : task.dueDate}</td>
                   </tr>
                 );
               })}
@@ -550,8 +559,8 @@ export function Tasks({ language }: TasksProps) {
         <div className="space-y-4">
           {teamEmployees.length === 0 && (
             <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-8 text-center">
-              <div className="text-sm text-gray-500 mb-1">Пока никого в команде</div>
-              <div className="text-xs text-gray-400">Добавьте сотрудников в Настройках → Команда — они появятся здесь со своими задачами.</div>
+              <div className="text-sm text-gray-500 mb-1">{l('Пока никого в команде', 'Әзірге командада ешкім жоқ', 'No one in the team yet')}</div>
+              <div className="text-xs text-gray-400">{l('Добавьте сотрудников в Настройках → Команда — они появятся здесь со своими задачами.', 'Қызметкерлерді Баптаулар → Команда бөлімінде қосыңыз — олар осында тапсырмаларымен пайда болады.', 'Add employees in Settings → Team — they will appear here with their tasks.')}</div>
             </div>
           )}
           {teamEmployees.map(emp => {
@@ -574,7 +583,7 @@ export function Tasks({ language }: TasksProps) {
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <div className="text-sm text-gray-900">{empDone}/{empTasks.length}</div>
-                      <div className="text-xs text-gray-400">задач</div>
+                      <div className="text-xs text-gray-400">{l('задач', 'тапсырма', 'tasks')}</div>
                     </div>
                     <div className="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: empTasks.length > 0 ? `${(empDone / empTasks.length) * 100}%` : '0%' }} />
@@ -584,7 +593,7 @@ export function Tasks({ language }: TasksProps) {
                 </button>
                 {isExpanded && (
                   <div className="border-t border-white/60 p-4 space-y-2">
-                    {empTasks.length === 0 && <div className="text-sm text-gray-400 text-center py-4">Нет задач</div>}
+                    {empTasks.length === 0 && <div className="text-sm text-gray-400 text-center py-4">{l('Нет задач', 'Тапсырма жоқ', 'No tasks')}</div>}
                     {empTasks.map(task => {
                       const statusCol = columns.find(c => c.id === task.status)!;
                       const StatusIcon = statusCol.icon;
@@ -600,7 +609,7 @@ export function Tasks({ language }: TasksProps) {
                               <div className="text-sm text-gray-900">{task.title}</div>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColor(task.category, taskCategories)}`}>{task.category}</span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${priorityConfig[task.priority].bg} ${priorityConfig[task.priority].color}`}>{priorityConfig[task.priority].label}</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${priorityConfig[task.priority].bg} ${priorityConfig[task.priority].color}`}>{pickLang(priorityConfig[task.priority].label, language)}</span>
                               </div>
                             </div>
                           </div>
@@ -620,6 +629,7 @@ export function Tasks({ language }: TasksProps) {
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
+          language={language}
           storeEmployees={store.employees}
           onClose={() => setSelectedTask(null)}
           onMoveStatus={(status) => moveTask(selectedTask.id, status)}
@@ -649,6 +659,7 @@ export function Tasks({ language }: TasksProps) {
       {showNewTaskModal && (
         <NewTaskModal
           employees={teamEmployees}
+          language={language}
           categories={taskCategories}
           deals={store.deals.filter(d => d.status !== 'rejected').map(d => ({ id: d.id, customerName: d.customerName, product: d.product }))}
           onClose={() => setShowNewTaskModal(false)}
@@ -667,7 +678,7 @@ export function Tasks({ language }: TasksProps) {
       {showImport && (
         <CsvImportModal
           language={language}
-          title="Задачи"
+          title={l('Задачи', 'Тапсырмалар', 'Tasks')}
           fields={(() => {
             const f: CsvFieldSpec[] = [
               { key: 'title',       headers: ['Название', 'Title'], required: true },
@@ -708,7 +719,8 @@ export function Tasks({ language }: TasksProps) {
 }
 
 // ─── TASK CARD ───────────────────────────────────────────────
-function TaskCard({ task, categories, onClick, onMove }: { task: Task; categories: string[]; onClick: () => void; onMove: (id: string, status: Task['status']) => void }) {
+function TaskCard({ task, categories, language, onClick, onMove }: { task: Task; categories: string[]; language: 'kz' | 'ru' | 'eng'; onClick: () => void; onMove: (id: string, status: Task['status']) => void }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const next = task.status === 'new' ? 'in_progress' : task.status === 'in_progress' ? 'review' : task.status === 'review' ? 'done' : null;
   const subtasksDone = task.subtasks?.filter(s => s.done).length || 0;
   const subtasksTotal = task.subtasks?.length || 0;
@@ -728,8 +740,8 @@ function TaskCard({ task, categories, onClick, onMove }: { task: Task; categorie
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColor(task.category, categories)}`}>{task.category}</span>
-          {task.priority === 'urgent' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600">Срочно</span>}
-          {task.priority === 'high' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">Высокий</span>}
+          {task.priority === 'urgent' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600">{l('Срочно', 'Шұғыл', 'Urgent')}</span>}
+          {task.priority === 'high' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">{l('Высокий', 'Жоғары', 'High')}</span>}
         </div>
         {task.source === 'telegram' && <Send className="w-3 h-3 text-[#2AABEE]" />}
       </div>
@@ -742,7 +754,7 @@ function TaskCard({ task, categories, onClick, onMove }: { task: Task; categorie
           isOverdue ? 'bg-rose-100 text-rose-700' : isDueToday ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'
         }`}>
           <Calendar className="w-2.5 h-2.5" />
-          {isOverdue ? 'Просрочено · ' : isDueToday ? 'Сегодня · ' : ''}{task.dueDate}
+          {isOverdue ? l('Просрочено · ', 'Мерзімі өтті · ', 'Overdue · ') : isDueToday ? l('Сегодня · ', 'Бүгін · ', 'Today · ') : ''}{task.dueDate}
         </div>
       )}
 
@@ -769,9 +781,9 @@ function TaskCard({ task, categories, onClick, onMove }: { task: Task; categorie
           <button
             onClick={(e) => { e.stopPropagation(); onMove(task.id, next as Task['status']); }}
             className="text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg flex items-center gap-0.5 transition-colors"
-            title="Передвинуть на следующий этап"
+            title={l('Передвинуть на следующий этап', 'Келесі кезеңге жылжыту', 'Move to the next stage')}
           >
-            {next === 'in_progress' ? 'В работу' : next === 'review' ? 'На проверку' : 'Готово'}
+            {next === 'in_progress' ? l('В работу', 'Жұмысқа', 'Start') : next === 'review' ? l('На проверку', 'Тексеруге', 'To review') : l('Готово', 'Дайын', 'Done')}
             <ArrowRight className="w-3 h-3" />
           </button>
         )}
@@ -781,13 +793,15 @@ function TaskCard({ task, categories, onClick, onMove }: { task: Task; categorie
 }
 
 // ─── NEW TASK MODAL ──────────────────────────────────────────
-function NewTaskModal({ employees, categories, deals, onClose, onAdd }: {
+function NewTaskModal({ employees, categories, language, deals, onClose, onAdd }: {
   employees: Employee[];
   categories: string[];
+  language: 'kz' | 'ru' | 'eng';
   deals: Array<{ id: string; customerName: string; product: string }>;
   onClose: () => void;
   onAdd: (task: Task) => void;
 }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   // If no team yet, default assigneeId to '' (unassigned).
@@ -822,57 +836,57 @@ function NewTaskModal({ employees, categories, deals, onClose, onAdd }: {
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-white/60 flex items-center justify-between">
-          <h2 className="text-gray-900">Новая задача</h2>
+          <h2 className="text-gray-900">{l('Новая задача', 'Жаңа тапсырма', 'New task')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Название задачи *</label>
+            <label className="text-xs text-gray-500 mb-1 block">{l('Название задачи *', 'Тапсырма атауы *', 'Task title *')}</label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="Например: Выезд на замер — ул. Абая 12"
+              placeholder={l('Например: Выезд на замер — ул. Абая 12', 'Мысалы: Өлшеуге шығу — Абай к-сі 12', 'For example: Site measurement — 12 Abay St.')}
               className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
             />
           </div>
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Описание</label>
+            <label className="text-xs text-gray-500 mb-1 block">{l('Описание', 'Сипаттама', 'Description')}</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={3}
-              placeholder="Подробности задачи..."
+              placeholder={l('Подробности задачи...', 'Тапсырма мәліметтері...', 'Task details...')}
               className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all resize-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Исполнитель</label>
+              <label className="text-xs text-gray-500 mb-1 block">{l('Исполнитель', 'Орындаушы', 'Assignee')}</label>
               <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
-                <option value="">Не назначен</option>
+                <option value="">{l('Не назначен', 'Тағайындалмаған', 'Unassigned')}</option>
                 {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Приоритет</label>
+              <label className="text-xs text-gray-500 mb-1 block">{l('Приоритет', 'Басымдық', 'Priority')}</label>
               <select value={priority} onChange={e => setPriority(e.target.value as Task['priority'])} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
-                <option value="low">Низкий</option>
-                <option value="medium">Средний</option>
-                <option value="high">Высокий</option>
-                <option value="urgent">Срочно</option>
+                <option value="low">{l('Низкий', 'Төмен', 'Low')}</option>
+                <option value="medium">{l('Средний', 'Орташа', 'Medium')}</option>
+                <option value="high">{l('Высокий', 'Жоғары', 'High')}</option>
+                <option value="urgent">{l('Срочно', 'Шұғыл', 'Urgent')}</option>
               </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Категория</label>
+              <label className="text-xs text-gray-500 mb-1 block">{l('Категория', 'Санат', 'Category')}</label>
               <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Срок</label>
+              <label className="text-xs text-gray-500 mb-1 block">{l('Срок', 'Мерзім', 'Due')}</label>
               <input
                 type="date"
                 value={dueDate}
@@ -885,9 +899,9 @@ function NewTaskModal({ employees, categories, deals, onClose, onAdd }: {
               the task shows up there. Optional. */}
           {deals.length > 0 && (
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Связать со сделкой</label>
+              <label className="text-xs text-gray-500 mb-1 block">{l('Связать со сделкой', 'Мәмілеге байланыстыру', 'Link to a deal')}</label>
               <select value={linkedDealId} onChange={e => setLinkedDealId(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
-                <option value="">— без привязки —</option>
+                <option value="">{l('— без привязки —', '— байланыссыз —', '— no link —')}</option>
                 {deals.map(d => <option key={d.id} value={d.id}>{d.customerName}{d.product ? ` · ${d.product}` : ''}</option>)}
               </select>
             </div>
@@ -897,7 +911,7 @@ function NewTaskModal({ employees, categories, deals, onClose, onAdd }: {
             disabled={!title.trim()}
             className="w-full py-2.5 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Создать задачу
+            {l('Создать задачу', 'Тапсырма жасау', 'Create task')}
           </button>
         </div>
       </div>
@@ -919,6 +933,7 @@ function TaskDetailModal({
   task,
   storeEmployees,
   categories,
+  language,
   canDelete,
   onClose,
   onMoveStatus,
@@ -928,12 +943,14 @@ function TaskDetailModal({
   task: Task;
   storeEmployees: { id: string; name: string }[];
   categories: string[];
+  language: 'kz' | 'ru' | 'eng';
   canDelete: boolean;
   onClose: () => void;
   onMoveStatus: (s: Task['status']) => void;
   onSave: (u: TaskUpdates) => void;
   onDelete: () => void;
 }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   // Local edit state — initialized from task and reset when a different task is opened.
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
@@ -987,7 +1004,7 @@ function TaskDetailModal({
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColor(category, categoryOptions)}`}>{category}</span>
                 <span className={`text-xs px-2 py-0.5 rounded ${priorityConfig[priority].bg} ${priorityConfig[priority].color}`}>
-                  {priorityConfig[priority].label}
+                  {pickLang(priorityConfig[priority].label, language)}
                 </span>
                 {task.source === 'telegram' && (
                   <span className="inline-flex items-center gap-1 text-[10px] text-[#2AABEE] bg-blue-50 px-2 py-0.5 rounded-full">
@@ -999,7 +1016,7 @@ function TaskDetailModal({
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                placeholder="Название задачи"
+                placeholder={l('Название задачи', 'Тапсырма атауы', 'Task title')}
                 className="w-full text-gray-900 text-base bg-transparent border-0 border-b border-transparent hover:border-gray-200 focus:border-gray-300 focus:outline-none px-0 py-0.5"
               />
             </div>
@@ -1012,12 +1029,12 @@ function TaskDetailModal({
         <div className="p-5 space-y-5">
           {/* Description */}
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Описание</label>
+            <label className="text-xs text-gray-500 mb-1 block">{l('Описание', 'Сипаттама', 'Description')}</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={3}
-              placeholder="Подробности задачи…"
+              placeholder={l('Подробности задачи…', 'Тапсырма мәліметтері…', 'Task details…')}
               className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all resize-none"
             />
           </div>
@@ -1025,7 +1042,7 @@ function TaskDetailModal({
           {/* Assignee + Priority */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Исполнитель</label>
+              <label className="text-xs text-gray-500 mb-1 block">{l('Исполнитель', 'Орындаушы', 'Assignee')}</label>
               <select
                 value={assigneeId}
                 onChange={e => setAssigneeId(e.target.value)}
@@ -1041,16 +1058,16 @@ function TaskDetailModal({
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Приоритет</label>
+              <label className="text-xs text-gray-500 mb-1 block">{l('Приоритет', 'Басымдық', 'Priority')}</label>
               <select
                 value={priority}
                 onChange={e => setPriority(e.target.value as Task['priority'])}
                 className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all"
               >
-                <option value="low">Низкий</option>
-                <option value="medium">Средний</option>
-                <option value="high">Высокий</option>
-                <option value="urgent">Срочно</option>
+                <option value="low">{l('Низкий', 'Төмен', 'Low')}</option>
+                <option value="medium">{l('Средний', 'Орташа', 'Medium')}</option>
+                <option value="high">{l('Высокий', 'Жоғары', 'High')}</option>
+                <option value="urgent">{l('Срочно', 'Шұғыл', 'Urgent')}</option>
               </select>
             </div>
           </div>
@@ -1058,7 +1075,7 @@ function TaskDetailModal({
           {/* Category + Due date */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Категория</label>
+              <label className="text-xs text-gray-500 mb-1 block">{l('Категория', 'Санат', 'Category')}</label>
               <select
                 value={category}
                 onChange={e => setCategory(e.target.value)}
@@ -1068,7 +1085,7 @@ function TaskDetailModal({
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Срок</label>
+              <label className="text-xs text-gray-500 mb-1 block">{l('Срок', 'Мерзім', 'Due')}</label>
               <input
                 type="date"
                 value={dueDate}
@@ -1080,7 +1097,7 @@ function TaskDetailModal({
 
           {/* Status flow */}
           <div>
-            <label className="text-xs text-gray-500 mb-2 block">Статус</label>
+            <label className="text-xs text-gray-500 mb-2 block">{l('Статус', 'Күй', 'Status')}</label>
             <div className="flex items-center gap-1 flex-wrap">
               {columns.map((col, i) => {
                 const isActive = col.id === task.status;
@@ -1097,7 +1114,7 @@ function TaskDetailModal({
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
-                      {col.title}
+                      {pickLang(col.title, language)}
                     </button>
                     {i < columns.length - 1 && <ArrowRight className="w-3 h-3 text-gray-300 flex-shrink-0" />}
                   </div>
@@ -1109,7 +1126,7 @@ function TaskDetailModal({
           {/* Subtasks (read-only — separate editor would be a bigger feature) */}
           {task.subtasks && task.subtasks.length > 0 && (
             <div>
-              <div className="text-xs text-gray-500 mb-2">Подзадачи ({task.subtasks.filter(s => s.done).length}/{task.subtasks.length})</div>
+              <div className="text-xs text-gray-500 mb-2">{l('Подзадачи', 'Ішкі тапсырмалар', 'Subtasks')} ({task.subtasks.filter(s => s.done).length}/{task.subtasks.length})</div>
               <div className="space-y-1.5">
                 {task.subtasks.map(sub => (
                   <div key={sub.id} className="flex items-center gap-2 py-1">
@@ -1126,7 +1143,7 @@ function TaskDetailModal({
             <div className="bg-green-50 rounded-lg p-3 border border-green-100">
               <div className="flex items-center gap-2 mb-1">
                 <CheckCircle2 className="w-4 h-4 text-green-600" />
-                <span className="text-xs text-green-700">Отчёт о выполнении (через Telegram)</span>
+                <span className="text-xs text-green-700">{l('Отчёт о выполнении (через Telegram)', 'Орындалу туралы есеп (Telegram арқылы)', 'Completion report (via Telegram)')}</span>
               </div>
               <p className="text-sm text-green-800">{task.completionNote}</p>
             </div>
@@ -1136,12 +1153,12 @@ function TaskDetailModal({
           <div className="flex items-center gap-6 text-xs text-gray-500 flex-wrap">
             <div className="flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
-              Создано: {new Date(task.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              {l('Создано', 'Жасалды', 'Created')}: {new Date(task.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
             </div>
             {task.completedAt && (
               <div className="flex items-center gap-1">
                 <Check className="w-3.5 h-3.5 text-green-500" />
-                Выполнено: {new Date(task.completedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                {l('Выполнено', 'Орындалды', 'Completed')}: {new Date(task.completedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
               </div>
             )}
           </div>
@@ -1155,31 +1172,31 @@ function TaskDetailModal({
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Check className="w-4 h-4" />
-                Сохранить
+                {l('Сохранить', 'Сақтау', 'Save')}
               </button>
               <button
                 onClick={onClose}
                 className="px-4 py-2.5 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-2xl text-sm hover:bg-white transition-colors"
               >
-                Отмена
+                {l('Отмена', 'Болдырмау', 'Cancel')}
               </button>
             </div>
             {/* Delete is gated — a restricted/view-only role can edit
                 task status but can't permanently destroy a task. */}
             {canDelete && (confirmDelete ? (
               <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-lg">
-                <span className="text-xs text-red-700 flex-1">Удалить задачу безвозвратно?</span>
+                <span className="text-xs text-red-700 flex-1">{l('Удалить задачу безвозвратно?', 'Тапсырманы біржола жою керек пе?', 'Delete this task permanently?')}</span>
                 <button
                   onClick={onDelete}
                   className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors"
                 >
-                  Да, удалить
+                  {l('Да, удалить', 'Иә, жою', 'Yes, delete')}
                 </button>
                 <button
                   onClick={() => setConfirmDelete(false)}
                   className="px-3 py-1 text-gray-600 rounded text-xs hover:bg-white transition-colors"
                 >
-                  Отмена
+                  {l('Отмена', 'Болдырмау', 'Cancel')}
                 </button>
               </div>
             ) : (
@@ -1188,7 +1205,7 @@ function TaskDetailModal({
                 className="flex items-center justify-center gap-2 px-4 py-2 text-red-600 rounded-lg text-sm hover:bg-red-50 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
-                Удалить задачу
+                {l('Удалить задачу', 'Тапсырманы жою', 'Delete task')}
               </button>
             ))}
           </div>
