@@ -330,19 +330,21 @@
 /* Solid surfaces (cards, modals, inputs use bg-white) */
 .dark .bg-white { background-color: #1e293b !important; }
 
-/* Liquid-glass surfaces — bg-white/NN → translucent slate-800 */
-.dark .bg-white\/10 { background-color: rgba(30,41,59,0.30) !important; }
-.dark .bg-white\/20 { background-color: rgba(30,41,59,0.35) !important; }
-.dark .bg-white\/30 { background-color: rgba(30,41,59,0.42) !important; }
-.dark .bg-white\/40 { background-color: rgba(30,41,59,0.48) !important; }
-.dark .bg-white\/50 { background-color: rgba(30,41,59,0.52) !important; }
-.dark .bg-white\/55 { background-color: rgba(30,41,59,0.55) !important; }
-.dark .bg-white\/60 { background-color: rgba(30,41,59,0.58) !important; }
-.dark .bg-white\/70 { background-color: rgba(30,41,59,0.64) !important; }
-.dark .bg-white\/80 { background-color: rgba(30,41,59,0.72) !important; }
-.dark .bg-white\/85 { background-color: rgba(30,41,59,0.80) !important; }
-.dark .bg-white\/90 { background-color: rgba(30,41,59,0.86) !important; }
-.dark .bg-white\/95 { background-color: rgba(30,41,59,0.92) !important; }
+/* Liquid-glass surfaces — bg-white/NN → slate-800. Kept HIGH opacity in
+   dark so the page backdrop can't bleed through translucent cards (that
+   bleed is what made cards look like muddy rectangles with low contrast). */
+.dark .bg-white\/10 { background-color: rgba(30,41,59,0.45) !important; }
+.dark .bg-white\/20 { background-color: rgba(30,41,59,0.55) !important; }
+.dark .bg-white\/30 { background-color: rgba(30,41,59,0.65) !important; }
+.dark .bg-white\/40 { background-color: rgba(30,41,59,0.74) !important; }
+.dark .bg-white\/50 { background-color: rgba(30,41,59,0.85) !important; }
+.dark .bg-white\/55 { background-color: rgba(30,41,59,0.88) !important; }
+.dark .bg-white\/60 { background-color: rgba(30,41,59,0.90) !important; }
+.dark .bg-white\/70 { background-color: rgba(30,41,59,0.92) !important; }
+.dark .bg-white\/80 { background-color: rgba(30,41,59,0.94) !important; }
+.dark .bg-white\/85 { background-color: rgba(30,41,59,0.95) !important; }
+.dark .bg-white\/90 { background-color: rgba(30,41,59,0.96) !important; }
+.dark .bg-white\/95 { background-color: rgba(30,41,59,0.98) !important; }
 
 /* Gray surfaces */
 .dark .bg-gray-50      { background-color: rgba(30,41,59,0.50) !important; }
@@ -379,14 +381,15 @@
 .dark .border-gray-300  { border-color: #475569 !important; }
 .dark .border-gray-900  { border-color: #334155 !important; }
 .dark .border-white\/60,
-.dark .border-white\/70 { border-color: rgba(148,163,184,0.16) !important; }
+.dark .border-white\/70 { border-color: rgba(148,163,184,0.14) !important; }
 
-/* Rings — glass top-edge highlight becomes a faint light edge */
+/* Rings — the glass top-edge highlight becomes a clear hairline so cards
+   read as distinct surfaces against the dark page (separation, not glow). */
 .dark .ring-white\/10 { --tw-ring-color: rgba(148,163,184,0.10) !important; }
 .dark .ring-white\/20 { --tw-ring-color: rgba(148,163,184,0.12) !important; }
 .dark .ring-white\/40 { --tw-ring-color: rgba(148,163,184,0.14) !important; }
 .dark .ring-white\/50 { --tw-ring-color: rgba(148,163,184,0.16) !important; }
-.dark .ring-white\/60 { --tw-ring-color: rgba(148,163,184,0.16) !important; }
+.dark .ring-white\/60 { --tw-ring-color: rgba(148,163,184,0.14) !important; }
 .dark .ring-white\/80 { --tw-ring-color: rgba(148,163,184,0.20) !important; }
 .dark .ring-gray-200  { --tw-ring-color: rgba(71,85,105,0.60) !important; }
 .dark .ring-slate-100 { --tw-ring-color: rgba(51,65,85,0.50) !important; }
@@ -399,6 +402,12 @@
 /* Form fields — placeholder + value colour on the now-dark inputs */
 .dark input::placeholder,
 .dark textarea::placeholder { color: #64748b !important; }
+
+/* Decorative blurred corner orbs (bg-gradient + blur-2xl) read as muddy
+   pastel glows on dark cards — dim them to a faint accent hint. Card glass
+   uses `backdrop-blur-2xl` (a different class token), so it's untouched. */
+.dark .blur-2xl { opacity: 0.30 !important; }
+.dark .blur-3xl { opacity: 0.30 !important; }
 
 /* BLACK / SLATE accent in dark mode — the near-black accent-600 would be
    invisible on a dark backdrop, so lift it to a readable mid-slate and
@@ -418,12 +427,14 @@
   --accent-100-80: rgba(51,65,85,0.7);
 }
 
-/* Dark app backdrop — subtle slate orbs over near-black */
+/* Dark app backdrop — calm, near-flat near-black so high-opacity cards
+   clearly pop. One faint accent-tinted orb top-left makes the ambiance
+   follow the chosen theme colour (via color-mix on --accent-600), one
+   neutral slate orb bottom-right for depth. Far fewer/softer orbs than
+   before so nothing reads as a rectangular patch behind the cards. */
 .dark .app-backdrop {
   background:
-    radial-gradient(900px circle at 0% 0%,    rgba(51,65,85,0.55), transparent 45%),
-    radial-gradient(800px circle at 100% 0%,  rgba(30,41,59,0.55), transparent 45%),
-    radial-gradient(900px circle at 100% 80%, rgba(51,65,85,0.45), transparent 50%),
-    radial-gradient(900px circle at 0% 100%,  rgba(15,23,42,0.60), transparent 50%),
-    linear-gradient(180deg, #0b1120 0%, #060912 100%);
+    radial-gradient(1100px circle at 12% -10%, color-mix(in srgb, var(--accent-600) 20%, transparent), transparent 55%),
+    radial-gradient(1000px circle at 100% 110%, rgba(30,41,59,0.45), transparent 55%),
+    linear-gradient(180deg, #0b1120 0%, #070b15 100%);
 }
