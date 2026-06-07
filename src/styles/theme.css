@@ -324,8 +324,20 @@
 
 .dark {
   color-scheme: dark;            /* native date-pickers, scrollbars, etc. */
+  /* Accent tint chips (bg-emerald-50/100 → var(--accent-50/100)) must be
+     DARK in dark mode, not the light per-theme value — otherwise every
+     accent-tinted pill/card becomes a bright washed box. Derive a dark
+     tint from the accent colour so it follows the chosen theme. */
+  --accent-50:     color-mix(in srgb, var(--accent-600) 16%, transparent);
+  --accent-100:    color-mix(in srgb, var(--accent-600) 24%, transparent);
+  --accent-100-60: color-mix(in srgb, var(--accent-600) 18%, transparent);
+  --accent-100-70: color-mix(in srgb, var(--accent-600) 20%, transparent);
+  --accent-100-80: color-mix(in srgb, var(--accent-600) 22%, transparent);
 }
 .dark body { background-color: #0b1120; color: #e2e8f0; }
+/* Accent text on dark accent-tinted chips — lighten so it's readable. */
+.dark .text-emerald-600,
+.dark .text-emerald-700 { color: color-mix(in srgb, var(--accent-600) 52%, white) !important; }
 
 /* Solid surfaces (cards, modals, inputs use bg-white) */
 .dark .bg-white { background-color: #1e293b !important; }
@@ -403,11 +415,83 @@
 .dark input::placeholder,
 .dark textarea::placeholder { color: #64748b !important; }
 
-/* Decorative blurred corner orbs (bg-gradient + blur-2xl) read as muddy
-   pastel glows on dark cards — dim them to a faint accent hint. Card glass
-   uses `backdrop-blur-2xl` (a different class token), so it's untouched. */
-.dark .blur-2xl { opacity: 0.30 !important; }
-.dark .blur-3xl { opacity: 0.30 !important; }
+/* Decorative blurred corner orbs (rounded-full + blur-2xl/3xl, gradient
+   fill) are large relative to the card and clipped by overflow-hidden, so
+   they read as a boxy diagonal "sheen/shadow" in the corner. Tone them
+   down in BOTH themes so the clipped edge isn't noticeable. Card glass
+   uses `backdrop-blur-2xl` + `rounded-3xl` (different tokens) — untouched. */
+html:not(.dark) .rounded-full.blur-2xl,
+html:not(.dark) .rounded-full.blur-3xl { opacity: 0.40 !important; }
+.dark .blur-2xl { opacity: 0.22 !important; }
+.dark .blur-3xl { opacity: 0.22 !important; }
+
+/* ─── Colored tint surfaces in dark (amber/rose/green/sky/violet/…) ──
+   bg-{color}-50/100 are LIGHT pastels — on a dark page they render as
+   bright washed boxes that "blend" and hide their text. Retint each to a
+   dark translucent version of the colour, and lighten the matching text
+   (text-{color}-600..900 → the -300 shade) so chips/cards stay readable. */
+.dark .bg-amber-50,.dark .bg-amber-50\/40,.dark .bg-amber-50\/60,.dark .bg-amber-50\/80 { background-color: rgba(245,158,11,0.13) !important; }
+.dark .bg-amber-100,.dark .bg-amber-100\/60,.dark .bg-amber-100\/70,.dark .bg-amber-100\/80 { background-color: rgba(245,158,11,0.22) !important; }
+.dark .text-amber-600,.dark .text-amber-700,.dark .text-amber-800,.dark .text-amber-900 { color: #fcd34d !important; }
+.dark .ring-amber-100,.dark .ring-amber-100\/60,.dark .ring-amber-200\/60 { --tw-ring-color: rgba(245,158,11,0.30) !important; }
+.dark .border-amber-100,.dark .border-amber-200,.dark .border-amber-200\/60 { border-color: rgba(245,158,11,0.30) !important; }
+
+.dark .bg-rose-50,.dark .bg-rose-50\/60,.dark .bg-rose-50\/80 { background-color: rgba(244,63,94,0.13) !important; }
+.dark .bg-rose-100,.dark .bg-rose-100\/60,.dark .bg-rose-100\/70,.dark .bg-rose-100\/80 { background-color: rgba(244,63,94,0.22) !important; }
+.dark .text-rose-500,.dark .text-rose-600,.dark .text-rose-700,.dark .text-rose-800,.dark .text-rose-900 { color: #fda4af !important; }
+.dark .ring-rose-100\/60,.dark .ring-rose-200\/60 { --tw-ring-color: rgba(244,63,94,0.30) !important; }
+.dark .border-rose-100,.dark .border-rose-200 { border-color: rgba(244,63,94,0.30) !important; }
+
+.dark .bg-green-50,.dark .bg-green-50\/60,.dark .bg-green-50\/80 { background-color: rgba(34,197,94,0.13) !important; }
+.dark .bg-green-100,.dark .bg-green-100\/60,.dark .bg-green-100\/70 { background-color: rgba(34,197,94,0.22) !important; }
+.dark .text-green-600,.dark .text-green-700,.dark .text-green-800 { color: #86efac !important; }
+.dark .border-green-100,.dark .border-green-200 { border-color: rgba(34,197,94,0.30) !important; }
+
+.dark .bg-red-50,.dark .bg-red-50\/60,.dark .bg-red-50\/80 { background-color: rgba(239,68,68,0.13) !important; }
+.dark .bg-red-100,.dark .bg-red-100\/60 { background-color: rgba(239,68,68,0.22) !important; }
+.dark .text-red-500,.dark .text-red-600,.dark .text-red-700,.dark .text-red-800 { color: #fca5a5 !important; }
+.dark .border-red-100,.dark .border-red-200 { border-color: rgba(239,68,68,0.30) !important; }
+
+.dark .bg-sky-50,.dark .bg-sky-50\/40,.dark .bg-sky-50\/60 { background-color: rgba(14,165,233,0.13) !important; }
+.dark .bg-sky-100,.dark .bg-sky-100\/30,.dark .bg-sky-100\/60,.dark .bg-sky-100\/70,.dark .bg-sky-100\/80 { background-color: rgba(14,165,233,0.22) !important; }
+.dark .text-sky-600,.dark .text-sky-700,.dark .text-sky-800 { color: #7dd3fc !important; }
+.dark .ring-sky-100\/60,.dark .ring-sky-200\/60 { --tw-ring-color: rgba(14,165,233,0.30) !important; }
+.dark .border-sky-100,.dark .border-sky-200 { border-color: rgba(14,165,233,0.30) !important; }
+
+.dark .bg-violet-50,.dark .bg-violet-50\/60,.dark .bg-violet-50\/70,.dark .bg-violet-50\/80 { background-color: rgba(139,92,246,0.14) !important; }
+.dark .bg-violet-100,.dark .bg-violet-100\/60,.dark .bg-violet-100\/70,.dark .bg-violet-100\/80 { background-color: rgba(139,92,246,0.22) !important; }
+.dark .text-violet-600,.dark .text-violet-700,.dark .text-violet-800,.dark .text-violet-900 { color: #c4b5fd !important; }
+.dark .ring-violet-100\/60,.dark .ring-violet-200\/60 { --tw-ring-color: rgba(139,92,246,0.30) !important; }
+.dark .border-violet-100,.dark .border-violet-200 { border-color: rgba(139,92,246,0.30) !important; }
+
+.dark .bg-blue-50,.dark .bg-blue-50\/60 { background-color: rgba(59,130,246,0.13) !important; }
+.dark .bg-blue-100,.dark .bg-blue-100\/60 { background-color: rgba(59,130,246,0.22) !important; }
+.dark .text-blue-500,.dark .text-blue-600,.dark .text-blue-700,.dark .text-blue-800 { color: #93c5fd !important; }
+.dark .border-blue-100,.dark .border-blue-200 { border-color: rgba(59,130,246,0.30) !important; }
+
+.dark .bg-purple-50,.dark .bg-purple-50\/60 { background-color: rgba(168,85,247,0.13) !important; }
+.dark .bg-purple-100,.dark .bg-purple-100\/60 { background-color: rgba(168,85,247,0.22) !important; }
+.dark .text-purple-600,.dark .text-purple-700,.dark .text-purple-800 { color: #d8b4fe !important; }
+
+.dark .bg-yellow-50,.dark .bg-yellow-50\/60 { background-color: rgba(234,179,8,0.13) !important; }
+.dark .bg-yellow-100,.dark .bg-yellow-100\/70 { background-color: rgba(234,179,8,0.22) !important; }
+.dark .text-yellow-600,.dark .text-yellow-700,.dark .text-yellow-800 { color: #fde047 !important; }
+
+.dark .bg-orange-50,.dark .bg-orange-50\/60 { background-color: rgba(249,115,22,0.13) !important; }
+.dark .bg-orange-100,.dark .bg-orange-100\/60 { background-color: rgba(249,115,22,0.22) !important; }
+.dark .text-orange-600,.dark .text-orange-700,.dark .text-orange-800 { color: #fdba74 !important; }
+
+.dark .bg-indigo-50,.dark .bg-indigo-50\/60 { background-color: rgba(99,102,241,0.13) !important; }
+.dark .bg-indigo-100,.dark .bg-indigo-100\/60 { background-color: rgba(99,102,241,0.22) !important; }
+.dark .text-indigo-600,.dark .text-indigo-700,.dark .text-indigo-800 { color: #a5b4fc !important; }
+
+.dark .bg-teal-50,.dark .bg-teal-50\/60 { background-color: rgba(20,184,166,0.13) !important; }
+.dark .bg-teal-100,.dark .bg-teal-100\/60 { background-color: rgba(20,184,166,0.22) !important; }
+.dark .text-teal-600,.dark .text-teal-700,.dark .text-teal-800 { color: #5eead4 !important; }
+
+.dark .bg-cyan-50,.dark .bg-cyan-50\/60 { background-color: rgba(6,182,212,0.13) !important; }
+.dark .bg-cyan-100,.dark .bg-cyan-100\/60 { background-color: rgba(6,182,212,0.22) !important; }
+.dark .text-cyan-600,.dark .text-cyan-700,.dark .text-cyan-800 { color: #67e8f9 !important; }
 
 /* BLACK / SLATE accent in dark mode — the near-black accent-600 would be
    invisible on a dark backdrop, so lift it to a readable mid-slate and
