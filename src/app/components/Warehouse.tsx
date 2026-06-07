@@ -1668,9 +1668,9 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
                   <button onClick={() => useInOrder(t)} className="flex-1 text-[11px] px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
                     {l('В заказ', 'Тапсырысқа', 'Use')}
                   </button>
-                  <button onClick={() => setEditing(t)} title="Редактировать" className="w-7 h-7 hover:bg-white/50 border border-gray-100 rounded-lg flex items-center justify-center"><Edit2 className="w-3 h-3 text-slate-500" /></button>
-                  <button onClick={() => duplicate(t)} title="Дублировать" className="w-7 h-7 hover:bg-white/50 border border-gray-100 rounded-lg flex items-center justify-center"><Copy className="w-3 h-3 text-slate-500" /></button>
-                  <button onClick={() => t.id && remove(t.id)} title="Удалить" className="w-7 h-7 hover:bg-rose-50 border border-gray-100 rounded-lg flex items-center justify-center"><Trash2 className="w-3 h-3 text-rose-500" /></button>
+                  <button onClick={() => setEditing(t)} title={l('Редактировать', 'Өңдеу', 'Edit')} className="w-7 h-7 hover:bg-white/50 border border-gray-100 rounded-lg flex items-center justify-center"><Edit2 className="w-3 h-3 text-slate-500" /></button>
+                  <button onClick={() => duplicate(t)} title={l('Дублировать', 'Көшіру', 'Duplicate')} className="w-7 h-7 hover:bg-white/50 border border-gray-100 rounded-lg flex items-center justify-center"><Copy className="w-3 h-3 text-slate-500" /></button>
+                  <button onClick={() => t.id && remove(t.id)} title={l('Удалить', 'Жою', 'Delete')} className="w-7 h-7 hover:bg-rose-50 border border-gray-100 rounded-lg flex items-center justify-center"><Trash2 className="w-3 h-3 text-rose-500" /></button>
                 </div>
               </div>
             );
@@ -1753,9 +1753,9 @@ function BomEditorModal({ initial, onClose, onSave, busy, language, typeOptions 
           <div>
             <div className="text-[10px] text-slate-400 mb-1">{l('Размеры (мм)', 'Өлшемдер (мм)', 'Dimensions (mm)')}</div>
             <div className="grid grid-cols-3 gap-2">
-              <input type="number" value={t.width || 0}  onChange={e => up({ width:  Number(e.target.value) })} placeholder="Длина"  className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
-              <input type="number" value={t.depth || 0}  onChange={e => up({ depth:  Number(e.target.value) })} placeholder="Глубина" className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
-              <input type="number" value={t.height || 0} onChange={e => up({ height: Number(e.target.value) })} placeholder="Высота"  className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+              <input type="number" value={t.width || 0}  onChange={e => up({ width:  Number(e.target.value) })} placeholder={l('Длина', 'Ұзындық', 'Length')}  className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+              <input type="number" value={t.depth || 0}  onChange={e => up({ depth:  Number(e.target.value) })} placeholder={l('Глубина', 'Тереңдік', 'Depth')} className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+              <input type="number" value={t.height || 0} onChange={e => up({ height: Number(e.target.value) })} placeholder={l('Высота', 'Биіктік', 'Height')}  className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
             </div>
           </div>
 
@@ -1777,7 +1777,7 @@ function BomEditorModal({ initial, onClose, onSave, busy, language, typeOptions 
               {t.materials.map((m, i) => (
                 <div key={i} className="grid grid-cols-12 gap-1 px-2 py-1.5 border-t border-white/60 items-center">
                   <input value={m.mat}  onChange={e => upMat(i, { mat: e.target.value })}  placeholder="ЛДСП Egger…"   className="col-span-4 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
-                  <input value={m.sup}  onChange={e => upMat(i, { sup: e.target.value })}  placeholder="Поставщик"     className="col-span-3 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                  <input value={m.sup}  onChange={e => upMat(i, { sup: e.target.value })}  placeholder={l('Поставщик', 'Жеткізуші', 'Supplier')}     className="col-span-3 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
                   <input type="number"  value={m.qty}   onChange={e => upMat(i, { qty: Number(e.target.value) })}      className="col-span-1 px-2 py-1 bg-white rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-gray-200" />
                   <input value={m.unit} onChange={e => upMat(i, { unit: e.target.value })} placeholder="шт"             className="col-span-1 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
                   <input type="number"  value={m.price} onChange={e => upMat(i, { price: Number(e.target.value) })}    className="col-span-2 px-2 py-1 bg-white rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-gray-200" />

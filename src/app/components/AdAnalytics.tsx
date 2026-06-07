@@ -486,7 +486,7 @@ export function AdAnalytics({ language }: AdAnalyticsProps) {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Поиск..."
+              placeholder={language === 'kz' ? 'Іздеу...' : language === 'eng' ? 'Search...' : 'Поиск...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-8 py-2 bg-white/60 ring-1 ring-white/60 backdrop-blur-xl rounded-lg text-sm w-48 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"

@@ -246,7 +246,7 @@ export function ActivityLog({ language }: Props) {
                   {/* Telegram origin badge — admin sees instantly that this
                       action came from the bot, not the platform UI. */}
                   {log.source === 'telegram' && (
-                    <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-[#2AABEE] bg-blue-50 px-1 py-0.5 rounded" title="Через Telegram-бот">
+                    <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-[#2AABEE] bg-blue-50 px-1 py-0.5 rounded" title={l('Через Telegram-бот', 'Telegram-бот арқылы', 'Via Telegram bot')}>
                       ✈️ TG
                     </span>
                   )}

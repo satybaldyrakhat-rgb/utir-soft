@@ -192,7 +192,7 @@ export function ClientCabinet({ session, onLogout }: { session: ClientSession; o
               <span className="w-3 h-3 rounded-full bg-amber-400/80" />
               <span className="w-3 h-3 rounded-full bg-emerald-400/80" />
             </div>
-            <button onClick={() => setMobileOpen(true)} className="lg:hidden px-3 py-1.5 rounded-lg bg-gray-100 text-xs">Меню</button>
+            <button onClick={() => setMobileOpen(true)} className="lg:hidden px-3 py-1.5 rounded-lg bg-gray-100 text-xs">{tl(lang, 'Меню', 'Мәзір', 'Menu')}</button>
             <div className="min-w-0 lg:ml-2">
               <div className="text-sm text-gray-900 truncate">{curNav ? tl(lang, curNav.ru, curNav.kz, curNav.eng) : ''}</div>
             </div>
@@ -252,7 +252,7 @@ function HomePage({
   const markers: MapMarker[] = [
     { id: 'home', lat: CLIENT_HOME[0], lng: CLIENT_HOME[1], label: tl(lang, 'Вы здесь', 'Сіз осындасыз', 'You'), sub: 'ул. Абая 45', color: 'sky' },
     { id: 'prod', lat: PRODUCTION[0], lng: PRODUCTION[1], label: tl(lang, 'Производство', 'Өндіріс', 'Production'), sub: 'Utir Soft', color: 'gray' },
-    { id: 'courier', lat: courier.pos[0], lng: courier.pos[1], label: tl(lang, 'Курьер', 'Курьер', 'Courier'), sub: tl(lang, '~12 минут', '~12 минут', '~12 min'), color: 'emerald', initials: 'К' },
+    { id: 'courier', lat: courier.pos[0], lng: courier.pos[1], label: tl(lang, 'Курьер', 'Курьер', 'Courier'), sub: tl(lang, '~12 минут', '~12 минут', '~12 min'), color: 'emerald', initials: tl(lang, 'К', 'К', 'C') },
   ];
 
   const mainDeal = activeDeals[0] || deals[0];
@@ -281,10 +281,10 @@ function HomePage({
         <ClientCabinetMap height={300} markers={markers} route={{ from: 'courier', to: 'home' }} center={[43.235, 76.88]} />
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs">К</div>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs">{tl(lang, 'К', 'К', 'C')}</div>
             <div>
               <div className="text-sm text-gray-900">{tl(lang, 'Курьер подъезжает к вам', 'Курьер жақындап келе жатыр', 'Courier is approaching')}</div>
-              <div className="text-xs text-slate-400">~12 минут · {tl(lang, 'обновлено сейчас', 'жаңартылды', 'updated now')}</div>
+              <div className="text-xs text-slate-400">{tl(lang, '~12 минут', '~12 минут', '~12 min')} · {tl(lang, 'обновлено сейчас', 'жаңартылды', 'updated now')}</div>
             </div>
           </div>
           <div className="flex gap-2">
@@ -498,7 +498,7 @@ function TrackingPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
   const markers: MapMarker[] = [
     { id: 'home', lat: CLIENT_HOME[0], lng: CLIENT_HOME[1], label: tl(lang, 'Ваш адрес', 'Сіздің мекенжай', 'Your address'), sub: 'ул. Абая 45', color: 'sky' },
     { id: 'prod', lat: PRODUCTION[0], lng: PRODUCTION[1], label: tl(lang, 'Производство', 'Өндіріс', 'Production'), sub: 'Utir Soft', color: 'gray' },
-    { id: 'courier', lat: courier.pos[0], lng: courier.pos[1], label: tl(lang, 'Бригада', 'Бригада', 'Crew'), sub: tl(lang, 'В пути', 'Жолда', 'En route'), color: 'emerald', initials: 'Б' },
+    { id: 'courier', lat: courier.pos[0], lng: courier.pos[1], label: tl(lang, 'Бригада', 'Бригада', 'Crew'), sub: tl(lang, 'В пути', 'Жолда', 'En route'), color: 'emerald', initials: tl(lang, 'Б', 'Б', 'C') },
   ];
 
   const TIMELINE = [
@@ -687,7 +687,7 @@ function PaymentsPage({ lang, deals }: { lang: Lang; deals: Deal[] }) {
                   <td className="px-4 py-3 text-gray-900">{h.order}</td>
                   <td className="px-4 py-3 text-gray-900 tabular-nums">{(h.amount / 1000).toFixed(0)}К ₸</td>
                   <td className="px-4 py-3 text-gray-600">{h.method}</td>
-                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] ${h.cls}`}>{tl(lang, h.status, h.status, h.status)}</span></td>
+                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] ${h.cls}`}>{h.status === 'Оплачен' ? tl(lang, 'Оплачен', 'Төленді', 'Paid') : tl(lang, 'К оплате', 'Төленеді', 'Due')}</span></td>
                   <td className="px-4 py-3">{h.status === 'Оплачен' ? <button className="text-slate-400 hover:text-gray-900"><Download className="w-3.5 h-3.5" /></button> : '—'}</td>
                 </tr>
               ))}
