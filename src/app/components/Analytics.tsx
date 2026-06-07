@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, TrendingDown, ArrowUpRight, ChevronRight, ShoppingBag, DollarSign, Users, Target, BarChart3, Percent, ArrowRight, Star, X, Sparkles, Eye, Download } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { AdAnalytics } from './AdAnalytics';
+import { MarketingDashboard } from './MarketingDashboard';
 import { t } from '../utils/translations';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
@@ -389,7 +389,7 @@ export function Analytics({ language }: AnalyticsProps) {
       )}
 
       {activeTab === 'ads' && store.getModuleLevel('marketing') !== 'none' ? (
-        <AdAnalytics language={language} />
+        <MarketingDashboard language={language} />
       ) : activeTab === 'team' ? (
         <TeamMetrics language={language} />
       ) : store.deals.length === 0 ? (

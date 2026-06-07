@@ -4,6 +4,7 @@ import { useDataStore } from '../utils/dataStore';
 import { t } from '../utils/translations';
 import { getNiche } from '../utils/niches';
 import { NicheIcon } from './NicheIcon';
+import { LEAD_SOURCES } from '../utils/marketing';
 
 // Seed shape — pre-fills the modal when opened from a BOM template.
 // All fields optional; whatever is supplied overrides the empty defaults.
@@ -55,7 +56,7 @@ export function NewDealModal({ language, onClose, seed, defaultStatus }: Props) 
   // tab so the user sees the pre-filled fields immediately and only needs
   // to fill in client info on tab 0. Plain «Новая сделка» starts on tab 0.
   const [tab, setTab] = useState<0 | 1 | 2 | 3>(seed ? 1 : 0);
-  const [client, setClient] = useState({ name: '', phone: '', email: '', address: '', siteAddress: '', source: 'Instagram' });
+  const [client, setClient] = useState({ name: '', phone: '', email: '', address: '', siteAddress: '', source: 'Instagram', campaign: '', referrerName: '' });
   // Seed overrides — note we convert mm dimensions to m for the UI
   // (which works in meters: 3000mm → 3m).
   const [product, setProduct] = useState({
@@ -145,6 +146,8 @@ export function NewDealModal({ language, onClose, seed, defaultStatus }: Props) 
       date: new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
       progress: progressMap[status] ?? 5,
       source: client.source,
+      campaign: client.campaign.trim() || undefined,
+      referrerName: client.source === 'Рекомендация' ? (client.referrerName.trim() || undefined) : undefined,
       measurer: term.measurer,
       designer: '',
       foreman: undefined,
@@ -296,8 +299,25 @@ export function NewDealModal({ language, onClose, seed, defaultStatus }: Props) 
             <div>
               <label className={LABEL}>{l('Источник', 'Көзі', 'Source')}</label>
               <select value={client.source} onChange={e => setClient({ ...client, source: e.target.value })} className={INPUT}>
-                {['Instagram', 'WhatsApp', 'Telegram', 'Сайт', 'Рекомендация', 'Реклама Meta', 'Звонок', 'Visit'].map(s => <option key={s}>{s}</option>)}
+                {LEAD_SOURCES.map(s => <option key={s}>{s}</option>)}
               </select>
+            </div>
+            <div>
+              <label className={LABEL}>{l('Кампания / объявление', 'Науқан / жарнама', 'Campaign / ad')}</label>
+              <input
+                value={client.campaign}
+                onChange={e => setClient({ ...client, campaign: e.target.value })}
+                placeholder={l('напр. «Акция кухни май»', 'мыс. «Ас үй науқаны»', 'e.g. "Kitchen promo May"')}
+                className={INPUT}
+              />
+              {client.source === 'Рекомендация' && (
+                <input
+                  value={client.referrerName}
+                  onChange={e => setClient({ ...client, referrerName: e.target.value })}
+                  placeholder={l('Кто порекомендовал (имя клиента)', 'Кім ұсынды (клиент аты)', 'Referred by (client name)')}
+                  className={`${INPUT} mt-2`}
+                />
+              )}
             </div>
           </>)}
 

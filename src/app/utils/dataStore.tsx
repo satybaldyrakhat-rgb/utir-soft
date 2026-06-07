@@ -57,6 +57,19 @@ export interface Deal {
   // Stored as the niche id (furniture / windows / ceilings / blinds /
   // doors / stairs / flooring / construction / custom).
   niche?: string;
+  // ─── Marketing (маркетинг) ──────────────────────────────────────
+  // Кампания / объявление, с которого пришёл лид — уточняет `source`
+  // (напр. source=Instagram, campaign="Акция кухни май"). Позволяет
+  // считать CPL/ROMI по конкретной рекламе, а не только по каналу.
+  campaign?: string;
+  // Причина отказа — заполняется при переводе сделки в «Отказ».
+  // Питает аналитику «почему не покупают» (дорого / передумал / ушёл…).
+  lostReason?: string;
+  // Сарафан: имя клиента-рекомендателя, который привёл этого клиента.
+  referrerName?: string;
+  // Отзыв клиента — собирается через публичный Trackpage после
+  // завершения заказа. Питает соц-доказательство и контент.
+  review?: { rating: number; text?: string; at: string };
 }
 
 // RoleKey is now a free-form string id (e.g. 'admin', 'manager', 'accountant').
@@ -225,6 +238,10 @@ export interface FinanceTransaction {
   // Money account the payment went through — drives the cash/bank/Kaspi
   // split and the кассовая книга. Missing → treated as 'bank'.
   account?: 'cash' | 'bank' | 'kaspi';
+  // Маркетинговый канал, на который потрачен расход (Instagram / WhatsApp /
+  // Реклама Meta / …). Заполняется для расходов категории «Маркетинг» —
+  // питает маркетинг-дашборд (CPL/ROMI по каналам) без внешних API.
+  adChannel?: string;
 }
 
 export interface Integration {
