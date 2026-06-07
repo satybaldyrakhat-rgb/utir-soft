@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Clock, Loader2, Phone, MessageCircle, ShieldCheck, PackageCheck } from 'lucide-react';
+import { CheckCircle2, Clock, Loader2, Phone, MessageCircle, ShieldCheck, PackageCheck, Star } from 'lucide-react';
 import { api } from '../utils/api';
 
 interface Props { orderId: string; }
@@ -20,6 +20,8 @@ interface TrackData {
     statusLabel: string;
     progress: number;
     rejected: boolean;
+    completed: boolean;
+    hasReview: boolean;
   };
   stages: Array<{ id: string; label: string; done: boolean; active: boolean; date: string }>;
   payment: { amount: number; paid: number; pct: number } | null;
@@ -34,6 +36,17 @@ export function ClientTrack({ orderId }: Props) {
   const code = (orderId || '').trim();
   const [data, setData] = useState<TrackData | null>(null);
   const [state, setState] = useState<'loading' | 'ok' | 'notfound'>('loading');
+  // Review form state — shown after completion when no review yet.
+  const [rating, setRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [reviewState, setReviewState] = useState<'idle' | 'sending' | 'done'>('idle');
+  const submitReview = () => {
+    if (!rating) return;
+    setReviewState('sending');
+    api.post(`/api/track/${encodeURIComponent(code)}/review`, { rating, text: reviewText })
+      .then(() => setReviewState('done'))
+      .catch(() => setReviewState('idle'));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -135,6 +148,42 @@ export function ClientTrack({ orderId }: Props) {
             </div>
           </div>
         )}
+
+        {/* Review — after completion, if not left yet */}
+        {order.completed && (order.hasReview || reviewState === 'done' ? (
+          <div className="bg-white ring-1 ring-emerald-100 shadow-sm rounded-3xl p-5 text-center">
+            <CheckCircle2 className="w-7 h-7 text-emerald-500 mx-auto mb-2" />
+            <div className="text-sm text-slate-900">Спасибо за отзыв!</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Это помогает нам стать лучше.</div>
+          </div>
+        ) : (
+          <div className="bg-white ring-1 ring-slate-100 shadow-sm rounded-3xl p-5">
+            <div className="text-sm text-slate-900 mb-1">Как вам результат?</div>
+            <div className="text-[11px] text-slate-400 mb-3">Оцените работу — это займёт 10 секунд.</div>
+            <div className="flex items-center gap-1.5 mb-3">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button key={n} onClick={() => setRating(n)} className="p-1" aria-label={`${n}`}>
+                  <Star className={`w-7 h-7 transition-colors ${n <= rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}`} strokeWidth={1.5} />
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={reviewText}
+              onChange={e => setReviewText(e.target.value)}
+              rows={2}
+              placeholder="Что понравилось или что улучшить? (необязательно)"
+              className="w-full px-3 py-2 bg-slate-50 ring-1 ring-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none mb-3"
+            />
+            <button
+              onClick={submitReview}
+              disabled={!rating || reviewState === 'sending'}
+              className="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 disabled:opacity-40 flex items-center justify-center gap-1.5"
+            >
+              {reviewState === 'sending' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Star className="w-3.5 h-3.5" strokeWidth={1.5} />}
+              Оставить отзыв
+            </button>
+          </div>
+        ))}
 
         {/* Payment */}
         {payment && (

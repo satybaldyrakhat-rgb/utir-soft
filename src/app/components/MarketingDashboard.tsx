@@ -6,7 +6,7 @@
 // numbers. Answers the marketer's core question: "which channel pays off?".
 
 import { useMemo, useState } from 'react';
-import { TrendingUp, Megaphone, Plus, Users, Percent, Wallet, Target, Loader2 } from 'lucide-react';
+import { TrendingUp, Megaphone, Plus, Users, Percent, Wallet, Target, Loader2, Star, Heart } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { LEAD_SOURCES, PAID_CHANNELS, MARKETING_CATEGORY, computeChannelStats } from '../utils/marketing';
 
@@ -73,6 +73,24 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
     }
     return Array.from(m.values()).sort((a, b) => b.leads - a.leads);
   }, [deals]);
+
+  // Reviews (отзывы) — collected via the public Trackpage after completion.
+  const reviews = useMemo(() => {
+    const withReview = store.deals.filter(d => d.review && d.review.rating > 0);
+    const avg = withReview.length ? withReview.reduce((s, d) => s + (d.review!.rating), 0) / withReview.length : 0;
+    return {
+      avg: Math.round(avg * 10) / 10,
+      count: withReview.length,
+      list: withReview.slice().sort((a, b) => (b.review!.at || '').localeCompare(a.review!.at || '')),
+    };
+  }, [store.deals]);
+
+  // Сарафан (referrals) — кто привёл клиентов.
+  const referrers = useMemo(() => {
+    const m = new Map<string, number>();
+    store.deals.forEach(d => { if (d.referrerName) m.set(d.referrerName, (m.get(d.referrerName) || 0) + 1); });
+    return Array.from(m.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  }, [store.deals]);
 
   const addSpend = () => {
     const amt = Number(spend.amount);
@@ -252,6 +270,65 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
           </div>
         </div>
       )}
+
+      {/* Reviews + Referrals (отзывы + сарафан) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Отзывы клиентов */}
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+          <div className="px-5 py-3.5 flex items-center justify-between border-b border-white/60">
+            <div className="flex items-center gap-2">
+              <Star className="w-3.5 h-3.5 text-amber-400" strokeWidth={1.5} />
+              <span className="text-sm text-gray-900">{l('Отзывы клиентов', 'Клиент пікірлері', 'Client reviews')}</span>
+            </div>
+            {reviews.count > 0 && (
+              <span className="text-[11px] text-gray-500 tabular-nums">★ {reviews.avg} · {reviews.count}</span>
+            )}
+          </div>
+          {reviews.count === 0 ? (
+            <div className="px-5 py-6 text-center text-[11px] text-gray-400 leading-relaxed">
+              {l('Отзывы появятся, когда клиенты оценят заказ на странице отслеживания (после завершения).',
+                 'Тапсырыс аяқталған соң клиенттер бағалағанда пікірлер пайда болады.',
+                 'Reviews appear once clients rate a completed order on the tracking page.')}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+              {reviews.list.map(d => (
+                <div key={d.id} className="px-5 py-3">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs text-gray-800 truncate">{d.customerName}</span>
+                    <span className="text-[11px] text-amber-500 tabular-nums flex-shrink-0">{'★'.repeat(d.review!.rating)}<span className="text-gray-200">{'★'.repeat(5 - d.review!.rating)}</span></span>
+                  </div>
+                  {d.review!.text && <div className="text-[11px] text-gray-500 leading-snug">{d.review!.text}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Сарафан */}
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+          <div className="px-5 py-3.5 flex items-center gap-2 border-b border-white/60">
+            <Heart className="w-3.5 h-3.5 text-rose-400" strokeWidth={1.5} />
+            <span className="text-sm text-gray-900">{l('Сарафан — кто рекомендует', 'Сарафан — кім ұсынады', 'Referrals')}</span>
+          </div>
+          {referrers.length === 0 ? (
+            <div className="px-5 py-6 text-center text-[11px] text-gray-400 leading-relaxed">
+              {l('При создании сделки с источником «Рекомендация» укажите, кто порекомендовал — здесь увидите ваших адвокатов бренда.',
+                 'Мәмілені «Ұсыныс» көзімен жасағанда кім ұсынғанын көрсетіңіз.',
+                 'When creating a deal from "Referral", note who referred — your brand advocates show up here.')}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+              {referrers.map((r, i) => (
+                <div key={i} className="px-5 py-2.5 flex items-center justify-between text-xs">
+                  <span className="text-gray-800 truncate">{r.name}</span>
+                  <span className="text-gray-500 tabular-nums flex-shrink-0">{r.count} {l('привёл', 'әкелді', 'referred')}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

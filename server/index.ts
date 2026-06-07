@@ -1178,6 +1178,8 @@ app.get('/api/track/:code', (req, res) => {
       statusLabel: TRACK_STAGE_LABEL[d.status] || d.status,
       progress: Number(d.progress) || 0,
       rejected: d.status === 'rejected',
+      completed: d.status === 'completed',
+      hasReview: !!d.review,
     },
     stages,
     payment: d.amount > 0 ? {
@@ -1189,6 +1191,26 @@ app.get('/api/track/:code', (req, res) => {
     warranty: d.warranty || null,
     installationDate: d.installationDate || '',
   });
+});
+
+// POST /api/track/:code/review → client leaves a rating (1-5) + optional
+// text on a completed order. No auth (public Trackpage). Stored on the deal
+// JSON as `review`; idempotent-ish — overwrites a previous review. Feeds the
+// team's «Отзывы» (соц-доказательство) without exposing any team data.
+app.post('/api/track/:code/review', (req, res) => {
+  const link = db.prepare('SELECT deal_id, team_id FROM track_links WHERE code = ?').get(String(req.params.code || '').toUpperCase()) as any;
+  if (!link) return res.status(404).json({ error: 'not found' });
+  const row = db.prepare('SELECT data FROM deals WHERE id = ? AND team_id = ?').get(link.deal_id, link.team_id) as any;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  let d: any; try { d = JSON.parse(row.data); } catch { return res.status(404).json({ error: 'not found' }); }
+
+  const rating = Math.round(Number((req.body || {}).rating));
+  if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: 'rating must be 1-5' });
+  const text = String((req.body || {}).text || '').slice(0, 1000).trim();
+
+  d.review = { rating, text: text || undefined, at: new Date().toISOString() };
+  db.prepare('UPDATE deals SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(d), link.deal_id, link.team_id);
+  res.json({ ok: true });
 });
 
 // Audit-trail readback. Returns the deal_history rows newest-first.
