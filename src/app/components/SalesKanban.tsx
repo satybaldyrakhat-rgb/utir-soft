@@ -23,6 +23,7 @@ import { NewDealModal } from './NewDealModal';
 import { useDataStore, type Deal } from '../utils/dataStore';
 import { confirmDialog } from '../utils/confirm';
 import { NicheIcon } from './NicheIcon';
+import { LOST_REASONS } from '../utils/marketing';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
 import { useAutoRefresh } from '../utils/useAutoRefresh';
@@ -302,7 +303,15 @@ export function SalesKanban({ language }: SalesKanbanProps) {
     store.deleteDeal(confirmDelete.id);
     setConfirmDelete(null);
   };
-  const handleRejectDeal = (id: string) => { store.updateDeal(id, { status: 'rejected', progress: 0 }); };
+  // Reject opens a reason picker first — the lostReason feeds the
+  // "почему не покупают" analytics. Drag-to-reject / bulk reject skip it.
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const handleRejectDeal = (id: string) => setRejectingId(id);
+  const confirmReject = (reason?: string) => {
+    if (!rejectingId) return;
+    store.updateDeal(rejectingId, { status: 'rejected', progress: 0, lostReason: reason });
+    setRejectingId(null);
+  };
 
   // ─── Bulk actions ──────────────────────────────────────────────
   const toggleBulk = (id: string) => {
@@ -967,6 +976,29 @@ export function SalesKanban({ language }: SalesKanbanProps) {
         />
       )}
 
+      {/* ─── Reject reason picker ────────────────────────────── */}
+      {rejectingId && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setRejectingId(null)} />
+          <div className="relative w-full max-w-sm bg-white/85 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_24px_64px_-16px_rgba(15,23,42,0.35)] rounded-3xl p-5 animate-[toastIn_.18s_ease-out]">
+            <div className="text-sm text-slate-900 mb-1">{l('Причина отказа', 'Бас тарту себебі', 'Reason for rejection')}</div>
+            <div className="text-[11px] text-slate-500 mb-4">{l('Поможет понять, почему клиенты не покупают.', 'Клиенттер неге сатып алмайтынын түсінуге көмектеседі.', 'Helps understand why clients don\'t buy.')}</div>
+            <div className="grid grid-cols-2 gap-2">
+              {LOST_REASONS.map(r => (
+                <button key={r} onClick={() => confirmReject(r)}
+                  className="px-3 py-2 rounded-xl text-[11px] text-slate-700 bg-white/60 ring-1 ring-white/60 hover:bg-white hover:ring-rose-200 transition-colors text-left">
+                  {r}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex items-center justify-between">
+              <button onClick={() => confirmReject(undefined)} className="text-[11px] text-slate-400 hover:text-slate-600">{l('Без причины', 'Себепсіз', 'No reason')}</button>
+              <button onClick={() => setRejectingId(null)} className="px-3.5 py-2 rounded-xl text-xs text-slate-600 bg-white/60 ring-1 ring-white/60 hover:bg-white transition-colors">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Rejected archive modal (glass) ──────────────────── */}
       {showArchive && (
         <RejectedArchive
@@ -1255,6 +1287,12 @@ function RejectedArchive(props: {
 }) {
   const { rejectedDeals, canWrite, language, l, onClose, onRestore, onDelete } = props;
   const [q, setQ] = useState('');
+  // Aggregate lost reasons — «почему не покупают», most common first.
+  const reasonStats = useMemo(() => {
+    const m = new Map<string, number>();
+    rejectedDeals.forEach(d => { if (d.lostReason) m.set(d.lostReason, (m.get(d.lostReason) || 0) + 1); });
+    return Array.from(m.entries()).map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count);
+  }, [rejectedDeals]);
   const filtered = useMemo(() => {
     if (!q.trim()) return rejectedDeals;
     const lq = q.toLowerCase();
@@ -1299,6 +1337,19 @@ function RejectedArchive(props: {
             </div>
           </div>
         )}
+        {/* Reasons summary — почему не покупают */}
+        {reasonStats.length > 0 && (
+          <div className="px-4 py-3 border-b border-white/60 flex-shrink-0">
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-2">{l('Почему не покупают', 'Неге сатып алмайды', 'Why they don\'t buy')}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {reasonStats.map(r => (
+                <span key={r.reason} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-rose-50 text-rose-700 ring-1 ring-rose-100/60">
+                  {r.reason} <b className="tabular-nums">{r.count}</b>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto p-4">
           {filtered.length === 0 ? (
             <div className="py-12 text-center">
@@ -1327,6 +1378,9 @@ function RejectedArchive(props: {
                     <div className="text-[11px] text-slate-500 truncate">
                       {deal.product || '—'} · {fmtMoney(deal.amount || 0)}
                     </div>
+                    {deal.lostReason && (
+                      <div className="text-[10px] text-rose-500 mt-0.5 truncate">{l('Причина', 'Себебі', 'Reason')}: {deal.lostReason}</div>
+                    )}
                   </div>
                   {canWrite && (
                     <div className="flex items-center gap-1 flex-shrink-0">
