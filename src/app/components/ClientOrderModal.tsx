@@ -140,6 +140,9 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   const [campaign, setCampaign] = useState(deal.campaign || '');
   const [referrerName, setReferrerName] = useState(deal.referrerName || '');
   const [lostReason, setLostReason] = useState(deal.lostReason || '');
+  // Следующий шаг — дата + заметка («перезвонить 10 июня»).
+  const [nextActionAt, setNextActionAt] = useState(deal.nextActionAt || '');
+  const [nextActionNote, setNextActionNote] = useState(deal.nextActionNote || '');
   const [measurer, setMeasurer] = useState(deal.measurer || '');
   const [designer, setDesigner] = useState(deal.designer || '');
   const [foreman, setForeman] = useState(deal.foreman || '');
@@ -259,6 +262,8 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     setCampaign(deal.campaign || '');
     setReferrerName(deal.referrerName || '');
     setLostReason(deal.lostReason || '');
+    setNextActionAt(deal.nextActionAt || '');
+    setNextActionNote(deal.nextActionNote || '');
     setMeasurer(deal.measurer || '');
     setDesigner(deal.designer || '');
     setForeman(deal.foreman || '');
@@ -478,6 +483,8 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         campaign,
         referrerName: source === 'Рекомендация' ? referrerName : '',
         lostReason: status === 'rejected' ? lostReason : '',
+        nextActionAt,
+        nextActionNote,
         measurer,
         designer,
         foreman,
@@ -553,6 +560,8 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       campaign !== (deal.campaign || '') ||
       referrerName !== (deal.referrerName || '') ||
       lostReason !== (deal.lostReason || '') ||
+      nextActionAt !== (deal.nextActionAt || '') ||
+      nextActionNote !== (deal.nextActionNote || '') ||
       measurer !== (deal.measurer || '') ||
       designer !== (deal.designer || '') ||
       foreman !== (deal.foreman || '') ||
@@ -571,7 +580,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       JSON.stringify(paymentMethods) !== JSON.stringify(deal.paymentMethods || {}) ||
       JSON.stringify(documents.map(d => d.id).sort()) !== JSON.stringify(((deal as any).documents || []).map((d: DealDoc) => d.id).sort());
     setDirty(changed);
-  }, [phone, address, siteAddress, source, campaign, referrerName, lostReason, measurer, designer, foreman, architect,
+  }, [phone, address, siteAddress, source, campaign, referrerName, lostReason, nextActionAt, nextActionNote, measurer, designer, foreman, architect,
       ownerId, furnitureType, materials, measurementDate, completionDate,
       installationDate, notes, paidAmount, status, customerBIN, paymentMethods, documents, deal]);
 
@@ -732,6 +741,28 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                     placeholder="123456789012"
                     inputMode="numeric"
                     maxLength={12}
+                  />
+                </div>
+              </section>
+
+              {/* ── Section: Next step (РОП — дисциплина касаний) ── */}
+              <section>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Следующий шаг', 'Келесі қадам', 'Next step')}</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] text-slate-500 mb-1 block">{l('Дата контакта', 'Байланыс күні', 'Contact date')}</label>
+                    <input
+                      type="date" value={nextActionAt} onChange={e => setNextActionAt(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-white/55 ring-1 ring-white/60 rounded-2xl text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                    />
+                    {nextActionAt && nextActionAt < new Date().toISOString().slice(0, 10) && (
+                      <div className="text-[10px] text-rose-500 mt-1">{l('Просрочено', 'Мерзімі өтті', 'Overdue')}</div>
+                    )}
+                  </div>
+                  <FieldInput
+                    label={l('Что сделать', 'Не істеу керек', 'What to do')}
+                    value={nextActionNote} onChange={setNextActionNote}
+                    placeholder={l('напр. перезвонить, отправить замер', 'мыс. қоңырау шалу', 'e.g. call back, send quote')}
                   />
                 </div>
               </section>

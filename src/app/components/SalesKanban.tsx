@@ -1270,6 +1270,21 @@ function DealCard(props: {
         );
       })()}
 
+      {/* Следующий шаг — подсветка сегодня/просрочено. */}
+      {deal.nextActionAt && (() => {
+        const today = new Date().toISOString().slice(0, 10);
+        const overdue = deal.nextActionAt < today;
+        const isToday = deal.nextActionAt === today;
+        if (!overdue && !isToday) return null;
+        return (
+          <div className={`mb-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ring-1 ${overdue ? 'bg-rose-50 text-rose-600 ring-rose-100/60' : 'bg-amber-50 text-amber-600 ring-amber-100/60'}`}>
+            <Calendar className="w-2.5 h-2.5" />
+            {overdue ? l('касание просрочено', 'байланыс өтті', 'follow-up overdue') : l('касание сегодня', 'байланыс бүгін', 'follow-up today')}
+            {deal.nextActionNote ? ` · ${deal.nextActionNote}` : ''}
+          </div>
+        );
+      })()}
+
       {/* Быстрое назначение — РОП распределяет лид без открытия карточки. */}
       {!deal.ownerId && canWrite && owners.length > 0 && (
         <select
