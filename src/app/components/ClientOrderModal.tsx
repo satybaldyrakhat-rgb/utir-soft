@@ -7,6 +7,7 @@ import { api } from '../utils/api';
 import { toast } from '../utils/toast';
 import { confirmDialog } from '../utils/confirm';
 import { NicheIcon } from './NicheIcon';
+import { LEAD_SOURCES, LOST_REASONS } from '../utils/marketing';
 import { DEFAULT_STAGES_TEMPLATE, type DealStage, type ConsumedMaterial } from './Warehouse';
 
 type Lang = 'kz' | 'ru' | 'eng';
@@ -135,6 +136,10 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   const [address, setAddress] = useState(deal.address || '');
   const [siteAddress, setSiteAddress] = useState(deal.siteAddress || '');
   const [source, setSource] = useState(deal.source || 'Instagram');
+  // Маркетинг — кампания/объявление, рекомендатель, причина отказа.
+  const [campaign, setCampaign] = useState(deal.campaign || '');
+  const [referrerName, setReferrerName] = useState(deal.referrerName || '');
+  const [lostReason, setLostReason] = useState(deal.lostReason || '');
   const [measurer, setMeasurer] = useState(deal.measurer || '');
   const [designer, setDesigner] = useState(deal.designer || '');
   const [foreman, setForeman] = useState(deal.foreman || '');
@@ -235,6 +240,9 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     setAddress(deal.address || '');
     setSiteAddress(deal.siteAddress || '');
     setSource(deal.source || 'Instagram');
+    setCampaign(deal.campaign || '');
+    setReferrerName(deal.referrerName || '');
+    setLostReason(deal.lostReason || '');
     setMeasurer(deal.measurer || '');
     setDesigner(deal.designer || '');
     setForeman(deal.foreman || '');
@@ -451,6 +459,9 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         address,
         siteAddress,
         source,
+        campaign,
+        referrerName: source === 'Рекомендация' ? referrerName : '',
+        lostReason: status === 'rejected' ? lostReason : '',
         measurer,
         designer,
         foreman,
@@ -523,6 +534,9 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       address !== (deal.address || '') ||
       siteAddress !== (deal.siteAddress || '') ||
       source !== (deal.source || 'Instagram') ||
+      campaign !== (deal.campaign || '') ||
+      referrerName !== (deal.referrerName || '') ||
+      lostReason !== (deal.lostReason || '') ||
       measurer !== (deal.measurer || '') ||
       designer !== (deal.designer || '') ||
       foreman !== (deal.foreman || '') ||
@@ -541,7 +555,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       JSON.stringify(paymentMethods) !== JSON.stringify(deal.paymentMethods || {}) ||
       JSON.stringify(documents.map(d => d.id).sort()) !== JSON.stringify(((deal as any).documents || []).map((d: DealDoc) => d.id).sort());
     setDirty(changed);
-  }, [phone, address, siteAddress, source, measurer, designer, foreman, architect,
+  }, [phone, address, siteAddress, source, campaign, referrerName, lostReason, measurer, designer, foreman, architect,
       ownerId, furnitureType, materials, measurementDate, completionDate,
       installationDate, notes, paidAmount, status, customerBIN, paymentMethods, documents, deal]);
 
@@ -661,8 +675,26 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <FieldInput label={tt('phone')} value={phone} onChange={setPhone} placeholder={tt('phoneMask')} />
                   <FieldSelect label={l('Источник', 'Көзі', 'Source')} value={source} onChange={setSource}>
-                    <option>Instagram</option><option>WhatsApp</option><option>Facebook</option><option>{l('Реклама', 'Жарнама', 'Ads')}</option><option>{l('Рекомендация', 'Ұсыныс', 'Referral')}</option>
+                    {LEAD_SOURCES.map(s => <option key={s}>{s}</option>)}
                   </FieldSelect>
+                  <FieldInput
+                    label={l('Кампания / объявление', 'Науқан / жарнама', 'Campaign / ad')}
+                    value={campaign} onChange={setCampaign}
+                    placeholder={l('напр. «Акция кухни май»', 'мыс. «Ас үй науқаны»', 'e.g. "Kitchen promo May"')}
+                  />
+                  {source === 'Рекомендация' && (
+                    <FieldInput
+                      label={l('Кто порекомендовал', 'Кім ұсынды', 'Referred by')}
+                      value={referrerName} onChange={setReferrerName}
+                      placeholder={l('имя клиента', 'клиент аты', 'client name')}
+                    />
+                  )}
+                  {status === 'rejected' && (
+                    <FieldSelect label={l('Причина отказа', 'Бас тарту себебі', 'Lost reason')} value={lostReason} onChange={setLostReason}>
+                      <option value="">{l('— не указана —', '— көрсетілмеген —', '— none —')}</option>
+                      {LOST_REASONS.map(r => <option key={r}>{r}</option>)}
+                    </FieldSelect>
+                  )}
                 </div>
                 {/* БИН/ИИН — нужен для счёт-фактур и актов. 12 цифр. */}
                 <div className="mt-3">
