@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, ArrowUpRight, ChevronRight, ShoppingBag, DollarSign, Users, Target, BarChart3, Percent, ArrowRight, Star, X, Sparkles, Eye, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUpRight, ChevronRight, ShoppingBag, DollarSign, Users, Target, BarChart3, Percent, ArrowRight, Star, X, Sparkles, Eye, Download, Clock, Calendar } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { MarketingDashboard } from './MarketingDashboard';
 import { t } from '../utils/translations';
@@ -174,6 +174,20 @@ export function Analytics({ language }: AnalyticsProps) {
     return { weighted: Math.round(weighted), wonRevenue, deptPlan, expectedTotal,
       planPct: deptPlan > 0 ? Math.round((expectedTotal / deptPlan) * 100) : 0 };
   }, [scopedDeals, store.employees]);
+
+  // ─── Контроль РОПа: что требует внимания + честный win rate ──────
+  const ropStats = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const active = store.deals.filter(d => d.status !== 'rejected' && d.status !== 'completed');
+    const unassigned = active.filter(d => !d.ownerId).length;
+    const overdueFollow = active.filter(d => d.nextActionAt && d.nextActionAt < today).length;
+    const slow = store.deals.filter(d => d.status === 'new' && !d.firstContactAt && d.createdAt
+      && (Date.now() - new Date(d.createdAt).getTime()) > 2 * 60 * 60 * 1000).length;
+    const won = store.deals.filter(d => d.status === 'completed').length;
+    const lost = store.deals.filter(d => d.status === 'rejected').length;
+    const winRate = (won + lost) > 0 ? Math.round((won / (won + lost)) * 100) : 0;
+    return { unassigned, overdueFollow, slow, won, lost, winRate };
+  }, [store.deals]);
 
   // Client sources from deals
   const sources = useMemo(() => {
@@ -620,6 +634,38 @@ export function Analytics({ language }: AnalyticsProps) {
           </div>
 
           {/* Masters + Sources */}
+          {/* Контроль РОПа — что требует внимания + win rate */}
+          {store.deals.length > 0 && (() => {
+            const goSales = () => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'sales' } }));
+            const counters = [
+              { n: ropStats.unassigned, label: l('Без ответственного', 'Жауапсыз', 'Unassigned'), icon: Users, cls: ropStats.unassigned > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-400' },
+              { n: ropStats.overdueFollow, label: l('Просрочен контакт', 'Байланыс өтті', 'Overdue follow-up'), icon: Calendar, cls: ropStats.overdueFollow > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-400' },
+              { n: ropStats.slow, label: l('Долго без реакции', 'Реакция жоқ', 'Slow response'), icon: Clock, cls: ropStats.slow > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-400' },
+            ];
+            return (
+              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2"><Target className="w-3.5 h-3.5 text-slate-500" strokeWidth={1.5} /><span className="text-sm text-gray-900">{l('Контроль РОПа', 'РОП бақылауы', 'Sales lead control')}</span></div>
+                  <div className="text-[11px] text-gray-500">Win rate <b className="text-gray-900 tabular-nums">{ropStats.winRate}%</b> <span className="text-gray-400">({ropStats.won}/{ropStats.won + ropStats.lost})</span></div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  {counters.map((c, i) => {
+                    const Icon = c.icon;
+                    return (
+                      <button key={i} onClick={goSales} className="flex items-center gap-2.5 p-3 rounded-2xl bg-white/50 ring-1 ring-white/60 hover:bg-white transition-colors text-left">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${c.cls}`}><Icon className="w-4 h-4" strokeWidth={1.5} /></div>
+                        <div className="min-w-0">
+                          <div className="text-base text-gray-900 tabular-nums leading-none">{c.n}</div>
+                          <div className="text-[10px] text-gray-400 leading-tight mt-0.5 truncate">{c.label}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* План отдела / факт / прогноз воронки (для РОПа) */}
           {(forecast.deptPlan > 0 || forecast.expectedTotal > 0) && (() => {
             const M = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
