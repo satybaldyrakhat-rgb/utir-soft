@@ -6,7 +6,7 @@
 // numbers. Answers the marketer's core question: "which channel pays off?".
 
 import { useEffect, useMemo, useState } from 'react';
-import { TrendingUp, Megaphone, Plus, Users, Percent, Wallet, Target, Loader2, Star, Heart, Link2, Copy, Check } from 'lucide-react';
+import { TrendingUp, Megaphone, Plus, Users, Percent, Wallet, Target, Loader2, Star, Heart, Link2, Copy, Check, Lightbulb, AlertTriangle, Sparkles } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { api } from '../utils/api';
 import { LEAD_SOURCES, PAID_CHANNELS, MARKETING_CATEGORY, computeChannelStats } from '../utils/marketing';
@@ -117,6 +117,39 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
     return Array.from(m.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   }, [store.deals]);
 
+  // Auto-insights — подсказки «куда вкладывать бюджет», из тех же цифр.
+  type Insight = { tone: 'good' | 'bad' | 'info'; text: string };
+  const insights = useMemo<Insight[]>(() => {
+    const out: Insight[] = [];
+    const withSpend = channels.filter(c => c.spend > 0 && c.romi !== null);
+    const losing = withSpend.filter(c => (c.romi as number) < 0).sort((a, b) => (a.romi as number) - (b.romi as number));
+    const best = withSpend.slice().sort((a, b) => (b.romi as number) - (a.romi as number))[0];
+    const exp = withSpend.slice().sort((a, b) => b.cpl - a.cpl)[0];
+    const conv = channels.filter(c => c.leads >= 3).slice().sort((a, b) => b.conversion - a.conversion)[0];
+
+    if (losing[0]) out.push({ tone: 'bad', text: l(
+      `Канал «${losing[0].source}» убыточен: ROMI ${losing[0].romi}%. Пересмотрите креатив или приостановите.`,
+      `«${losing[0].source}» арнасы шығынды: ROMI ${losing[0].romi}%. Креативті қайта қараңыз.`,
+      `Channel "${losing[0].source}" is unprofitable: ROMI ${losing[0].romi}%. Rework or pause it.`) });
+    if (best && (best.romi as number) > 0 && best.source !== losing[0]?.source) out.push({ tone: 'good', text: l(
+      `Лучше всех окупается «${best.source}»: ROMI ${best.romi}%. Можно увеличить бюджет.`,
+      `Ең жақсы өтелетін «${best.source}»: ROMI ${best.romi}%. Бюджетті көбейтуге болады.`,
+      `Best return: "${best.source}" at ROMI ${best.romi}%. Consider scaling it.`) });
+    if (conv && out.length < 3) out.push({ tone: 'good', text: l(
+      `Лучшая конверсия у «${conv.source}» — ${conv.conversion}% лидов в продажу.`,
+      `Ең жоғары конверсия «${conv.source}» — ${conv.conversion}%.`,
+      `Best conversion: "${conv.source}" — ${conv.conversion}% of leads close.`) });
+    if (exp && out.length < 3 && exp.source !== best?.source) out.push({ tone: 'info', text: l(
+      `Самый дорогой лид — «${exp.source}»: ${fmt(exp.cpl)} за заявку.`,
+      `Ең қымбат лид — «${exp.source}»: өтінім үшін ${fmt(exp.cpl)}.`,
+      `Priciest lead — "${exp.source}": ${fmt(exp.cpl)} per inquiry.`) });
+    if (withSpend.length === 0 && totals.leads > 0) out.push({ tone: 'info', text: l(
+      'Внесите рекламный расход — увидите стоимость лида и окупаемость по каналам.',
+      'Жарнама шығынын енгізіңіз — лид құны мен өтелуін көресіз.',
+      'Add ad spend to see cost per lead and ROI per channel.') });
+    return out.slice(0, 4);
+  }, [channels, totals, language]);
+
   const addSpend = () => {
     const amt = Number(spend.amount);
     if (!amt || amt <= 0) return;
@@ -219,6 +252,28 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
           );
         })}
       </div>
+
+      {/* Auto-insights — что делать с бюджетом */}
+      {insights.length > 0 && (
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-violet-500" strokeWidth={1.5} />
+            <span className="text-sm text-gray-900">{l('Подсказки по рекламе', 'Жарнама бойынша кеңестер', 'Marketing insights')}</span>
+          </div>
+          <div className="space-y-2">
+            {insights.map((ins, i) => {
+              const Icon = ins.tone === 'bad' ? AlertTriangle : ins.tone === 'good' ? TrendingUp : Lightbulb;
+              const cls = ins.tone === 'bad' ? 'bg-rose-50 text-rose-600' : ins.tone === 'good' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600';
+              return (
+                <div key={i} className="flex items-start gap-2.5">
+                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${cls}`}><Icon className="w-3.5 h-3.5" strokeWidth={1.5} /></div>
+                  <div className="text-xs text-gray-700 leading-snug pt-0.5">{ins.text}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Lead-form link builder — paste in Instagram bio / ads, leads land
           in the funnel tagged with this source+campaign for clean ROI. */}
