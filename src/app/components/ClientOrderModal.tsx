@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History, RotateCcw, AlertTriangle, Loader2, Upload, Download, FileSpreadsheet, FileImage, Paperclip, Layers, Package, ListChecks, ShoppingCart, ExternalLink, Wrench, Truck, TrendingUp } from 'lucide-react';
+import { X, FileText, Check, Banknote, CreditCard, QrCode, Wallet, Building2, Calendar as CalendarIcon, MessageCircle, Plus, Trash2, History, RotateCcw, AlertTriangle, Loader2, Upload, Download, FileSpreadsheet, FileImage, Paperclip, Layers, Package, ListChecks, ShoppingCart, ExternalLink, Wrench, Truck, TrendingUp, Star } from 'lucide-react';
 import { t } from '../utils/translations';
 import { useDataStore, type Deal } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
@@ -221,6 +221,22 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       setTrackCopied(true);
       setTimeout(() => setTrackCopied(false), 2200);
     } catch { /* ignore */ }
+  };
+
+  // Запрос отзыва в 1 клик — открывает WhatsApp клиенту с ссылкой на
+  // страницу заказа, где после завершения он ставит оценку (см. ClientTrack).
+  const requestReview = async () => {
+    try {
+      const r = await api.get<{ link: string }>(`/api/deals/${deal.id}/track-link`);
+      const ph = (deal.phone || '').replace(/\D/g, '');
+      const first = (deal.customerName || '').split(/\s+/)[0];
+      const msg = l(
+        `${first ? first + ', з' : 'З'}дравствуйте! Спасибо, что выбрали нас 🙌 Будем благодарны за короткий отзыв — это займёт 10 секунд: ${r.link}`,
+        `${first ? first + ', с' : 'С'}әлеметсіз бе! Бізді таңдағаныңызға рахмет 🙌 Қысқа пікір қалдырсаңыз қуанамыз: ${r.link}`,
+        `${first ? first + ', h' : 'H'}i! Thanks for choosing us 🙌 We'd love a quick review — it takes 10 seconds: ${r.link}`,
+      );
+      window.open(`https://wa.me/${ph}?text=${encodeURIComponent(msg)}`, '_blank');
+    } catch { toast(l('Не удалось получить ссылку', 'Сілтеме алынбады', 'Could not get link'), 'error'); }
   };
 
   // Payment methods: render whatever is on the deal; if none, seed default KZ enum.
@@ -613,6 +629,17 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
               {trackCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <ExternalLink className="w-3.5 h-3.5" />}
               <span className="hidden sm:inline">{trackCopied ? l('Скопировано', 'Көшірілді', 'Copied') : l('Ссылка клиенту', 'Сілтеме', 'Track link')}</span>
             </button>
+            {/* Запрос отзыва — только для завершённых заказов. */}
+            {status === 'completed' && (
+              <button
+                onClick={requestReview}
+                title={l('Запросить отзыв у клиента (WhatsApp)', 'Клиенттен пікір сұрау (WhatsApp)', 'Request a review (WhatsApp)')}
+                className="flex items-center gap-1.5 px-3 h-9 bg-emerald-600 hover:bg-emerald-700 text-white ring-1 ring-white/10 rounded-2xl text-[11px] transition-colors"
+              >
+                <Star className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <span className="hidden sm:inline">{l('Запросить отзыв', 'Пікір сұрау', 'Request review')}</span>
+              </button>
+            )}
             <button onClick={handleClose} className="w-9 h-9 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center transition-colors">
               <X className="w-4 h-4 text-slate-500" />
             </button>
