@@ -2949,8 +2949,71 @@ app.post('/api/telegram/team-invite/rotate', authMiddleware, requireRole('manage
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, telegram: isTelegramReady(), claude: isClaudeReady() }));
 
+// ─── Lead follow-up auto-tasks (авто-догрев зависших лидов) ─────────
+// Periodically: for each team, find early-funnel leads (new/measured) with
+// NO movement for 3–30 days and auto-create ONE follow-up task so warm
+// leads don't rot. Dedup by `autoFollowup` marker → one task per deal ever,
+// so the scan is idempotent and safe to run often. The 30-day upper bound
+// stops a first run from flooding the team with tasks for ancient leads.
+const FOLLOWUP_MIN_DAYS = 3;
+const FOLLOWUP_MAX_DAYS = 30;
+const FOLLOWUP_STATUSES = new Set(['new', 'measured']);
+function runLeadFollowupScan() {
+  try {
+    const now = Date.now();
+    const staleBefore = now - FOLLOWUP_MIN_DAYS * 24 * 60 * 60 * 1000;
+    const tooOld = now - FOLLOWUP_MAX_DAYS * 24 * 60 * 60 * 1000;
+    const teams = db.prepare('SELECT DISTINCT team_id FROM deals WHERE team_id IS NOT NULL').all() as any[];
+    for (const t of teams) {
+      const teamId = t.team_id;
+      if (!teamId) continue;
+      // Leads that already have an auto follow-up — never nag twice.
+      const taskRows = db.prepare('SELECT data FROM tasks WHERE team_id = ?').all(teamId) as any[];
+      const haveFollowup = new Set<string>();
+      for (const r of taskRows) {
+        try { const tk = JSON.parse(r.data); if (tk.autoFollowup && tk.linkedDealId) haveFollowup.add(tk.linkedDealId); } catch { /* skip */ }
+      }
+      const dealRows = db.prepare('SELECT id, data FROM deals WHERE team_id = ?').all(teamId) as any[];
+      for (const dr of dealRows) {
+        let d: any; try { d = JSON.parse(dr.data); } catch { continue; }
+        if (!FOLLOWUP_STATUSES.has(d.status)) continue;
+        if (haveFollowup.has(dr.id)) continue;
+        const hist = db.prepare('SELECT MAX(created_at) AS last FROM deal_history WHERE deal_id = ? AND team_id = ?').get(dr.id, teamId) as any;
+        const lastTs = hist?.last ? Date.parse(String(hist.last).replace(' ', 'T') + 'Z')
+                     : (d.createdAt ? Date.parse(d.createdAt) : now);
+        if (isNaN(lastTs) || lastTs > staleBefore || lastTs < tooOld) continue; // not in the 3–30d stale window
+        const id = newId('T');
+        const task = {
+          id,
+          title: `Догреть лид: ${d.customerName || 'клиент'}`,
+          description: `Лид без движения ${FOLLOWUP_MIN_DAYS}+ дн. Источник: ${d.source || '—'}${d.phone ? ` · ${d.phone}` : ''}. Перезвоните или напишите.`,
+          status: 'new',
+          priority: 'high',
+          assigneeId: d.ownerId || '',
+          createdAt: new Date().toISOString(),
+          dueDate: new Date().toISOString().slice(0, 10),
+          category: 'Продажи',
+          subtasks: [],
+          linkedDealId: dr.id,
+          autoFollowup: true,
+        };
+        db.prepare('INSERT INTO tasks (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, 'auto-followup', teamId, JSON.stringify(task));
+        console.log('[lead-followup] task for stalled lead', dr.id, 'team', teamId);
+      }
+    }
+  } catch (e) { console.warn('[lead-followup] scan failed', e); }
+}
+let followupTimer: ReturnType<typeof setInterval> | null = null;
+function startLeadFollowupScheduler() {
+  if (followupTimer) return;
+  setTimeout(runLeadFollowupScan, 60 * 1000);               // first pass ~1min after boot
+  followupTimer = setInterval(runLeadFollowupScan, 12 * 60 * 60 * 1000); // then every 12h
+  console.log('[server] lead follow-up scheduler started (every 12h)');
+}
+
 app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
+  startLeadFollowupScheduler();
   // Push the /-command menu to Telegram (idempotent — safe on every boot).
   // Adds /design to the blue menu button so users discover the wizard.
   if (isTelegramReady()) {
