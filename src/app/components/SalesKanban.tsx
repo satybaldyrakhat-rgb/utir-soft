@@ -16,7 +16,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Phone, X, Users, Mail, Calendar, TrendingUp, XCircle, Plus, Search,
   Archive, Download, Upload, RotateCcw, Trash2, Filter, ArrowUpDown,
-  ChevronDown, MoveRight, Eye, Sparkles, MessageCircle, AlertTriangle,
+  ChevronDown, MoveRight, Eye, Sparkles, MessageCircle, AlertTriangle, Clock,
 } from 'lucide-react';
 import { ClientOrderModal } from './ClientOrderModal';
 import { NewDealModal } from './NewDealModal';
@@ -135,6 +135,9 @@ export function SalesKanban({ language }: SalesKanbanProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [filterSource, setFilterSource] = useState<string>('');
   const [filterOwner, setFilterOwner] = useState<string>('');
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
+  // Owners for the in-card quick-assign (РОП распределяет лиды без открытия).
+  const owners = useMemo(() => store.employees.map(e => ({ id: e.id, name: e.name })), [store.employees]);
   const [filterPriority, setFilterPriority] = useState<string>('');
   const [filterDateFrom, setFilterDateFrom] = useState<string>('');
   const [filterDateTo, setFilterDateTo] = useState<string>('');
@@ -189,6 +192,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
       // Filters.
       if (filterSource   && d.source   !== filterSource)   return false;
       if (filterOwner    && d.ownerId  !== filterOwner)    return false;
+      if (unassignedOnly && d.ownerId)                     return false;
       if (filterPriority && d.priority !== filterPriority) return false;
       // Niche filter (multi-niche teams only). Resolves the effective
       // niche of the deal (own niche || team primary) so old deals
@@ -205,7 +209,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
       }
       return true;
     });
-  }, [activeDeals, searchQuery, filterSource, filterOwner, filterPriority, filterDateFrom, filterDateTo, filterNiche, store.niche]);
+  }, [activeDeals, searchQuery, filterSource, filterOwner, filterPriority, filterDateFrom, filterDateTo, filterNiche, store.niche, unassignedOnly]);
 
   // Per-stage bucket + sort. Memoized so unrelated store mutations
   // (e.g. an unrelated transaction update) don't rebuild the kanban.
@@ -474,6 +478,22 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                   <span className="tabular-nums text-emerald-700">{fmtMoney(totalSum)}</span>
                 </div>
               )}
+              {/* Нераспределённые лиды — РОП назначает быстро. */}
+              {(() => {
+                const unassigned = activeDeals.filter(d => !d.ownerId).length;
+                if (unassigned === 0 && !unassignedOnly) return null;
+                return (
+                  <button
+                    onClick={() => setUnassignedOnly(v => !v)}
+                    className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full ring-1 transition-all ${unassignedOnly ? 'bg-amber-500 text-white ring-white/20' : 'bg-amber-100/70 text-amber-700 ring-white/40 hover:bg-amber-100'}`}
+                    title={l('Показать только нераспределённые', 'Тек бөлінбегендерді көрсету', 'Show unassigned only')}
+                  >
+                    <Users className="w-3 h-3" />
+                    <span className="tabular-nums">{unassigned}</span>
+                    {' '}{l('без ответственного', 'жауапсыз', 'unassigned')}
+                  </button>
+                );
+              })()}
             </div>
 
             <div className="flex-1 min-w-[180px] max-w-xs relative">
@@ -771,6 +791,8 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                   l={l}
                   teamNiche={store.niche}
                   showNicheChip={store.secondaryNiches.length > 0}
+                  owners={owners}
+                  onAssign={(ownerId: string) => store.updateDeal(deal.id, { ownerId })}
                 />
               ))}
               {(dealsByStage[mobileStage] || []).length === 0 && (
@@ -1136,10 +1158,12 @@ function DealCard(props: {
   // 🚪 chip). Undefined / equal-to-primary → no chip.
   teamNiche: string;
   showNicheChip: boolean;
+  owners: { id: string; name: string }[];
+  onAssign: (ownerId: string) => void;
 }) {
   const { deal, selected, onToggleSelect, onOpen, onReject, onDelete, onMove,
           onDragStart, onDragEnd, iconMap, priorityConf, canWrite, isMobile, language, l,
-          teamNiche, showNicheChip } = props;
+          teamNiche, showNicheChip, owners, onAssign } = props;
   const [moveOpen, setMoveOpen] = useState(false);
   const currentStage = statusToStage(deal.status);
   const priority = priorityConf(deal.priority);
@@ -1231,6 +1255,32 @@ function DealCard(props: {
           <NicheIcon niche={dealNiche} className="w-3 h-3 flex-shrink-0" />
           <span className="truncate">{dealNiche.name[language]}</span>
         </div>
+      )}
+
+      {/* SLA — необработанный новый лид (скорость реакции). */}
+      {deal.status === 'new' && !deal.firstContactAt && deal.createdAt && (() => {
+        const mins = Math.floor((Date.now() - new Date(deal.createdAt).getTime()) / 60000);
+        if (isNaN(mins) || mins < 1) return null;
+        const over = mins >= 120, warn = mins >= 30;
+        const label = mins >= 60 ? `${Math.floor(mins / 60)} ${l('ч', 'сағ', 'h')}` : `${mins} ${l('мин', 'мин', 'min')}`;
+        return (
+          <div className={`mb-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ring-1 ${over ? 'bg-rose-50 text-rose-600 ring-rose-100/60' : warn ? 'bg-amber-50 text-amber-600 ring-amber-100/60' : 'bg-slate-50 text-slate-500 ring-white/60'}`}>
+            <Clock className="w-2.5 h-2.5" /> {l('не обработан', 'өңделмеген', 'unhandled')} {label}
+          </div>
+        );
+      })()}
+
+      {/* Быстрое назначение — РОП распределяет лид без открытия карточки. */}
+      {!deal.ownerId && canWrite && owners.length > 0 && (
+        <select
+          value=""
+          onClick={e => e.stopPropagation()}
+          onChange={e => { if (e.target.value) onAssign(e.target.value); }}
+          className="mb-2.5 w-full px-2 py-1 bg-amber-50 ring-1 ring-amber-100/60 rounded-lg text-[11px] text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-300"
+        >
+          <option value="">{l('Назначить ответственного…', 'Жауапты тағайындау…', 'Assign owner…')}</option>
+          {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
       )}
 
       {/* Product + Amount */}

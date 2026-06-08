@@ -70,6 +70,15 @@ export interface Deal {
   // Отзыв клиента — собирается через публичный Trackpage после
   // завершения заказа. Питает соц-доказательство и контент.
   review?: { rating: number; text?: string; at: string };
+  // ─── Продажи / РОП ──────────────────────────────────────────────
+  // Когда лид впервые взят в работу (вышел из «new» или ему назначили
+  // владельца). Время от createdAt до firstContactAt = скорость реакции
+  // (SLA) — ключевой фактор конверсии для этих ниш.
+  firstContactAt?: string;
+  // Следующий шаг по сделке — дата и заметка («перезвонить 10 июня»).
+  // Просроченные касания подсвечиваются и попадают в «Что нужно сделать».
+  nextActionAt?: string;   // YYYY-MM-DD
+  nextActionNote?: string;
 }
 
 // RoleKey is now a free-form string id (e.g. 'admin', 'manager', 'accountant').
@@ -1238,19 +1247,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [addActivity]);
 
   const updateDeal = useCallback(async (id: string, updates: Partial<Deal>) => {
+    // Auto-capture SLA "first contact": the moment a lead is first worked —
+    // either it leaves the 'new' column or it gets an owner. Time from
+    // createdAt to here = reaction speed (РОП SLA metric).
+    const current = deals.find(d => d.id === id);
+    let patch: Partial<Deal> = updates;
+    if (current && !current.firstContactAt) {
+      const leavingNew = current.status === 'new' && !!updates.status && updates.status !== 'new';
+      const gettingOwner = !current.ownerId && !!updates.ownerId;
+      if (leavingNew || gettingOwner) patch = { ...updates, firstContactAt: new Date().toISOString() };
+    }
     // Optimistic update — UI reflects the change immediately. If the
     // PATCH fails the caller can rollback or just refetch.
-    setDeals(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
+    setDeals(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d));
     addActivity({ user: 'Вы', action: 'Обновили сделку', target: `#${id}`, type: 'update', page: 'sales' });
     try {
-      await api.patch(`/api/deals/${id}`, updates);
+      await api.patch(`/api/deals/${id}`, patch);
     } catch (err) {
       console.error('[updateDeal]', err);
       // Re-throw so awaiting callers (ClientOrderModal handleSave) can
       // surface a friendly error and keep the form open.
       throw err;
     }
-  }, [addActivity]);
+  }, [addActivity, deals]);
 
   const deleteDeal = useCallback((id: string) => {
     setDeals(prev => prev.filter(d => d.id !== id));
