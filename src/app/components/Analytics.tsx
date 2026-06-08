@@ -139,13 +139,13 @@ export function Analytics({ language }: AnalyticsProps) {
         ? Math.round(((thisMonthRev - lastMonthRev) / lastMonthRev) * 100)
         : (thisMonthRev > 0 ? 100 : 0);
       const trendAmount = thisMonthRev - lastMonthRev;
-      // Plan is OPTIONAL — based on salary × 25 (a furniture-team convention).
-      // Show only when salary is set, hide gracefully otherwise so we don't
-      // mock revenue plans for employees who never had one.
-      const hasPlan = e.salary > 0;
-      const plan = hasPlan ? e.salary * 25 : 0;
+      // Real monthly target set by the РОП (replaces the old salary×25
+      // hack). 0 / unset → no plan shown; РОП fills it inline.
+      const plan = e.monthlyTarget || 0;
+      const hasPlan = plan > 0;
       const planProgress = plan ? Math.min(100, Math.round((revenue / plan) * 100)) : 0;
       return {
+        id: e.id,
         name: e.name,
         avatar: e.avatar || e.name.slice(0, 1),
         specialization: specMap[e.role] || { ru: e.role, kz: e.role, eng: e.role },
@@ -156,6 +156,24 @@ export function Analytics({ language }: AnalyticsProps) {
       };
     });
   }, [store.employees, scopedDeals, niche]);
+
+  // ─── Forecast (прогноз воронки) + dept plan ──────────────────────
+  // Weighted pipeline = Σ(сумма × вероятность стадии). Plus факт (закрытая
+  // выручка) и план отдела (Σ месячных целей менеджеров). Даёт РОПу ответ
+  // «вытянем ли план» заранее.
+  const STAGE_PROB: Record<string, number> = { new: 0.1, measured: 0.3, 'project-agreed': 0.6, production: 0.85, installation: 0.95 };
+  const forecast = useMemo(() => {
+    let weighted = 0;
+    for (const d of scopedDeals) {
+      if (d.status === 'completed' || d.status === 'rejected') continue;
+      weighted += (d.amount || 0) * (STAGE_PROB[d.status] ?? 0.2);
+    }
+    const wonRevenue = scopedDeals.filter(d => d.status === 'completed').reduce((s, d) => s + (d.amount || 0), 0);
+    const deptPlan = store.employees.reduce((s, e) => s + (e.monthlyTarget || 0), 0);
+    const expectedTotal = Math.round(weighted) + wonRevenue;
+    return { weighted: Math.round(weighted), wonRevenue, deptPlan, expectedTotal,
+      planPct: deptPlan > 0 ? Math.round((expectedTotal / deptPlan) * 100) : 0 };
+  }, [scopedDeals, store.employees]);
 
   // Client sources from deals
   const sources = useMemo(() => {
@@ -602,6 +620,32 @@ export function Analytics({ language }: AnalyticsProps) {
           </div>
 
           {/* Masters + Sources */}
+          {/* План отдела / факт / прогноз воронки (для РОПа) */}
+          {(forecast.deptPlan > 0 || forecast.expectedTotal > 0) && (() => {
+            const M = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
+            const cards = [
+              { label: l('План отдела', 'Бөлім жоспары', 'Dept plan'), value: forecast.deptPlan > 0 ? M(forecast.deptPlan) : '—', cls: 'bg-slate-100 text-slate-600' },
+              { label: l('Факт (закрыто)', 'Факт (жабылған)', 'Won (closed)'), value: M(forecast.wonRevenue), cls: 'bg-emerald-50 text-emerald-600' },
+              { label: l('Прогноз воронки', 'Воронка болжамы', 'Pipeline forecast'), value: M(forecast.weighted), cls: 'bg-sky-50 text-sky-600' },
+              { label: l('Ожидаемо всего', 'Күтілетін барлығы', 'Expected total'), value: M(forecast.expectedTotal), cls: 'bg-violet-50 text-violet-600' },
+            ];
+            return (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                {cards.map((c, i) => (
+                  <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+                    <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">{c.label}</div>
+                    <div className="text-sm text-gray-900 tabular-nums">{c.value}</div>
+                    {i === 3 && forecast.deptPlan > 0 && (
+                      <div className={`text-[10px] mt-1 ${forecast.planPct >= 100 ? 'text-emerald-600' : forecast.planPct >= 70 ? 'text-amber-600' : 'text-rose-500'}`}>
+                        {forecast.planPct}% {l('от плана', 'жоспардан', 'of plan')}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             {/* Team performance — niche-neutral header (was "Эффективность мастеров"
                 which only made sense for furniture). */}
@@ -740,38 +784,39 @@ export function Analytics({ language }: AnalyticsProps) {
                         </div>
                       </div>
 
-                      {/* Plan section is OPTIONAL — we only render when the
-                          employee has a salary on file (plan = salary × 25).
-                          Otherwise show a neutral "no plan" hint so the card
-                          doesn't fake a 0% red progress bar. */}
-                      {master.hasPlan ? (
-                        <div className="pt-3 border-t border-white/60">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <div className="text-[11px] text-gray-400">
-                              {l('План на месяц', 'Айлық жоспар', 'Monthly plan')}
-                            </div>
-                            <div className="text-[11px] text-gray-900">
-                              {(master.revenue / 1000000).toFixed(1)}М / {(master.plan / 1000000).toFixed(0)}М ₸
-                            </div>
-                          </div>
-                          <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1">
-                            <div className={`h-full rounded-full ${planColor}`} style={{ width: `${planPct}%` }} />
-                          </div>
-                          <div className="text-[10px] text-gray-400 text-right">
-                            {planPct}% {l('от плана', 'жоспардан', 'of plan')}
-                          </div>
+                      {/* Месячный план продаж — РОП (админ) задаёт цель по
+                          выручке прямо здесь. Прогресс — факт / план. */}
+                      <div className="pt-3 border-t border-white/60">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="text-[11px] text-gray-400">{l('План на месяц', 'Айлық жоспар', 'Monthly plan')}</div>
+                          {store.currentUserRole === 'admin' ? (
+                            <input
+                              type="number" defaultValue={master.plan || ''} placeholder="0"
+                              onClick={e => e.stopPropagation()}
+                              onBlur={e => { const v = Number(e.target.value) || 0; if (v !== (master.plan || 0)) store.updateEmployee(master.id, { monthlyTarget: v }); }}
+                              className="w-28 px-2 py-0.5 text-[11px] text-right bg-white/60 ring-1 ring-white/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 tabular-nums"
+                            />
+                          ) : (
+                            <div className="text-[11px] text-gray-900 tabular-nums">{master.hasPlan ? `${(master.plan / 1e6).toFixed(1)}М ₸` : '—'}</div>
+                          )}
                         </div>
-                      ) : (
-                        <div className="pt-3 border-t border-white/60">
-                          <div className="text-[11px] text-gray-400">
-                            {l(
-                              'План не задан — укажите оклад сотрудника в Настройках, чтобы появилась цель на месяц.',
-                              'Жоспар орнатылмаған — Баптаулар бөлімінен жалақыны енгізіңіз.',
-                              'No plan — set salary in Settings to enable monthly target.',
-                            )}
+                        {master.hasPlan ? (
+                          <>
+                            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1">
+                              <div className={`h-full rounded-full ${planColor}`} style={{ width: `${planPct}%` }} />
+                            </div>
+                            <div className="text-[10px] text-gray-400 text-right tabular-nums">
+                              {(master.revenue / 1e6).toFixed(1)}М ₸ · {planPct}% {l('от плана', 'жоспардан', 'of plan')}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-[10px] text-gray-400">
+                            {store.currentUserRole === 'admin'
+                              ? l('Поставьте цель по выручке на месяц', 'Айлық табыс мақсатын қойыңыз', 'Set a monthly revenue target')
+                              : l('План не задан', 'Жоспар жоқ', 'No plan set')}
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   );
                 })}

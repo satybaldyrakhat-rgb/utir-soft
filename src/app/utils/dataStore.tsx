@@ -130,6 +130,9 @@ export interface Employee {
   avatar: string;
   permissions: { sales: boolean; finance: boolean; warehouse: boolean; chats: boolean; analytics: boolean; settings: boolean; };
   performance: { ordersCompleted: number; rating: number; efficiency: number; };
+  // Месячный план продаж по выручке (₸), который ставит РОП. Заменяет
+  // костыль «оклад × 25». 0 / undefined → плана нет (не показываем).
+  monthlyTarget?: number;
   // Niche assignments — for multi-niche businesses where specific
   // teammates only handle certain directions (e.g. one master only does
   // doors, another only stairs). Empty / undefined means "works across
