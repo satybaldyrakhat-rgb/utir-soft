@@ -5,9 +5,10 @@
 // No Meta API needed — when that integration ships it can feed the same
 // numbers. Answers the marketer's core question: "which channel pays off?".
 
-import { useMemo, useState } from 'react';
-import { TrendingUp, Megaphone, Plus, Users, Percent, Wallet, Target, Loader2, Star, Heart } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { TrendingUp, Megaphone, Plus, Users, Percent, Wallet, Target, Loader2, Star, Heart, Link2, Copy, Check } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
+import { api } from '../utils/api';
 import { LEAD_SOURCES, PAID_CHANNELS, MARKETING_CATEGORY, computeChannelStats } from '../utils/marketing';
 
 const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
@@ -20,6 +21,30 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
   const canWrite = store.getModuleLevel('marketing') === 'full';
 
   const [period, setPeriod] = useState<PeriodKey>('all');
+
+  // Public lead-form link + builder (источник/кампания → UTM-метки в ссылке).
+  const [leadCode, setLeadCode] = useState<string | null>(null);
+  const [linkSource, setLinkSource] = useState<string>('Instagram');
+  const [linkCampaign, setLinkCampaign] = useState('');
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    api.get<{ code: string }>('/api/team/lead-form').then(r => setLeadCode(r.code)).catch(() => {});
+  }, []);
+  const leadLink = useMemo(() => {
+    if (!leadCode) return '';
+    const base = `${window.location.origin}/#/lead/${leadCode}`;
+    const params = new URLSearchParams();
+    if (linkSource) params.set('s', linkSource);
+    if (linkCampaign.trim()) params.set('c', linkCampaign.trim());
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+  }, [leadCode, linkSource, linkCampaign]);
+  const copyLink = () => {
+    if (!leadLink) return;
+    try { navigator.clipboard?.writeText(leadLink); } catch { /* ignore */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
   const [spendOpen, setSpendOpen] = useState(false);
   const [spend, setSpend] = useState({ channel: PAID_CHANNELS[0] as string, amount: '', date: new Date().toISOString().slice(0, 10), campaign: '' });
   const [saving, setSaving] = useState(false);
@@ -194,6 +219,39 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
           );
         })}
       </div>
+
+      {/* Lead-form link builder — paste in Instagram bio / ads, leads land
+          in the funnel tagged with this source+campaign for clean ROI. */}
+      {canWrite && leadCode && (
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Link2 className="w-3.5 h-3.5 text-emerald-600" strokeWidth={1.5} />
+            <span className="text-sm text-gray-900">{l('Ссылка на форму заявки', 'Өтінім сілтемесі', 'Lead form link')}</span>
+          </div>
+          <div className="text-[11px] text-gray-400 mb-3 leading-relaxed">
+            {l('Выберите канал и кампанию — ссылку вставьте в Instagram-bio или рекламу. Заявки попадут в воронку с этой меткой, и вы увидите, какая реклама даёт клиентов.',
+               'Арна мен науқанды таңдаңыз — сілтемені Instagram-bio немесе жарнамаға қойыңыз.',
+               'Pick channel + campaign — paste the link in your Instagram bio or ad. Leads land in the funnel with this tag.')}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+            <select value={linkSource} onChange={e => setLinkSource(e.target.value)}
+              className="w-full px-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              {LEAD_SOURCES.map(s => <option key={s}>{s}</option>)}
+            </select>
+            <input value={linkCampaign} onChange={e => setLinkCampaign(e.target.value)} placeholder={l('Кампания (необязательно)', 'Науқан', 'Campaign (optional)')}
+              className="w-full px-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div className="flex items-center gap-2">
+            <input readOnly value={leadLink} onFocus={e => e.currentTarget.select()}
+              className="flex-1 min-w-0 px-3 py-2 bg-gray-50 ring-1 ring-white/60 rounded-xl text-xs text-gray-600 focus:outline-none" />
+            <button onClick={copyLink}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs ring-1 ring-white/10 transition-colors flex-shrink-0">
+              {copied ? <Check className="w-3.5 h-3.5" strokeWidth={1.5} /> : <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />}
+              {copied ? l('Скопировано', 'Көшірілді', 'Copied') : l('Копировать', 'Көшіру', 'Copy')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Empty state */}
       {channels.length === 0 ? (

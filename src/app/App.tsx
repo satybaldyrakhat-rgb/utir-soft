@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { ClientTrack } from './components/ClientTrack';
+import { LeadForm } from './components/LeadForm';
 import { ClientCabinet } from './components/ClientCabinet';
 import { Booking } from './components/Booking';
 import { AIDesign } from './components/AIDesign';
@@ -742,6 +743,7 @@ function PublicRouter({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
   if (hash.startsWith('#/track/')) return <ClientTrack orderId={hash.replace('#/track/', '')} />;
+  if (hash.startsWith('#/lead/')) return <LeadForm route={hash.replace('#/lead/', '')} />;
   if (hash === '#/cabinet' || hash.startsWith('#/cabinet/')) return <ClientCabinetRoute />;
   if (hash === '#/booking') return <Booking />;
   if (hash === '#/terms') return <Terms language={legalLang} onLanguageChange={setLegalLang} />;

@@ -349,6 +349,10 @@ migrateColumn('team_settings', 'niche', 'TEXT');
 // labels / production stages / material categories follow the right
 // niche instead of being forced into the primary one.
 migrateColumn('team_settings', 'secondary_niches', 'TEXT');
+// Public lead-form code — stable per-team slug for the shareable заявка page
+// (#/lead/<code>). Leads submitted there land in the funnel as new deals
+// tagged with their source/campaign. Generated lazily on first request.
+migrateColumn('team_settings', 'lead_form_code', 'TEXT');
 // Onboarding state — JSON { completed: bool, step?: string, completedAt?: ISO }.
 // Drives whether we show the first-time setup wizard. Once completed=true
 // the user won't see the wizard again unless explicitly reset.
@@ -590,6 +594,7 @@ const RATE_LIMITS: Record<string, { max: number; windowMs: number }> = {
   login:         { max: 10, windowMs: 5  * 60 * 1000 },  // 10 / 5min — soft
   'resend-code': { max: 5,  windowMs: 15 * 60 * 1000 },  // 5 / 15min
   'forgot':      { max: 3,  windowMs: 15 * 60 * 1000 },  // 3 / 15min — strict, prevents email-spam-via-form
+  'lead':        { max: 20, windowMs: 60 * 60 * 1000 },  // 20 / hour per IP — public lead form
 };
 function rateLimit(bucket: keyof typeof RATE_LIMITS) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -1210,6 +1215,78 @@ app.post('/api/track/:code/review', (req, res) => {
 
   d.review = { rating, text: text || undefined, at: new Date().toISOString() };
   db.prepare('UPDATE deals SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(d), link.deal_id, link.team_id);
+  res.json({ ok: true });
+});
+
+// ─── Public lead form (заявка с сайта/рекламы) ──────────────────────
+// Stable per-team code → a public form page can POST new leads straight
+// into the funnel, tagged with their source/campaign for ROI attribution.
+function getOrCreateLeadFormCode(teamId: string): string {
+  const row = db.prepare('SELECT lead_form_code FROM team_settings WHERE team_id = ?').get(teamId) as any;
+  if (row?.lead_form_code) return row.lead_form_code;
+  const code = 'L' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  if (row) db.prepare('UPDATE team_settings SET lead_form_code = ? WHERE team_id = ?').run(code, teamId);
+  else db.prepare('INSERT INTO team_settings (team_id, lead_form_code) VALUES (?, ?)').run(teamId, code);
+  return code;
+}
+
+// Authed: get (or lazily create) this team's lead-form code. Marketing
+// module gates it — same as the dashboard that consumes the leads.
+app.get('/api/team/lead-form', authMiddleware, (req: AuthedRequest, res) => {
+  res.json({ code: getOrCreateLeadFormCode(req.teamId!) });
+});
+
+// Public: company + niche info so the form can brand itself + offer the
+// right product-type hint. No team data leaked beyond name.
+app.get('/api/lead/:code', (req, res) => {
+  const code = String(req.params.code || '').toUpperCase();
+  const ts = db.prepare('SELECT team_id, company_requisites, niche FROM team_settings WHERE lead_form_code = ?').get(code) as any;
+  if (!ts) return res.status(404).json({ error: 'not found' });
+  let company = { name: 'Utir Soft' };
+  try { if (ts.company_requisites) { const r = JSON.parse(ts.company_requisites); company = { name: r.legalName || r.name || 'Utir Soft' }; } } catch { /* default */ }
+  res.json({ company, niche: ts.niche || 'furniture' });
+});
+
+// Public: submit a lead → creates a `new` deal in the team's funnel.
+app.post('/api/lead/:code', rateLimit('lead'), (req, res) => {
+  const code = String(req.params.code || '').toUpperCase();
+  const ts = db.prepare('SELECT team_id FROM team_settings WHERE lead_form_code = ?').get(code) as any;
+  if (!ts) return res.status(404).json({ error: 'not found' });
+
+  const b = req.body || {};
+  const name = String(b.name || '').trim().slice(0, 120);
+  const phone = String(b.phone || '').trim().slice(0, 40);
+  if (!name || !phone) return res.status(400).json({ error: 'name and phone required' });
+
+  const product = String(b.product || '').trim().slice(0, 200);
+  const comment = String(b.comment || '').trim().slice(0, 1000);
+  const source = String(b.source || 'Сайт').trim().slice(0, 60) || 'Сайт';
+  const campaign = String(b.campaign || '').trim().slice(0, 120);
+
+  const id = newId('D');
+  const sourceIcon: Record<string, string> = { Instagram: 'instagram', WhatsApp: 'whatsapp', Telegram: 'telegram', Сайт: 'phone' };
+  const deal: any = {
+    id,
+    customerName: name,
+    phone,
+    address: '', siteAddress: '',
+    product: product || 'Заявка с сайта',
+    furnitureType: product || '',
+    amount: 0, paidAmount: 0,
+    status: 'new',
+    icon: sourceIcon[source] || 'phone',
+    priority: 'medium',
+    date: new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
+    progress: 5,
+    source,
+    campaign: campaign || undefined,
+    measurer: '', designer: '', materials: '',
+    measurementDate: '', completionDate: '', installationDate: '',
+    paymentMethods: {},
+    notes: comment ? `Заявка с лид-формы: ${comment}` : 'Заявка с лид-формы',
+    createdAt: new Date().toISOString(),
+  };
+  db.prepare('INSERT INTO deals (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, 'lead-form', ts.team_id, JSON.stringify(deal));
   res.json({ ok: true });
 });
 
