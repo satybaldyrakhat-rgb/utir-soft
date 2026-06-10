@@ -1247,6 +1247,34 @@ app.get('/api/lead/:code', (req, res) => {
   res.json({ company, niche: ts.niche || 'furniture' });
 });
 
+// Pick the sales-capable teammate with the FEWEST active deals — fair,
+// load-balanced lead distribution. Returns '' if no eligible manager.
+function pickLeastLoadedManager(teamId: string): string {
+  const SALES_ROLES = new Set(['admin', 'manager', 'sales']);
+  const empRows = db.prepare('SELECT id, data FROM employees WHERE team_id = ?').all(teamId) as any[];
+  const eligible: { id: string }[] = [];
+  for (const r of empRows) {
+    try {
+      const e = JSON.parse(r.data);
+      if (SALES_ROLES.has(e.role) && (e.status || 'active') === 'active') eligible.push({ id: r.id });
+    } catch { /* skip */ }
+  }
+  if (eligible.length === 0) return '';
+  // Active (non-final) deal counts per owner.
+  const load = new Map<string, number>();
+  const dealRows = db.prepare('SELECT data FROM deals WHERE team_id = ?').all(teamId) as any[];
+  for (const r of dealRows) {
+    try {
+      const d = JSON.parse(r.data);
+      if (d.ownerId && d.status !== 'completed' && d.status !== 'rejected') {
+        load.set(d.ownerId, (load.get(d.ownerId) || 0) + 1);
+      }
+    } catch { /* skip */ }
+  }
+  eligible.sort((a, b) => (load.get(a.id) || 0) - (load.get(b.id) || 0));
+  return eligible[0].id;
+}
+
 // Public: submit a lead → creates a `new` deal in the team's funnel.
 app.post('/api/lead/:code', rateLimit('lead'), (req, res) => {
   const code = String(req.params.code || '').toUpperCase();
@@ -1265,6 +1293,9 @@ app.post('/api/lead/:code', rateLimit('lead'), (req, res) => {
 
   const id = newId('D');
   const sourceIcon: Record<string, string> = { Instagram: 'instagram', WhatsApp: 'whatsapp', Telegram: 'telegram', Сайт: 'phone' };
+  // Авто-распределение: лид уходит менеджеру с наименьшей загрузкой
+  // (по числу активных сделок) — справедливо и быстро для SLA.
+  const ownerId = pickLeastLoadedManager(ts.team_id);
   const deal: any = {
     id,
     customerName: name,
@@ -1280,6 +1311,7 @@ app.post('/api/lead/:code', rateLimit('lead'), (req, res) => {
     progress: 5,
     source,
     campaign: campaign || undefined,
+    ownerId: ownerId || undefined,
     measurer: '', designer: '', materials: '',
     measurementDate: '', completionDate: '', installationDate: '',
     paymentMethods: {},
@@ -1287,6 +1319,8 @@ app.post('/api/lead/:code', rateLimit('lead'), (req, res) => {
     createdAt: new Date().toISOString(),
   };
   db.prepare('INSERT INTO deals (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, 'lead-form', ts.team_id, JSON.stringify(deal));
+  // Мгновенный пуш назначенному менеджеру в Telegram (best-effort).
+  if (ownerId) { try { void notifyAssignment(db, ts.team_id, id, ownerId); } catch { /* ignore */ } }
   res.json({ ok: true });
 });
 
