@@ -5,6 +5,7 @@ import { confirmDialog } from '../utils/confirm';
 import { Calculator } from './Calculator';
 import { api } from '../utils/api';
 import { getNiche, type NicheStage } from '../utils/niches';
+import { plural } from '../utils/translations';
 import { NicheIcon } from './NicheIcon';
 import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
@@ -785,8 +786,8 @@ export function Warehouse({ language }: WarehouseProps) {
       {/* Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         {[
-          { label: l('В работе', 'Жұмыста', 'In Progress'), value: String(activeOrders), sub: l('заказов', 'тапсырыс', 'orders'), icon: Wrench, color: '' },
-          { label: l('Материалов', 'Материалдар', 'Materials'), value: String(products.length), sub: l('позиций', 'позиция', 'items'), icon: Package, color: '' },
+          { label: l('В работе', 'Жұмыста', 'In Progress'), value: String(activeOrders), sub: l(plural(activeOrders, 'заказ', 'заказа', 'заказов'), 'тапсырыс', 'orders'), icon: Wrench, color: '' },
+          { label: l('Материалов', 'Материалдар', 'Materials'), value: String(products.length), sub: l(plural(products.length, 'позиция', 'позиции', 'позиций'), 'позиция', 'items'), icon: Package, color: '' },
           { label: l('Стоимость склада', 'Қойма құны', 'Stock Value'), value: `${(totalValue / 1000000).toFixed(1)}М₸`, sub: l('общая', 'жалпы', 'total'), icon: TrendingUp, color: '' },
           { label: l('Мало', 'Аз', 'Low Stock'), value: String(lowCount), sub: l('заказать', 'тапсыру', 'reorder'), icon: AlertTriangle, color: lowCount > 0 ? 'text-yellow-600' : '' },
           { label: l('Закончилось', 'Жоқ', 'Out of Stock'), value: String(outCount), sub: l('срочно', 'шұғыл', 'urgent'), icon: ShoppingCart, color: outCount > 0 ? 'text-red-600' : '' },
