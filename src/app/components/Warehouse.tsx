@@ -883,9 +883,20 @@ export function Warehouse({ language }: WarehouseProps) {
                           <span className="text-gray-800 truncate">{d.customerName}</span>
                           <span className={`flex-shrink-0 tabular-nums ${d.installationDate === todayStr ? 'text-amber-600' : 'text-gray-500'}`}>{d.installationDate === todayStr ? l('сегодня', 'бүгін', 'today') : d.installationDate}</span>
                         </div>
-                        {(d.siteAddress || d.address || d.measurer) && (
-                          <div className="text-[10px] text-gray-400 truncate">{d.siteAddress || d.address}{d.measurer ? ` · ${d.measurer}` : ''}</div>
-                        )}
+                        {(d.siteAddress || d.address || d.measurer) && (() => {
+                          const addr = d.siteAddress || d.address;
+                          return (
+                            <div className="text-[10px] text-gray-400 truncate flex items-center gap-1.5">
+                              {addr ? (
+                                <a href={`https://2gis.kz/search/${encodeURIComponent(addr)}`} target="_blank" rel="noreferrer"
+                                  onClick={e => e.stopPropagation()} className="text-sky-600 hover:underline inline-flex items-center gap-0.5">
+                                  <MapPin className="w-2.5 h-2.5" /> {addr}
+                                </a>
+                              ) : null}
+                              {d.measurer ? <span>· {d.measurer}</span> : null}
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>

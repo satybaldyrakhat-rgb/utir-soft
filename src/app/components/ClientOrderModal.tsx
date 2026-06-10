@@ -143,6 +143,8 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   // Следующий шаг — дата + заметка («перезвонить 10 июня»).
   const [nextActionAt, setNextActionAt] = useState(deal.nextActionAt || '');
   const [nextActionNote, setNextActionNote] = useState(deal.nextActionNote || '');
+  // Чек-лист приёмки монтажа.
+  const [installChecklist, setInstallChecklist] = useState<{ label: string; done: boolean }[]>(deal.installChecklist || []);
   const [measurer, setMeasurer] = useState(deal.measurer || '');
   const [designer, setDesigner] = useState(deal.designer || '');
   const [foreman, setForeman] = useState(deal.foreman || '');
@@ -264,6 +266,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     setLostReason(deal.lostReason || '');
     setNextActionAt(deal.nextActionAt || '');
     setNextActionNote(deal.nextActionNote || '');
+    setInstallChecklist(deal.installChecklist || []);
     setMeasurer(deal.measurer || '');
     setDesigner(deal.designer || '');
     setForeman(deal.foreman || '');
@@ -485,6 +488,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         lostReason: status === 'rejected' ? lostReason : '',
         nextActionAt,
         nextActionNote,
+        installChecklist,
         measurer,
         designer,
         foreman,
@@ -562,6 +566,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       lostReason !== (deal.lostReason || '') ||
       nextActionAt !== (deal.nextActionAt || '') ||
       nextActionNote !== (deal.nextActionNote || '') ||
+      JSON.stringify(installChecklist) !== JSON.stringify(deal.installChecklist || []) ||
       measurer !== (deal.measurer || '') ||
       designer !== (deal.designer || '') ||
       foreman !== (deal.foreman || '') ||
@@ -580,7 +585,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
       JSON.stringify(paymentMethods) !== JSON.stringify(deal.paymentMethods || {}) ||
       JSON.stringify(documents.map(d => d.id).sort()) !== JSON.stringify(((deal as any).documents || []).map((d: DealDoc) => d.id).sort());
     setDirty(changed);
-  }, [phone, address, siteAddress, source, campaign, referrerName, lostReason, nextActionAt, nextActionNote, measurer, designer, foreman, architect,
+  }, [phone, address, siteAddress, source, campaign, referrerName, lostReason, nextActionAt, nextActionNote, installChecklist, measurer, designer, foreman, architect,
       ownerId, furnitureType, materials, measurementDate, completionDate,
       installationDate, notes, paidAmount, status, customerBIN, paymentMethods, documents, deal]);
 
@@ -766,6 +771,43 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                   />
                 </div>
               </section>
+
+              {/* ── Section: Install acceptance checklist (приёмка монтажа) ── */}
+              {(status === 'installation' || status === 'completed') && (() => {
+                const DEFAULTS = [
+                  l('Доставлено всё по спецификации', 'Спецификация бойынша жеткізілді', 'Delivered per spec'),
+                  l('Установлено ровно, без зазоров', 'Тегіс, саңылаусыз орнатылды', 'Installed evenly'),
+                  l('Проверена работа механизмов', 'Механизмдер тексерілді', 'Mechanisms checked'),
+                  l('Нет повреждений и сколов', 'Зақым мен сынық жоқ', 'No damage or chips'),
+                  l('Убран мусор после монтажа', 'Монтаждан кейін қоқыс жиналды', 'Site cleaned up'),
+                  l('Клиент принял работу', 'Клиент жұмысты қабылдады', 'Client accepted'),
+                ];
+                const list = installChecklist.length ? installChecklist : DEFAULTS.map(label => ({ label, done: false }));
+                const doneCount = list.filter(i => i.done).length;
+                const toggle = (idx: number) => {
+                  const base = installChecklist.length ? installChecklist : DEFAULTS.map(label => ({ label, done: false }));
+                  setInstallChecklist(base.map((it, i) => i === idx ? { ...it, done: !it.done } : it));
+                };
+                return (
+                  <section>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3 flex items-center justify-between">
+                      <span>{l('Приёмка монтажа', 'Монтажды қабылдау', 'Installation acceptance')}</span>
+                      <span className="text-slate-400 tabular-nums normal-case">{doneCount}/{list.length}</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {list.map((it, i) => (
+                        <button key={i} onClick={() => toggle(i)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 bg-white/50 ring-1 ring-white/60 rounded-xl text-left hover:bg-white/70 transition-colors">
+                          <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ring-1 ${it.done ? 'bg-emerald-600 ring-white/10' : 'bg-white/60 ring-white/60'}`}>
+                            {it.done && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                          </span>
+                          <span className={`text-xs ${it.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{it.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })()}
 
               {/* ── Section: Object addresses ── */}
               <section>

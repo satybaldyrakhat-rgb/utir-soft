@@ -87,6 +87,9 @@ export interface Deal {
   // Брак / переделка на заказе — причина + момент. Питает аналитику
   // качества «почему переделываем» и подсветку на карточке заказа.
   defect?: { reason: string; note?: string; at: string };
+  // Чек-лист приёмки монтажа — монтажник/прораб отмечает пункты при сдаче
+  // объекта клиенту (доставлено, установлено ровно, нет повреждений и т.д.).
+  installChecklist?: { label: string; done: boolean }[];
 }
 
 // RoleKey is now a free-form string id (e.g. 'admin', 'manager', 'accountant').
