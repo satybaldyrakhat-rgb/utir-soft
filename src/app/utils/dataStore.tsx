@@ -79,6 +79,11 @@ export interface Deal {
   // Просроченные касания подсвечиваются и попадают в «Что нужно сделать».
   nextActionAt?: string;   // YYYY-MM-DD
   nextActionNote?: string;
+  // ─── Производство / снабжение ───────────────────────────────────
+  // Привязанная спецификация (BOM) — план материалов на заказ. По ней
+  // считается резерв материалов (бронь под заказ) и потребность к закупке
+  // (нужно по плану − уже списано). id из /api/bom-templates.
+  bomTemplateId?: string;
 }
 
 // RoleKey is now a free-form string id (e.g. 'admin', 'manager', 'accountant').

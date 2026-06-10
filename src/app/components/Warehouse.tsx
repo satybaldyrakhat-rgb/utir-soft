@@ -149,6 +149,10 @@ export function Warehouse({ language }: WarehouseProps) {
   }, [store.deals, store.products.length]);
   const [activeView, setActiveView] = useState<'materials' | 'production' | 'bom' | 'calculator' | 'nesting' | 'suppliers' | 'purchases' | 'reports'>(initialView);
   const [selectedCategory, setSelectedCategory] = useState('Все');
+  // BOM-шаблоны команды — нужны для расчёта резерва материалов под заказы
+  // и потребности к закупке (см. `reservation` ниже).
+  const [bomTemplates, setBomTemplates] = useState<BomTemplate[]>([]);
+  useEffect(() => { api.get<BomTemplate[]>('/api/bom-templates').then(setBomTemplates).catch(() => {}); }, []);
   // Niche filter for multi-niche teams. '' = all niches; otherwise
   // compares to product.niche. Materials without a niche tag are
   // treated as cross-niche (visible in every filter) — common for
@@ -379,6 +383,31 @@ export function Warehouse({ language }: WarehouseProps) {
     setShowPoModal(true);
   }
 
+  // Сформировать одну закупку на весь дефицит под заказы (потребность).
+  async function triggerPurchaseForShortages() {
+    if (shortages.length === 0) return;
+    let sups = suppliers;
+    if (sups.length === 0) {
+      try { sups = await api.get<Supplier[]>('/api/suppliers'); setSuppliers(sups); }
+      catch { /* ignore */ }
+    }
+    if (sups.length === 0) {
+      flash(l('Сначала добавьте поставщика во вкладке «Поставщики»', 'Алдымен жеткізуші қосыңыз', 'Add a supplier first'));
+      setActiveView('suppliers');
+      return;
+    }
+    const items = shortages.map(s => ({ name: s.name, qty: Math.ceil(s.shortage), unit: s.unit, costPerUnit: s.cost }));
+    const draft: PurchaseOrder = {
+      id: '', supplierId: sups[0].id,
+      items, totalCost: items.reduce((sum, it) => sum + it.qty * it.costPerUnit, 0),
+      status: 'draft', expectedDate: '',
+      notes: l('Закупка под потребность активных заказов', 'Белсенді тапсырыстар қажеттілігі', 'Purchase for active orders demand'),
+      linkedDealIds: [],
+    };
+    setEditingPo(draft);
+    setShowPoModal(true);
+  }
+
   function triggerPurchaseForAll() {
     // Bulk: not yet — we open the modal for the FIRST low item; user can
     // add more items in the modal itself. Keeping it simple: one PO per
@@ -421,6 +450,48 @@ export function Warehouse({ language }: WarehouseProps) {
         nicheId: d.niche || store.niche,
       } as ProdOrder & { nicheStages: typeof dealNicheConfig.productionStages; nicheId: string };
     });
+
+  // ─── Резерв материалов под заказы (A) + потребность к закупке (B) ─
+  // Для каждого активного заказа с привязанной спецификацией (BOM):
+  // зарезервировано = план по BOM − уже списано. Сводим по материалам.
+  // «Доступно = остаток − резерв», дефицит = резерв − остаток.
+  const reservation = useMemo(() => {
+    const bomById = new Map(bomTemplates.filter(b => b.id).map(b => [b.id!, b]));
+    const need = new Map<string, { name: string; reserved: number; unit: string; orders: number }>();
+    for (const d of store.deals) {
+      if (!['production', 'assembly', 'contract', 'project-agreed', 'manufacturing', 'installation', 'measured'].includes(d.status)) continue;
+      const bomId = (d as any).bomTemplateId;
+      if (!bomId) continue;
+      const bom = bomById.get(bomId);
+      if (!bom) continue;
+      const consumedByName = new Map<string, number>();
+      (((d as any).consumed as ConsumedMaterial[] | undefined) || []).forEach(c =>
+        consumedByName.set((c.name || '').toLowerCase(), (consumedByName.get((c.name || '').toLowerCase()) || 0) + (c.qty || 0)));
+      for (const m of bom.materials) {
+        const key = (m.mat || '').trim().toLowerCase();
+        if (!key) continue;
+        const remaining = Math.max(0, (m.qty || 0) - (consumedByName.get(key) || 0));
+        if (remaining <= 0) continue;
+        const cur = need.get(key) || { name: m.mat, reserved: 0, unit: m.unit || 'шт', orders: 0 };
+        cur.reserved += remaining; cur.orders += 1;
+        need.set(key, cur);
+      }
+    }
+    return need;
+  }, [store.deals, bomTemplates]);
+
+  // Потребность к закупке: для каждого зарезервированного материала
+  // сопоставляем остаток на складе по имени → дефицит.
+  const shortages = useMemo(() => {
+    const out: { name: string; reserved: number; stock: number; shortage: number; unit: string; cost: number; product?: Product }[] = [];
+    reservation.forEach((r, key) => {
+      const product = store.products.find(p => (p.name || '').trim().toLowerCase() === key);
+      const stock = product?.quantity || 0;
+      const shortage = Math.max(0, r.reserved - stock);
+      if (shortage > 0) out.push({ name: r.name, reserved: r.reserved, stock, shortage, unit: r.unit, cost: product?.cost || 0, product });
+    });
+    return out.sort((a, b) => b.shortage - a.shortage);
+  }, [reservation, store.products]);
 
   // ─── Material consumption ────────────────────────────────────────
   // Single source of truth for the «Списать материалы» modal — captures
@@ -893,6 +964,22 @@ export function Warehouse({ language }: WarehouseProps) {
                     </div>
                   )}
 
+                  {/* Спецификация (BOM) — план материалов; по ней считается
+                       резерв материалов и потребность к закупке. */}
+                  {canWrite && bomTemplates.length > 0 && (
+                    <div className="mt-3" onClick={e => e.stopPropagation()}>
+                      <select
+                        value={(store.deals.find(d => d.id === o.dealId)?.bomTemplateId) || ''}
+                        onChange={e => store.updateDeal(o.dealId, { bomTemplateId: e.target.value || undefined })}
+                        className="w-full px-2.5 py-1.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-[11px] text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        title={l('Спецификация (BOM) — план материалов для резерва', 'BOM — материал жоспары', 'BOM — material plan for reservation')}
+                      >
+                        <option value="">{l('Спецификация (BOM)…', 'Спецификация (BOM)…', 'Spec (BOM)…')}</option>
+                        {bomTemplates.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+
                   {/* Consume materials CTA — appears below the stage chain
                        so admin can pull stock onto this order in one click. */}
                   <div className="mt-3" onClick={e => e.stopPropagation()}>
@@ -956,6 +1043,41 @@ export function Warehouse({ language }: WarehouseProps) {
       })()}
 
       {/* ===== MATERIALS VIEW ===== */}
+      {/* Потребность под заказы (резерв материалов + дефицит к закупке) */}
+      {activeView === 'materials' && reservation.size > 0 && (
+        <div className="mb-4 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+          <div className="px-5 py-3.5 flex items-center justify-between border-b border-white/60 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-sm text-gray-900">{l('Потребность под заказы', 'Тапсырыстар қажеттілігі', 'Demand for active orders')}</span>
+              <span className="text-[11px] text-gray-400">· {l('зарезервировано позиций', 'брондалған', 'reserved items')}: {reservation.size}</span>
+            </div>
+            {shortages.length > 0 && canWrite && (
+              <button onClick={triggerPurchaseForShortages}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] ring-1 ring-white/10 transition-colors">
+                <ShoppingCart className="w-3.5 h-3.5" /> {l('Сформировать закупку', 'Сатып алу жасау', 'Create purchase')} ({shortages.length})
+              </button>
+            )}
+          </div>
+          {shortages.length === 0 ? (
+            <div className="px-5 py-4 text-xs text-emerald-600">{l('Материалов хватает на все активные заказы', 'Барлық тапсырысқа материал жеткілікті', 'Enough materials for all active orders')}</div>
+          ) : (
+            <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+              {shortages.map(s => (
+                <div key={s.name} className="px-5 py-2.5 flex items-center justify-between text-xs gap-3">
+                  <div className="text-gray-800 truncate min-w-0">{s.name}</div>
+                  <div className="flex items-center gap-3 sm:gap-4 tabular-nums flex-shrink-0">
+                    <span className="text-gray-500 hidden sm:inline">{l('нужно', 'қажет', 'need')} {Math.ceil(s.reserved)}</span>
+                    <span className="text-gray-500">{l('склад', 'қойма', 'stock')} {s.stock}</span>
+                    <span className="text-rose-600 w-24 text-right">−{Math.ceil(s.shortage)} {s.unit}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {activeView === 'materials' && (
         store.products.length === 0 ? (
           // ─── Empty-state hero ─────────────────────────────────
