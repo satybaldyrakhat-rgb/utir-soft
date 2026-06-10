@@ -964,6 +964,42 @@ export function Warehouse({ language }: WarehouseProps) {
                     </div>
                   )}
 
+                  {/* Себестоимость заказа: план (BOM) vs факт (списано) +
+                       перерасход материалов + маржа. Только когда привязан BOM. */}
+                  {(() => {
+                    const deal = store.deals.find(d => d.id === o.dealId);
+                    const bom = bomTemplates.find(b => b.id === deal?.bomTemplateId);
+                    if (!bom) return null;
+                    const f0 = (n: number) => Math.round(n).toLocaleString('ru-RU');
+                    const planMat = bom.materials.reduce((s, m) => s + ((m.qty || 0) * (m.price || 0)), 0);
+                    const factMat = (o.consumed || []).reduce((s, c) => s + c.qty * c.costPerUnit, 0);
+                    const labour = bom.labourCost || 0;
+                    const factTotal = factMat + labour;
+                    const overrun = factMat - planMat;
+                    const amount = deal?.amount || 0;
+                    const margin = amount - factTotal;
+                    const marginPct = amount > 0 ? Math.round((margin / amount) * 100) : null;
+                    return (
+                      <div className="mt-3 bg-white/40 ring-1 ring-white/60 rounded-2xl px-3 py-2 text-[11px] space-y-1">
+                        <div className="text-[10px] text-slate-500 uppercase tracking-wide">{l('Себестоимость', 'Өзіндік құн', 'Cost')}</div>
+                        <div className="flex items-center justify-between"><span className="text-slate-500">{l('Материалы план', 'Материал жоспар', 'Materials plan')}</span><span className="tabular-nums text-slate-700">{f0(planMat)} ₸</span></div>
+                        {factMat > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">{l('Материалы факт', 'Материал факт', 'Materials actual')}</span>
+                            <span className={`tabular-nums ${overrun > 1 ? 'text-rose-600' : 'text-slate-700'}`}>{f0(factMat)} ₸{overrun > 1 ? ` (+${f0(overrun)})` : ''}</span>
+                          </div>
+                        )}
+                        {labour > 0 && <div className="flex items-center justify-between"><span className="text-slate-500">{l('Работа', 'Жұмыс', 'Labour')}</span><span className="tabular-nums text-slate-700">{f0(labour)} ₸</span></div>}
+                        {amount > 0 && (
+                          <div className="flex items-center justify-between pt-1 border-t border-white/60">
+                            <span className="text-slate-500">{l('Маржа', 'Маржа', 'Margin')}</span>
+                            <span className={`tabular-nums ${margin < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{f0(margin)} ₸{marginPct !== null ? ` · ${marginPct}%` : ''}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Спецификация (BOM) — план материалов; по ней считается
                        резерв материалов и потребность к закупке. */}
                   {canWrite && bomTemplates.length > 0 && (
