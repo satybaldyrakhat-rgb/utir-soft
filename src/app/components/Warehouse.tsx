@@ -153,17 +153,9 @@ export function Warehouse({ language }: WarehouseProps) {
   // и потребности к закупке (см. `reservation` ниже).
   const [bomTemplates, setBomTemplates] = useState<BomTemplate[]>([]);
   useEffect(() => { api.get<BomTemplate[]>('/api/bom-templates').then(setBomTemplates).catch(() => {}); }, []);
-  // Брак/переделка — какой заказ сейчас отмечаем + список причин.
+  // Брак/переделка — какой заказ сейчас отмечаем (список причин ниже,
+  // после объявления `l`, иначе TDZ-краш при рендере).
   const [defectForOrder, setDefectForOrder] = useState<string | null>(null);
-  const DEFECT_REASONS = [
-    l('Скол / царапина', 'Сынық / сызат', 'Chip / scratch'),
-    l('Неверный размер', 'Қате өлшем', 'Wrong size'),
-    l('Брак материала', 'Материал ақауы', 'Material defect'),
-    l('Ошибка сборки', 'Жинау қатесі', 'Assembly error'),
-    l('Ошибка замера', 'Өлшеу қатесі', 'Measurement error'),
-    l('Повреждено при доставке', 'Жеткізуде зақымдалды', 'Damaged in delivery'),
-    l('Другое', 'Басқа', 'Other'),
-  ];
   // Niche filter for multi-niche teams. '' = all niches; otherwise
   // compares to product.niche. Materials without a niche tag are
   // treated as cross-niche (visible in every filter) — common for
@@ -666,6 +658,16 @@ export function Warehouse({ language }: WarehouseProps) {
 
   const categories = ['Все', ...new Set(store.products.map(p => p.category))];
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  // Причины брака/переделки (используют `l`, поэтому объявлены после него).
+  const DEFECT_REASONS = [
+    l('Скол / царапина', 'Сынық / сызат', 'Chip / scratch'),
+    l('Неверный размер', 'Қате өлшем', 'Wrong size'),
+    l('Брак материала', 'Материал ақауы', 'Material defect'),
+    l('Ошибка сборки', 'Жинау қатесі', 'Assembly error'),
+    l('Ошибка замера', 'Өлшеу қатесі', 'Measurement error'),
+    l('Повреждено при доставке', 'Жеткізуде зақымдалды', 'Damaged in delivery'),
+    l('Другое', 'Басқа', 'Other'),
+  ];
 
   // Filter + sort. The default 'name' sort matches the previous
   // alphabetical order (which is basically insertion order since names
