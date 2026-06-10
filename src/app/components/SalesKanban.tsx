@@ -27,7 +27,7 @@ import { LOST_REASONS } from '../utils/marketing';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { CsvImportModal, type CsvFieldSpec } from './CsvImportModal';
 import { useAutoRefresh } from '../utils/useAutoRefresh';
-import { t } from '../utils/translations';
+import { t, plural } from '../utils/translations';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo } from './PlatformLogos';
 import { getNiche, getDealNiche } from '../utils/niches';
 
@@ -470,7 +470,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                 <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full" />
                 <span className="tabular-nums">{filteredDeals.length}</span>
                 {hasActiveFilters && <span className="text-slate-400">/ {activeDeals.length}</span>}
-                {' '}{l('сделок', 'мәміле', 'deals')}
+                {' '}{l(plural(filteredDeals.length, 'сделка', 'сделки', 'сделок'), 'мәміле', 'deals')}
               </div>
               {totalSum > 0 && (
                 <div className="flex items-center gap-1.5 text-[11px] text-slate-600 px-2.5 py-1 rounded-full bg-emerald-100/60 ring-1 ring-white/40 backdrop-blur-xl">
@@ -1379,7 +1379,7 @@ function RejectedArchive(props: {
             <div>
               <div className="text-sm text-slate-900">{l('Архив отказов', 'Бас тарту мұрағаты', 'Rejected Archive')}</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                {filtered.length} / {rejectedDeals.length} {l('сделок', 'мәміле', 'deals')}
+                {filtered.length} / {rejectedDeals.length} {l(plural(rejectedDeals.length, 'сделка', 'сделки', 'сделок'), 'мәміле', 'deals')}
               </div>
             </div>
           </div>
