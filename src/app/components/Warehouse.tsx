@@ -457,7 +457,7 @@ export function Warehouse({ language }: WarehouseProps) {
   // «Доступно = остаток − резерв», дефицит = резерв − остаток.
   const reservation = useMemo(() => {
     const bomById = new Map(bomTemplates.filter(b => b.id).map(b => [b.id!, b]));
-    const need = new Map<string, { name: string; reserved: number; unit: string; orders: number }>();
+    const need = new Map<string, { name: string; reserved: number; unit: string; orders: number; nearestDeadline?: string }>();
     for (const d of store.deals) {
       if (!['production', 'assembly', 'contract', 'project-agreed', 'manufacturing', 'installation', 'measured'].includes(d.status)) continue;
       const bomId = (d as any).bomTemplateId;
@@ -467,13 +467,15 @@ export function Warehouse({ language }: WarehouseProps) {
       const consumedByName = new Map<string, number>();
       (((d as any).consumed as ConsumedMaterial[] | undefined) || []).forEach(c =>
         consumedByName.set((c.name || '').toLowerCase(), (consumedByName.get((c.name || '').toLowerCase()) || 0) + (c.qty || 0)));
+      const dl = d.completionDate || '';
       for (const m of bom.materials) {
         const key = (m.mat || '').trim().toLowerCase();
         if (!key) continue;
         const remaining = Math.max(0, (m.qty || 0) - (consumedByName.get(key) || 0));
         if (remaining <= 0) continue;
-        const cur = need.get(key) || { name: m.mat, reserved: 0, unit: m.unit || 'шт', orders: 0 };
+        const cur = need.get(key) || { name: m.mat, reserved: 0, unit: m.unit || 'шт', orders: 0, nearestDeadline: undefined as string | undefined };
         cur.reserved += remaining; cur.orders += 1;
+        if (dl && (!cur.nearestDeadline || dl < cur.nearestDeadline)) cur.nearestDeadline = dl;
         need.set(key, cur);
       }
     }
@@ -483,15 +485,23 @@ export function Warehouse({ language }: WarehouseProps) {
   // Потребность к закупке: для каждого зарезервированного материала
   // сопоставляем остаток на складе по имени → дефицит.
   const shortages = useMemo(() => {
-    const out: { name: string; reserved: number; stock: number; shortage: number; unit: string; cost: number; product?: Product }[] = [];
+    const todayMs = Date.now();
+    const out: { name: string; reserved: number; stock: number; shortage: number; unit: string; cost: number; product?: Product; deadline?: string; eta?: string; late: boolean }[] = [];
     reservation.forEach((r, key) => {
       const product = store.products.find(p => (p.name || '').trim().toLowerCase() === key);
       const stock = product?.quantity || 0;
       const shortage = Math.max(0, r.reserved - stock);
-      if (shortage > 0) out.push({ name: r.name, reserved: r.reserved, stock, shortage, unit: r.unit, cost: product?.cost || 0, product });
+      if (shortage <= 0) return;
+      // ETA = сегодня + срок поставки поставщика этого материала (или 7 дней).
+      const sup = product?.supplier ? suppliers.find(s => s.name.toLowerCase().trim() === product.supplier.toLowerCase().trim()) : undefined;
+      const leadDays = sup?.deliveryDays && sup.deliveryDays > 0 ? sup.deliveryDays : 7;
+      const eta = new Date(todayMs + leadDays * 86400000).toISOString().slice(0, 10);
+      const late = !!r.nearestDeadline && eta > r.nearestDeadline;
+      out.push({ name: r.name, reserved: r.reserved, stock, shortage, unit: r.unit, cost: product?.cost || 0, product, deadline: r.nearestDeadline, eta, late });
     });
-    return out.sort((a, b) => b.shortage - a.shortage);
-  }, [reservation, store.products]);
+    // Сначала «не успеваем», потом по размеру дефицита.
+    return out.sort((a, b) => (Number(b.late) - Number(a.late)) || (b.shortage - a.shortage));
+  }, [reservation, store.products, suppliers]);
 
   // ─── Material consumption ────────────────────────────────────────
   // Single source of truth for the «Списать материалы» modal — captures
@@ -1165,7 +1175,14 @@ export function Warehouse({ language }: WarehouseProps) {
             <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
               {shortages.map(s => (
                 <div key={s.name} className="px-5 py-2.5 flex items-center justify-between text-xs gap-3">
-                  <div className="text-gray-800 truncate min-w-0">{s.name}</div>
+                  <div className="min-w-0">
+                    <div className="text-gray-800 truncate">{s.name}</div>
+                    {s.late && (
+                      <div className="text-[10px] text-rose-500 truncate">
+                        {l('не успеет: приход ~', 'үлгермейді: ~', 'won\'t make it: ETA ~')}{s.eta} {l('· дедлайн', '· мерзім', '· deadline')} {s.deadline}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-3 sm:gap-4 tabular-nums flex-shrink-0">
                     <span className="text-gray-500 hidden sm:inline">{l('нужно', 'қажет', 'need')} {Math.ceil(s.reserved)}</span>
                     <span className="text-gray-500">{l('склад', 'қойма', 'stock')} {s.stock}</span>
@@ -2530,6 +2547,9 @@ function PurchasesView({
                     <span>{(p.items || []).length} {l('позиций', 'позиция', 'items')}</span>
                     {p.expectedDate && <span>· {l('ожидается', 'күтілуде', 'expected')} {p.expectedDate}</span>}
                     {p.receivedDate && <span>· {l('получено', 'қабылданды', 'received')} {p.receivedDate}</span>}
+                    {p.status === 'sent' && p.expectedDate && p.expectedDate < new Date().toISOString().slice(0, 10) && (
+                      <span className="text-rose-600">· {l('поставка просрочена', 'жеткізу мерзімі өтті', 'delivery overdue')}</span>
+                    )}
                   </div>
                 </div>
               );
@@ -2692,8 +2712,14 @@ function PoModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={LABEL}>{l('Поставщик', 'Жеткізуші', 'Supplier')} *</label>
-              <select className={INPUT} value={data.supplierId} onChange={e => setData(d => ({ ...d, supplierId: e.target.value }))}>
-                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <select className={INPUT} value={data.supplierId} onChange={e => setData(d => {
+                const sup = suppliers.find(s => s.id === e.target.value);
+                const lead = sup?.deliveryDays && sup.deliveryDays > 0 ? sup.deliveryDays : 0;
+                // Авто-подстановка ожидаемой даты из срока поставки, если ещё не задана.
+                const exp = (!d.expectedDate && lead) ? new Date(Date.now() + lead * 86400000).toISOString().slice(0, 10) : d.expectedDate;
+                return { ...d, supplierId: e.target.value, expectedDate: exp };
+              })}>
+                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}{s.deliveryDays ? ` (~${s.deliveryDays} дн.)` : ''}</option>)}
               </select>
             </div>
             <div>
