@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Eye, EyeOff, ArrowLeft, Check, Loader2, Mail, ShieldCheck, ArrowRight, Sparkles, BarChart3, MessageCircle, Package } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Check, Loader2, Mail, ShieldCheck, ArrowRight, Package, ChevronRight } from 'lucide-react';
 import profileLogo from '../../imports/utirsoft.png';
 import { api, setToken } from '../utils/api';
 
@@ -437,11 +437,23 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </div>
             )}
 
-            {/* Client cabinet entry */}
-            <button onClick={() => { window.location.hash = '#/cabinet'; }} className="mt-5 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11px] text-amber-700 bg-amber-50/80 ring-1 ring-amber-100/60 hover:bg-amber-100/80 transition-colors">
-              <Package className="w-3 h-3" />
-              {l('Я клиент — войти в кабинет', 'Мен клиентпін — кабинетке кіру', "I'm a client — open cabinet")}
-            </button>
+            {/* Client cabinet entry — secondary, divided from the form,
+                refined glass row with icon chip + chevron. */}
+            <div className="mt-6 pt-5 border-t border-white/50">
+              <button
+                onClick={() => { window.location.hash = '#/cabinet'; }}
+                className="group w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-white/45 ring-1 ring-white/60 backdrop-blur-xl hover:bg-white/75 hover:ring-white/80 transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]"
+              >
+                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-100 to-amber-50 ring-1 ring-amber-200/50 flex items-center justify-center text-amber-600 flex-shrink-0 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7)]">
+                  <Package className="w-4 h-4" strokeWidth={1.75} />
+                </span>
+                <span className="flex-1 text-left">
+                  <span className="block text-[12px] text-slate-800 leading-tight">{l('Кабинет клиента', 'Клиент кабинеті', 'Client cabinet')}</span>
+                  <span className="block text-[10px] text-slate-400 leading-tight mt-0.5">{l('Отследить свой заказ', 'Тапсырысты қадағалау', 'Track your order')}</span>
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+              </button>
+            </div>
           </div>
         );
 
