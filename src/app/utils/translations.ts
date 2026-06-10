@@ -625,3 +625,14 @@ export function t(key: keyof typeof translations, language: 'kz' | 'ru' | 'eng')
   if (!translation) return key;
   return translation[language] || translation.ru;
 }
+
+// Русское склонение по числу: plural(2, 'заказ', 'заказа', 'заказов') → 'заказа'.
+// one — 1, 21, 31…; few — 2-4, 22-24…; many — 0, 5-20, 11-14…
+export function plural(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(n);
+  const m10 = abs % 10;
+  const m100 = abs % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}

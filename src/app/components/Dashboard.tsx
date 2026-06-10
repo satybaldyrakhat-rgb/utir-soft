@@ -21,7 +21,7 @@ import {
   Package, Palette, ChevronRight, X, Sparkles, MessageCircle,
   Rocket, Wallet, AlertTriangle, ShieldCheck, Banknote, HandCoins,
 } from 'lucide-react';
-import { t } from '../utils/translations';
+import { t, plural } from '../utils/translations';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
 import { NicheIcon } from './NicheIcon';
@@ -267,27 +267,27 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
               `Ай шығынды: шығыс кірістен ${fmtKZT(-monthProfit)} артық`,
               `Month in the red: expenses exceed income by ${fmtKZT(-monthProfit)}`) });
     if (overdueInstall > 0) risks.push({ id: 'install', sev: 'high', page: 'sales',
-      text: l(`${overdueInstall} монтажей с просроченной датой`,
+      text: l(`${overdueInstall} ${plural(overdueInstall, 'монтаж', 'монтажа', 'монтажей')} с просроченной датой`,
               `${overdueInstall} монтаж мерзімі өтіп кеткен`,
               `${overdueInstall} installations past their date`) });
     if (overdueProd > 0) risks.push({ id: 'prod', sev: 'high', page: 'warehouse',
-      text: l(`${overdueProd} заказов с просроченным дедлайном производства`,
+      text: l(`${overdueProd} ${plural(overdueProd, 'заказ', 'заказа', 'заказов')} с просроченным дедлайном производства`,
               `${overdueProd} тапсырыс өндіріс мерзімінен өтті`,
               `${overdueProd} orders past production deadline`) });
     if (rework > 0) risks.push({ id: 'rework', sev: 'mid', page: 'warehouse',
-      text: l(`${rework} заказов на переделке (брак)`,
+      text: l(`${rework} ${plural(rework, 'заказ', 'заказа', 'заказов')} на переделке (брак)`,
               `${rework} тапсырыс қайта жасауда (ақау)`,
               `${rework} orders in rework (defect)`) });
     if (staleTouch > 0) risks.push({ id: 'touch', sev: 'mid', page: 'sales',
-      text: l(`${staleTouch} сделок с просроченным следующим шагом`,
+      text: l(`${staleTouch} ${plural(staleTouch, 'сделка', 'сделки', 'сделок')} с просроченным следующим шагом`,
               `${staleTouch} мәміленің келесі қадамы өтіп кетті`,
               `${staleTouch} deals with an overdue next step`) });
     if (unassigned > 0) risks.push({ id: 'unassigned', sev: 'mid', page: 'sales',
-      text: l(`${unassigned} активных сделок без ответственного`,
+      text: l(`${unassigned} ${plural(unassigned, 'активная сделка', 'активные сделки', 'активных сделок')} без ответственного`,
               `${unassigned} белсенді мәміле жауаптысыз`,
               `${unassigned} active deals without an owner`) });
     if (receivables > 0) risks.push({ id: 'recv', sev: 'mid', page: 'finance',
-      text: l(`Дебиторка ${fmtKZT(receivables)} по ${recvDeals.length} сделкам`,
+      text: l(`Дебиторка ${fmtKZT(receivables)} по ${recvDeals.length} ${plural(recvDeals.length, 'сделке', 'сделкам', 'сделкам')}`,
               `Дебиторлық ${fmtKZT(receivables)}, ${recvDeals.length} мәміле`,
               `Receivables ${fmtKZT(receivables)} across ${recvDeals.length} deals`) });
 
@@ -609,7 +609,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
               </h1>
               <p className="text-sm text-slate-500">
                 {l(
-                  `${activeDeals > 0 ? `${activeDeals} активных заказов сегодня` : 'Тихий день — самое время поработать с воронкой'}.`,
+                  `${activeDeals > 0 ? `${activeDeals} ${plural(activeDeals, 'активный заказ', 'активных заказа', 'активных заказов')} сегодня` : 'Тихий день — самое время поработать с воронкой'}.`,
                   `${activeDeals > 0 ? `Бүгін ${activeDeals} белсенді тапсырыс` : 'Тыныш күн — воронкамен жұмыс істеу уақыты'}.`,
                   `${activeDeals > 0 ? `${activeDeals} active orders today` : 'A quiet day — good time to work the pipeline'}.`,
                 )}
@@ -706,7 +706,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
                     </div>
                     <div className="text-lg tabular-nums tracking-tight text-slate-800">
                       {fmtKZT(owner.receivables)}
-                      {owner.recvCount > 0 && <span className="text-[11px] text-slate-400 ml-1.5">· {owner.recvCount} {l('сделок', 'мәміле', 'deals')}</span>}
+                      {owner.recvCount > 0 && <span className="text-[11px] text-slate-400 ml-1.5">· {owner.recvCount} {l(plural(owner.recvCount, 'сделка', 'сделки', 'сделок'), 'мәміле', 'deals')}</span>}
                     </div>
                   </button>
                 </div>
