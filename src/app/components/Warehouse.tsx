@@ -153,6 +153,17 @@ export function Warehouse({ language }: WarehouseProps) {
   // и потребности к закупке (см. `reservation` ниже).
   const [bomTemplates, setBomTemplates] = useState<BomTemplate[]>([]);
   useEffect(() => { api.get<BomTemplate[]>('/api/bom-templates').then(setBomTemplates).catch(() => {}); }, []);
+  // Брак/переделка — какой заказ сейчас отмечаем + список причин.
+  const [defectForOrder, setDefectForOrder] = useState<string | null>(null);
+  const DEFECT_REASONS = [
+    l('Скол / царапина', 'Сынық / сызат', 'Chip / scratch'),
+    l('Неверный размер', 'Қате өлшем', 'Wrong size'),
+    l('Брак материала', 'Материал ақауы', 'Material defect'),
+    l('Ошибка сборки', 'Жинау қатесі', 'Assembly error'),
+    l('Ошибка замера', 'Өлшеу қатесі', 'Measurement error'),
+    l('Повреждено при доставке', 'Жеткізуде зақымдалды', 'Damaged in delivery'),
+    l('Другое', 'Басқа', 'Other'),
+  ];
   // Niche filter for multi-niche teams. '' = all niches; otherwise
   // compares to product.niche. Materials without a niche tag are
   // treated as cross-niche (visible in every filter) — common for
@@ -821,7 +832,8 @@ export function Warehouse({ language }: WarehouseProps) {
         const montages = store.deals
           .filter(d => d.installationDate && d.installationDate >= todayStr && d.installationDate <= weekEnd && !['completed', 'rejected'].includes(d.status))
           .sort((a, b) => (a.installationDate || '').localeCompare(b.installationDate || ''));
-        const showWorkshop = overdueProd.length > 0 || todayProd.length > 0 || montages.length > 0;
+        const defectActive = activeNotDone.filter(o => store.deals.find(d => d.id === o.dealId)?.defect).length;
+        const showWorkshop = overdueProd.length > 0 || todayProd.length > 0 || montages.length > 0 || defectActive > 0;
         return (
         <div className="space-y-4">
           {/* Дашборд цеха — что горит сегодня + график монтажей */}
@@ -831,6 +843,11 @@ export function Warehouse({ language }: WarehouseProps) {
                 <div className="px-5 py-3 border-b border-white/60 flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5 text-amber-500" />
                   <span className="text-sm text-gray-900">{l('Дедлайны производства', 'Өндіріс мерзімдері', 'Production deadlines')}</span>
+                  {defectActive > 0 && (
+                    <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-rose-600 bg-rose-50 ring-1 ring-rose-100/60 px-1.5 py-0.5 rounded-full">
+                      <AlertTriangle className="w-2.5 h-2.5" /> {l('переделок', 'қайта жасау', 'rework')}: {defectActive}
+                    </span>
+                  )}
                 </div>
                 {overdueProd.length === 0 && todayProd.length === 0 ? (
                   <div className="px-5 py-4 text-xs text-emerald-600">{l('На сегодня всё в срок', 'Бүгін бәрі мерзімінде', 'On track for today')}</div>
@@ -1102,6 +1119,42 @@ export function Warehouse({ language }: WarehouseProps) {
                       {l('Списать материалы', 'Материалдарды жазу', 'Deduct materials')}
                     </button>
                   </div>
+
+                  {/* Брак / переделка — отметка + причина (контроль качества). */}
+                  {canWrite && (() => {
+                    const deal = store.deals.find(d => d.id === o.dealId);
+                    const defect = deal?.defect;
+                    if (defect) {
+                      return (
+                        <div className="mt-2 flex items-center justify-between gap-2 px-2.5 py-1.5 bg-rose-50 ring-1 ring-rose-100/60 rounded-xl text-[11px]" onClick={e => e.stopPropagation()}>
+                          <span className="text-rose-600 truncate"><AlertTriangle className="w-3 h-3 inline mr-1" />{l('Переделка', 'Қайта жасау', 'Rework')}: {defect.reason}</span>
+                          <button onClick={() => store.updateDeal(o.dealId, { defect: undefined })} className="text-rose-400 hover:text-rose-600 flex-shrink-0"><X className="w-3 h-3" /></button>
+                        </div>
+                      );
+                    }
+                    if (defectForOrder === o.dealId) {
+                      return (
+                        <div className="mt-2 p-2 bg-white/60 ring-1 ring-white/60 rounded-xl" onClick={e => e.stopPropagation()}>
+                          <div className="text-[10px] text-slate-500 mb-1.5">{l('Причина брака/переделки', 'Ақау себебі', 'Defect reason')}</div>
+                          <div className="grid grid-cols-2 gap-1">
+                            {DEFECT_REASONS.map(r => (
+                              <button key={r} onClick={() => { store.updateDeal(o.dealId, { defect: { reason: r, at: new Date().toISOString() } }); setDefectForOrder(null); }}
+                                className="px-2 py-1 text-[10px] text-left text-slate-700 bg-white/60 ring-1 ring-white/60 rounded-lg hover:bg-white hover:ring-rose-200">{r}</button>
+                            ))}
+                          </div>
+                          <button onClick={() => setDefectForOrder(null)} className="mt-1.5 text-[10px] text-slate-400 hover:text-slate-600">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="mt-2" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setDefectForOrder(o.dealId)}
+                          className="w-full inline-flex items-center justify-center gap-1.5 text-[11px] px-3 py-1.5 text-rose-500 hover:bg-rose-50 ring-1 ring-rose-100/60 rounded-xl transition-colors">
+                          <AlertTriangle className="w-3 h-3" /> {l('Отметить брак', 'Ақауды белгілеу', 'Flag defect')}
+                        </button>
+                      </div>
+                    );
+                  })()}
 
                   {/* Action buttons — stop propagation so they don't open
                        the order details modal at the same time. Each one

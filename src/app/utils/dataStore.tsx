@@ -84,6 +84,9 @@ export interface Deal {
   // считается резерв материалов (бронь под заказ) и потребность к закупке
   // (нужно по плану − уже списано). id из /api/bom-templates.
   bomTemplateId?: string;
+  // Брак / переделка на заказе — причина + момент. Питает аналитику
+  // качества «почему переделываем» и подсветку на карточке заказа.
+  defect?: { reason: string; note?: string; at: string };
 }
 
 // RoleKey is now a free-form string id (e.g. 'admin', 'manager', 'accountant').
