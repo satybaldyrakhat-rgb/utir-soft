@@ -3,7 +3,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import { TrendingUp, TrendingDown, ArrowUpRight, ChevronRight, ShoppingBag, DollarSign, Users, Target, BarChart3, Percent, ArrowRight, Star, X, Sparkles, Eye, Download, Clock, Calendar } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { MarketingDashboard } from './MarketingDashboard';
-import { t } from '../utils/translations';
+import { t, plural } from '../utils/translations';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
 import { NicheIcon } from './NicheIcon';
@@ -626,7 +626,7 @@ export function Analytics({ language }: AnalyticsProps) {
                         {n.revenue ? `${(n.revenue / 1000000).toFixed(1)}М ₸` : '0 ₸'}
                       </div>
                       <div className="text-[10px] text-gray-400">
-                        {n.orders} {l('сделок', 'мәміле', 'deals')} · {n.pct}%
+                        {n.orders} {l(plural(n.orders, 'сделка', 'сделки', 'сделок'), 'мәміле', 'deals')} · {n.pct}%
                       </div>
                     </button>
                   );
@@ -696,7 +696,7 @@ export function Analytics({ language }: AnalyticsProps) {
                     <div className="text-center">
                       <div className="text-lg text-gray-900">{totalOrders}</div>
                       <div className="text-[10px] text-gray-400">
-                        {language === 'kz' ? 'заказ' : language === 'eng' ? 'orders' : 'заказов'}
+                        {language === 'kz' ? 'тапсырыс' : language === 'eng' ? 'orders' : plural(totalOrders, 'заказ', 'заказа', 'заказов')}
                       </div>
                     </div>
                   </div>
