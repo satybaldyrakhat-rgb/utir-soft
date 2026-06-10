@@ -23,6 +23,11 @@ interface AnalyticsProps {
 export function Analytics({ language }: AnalyticsProps) {
   const store = useDataStore();
   const niche = getNiche(store.niche);
+  const fmtKZT = (n: number) => {
+    if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} млн ₸`;
+    if (Math.abs(n) >= 1_000)     return `${Math.round(n / 1_000)}K ₸`;
+    return `${Math.round(n).toLocaleString('ru-RU')} ₸`;
+  };
   // Aналитика — read-only по природе. Если матрица говорит 'none' для
   // модуля analytics — раздел в сайдбаре скрыт, но если кто-то попадёт
   // сюда по deeplink, отдадим понятный no-access экран вместо данных.
@@ -257,6 +262,54 @@ export function Analytics({ language }: AnalyticsProps) {
   const conversion = scopedDeals.length
     ? Math.round((scopedDeals.filter(d => d.status === 'completed').length / scopedDeals.length) * 100)
     : 0;
+
+  // ─── Тренды месяц-к-месяцу (MoM) ──────────────────────────────────
+  // Сравнивает ТЕКУЩИЙ календарный месяц с ПРЕДЫДУЩИМ по ключевым
+  // метрикам собственника: выручка, прибыль, средний чек, конверсия,
+  // новые сделки. Независимо от фильтра периода — это всегда «этот
+  // месяц vs прошлый», чтобы владелец видел динамику бизнеса.
+  const mom = useMemo(() => {
+    const now = new Date();
+    const curStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+    const inRange = (iso: string | undefined, s: number, e: number) => {
+      if (!iso) return false;
+      const ms = new Date(iso).getTime();
+      return ms >= s && ms < e;
+    };
+    const completedTx = store.transactions.filter(tx => tx.status === 'completed');
+    const sum = (type: 'income' | 'expense', s: number, e: number) => completedTx
+      .filter(tx => tx.type === type && inRange(tx.date, s, e))
+      .reduce((acc, tx) => acc + tx.amount, 0);
+    const dealsIn = (s: number, e: number) => store.deals.filter(d => inRange(d.date || d.createdAt, s, e));
+    const avgOf = (ds: typeof store.deals) => {
+      const w = ds.filter(d => (d.amount || 0) > 0);
+      return w.length ? w.reduce((a, d) => a + d.amount, 0) / w.length : 0;
+    };
+    const convOf = (ds: typeof store.deals) => ds.length
+      ? Math.round((ds.filter(d => d.status === 'completed').length / ds.length) * 100) : 0;
+
+    const curRev = sum('income', curStart, now.getTime() + 1);
+    const prevRev = sum('income', prevStart, curStart);
+    const curProfit = curRev - sum('expense', curStart, now.getTime() + 1);
+    const prevProfit = prevRev - sum('expense', prevStart, curStart);
+    const curDeals = dealsIn(curStart, now.getTime() + 1);
+    const prevDeals = dealsIn(prevStart, curStart);
+
+    const pct = (a: number, b: number): { txt: string; up: boolean; neutral: boolean } => {
+      if (b === 0) return { txt: a === 0 ? '—' : l('новое', 'жаңа', 'new'), up: a >= 0, neutral: a === 0 };
+      const d = Math.round((a - b) / Math.abs(b) * 100);
+      return { txt: `${d >= 0 ? '+' : ''}${d}%`, up: d >= 0, neutral: d === 0 };
+    };
+    return [
+      { id: 'rev', label: l('Выручка', 'Түсім', 'Revenue'), value: fmtKZT(curRev), d: pct(curRev, prevRev), page: 'payments' },
+      { id: 'profit', label: l('Прибыль', 'Пайда', 'Profit'), value: fmtKZT(curProfit), d: pct(curProfit, prevProfit), page: 'payments', negative: curProfit < 0 },
+      { id: 'avg', label: l('Средний чек', 'Орташа чек', 'Avg. check'), value: fmtKZT(avgOf(curDeals)), d: pct(avgOf(curDeals), avgOf(prevDeals)), page: 'sales' },
+      { id: 'conv', label: l('Конверсия', 'Конверсия', 'Conversion'), value: `${convOf(curDeals)}%`, d: pct(convOf(curDeals), convOf(prevDeals)), page: 'sales' },
+      { id: 'deals', label: l('Новые сделки', 'Жаңа мәмілелер', 'New deals'), value: String(curDeals.length), d: pct(curDeals.length, prevDeals.length), page: 'sales' },
+    ];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.transactions, store.deals, language]);
 
   const tabs = {
     overview: { kz: 'Шолу',     ru: 'Обзор',   eng: 'Overview' },
@@ -494,6 +547,36 @@ export function Analytics({ language }: AnalyticsProps) {
                 </button>
               );
             })}
+          </div>
+
+          {/* MoM — тренды месяц-к-месяцу. Ключевые метрики собственника
+              «этот месяц vs прошлый» с динамикой ↑↓. */}
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 mb-6">
+            <div className="flex items-center gap-2 mb-5">
+              <BarChart3 className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm text-gray-900">{l('Динамика месяц к месяцу', 'Айдан айға динамика', 'Month-over-month')}</span>
+              <span className="text-[11px] text-gray-400">· {l('этот месяц vs прошлый', 'осы ай мен өткен ай', 'this vs last month')}</span>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              {mom.map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: m.page } }))}
+                  className="text-left bg-white/50 ring-1 ring-white/60 rounded-2xl p-3.5 hover:bg-white/70 transition-all"
+                >
+                  <div className="text-[11px] text-gray-400 mb-1.5">{m.label}</div>
+                  <div className={`text-lg tabular-nums tracking-tight mb-1.5 ${(m as any).negative ? 'text-rose-600' : 'text-gray-900'}`}>{m.value}</div>
+                  <div className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full ${
+                    m.d.neutral ? 'text-slate-500 bg-slate-100/70'
+                    : m.d.up    ? 'text-emerald-700 bg-emerald-100/60'
+                    :             'text-rose-700 bg-rose-100/60'
+                  }`}>
+                    {!m.d.neutral && (m.d.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />)}
+                    {m.d.txt}
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Niche breakdown — only for multi-niche teams */}
