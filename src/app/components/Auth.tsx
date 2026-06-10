@@ -332,7 +332,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
       case 'welcome':
         return (
           <div className="flex flex-col items-center">
-            <div className="w-16 h-16 rounded-xl flex items-center justify-center mb-5 shadow-sm overflow-hidden bg-white border border-gray-100">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 overflow-hidden bg-white/60 ring-1 ring-white/60 backdrop-blur-xl shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18),inset_0_1px_0_0_rgba(255,255,255,0.7)]">
               <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-2xl text-gray-900 mb-1 text-center">{l('Добро пожаловать', 'Қош келдіңіз', 'Welcome')}</h1>
@@ -773,8 +773,22 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
 
   return (
     <div
-      className="min-h-screen flex relative"
+      className="min-h-screen flex relative overflow-hidden"
+      style={{ background: 'linear-gradient(135deg, #e8f3ee 0%, #e3eef5 45%, #efe9f6 100%)' }}
     >
+      {/* ─── Liquid-glass ambient background ──────────────────────────
+          Soft colored aurora blobs drifting behind everything so the
+          frosted-glass panels actually refract color. Fixed, non-
+          interactive, sits below all content. */}
+      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden" aria-hidden="true">
+        <div className="aurora-a absolute -top-32 -left-24 w-[40rem] h-[40rem] rounded-full blur-[100px] opacity-70"
+             style={{ background: 'radial-gradient(circle at 35% 35%, #34d399, transparent 68%)' }} />
+        <div className="aurora-b absolute top-1/4 -right-28 w-[38rem] h-[38rem] rounded-full blur-[100px] opacity-60"
+             style={{ background: 'radial-gradient(circle at 50% 50%, #38bdf8, transparent 68%)' }} />
+        <div className="aurora-c absolute -bottom-40 left-1/3 w-[36rem] h-[36rem] rounded-full blur-[110px] opacity-55"
+             style={{ background: 'radial-gradient(circle at 50% 50%, #a78bfa, transparent 68%)' }} />
+      </div>
+
       {/* Left side - Features (desktop only) — glass panel */}
       <div className="hidden lg:flex lg:w-[45%] xl:w-[50%] bg-white/30 backdrop-blur-2xl border-r border-white/60 flex-col justify-between p-12 relative overflow-hidden">
         <div
@@ -793,14 +807,14 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
           </div>
 
           <h2 className="text-3xl text-slate-900 mb-3 max-w-md leading-tight tracking-tight">
-            {l('Замерные ниши — единая платформа от заявки до установки',
-               'Өлшеу салалары — өтінімнен орнатуға дейін бірыңғай платформа',
-               'Measure-based businesses — one platform from lead to install')}
+            {l('Единая платформа от заявки до сдачи объекта',
+               'Өтінімнен нысанды тапсыруға дейінгі бірыңғай платформа',
+               'One platform from lead to handover')}
           </h2>
           <p className="text-sm text-slate-500 mb-12 max-w-sm">
-            {l('Мебель, окна, потолки, двери, жалюзи, лестницы — выберите свою нишу при настройке, а платформа подстроится под её этапы и материалы.',
-               'Жиһаз, терезе, төбе, есік, перде — өз салаңызды таңдаңыз, платформа кезеңдерге және материалдарға бейімделеді.',
-               'Furniture, windows, ceilings, doors, blinds, stairs — pick your niche during setup and the platform adapts its stages and materials.')}
+            {l('Мебель, окна, потолки, двери, стройка и др. — выберите свою нишу при настройке, а платформа подстроится под её этапы и материалы.',
+               'Жиһаз, терезе, төбе, есік, құрылыс және т.б. — өз салаңызды таңдаңыз, платформа кезеңдерге және материалдарға бейімделеді.',
+               'Furniture, windows, ceilings, doors, construction & more — pick your niche during setup and the platform adapts its stages and materials.')}
           </p>
 
           <div className="space-y-3">
@@ -865,8 +879,9 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </div>
             )}
 
-            {/* Form card — wraps the step content in glass */}
-            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-6 sm:p-8">
+            {/* Form card — liquid-glass surface: translucent, frosted,
+                with a specular top-edge highlight + layered shadow. */}
+            <div className="bg-white/40 backdrop-blur-2xl backdrop-saturate-200 border border-white/50 rounded-[2rem] p-6 sm:p-8 shadow-[0_16px_48px_-16px_rgba(15,23,42,0.25),inset_0_1px_0_0_rgba(255,255,255,0.65)]">
               {/* Signup step indicator */}
               {isSignupFlow && (
                 <div className="flex items-center gap-1 mb-6">

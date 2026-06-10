@@ -194,6 +194,28 @@ html {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ─── Liquid-glass ambient blobs (auth screen) ──────────────────────
+   Slow, organic drift of the colored aurora blobs behind the frosted
+   glass so the surfaces have something to refract. Kept subtle. */
+@keyframes auroraDriftA {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(6%, 8%, 0) scale(1.12); }
+}
+@keyframes auroraDriftB {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50%      { transform: translate3d(-7%, -5%, 0) scale(0.95); }
+}
+@keyframes auroraDriftC {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(5%, -8%, 0) scale(1.1); }
+}
+.aurora-a { animation: auroraDriftA 18s ease-in-out infinite; }
+.aurora-b { animation: auroraDriftB 22s ease-in-out infinite; }
+.aurora-c { animation: auroraDriftC 26s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .aurora-a, .aurora-b, .aurora-c { animation: none; }
+}
+
 /* Unified focus ring — one accent-tinted ring for keyboard users on any
    focusable control. Keeps the UI calm (no ring on mouse click) while
    staying accessible. */
