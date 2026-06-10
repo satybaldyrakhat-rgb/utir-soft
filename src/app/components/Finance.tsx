@@ -139,7 +139,7 @@ export function Finance({ language }: FinanceProps) {
   // ─── Report period + download state ─────────────────────────────
   // Default to «this month». Users can pick a different month/quarter/year
   // from the period chip; advanced range picker shown when «диапазон» chosen.
-  type ReportType = 'finance' | 'pl' | 'aging' | 'forecast';
+  type ReportType = 'finance' | 'pl' | 'aging' | 'forecast' | 'owner';
   const today = new Date();
   const [period, setPeriod] = useState<{ from: string; to: string; preset: string }>(() => {
     const from = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -247,6 +247,78 @@ export function Finance({ language }: FinanceProps) {
           .filter(t => t.status === 'completed')
           .reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
         await pdf.generateCashFlowForecastPDF(inflows, outflows, { company, openingBalance, horizonMonths: 3 });
+      } else if (kind === 'owner') {
+        // ─── Сводка собственника: деньги + финансы + продажи + цех + команда ──
+        const inP = (date?: string) => !!date && new Date(date).getTime() >= fromMs && new Date(date).getTime() <= toMs;
+        const completedTx = store.transactions.filter(t => t.status === 'completed');
+        const accBal = (acc: 'cash' | 'bank' | 'kaspi') => completedTx
+          .filter(t => (t.account || 'bank') === acc)
+          .reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
+        const cash = accBal('cash'), bank = accBal('bank'), kaspi = accBal('kaspi');
+        const periodTx = completedTx.filter(t => inP(t.date));
+        const income = periodTx.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+        const expense = periodTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+        const profit = income - expense;
+
+        const activeD = store.deals.filter(d => d.status !== 'rejected');
+        const recvDeals = activeD.filter(d => (d.amount || 0) > (d.paidAmount || 0));
+        const receivables = recvDeals.reduce((s, d) => s + ((d.amount || 0) - (d.paidAmount || 0)), 0);
+        const payables = store.transactions.filter(t => t.type === 'expense' && t.status !== 'completed').reduce((s, t) => s + t.amount, 0);
+
+        const periodDeals = store.deals.filter(d => inP(d.createdAt) || inP(d.date));
+        const won = store.deals.filter(d => d.status === 'completed').length;
+        const lost = store.deals.filter(d => d.status === 'rejected').length;
+        const closedDeals = periodDeals.filter(d => d.status === 'completed');
+        const revenueClosed = closedDeals.reduce((s, d) => s + (d.amount || 0), 0);
+        const withAmount = periodDeals.filter(d => (d.amount || 0) > 0);
+        const STAGE_PROB: Record<string, number> = { new: 0.1, measured: 0.3, 'project-agreed': 0.6, production: 0.85, installation: 0.95 };
+        const forecast = Math.round(store.deals
+          .filter(d => d.status !== 'completed' && d.status !== 'rejected')
+          .reduce((s, d) => s + (d.amount || 0) * (STAGE_PROB[d.status] ?? 0.2), 0));
+        const planDept = store.employees.reduce((s, e) => s + (e.monthlyTarget || 0), 0);
+
+        const PROD_STATUSES = ['production', 'assembly', 'manufacturing', 'installation'];
+        const inWork = store.deals.filter(d => PROD_STATUSES.includes(d.status)).length;
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const overdueProd = store.deals.filter(d => PROD_STATUSES.includes(d.status) && d.completionDate && d.completionDate < todayStr).length;
+        const rework = store.deals.filter(d => d.defect && d.status !== 'completed' && d.status !== 'rejected').length;
+
+        const fot = store.employees.reduce((s, e) => s + (e.salary || 0), 0);
+        const byOwner = new Map<string, number>();
+        closedDeals.forEach(d => { if (d.ownerId) byOwner.set(d.ownerId, (byOwner.get(d.ownerId) || 0) + (d.amount || 0)); });
+        const topId = Array.from(byOwner.entries()).sort((a, b) => b[1] - a[1])[0]?.[0];
+        const topManager = topId ? store.getEmployeeById(topId)?.name : undefined;
+
+        const risks: string[] = [];
+        if (receivables > 0) risks.push(`Дебиторка ${Math.round(receivables).toLocaleString('ru-RU')} ₸ по ${recvDeals.length} сделкам — проверьте оплаты`);
+        const unassigned = activeD.filter(d => d.status !== 'completed' && !d.ownerId).length;
+        if (unassigned > 0) risks.push(`${unassigned} лидов без ответственного`);
+        if (overdueProd > 0) risks.push(`${overdueProd} заказов с просроченным дедлайном производства`);
+        if (rework > 0) risks.push(`${rework} заказов на переделке (брак)`);
+        if (profit < 0) risks.push('Период убыточный — расходы превышают доход');
+
+        await pdf.generateOwnerReportPDF({
+          company,
+          periodLabel: `Период: ${period.from} — ${period.to}`,
+          money: { cash, bank, kaspi, total: cash + bank + kaspi },
+          finance: { income, expense, profit, marginPct: income > 0 ? Math.round((profit / income) * 100) : 0 },
+          debts: { receivables, receivableCount: recvDeals.length, payables },
+          sales: {
+            newLeads: periodDeals.length,
+            winRate: (won + lost) > 0 ? Math.round((won / (won + lost)) * 100) : 0,
+            revenueClosed,
+            avgCheck: withAmount.length ? Math.round(withAmount.reduce((s, d) => s + d.amount, 0) / withAmount.length) : 0,
+            forecast, planDept,
+          },
+          production: { inWork, overdue: overdueProd, rework },
+          team: {
+            headcount: store.employees.length,
+            fot,
+            fotPct: income > 0 && fot > 0 ? Math.round((fot / income) * 100) : 0,
+            topManager,
+          },
+          risks,
+        });
       }
     } catch (e: any) {
       console.error('[Finance/downloadReport]', e);
@@ -388,6 +460,12 @@ export function Finance({ language }: FinanceProps) {
                   <span className="flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-slate-400" strokeWidth={1.5} /> {l('Прогноз cash flow', 'Cash flow болжамы', 'Cash flow forecast')}</span>
                   <span className="text-[10px] text-slate-400">3 месяца</span>
                 </button>
+                {store.currentUserRole === 'admin' && (
+                  <button onClick={() => downloadReport('owner')} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
+                    <span className="flex items-center gap-2"><Wallet className="w-3.5 h-3.5 text-emerald-600" strokeWidth={1.5} /> {l('Отчёт собственника', 'Иесінің есебі', 'Owner report')}</span>
+                    <span className="text-[10px] text-slate-400">{l('вся сводка', 'толық', 'full summary')}</span>
+                  </button>
+                )}
                 <div className="px-3 py-2 text-[10px] uppercase tracking-wide text-slate-400 border-y border-gray-50">{l('Таблицы', 'Кесте', 'Tables')}</div>
                 <button onClick={downloadCSV} className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-white/50 flex items-center justify-between">
                   <span className="flex items-center gap-2"><Download className="w-3.5 h-3.5 text-slate-400" strokeWidth={1.5} /> CSV (Excel)</span>

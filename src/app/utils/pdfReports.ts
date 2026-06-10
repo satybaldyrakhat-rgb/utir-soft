@@ -1477,3 +1477,86 @@ export async function generateWaybillPDF(deal: WaybillDeal, requisites: CompanyR
   drawFooter(doc);
   doc.save(`nakladnaya-${todayStamp()}.pdf`);
 }
+
+// ─── Отчёт собственника ──────────────────────────────────────────────
+// Одностраничная сводка «здоровье бизнеса» за период: деньги, финансы,
+// продажи, производство, команда + точки внимания. Для владельца/партнёра.
+export interface OwnerReportData {
+  company?: string;
+  periodLabel: string;
+  money: { cash: number; bank: number; kaspi: number; total: number };
+  finance: { income: number; expense: number; profit: number; marginPct: number };
+  debts: { receivables: number; receivableCount: number; payables: number };
+  sales: { newLeads: number; winRate: number; revenueClosed: number; avgCheck: number; forecast: number; planDept: number };
+  production: { inWork: number; overdue: number; rework: number };
+  team: { headcount: number; fot: number; fotPct: number; topManager?: string };
+  risks: string[];
+}
+
+export async function generateOwnerReportPDF(d: OwnerReportData) {
+  const doc = await newDoc();
+  drawHeader(doc, 'Отчёт собственника', d.periodLabel, d.company);
+
+  let y = drawKpiCards(doc, 40, [
+    { label: 'Деньги сейчас', value: KZT(d.money.total), sub: 'касса + счёт + Kaspi', accent: [5, 150, 105] },
+    { label: 'Прибыль периода', value: KZT(d.finance.profit), sub: `маржа ${d.finance.marginPct}%`, accent: d.finance.profit >= 0 ? [5, 150, 105] : [225, 29, 72] },
+    { label: 'Дебиторка', value: KZT(d.debts.receivables), sub: `${d.debts.receivableCount} незакрытых`, accent: [217, 119, 6] },
+    { label: 'Прогноз воронки', value: KZT(d.sales.forecast), sub: d.sales.planDept > 0 ? `план ${KZT(d.sales.planDept)}` : 'план не задан', accent: [79, 70, 229] },
+  ]) + 6;
+
+  const section = (title: string, rows: Array<[string, string]>) => {
+    autoTable(doc, {
+      startY: y,
+      head: [[title, '']],
+      body: rows,
+      styles: { font: 'Roboto', fontSize: 8.5, cellPadding: 2 },
+      headStyles: { font: 'Roboto', fontStyle: 'bold', fillColor: [15, 23, 42], textColor: 255 },
+      columnStyles: { 1: { halign: 'right' } },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 5;
+  };
+
+  section('Финансы', [
+    ['Доход (поступило)', KZT(d.finance.income)],
+    ['Расход', KZT(d.finance.expense)],
+    ['Прибыль', KZT(d.finance.profit)],
+    ['Касса / Счёт / Kaspi', `${KZT(d.money.cash)} / ${KZT(d.money.bank)} / ${KZT(d.money.kaspi)}`],
+    ['Кредиторка (мы должны)', KZT(d.debts.payables)],
+  ]);
+
+  section('Продажи', [
+    ['Новых заявок за период', String(d.sales.newLeads)],
+    ['Закрыто (выручка по сделкам)', KZT(d.sales.revenueClosed)],
+    ['Средний чек', KZT(d.sales.avgCheck)],
+    ['Win rate', `${d.sales.winRate}%`],
+    ['Ожидаемая выручка воронки', KZT(d.sales.forecast)],
+  ]);
+
+  section('Производство', [
+    ['Заказов в работе', String(d.production.inWork)],
+    ['Просрочено дедлайнов', String(d.production.overdue)],
+    ['Переделок (брак)', String(d.production.rework)],
+  ]);
+
+  section('Команда', [
+    ['Сотрудников', String(d.team.headcount)],
+    ['ФОТ (оклады, месяц)', KZT(d.team.fot)],
+    ['ФОТ % от дохода периода', d.team.fotPct > 0 ? `${d.team.fotPct}%` : '—'],
+    ...(d.team.topManager ? [['Лучший по выручке', d.team.topManager] as [string, string]] : []),
+  ]);
+
+  if (d.risks.length) {
+    autoTable(doc, {
+      startY: y,
+      head: [['Точки внимания']],
+      body: d.risks.map(r => [r]),
+      styles: { font: 'Roboto', fontSize: 8.5, cellPadding: 2, textColor: [190, 18, 60] },
+      headStyles: { font: 'Roboto', fontStyle: 'bold', fillColor: [225, 29, 72], textColor: 255 },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  drawFooter(doc);
+  doc.save(`otchet-sobstvennika-${todayStamp()}.pdf`);
+}
