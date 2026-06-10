@@ -9,10 +9,14 @@ interface AuthProps {
   onLanguageChange: (lang: 'kz' | 'ru' | 'eng') => void;
 }
 
-type AuthStep = 'welcome' | 'login-email' | 'login-password' | 'signup-email' | 'signup-name' | 'signup-password' | 'otp' | 'forgot' | 'forgot-sent';
+// Console structure: a single glass panel with a Вход/Регистрация tab
+// switcher. Multi-step sub-flows (OTP after signup, password reset) render
+// as full-panel screens with a back arrow.
+type AuthStep = 'console' | 'otp' | 'forgot' | 'forgot-sent';
 
 export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
-  const [step, setStep] = useState<AuthStep>('welcome');
+  const [step, setStep] = useState<AuthStep>('console');
+  const [tab, setTab] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -45,8 +49,9 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
       const code = params.get('invite');
       if (!code) return;
       setInviteCode(code.toUpperCase());
-      // Jump straight into the signup flow so the user doesn't see the welcome screen.
-      setStep('signup-email');
+      // Jump straight into the signup tab so the invited user starts there.
+      setStep('console');
+      setTab('signup');
       api.get<{ company: string; inviter: string; role: string; email?: string | null }>(
         `/api/invitations/preview/${encodeURIComponent(code)}`,
       ).then(p => {
@@ -120,15 +125,8 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     onLogin({ name: data.user.name, email: data.user.email, teamRole: data.user.teamRole });
   };
 
-  const handleEmailContinue = (mode: 'login' | 'signup') => {
-    if (!email || !email.includes('@')) { setError(l('Введите корректный email', 'Дұрыс email енгізіңіз', 'Enter a valid email')); return; }
-    simulateLoading(() => {
-      if (mode === 'login') setStep('login-password');
-      else setStep('signup-name');
-    });
-  };
-
   const handleLogin = async () => {
+    if (!email || !email.includes('@')) { setError(l('Введите корректный email', 'Дұрыс email енгізіңіз', 'Enter a valid email')); return; }
     if (!password) { setError(l('Введите пароль', 'Құпия сөзді енгізіңіз', 'Enter password')); return; }
     setIsLoading(true); setError('');
     try {
@@ -155,22 +153,14 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     }
   };
 
-  const handleSignupNameContinue = () => {
-    if (!name.trim()) { setError(l('Введите имя', 'Атыңызды енгізіңіз', 'Enter your name')); return; }
-    // Invited users skip the company step — they inherit the inviter's company.
-    const hasValidInvite = invitePreview && !('error' in invitePreview);
-    if (!hasValidInvite && !company.trim()) {
-      setError(l('Введите название компании', 'Компания атауын енгізіңіз', 'Enter your company name'));
-      return;
-    }
-    simulateLoading(() => setStep('signup-password'), 300);
-  };
-
   // Dev-mode verification code received from the signup/resend response.
   // Displayed on the OTP screen so the tester doesn't need a real inbox.
   const [devVerificationCode, setDevVerificationCode] = useState<string>('');
 
   const handleSignup = async () => {
+    if (!name.trim()) { setError(l('Введите имя', 'Атыңызды енгізіңіз', 'Enter your name')); return; }
+    if (!hasValidInvite && !company.trim()) { setError(l('Введите название компании', 'Компания атауын енгізіңіз', 'Enter your company name')); return; }
+    if (!email || !email.includes('@')) { setError(l('Введите корректный email', 'Дұрыс email енгізіңіз', 'Enter a valid email')); return; }
     if (password.length < 8) { setError(l('Минимум 8 символов', 'Кемінде 8 таңба', 'Minimum 8 characters')); return; }
     if (!/[A-Za-zА-Яа-яЁё]/.test(password) || !/\d/.test(password)) {
       setError(l('Пароль должен содержать букву и цифру', 'Құпия сөз әріп пен цифрдан тұруы керек', 'Password must contain a letter and a digit'));
@@ -272,13 +262,10 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     }
   };
 
+  // All sub-screens (otp / forgot / forgot-sent) return to the main console.
   const goBack = () => {
     setError('');
-    if (step === 'login-password' || step === 'signup-name') setStep(step === 'login-password' ? 'login-email' : 'signup-email');
-    else if (step === 'signup-password') setStep('signup-name');
-    else if (step === 'otp') setStep('signup-password');
-    else if (step === 'forgot' || step === 'forgot-sent') setStep('login-email');
-    else setStep('welcome');
+    setStep('console');
   };
 
   // Password strength
@@ -319,335 +306,145 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     )},
   ];
 
-  const features = [
-    { icon: Sparkles, label: l('AI Дизайн интерьера', 'AI Интерьер дизайны', 'AI Interior Design'), desc: l('Генерация дизайна за минуту', 'Бір минутта дизайн жасау', 'Generate designs in a minute') },
-    { icon: BarChart3, label: l('Финансовый модуль', 'Қаржы модулі', 'Finance Module'), desc: l('Учёт в тенге, налоги КЗ', 'Теңгемен есеп, ҚЗ салықтары', 'KZT accounting, KZ taxes') },
-    { icon: MessageCircle, label: l('Омниканальные чаты', 'Омниканал чаттар', 'Omnichannel Chats'), desc: l('WhatsApp, Instagram, Telegram', 'WhatsApp, Instagram, Telegram', 'WhatsApp, Instagram, Telegram') },
-    { icon: Package, label: l('Производство и склад', 'Өндіріс және қойма', 'Production & Warehouse'), desc: l('Полный контроль производства', 'Өндірісті толық бақылау', 'Full production control') },
-  ];
+  // Shared frosted-glass field style for all inputs in the console.
+  const fieldCls = 'w-full px-4 py-3 bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm text-slate-800 focus:outline-none focus:bg-white/80 focus:ring-2 focus:ring-emerald-500/40 placeholder:text-slate-400 transition-all';
+  const hasValidInvite = !!invitePreview && !('error' in invitePreview);
 
   const renderStepContent = () => {
     switch (step) {
-      /* ===== WELCOME ===== */
-      case 'welcome':
+      /* ===== CONSOLE — единая стеклянная панель с табами Вход/Регистрация ===== */
+      case 'console':
         return (
-          <div className="flex flex-col items-center">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 overflow-hidden bg-white/60 ring-1 ring-white/60 backdrop-blur-xl shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18),inset_0_1px_0_0_rgba(255,255,255,0.7)]">
-              <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
-            </div>
-            <h1 className="text-2xl text-gray-900 mb-1 text-center">{l('Добро пожаловать', 'Қош келдіңіз', 'Welcome')}</h1>
-            <p className="text-sm text-slate-500 mb-8 text-center max-w-[300px]">
-              {l('CRM для производства и услуг под заказ — мебель, окна, потолки, стройка и др.',
-                 'Өндіріс пен тапсырыс қызметтеріне арналған CRM — жиһаз, терезе, төбе, құрылыс және т.б.',
-                 'CRM for custom manufacturing & services — furniture, windows, ceilings, construction & more')}
-            </p>
-
-            <div className="w-full space-y-2.5 mb-6">
-              <button onClick={() => { setStep('login-email'); setError(''); }} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
-                {l('Войти', 'Кіру', 'Log in')}
-              </button>
-              <button onClick={() => { setStep('signup-email'); setError(''); }} className="w-full py-3 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-700 hover:bg-white transition-all backdrop-blur-xl">
-                {l('Создать аккаунт', 'Аккаунт жасау', 'Sign up')}
-              </button>
+          <div>
+            {/* Brand header inside the console */}
+            <div className="flex flex-col items-center mb-6">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3 overflow-hidden bg-white/60 ring-1 ring-white/60 backdrop-blur-xl shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18),inset_0_1px_0_0_rgba(255,255,255,0.7)]">
+                <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
+              </div>
+              <div className="text-base text-slate-900 tracking-tight">Utir Soft</div>
+              <div className="text-[11px] text-slate-500">{l('Вход и регистрация', 'Кіру және тіркелу', 'Sign in or sign up')}</div>
             </div>
 
-            {showSocial && (
-              <div className="w-full">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-px bg-white/60 flex-1" />
-                  <span className="text-[10px] text-slate-400">{l('или продолжить с', 'немесе жалғастыру', 'or continue with')}</span>
-                  <div className="h-px bg-white/60 flex-1" />
+            {/* Segmented tab switcher */}
+            <div className="flex gap-1 p-1 mb-6 bg-white/40 ring-1 ring-white/50 rounded-2xl backdrop-blur-xl">
+              {(['login', 'signup'] as const).map(tb => (
+                <button
+                  key={tb}
+                  onClick={() => { setTab(tb); setError(''); }}
+                  className={`flex-1 py-2 rounded-xl text-sm transition-all ${tab === tb ? 'bg-white/90 text-slate-900 shadow-[0_2px_10px_-3px_rgba(15,23,42,0.25)]' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  {tb === 'login' ? l('Вход', 'Кіру', 'Sign in') : l('Регистрация', 'Тіркелу', 'Sign up')}
+                </button>
+              ))}
+            </div>
+
+            {tab === 'login' ? (
+              /* ---------- LOGIN ---------- */
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1.5">Email</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                    <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleLogin()} placeholder="name@company.kz" autoFocus className={`${fieldCls} pl-10`} />
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  {socialButtons.map(sb => (
-                    <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-xs text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
-                      {sb.icon}
-                      <span className="hidden sm:inline">{sb.label}</span>
-                    </button>
-                  ))}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] text-slate-500">{l('Пароль', 'Құпия сөз', 'Password')}</label>
+                    <button onClick={() => { setStep('forgot'); setError(''); }} className="text-[11px] text-slate-500 hover:text-slate-900 transition-colors">{l('Забыли?', 'Ұмыттыңыз ба?', 'Forgot?')}</button>
+                  </div>
+                  <div className="relative">
+                    <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => { setPassword(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleLogin()} placeholder="••••••••" className={`${fieldCls} pr-12`} />
+                    <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-slate-600">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
+                  </div>
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer pt-0.5">
+                  <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="w-3.5 h-3.5 rounded accent-emerald-600" />
+                  <span className="text-xs text-slate-600">{l('Запомнить меня', 'Есте сақтау', 'Remember me')}</span>
+                </label>
+                <button onClick={handleLogin} disabled={isLoading} className="w-full py-3 mt-1 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : l('Войти', 'Кіру', 'Log in')}
+                </button>
+              </div>
+            ) : (
+              /* ---------- SIGNUP ---------- */
+              <div className="space-y-3">
+                {hasValidInvite && invitePreview && !('error' in invitePreview) && (
+                  <div className="p-3 rounded-2xl bg-emerald-50/80 ring-1 ring-emerald-100/60">
+                    <div className="text-xs text-emerald-700 mb-0.5">{l('Приглашение от', 'Шақыру', 'Invitation from')} <b>{invitePreview.inviter}</b></div>
+                    <div className="text-sm text-emerald-900">{l('Команда', 'Команда', 'Team')}: <b>{invitePreview.company || l('команда пользователя', 'пайдаланушы командасы', "inviter's team")}</b> · {invitePreview.role}</div>
+                  </div>
+                )}
+                {invitePreview && 'error' in invitePreview && (
+                  <div className="p-3 rounded-2xl bg-rose-50/80 ring-1 ring-rose-100/60 text-xs text-rose-700">
+                    {invitePreview.error === 'expired' ? l('Срок приглашения истёк.', 'Шақыру мерзімі өтті.', 'Invitation expired.')
+                      : invitePreview.error === 'used' ? l('Приглашение уже использовано.', 'Шақыру пайдаланылған.', 'Invitation already used.')
+                      : invitePreview.error === 'network' ? l('Не удалось проверить приглашение.', 'Шақыруды тексеру мүмкін болмады.', 'Could not verify invitation.')
+                      : l('Недействительный код приглашения.', 'Жарамсыз шақыру коды.', 'Invalid invitation code.')}
+                    <div className="text-rose-600 mt-0.5">{l('Можно зарегистрироваться без приглашения.', 'Шақырусыз тіркелуге болады.', 'You can sign up without an invite.')}</div>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1.5">{l('Ваше имя', 'Атыңыз', 'Your name')}</label>
+                  <input type="text" value={name} onChange={e => { setName(e.target.value); setError(''); }} placeholder={l('Иван Петров', 'Айбек Серіков', 'John Doe')} autoFocus className={fieldCls} />
+                </div>
+                {!hasValidInvite && (
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1.5">{l('Название компании', 'Компания атауы', 'Company name')}</label>
+                    <input type="text" value={company} onChange={e => { setCompany(e.target.value); setError(''); }} placeholder={l('ТОО «Ваша компания»', 'ЖШС «Сіздің компания»', 'Your Company LLP')} className={fieldCls} />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1.5">Email</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                    <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} placeholder="name@company.kz" className={`${fieldCls} pl-10`} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1.5">{l('Пароль', 'Құпия сөз', 'Password')}</label>
+                  <div className="relative">
+                    <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => { setPassword(e.target.value); setError(''); }} placeholder="••••••••" className={`${fieldCls} pr-12`} />
+                    <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-slate-600">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
+                  </div>
+                  {password && (
+                    <div className="mt-2">
+                      <div className="flex gap-1 mb-1">{[1, 2, 3, 4].map(i => <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= strength.level ? strength.color : 'bg-white/50'}`} />)}</div>
+                      <span className="text-[10px] text-slate-400">{strength.label}</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1.5">{l('Повторите пароль', 'Құпия сөзді қайталаңыз', 'Confirm password')}</label>
+                  <div className="relative">
+                    <input type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setError(''); }} placeholder="••••••••" className={`${fieldCls} pr-12`} />
+                    <button onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-slate-600">{showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
+                  </div>
+                  {confirmPassword && password === confirmPassword && <div className="flex items-center gap-1 mt-1"><Check className="w-3 h-3 text-emerald-500" /><span className="text-[10px] text-emerald-500">{l('Совпадает', 'Сәйкес', 'Match')}</span></div>}
+                </div>
+                <label className="flex items-start gap-2.5 cursor-pointer pt-0.5">
+                  <input type="checkbox" checked={agreeTerms} onChange={e => { setAgreeTerms(e.target.checked); setError(''); }} className="w-3.5 h-3.5 rounded accent-emerald-600 mt-0.5" />
+                  <span className="text-xs text-slate-600">
+                    {l('Я принимаю', 'Мен қабылдаймын', 'I accept the')}{' '}
+                    <a href="#/terms" className="text-slate-900 hover:underline">{l('условия', 'шарттар', 'terms')}</a>
+                    {l(' и ', ' және ', ' & ')}
+                    <a href="#/privacy" className="text-slate-900 hover:underline">{l('политику конфиденциальности', 'құпиялылық саясаты', 'privacy policy')}</a>
+                  </span>
+                </label>
+                <button onClick={handleSignup} disabled={isLoading} className="w-full py-3 mt-1 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Создать аккаунт', 'Аккаунт жасау', 'Create account')} <ArrowRight className="w-4 h-4" /></>}
+                </button>
               </div>
             )}
 
-            <button
-              onClick={() => { window.location.hash = '#/cabinet'; }}
-              className="mt-6 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-amber-700 bg-amber-50 border border-amber-100 hover:bg-amber-100 transition-colors"
-            >
+            {/* Client cabinet entry */}
+            <button onClick={() => { window.location.hash = '#/cabinet'; }} className="mt-5 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11px] text-amber-700 bg-amber-50/80 ring-1 ring-amber-100/60 hover:bg-amber-100/80 transition-colors">
               <Package className="w-3 h-3" />
               {l('Я клиент — войти в кабинет', 'Мен клиентпін — кабинетке кіру', "I'm a client — open cabinet")}
             </button>
           </div>
         );
 
-      /* ===== LOGIN: EMAIL ===== */
-      case 'login-email':
-        return (
-          <div>
-            <h2 className="text-xl text-gray-900 mb-1">{l('Войти в аккаунт', 'Аккаунтқа кіру', 'Log in to your account')}</h2>
-            <p className="text-sm text-slate-500 mb-6">{l('Введите email для продолжения', 'Жалғастыру үшін email енгізіңіз', 'Enter your email to continue')}</p>
-
-            <div className="space-y-4 mb-4">
-              <div>
-                <label className="block text-[11px] text-slate-500 mb-1.5">Email</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                  <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleEmailContinue('login')} placeholder="name@company.kz" autoFocus className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
-                </div>
-              </div>
-            </div>
-
-            <button onClick={() => handleEmailContinue('login')} disabled={isLoading || !email} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
-            </button>
-
-            {showSocial && (
-              <>
-                <div className="flex items-center gap-3 mb-4"><div className="h-px bg-white/60 flex-1" /><span className="text-[10px] text-slate-400">{l('или', 'немесе', 'or')}</span><div className="h-px bg-white/60 flex-1" /></div>
-                <div className="space-y-2">
-                  {socialButtons.map(sb => (
-                    <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
-                      {sb.icon}
-                      <span>{l('Войти через', 'Арқылы кіру', 'Continue with')} {sb.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            <p className="text-center text-xs text-slate-500 mt-6">
-              {l('Нет аккаунта?', 'Аккаунт жоқ па?', "Don't have an account?")} <button onClick={() => { setStep('signup-email'); setError(''); }} className="text-gray-900 hover:underline">{l('Создать', 'Жасау', 'Sign up')}</button>
-            </p>
-          </div>
-        );
-
-      /* ===== LOGIN: PASSWORD ===== */
-      case 'login-password':
-        return (
-          <div>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-sm text-gray-600">{email[0]?.toUpperCase()}</div>
-              <div><p className="text-sm text-gray-900">{email}</p><button onClick={goBack} className="text-[10px] text-slate-400 hover:text-gray-600">{l('Изменить', 'Өзгерту', 'Change')}</button></div>
-            </div>
-
-            <h2 className="text-xl text-gray-900 mb-1">{l('Введите пароль', 'Құпия сөзді енгізіңіз', 'Enter your password')}</h2>
-            <p className="text-sm text-slate-500 mb-6">{l('Для входа в Utir Soft', 'Utir Soft-қа кіру үшін', 'To log in to Utir Soft')}</p>
-
-            <div className="space-y-4 mb-2">
-              <div>
-                <label className="block text-[11px] text-slate-500 mb-1.5">{l('Пароль', 'Құпия сөз', 'Password')}</label>
-                <div className="relative">
-                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => { setPassword(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleLogin()} placeholder="••••••••" autoFocus className="w-full px-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all pr-12" />
-                  <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-300 hover:text-gray-600">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between mb-6">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="w-3.5 h-3.5 rounded accent-gray-900" />
-                <span className="text-xs text-slate-600">{l('Запомнить меня', 'Есте сақтау', 'Remember me')}</span>
-              </label>
-              <button onClick={() => { setStep('forgot'); setError(''); }} className="text-xs text-slate-500 hover:text-gray-900 transition-colors">{l('Забыли пароль?', 'Құпия сөзді ұмыттыңыз ба?', 'Forgot password?')}</button>
-            </div>
-
-            <button onClick={handleLogin} disabled={isLoading || !password} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : l('Войти', 'Кіру', 'Log in')}
-            </button>
-          </div>
-        );
-
-      /* ===== SIGNUP: EMAIL ===== */
-      case 'signup-email':
-        return (
-          <div>
-            <h2 className="text-xl text-gray-900 mb-1">{l('Создать аккаунт', 'Аккаунт жасау', 'Create your account')}</h2>
-            <p className="text-sm text-slate-500 mb-6">{l('Начните управлять бизнесом эффективно', 'Бизнесті тиімді басқара бастаңыз', 'Start managing your business efficiently')}</p>
-
-            {/* Invitation banner */}
-            {invitePreview && !('error' in invitePreview) && (
-              <div className="mb-5 p-3 rounded-xl bg-emerald-50 border border-emerald-100">
-                <div className="text-xs text-emerald-700 mb-0.5">
-                  {l('Приглашение от', 'Шақыру', 'Invitation from')} <b>{invitePreview.inviter}</b>
-                </div>
-                <div className="text-sm text-emerald-900">
-                  {invitePreview.company ? (
-                    <>
-                      {l('Вы присоединяетесь к команде', 'Командаға қосыласыз', 'You are joining team')}{' '}
-                      <b>{invitePreview.company}</b>
-                    </>
-                  ) : (
-                    // Inviter never filled in a company name — fall back to "their team".
-                    <>{l('Вы присоединяетесь к команде', 'Командаға қосыласыз', 'You are joining the team')}</>
-                  )}
-                  {' · '}
-                  <span className="text-xs">{l('Роль', 'Рөл', 'Role')}: {invitePreview.role}</span>
-                </div>
-              </div>
-            )}
-            {invitePreview && 'error' in invitePreview && (
-              <div className="mb-5 p-3 rounded-xl bg-red-50 border border-red-100">
-                <div className="text-sm text-red-700">
-                  {invitePreview.error === 'expired'
-                    ? l('Срок действия приглашения истёк.', 'Шақырудың мерзімі өтті.', 'This invitation has expired.')
-                    : invitePreview.error === 'used'
-                    ? l('Это приглашение уже использовано.', 'Бұл шақыру пайдаланылған.', 'This invitation was already used.')
-                    : invitePreview.error === 'network'
-                    ? l('Не удалось проверить код приглашения (нет связи с сервером). Попробуйте обновить страницу или открыть ссылку позже.',
-                        'Шақыру кодын тексеру мүмкін болмады (сервермен байланыс жоқ). Бетті жаңартып көріңіз немесе кейінірек ашыңыз.',
-                        'Could not verify the invitation (server unreachable). Try refreshing or opening the link again later.')
-                    : l('Недействительный код приглашения.', 'Жарамсыз шақыру коды.', 'Invalid invitation code.')}
-                </div>
-                <div className="text-xs text-red-600 mt-1">
-                  {l('Можно зарегистрироваться без приглашения как обычный пользователь.', 'Шақырусыз жалпы пайдаланушы ретінде тіркелуге болады.', 'You can still sign up as a regular user.')}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-4 mb-4">
-              <div>
-                <label className="block text-[11px] text-slate-500 mb-1.5">Email</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                  <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleEmailContinue('signup')} placeholder="name@company.kz" autoFocus className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
-                </div>
-              </div>
-            </div>
-
-            <button onClick={() => handleEmailContinue('signup')} disabled={isLoading || !email} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mb-4">
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
-            </button>
-
-            {showSocial && (
-              <>
-                <div className="flex items-center gap-3 mb-4"><div className="h-px bg-white/60 flex-1" /><span className="text-[10px] text-slate-400">{l('или', 'немесе', 'or')}</span><div className="h-px bg-white/60 flex-1" /></div>
-                <div className="space-y-2">
-                  {socialButtons.map(sb => (
-                    <button key={sb.id} onClick={() => handleSocialLogin(sb.id)} disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-sm text-slate-600 hover:bg-white transition-all backdrop-blur-xl disabled:opacity-50">
-                      {sb.icon}
-                      <span>{l('Продолжить через', 'Арқылы жалғастыру', 'Continue with')} {sb.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            <p className="text-center text-xs text-slate-500 mt-6">
-              {l('Уже есть аккаунт?', 'Аккаунт бар ма?', 'Already have an account?')} <button onClick={() => { setStep('login-email'); setError(''); }} className="text-gray-900 hover:underline">{l('Войти', 'Кіру', 'Log in')}</button>
-            </p>
-          </div>
-        );
-
-      /* ===== SIGNUP: NAME + COMPANY (both required) ===== */
-      case 'signup-name':
-        return (
-          <div>
-            <h2 className="text-xl text-gray-900 mb-1">{l('Расскажите о себе', 'Өзіңіз туралы айтыңыз', 'Tell us about yourself')}</h2>
-            <p className="text-sm text-slate-500 mb-6">{l('Мы персонализируем CRM под ваш бизнес', 'CRM-ді бизнесіңізге бейімдейміз', 'We will personalize the CRM for your business')}</p>
-
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-[11px] text-slate-500 mb-1.5">
-                  {l('Ваше имя', 'Атыңыз', 'Your Name')} <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={e => { setName(e.target.value); setError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && handleSignupNameContinue()}
-                  autoFocus
-                  className="w-full px-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all"
-                />
-              </div>
-              {invitePreview && !('error' in invitePreview) ? (
-                /* Invited user — company is inherited from the team, show read-only. */
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1.5">
-                    {l('Команда', 'Команда', 'Team')}
-                  </label>
-                  <div className="w-full px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-900">
-                    {invitePreview.company || l('Команда пользователя', 'Пайдаланушы командасы', "Inviter's team")}
-                    <span className="text-xs text-emerald-600 ml-2">· {invitePreview.role}</span>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1.5">
-                    {l('Название компании', 'Компания атауы', 'Company Name')} <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={company}
-                    onChange={e => { setCompany(e.target.value); setError(''); }}
-                    onKeyDown={e => e.key === 'Enter' && handleSignupNameContinue()}
-                    className="w-full px-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all"
-                  />
-                </div>
-              )}
-            </div>
-
-            <button onClick={handleSignupNameContinue} disabled={isLoading || !name.trim() || (!(invitePreview && !('error' in invitePreview)) && !company.trim())} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Продолжить', 'Жалғастыру', 'Continue')} <ArrowRight className="w-4 h-4" /></>}
-            </button>
-          </div>
-        );
-
-      /* ===== SIGNUP: PASSWORD ===== */
-      case 'signup-password':
-        return (
-          <div>
-            <h2 className="text-xl text-gray-900 mb-1">{l('Создайте пароль', 'Құпия сөз жасаңыз', 'Create a password')}</h2>
-            <p className="text-sm text-slate-500 mb-6">{l('Минимум 8 символов', 'Кемінде 8 таңба', 'Minimum 8 characters')}</p>
-
-            <div className="space-y-4 mb-4">
-              <div>
-                <label className="block text-[11px] text-slate-500 mb-1.5">{l('Пароль', 'Құпия сөз', 'Password')}</label>
-                <div className="relative">
-                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => { setPassword(e.target.value); setError(''); }} placeholder="••••••••" autoFocus className="w-full px-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all pr-12" />
-                  <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-300 hover:text-gray-600">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
-                </div>
-                {/* Strength */}
-                {password && (
-                  <div className="mt-2">
-                    <div className="flex gap-1 mb-1">{[1, 2, 3, 4].map(i => <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= strength.level ? strength.color : 'bg-gray-100'}`} />)}</div>
-                    <span className="text-[10px] text-slate-400">{strength.label}</span>
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-[11px] text-slate-500 mb-1.5">{l('Повторите пароль', 'Құпия сөзді қайталаңыз', 'Confirm Password')}</label>
-                <div className="relative">
-                  <input type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setError(''); }} placeholder="••••••••" className="w-full px-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all pr-12" />
-                  <button onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-300 hover:text-gray-600">{showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
-                </div>
-                {confirmPassword && password === confirmPassword && <div className="flex items-center gap-1 mt-1"><Check className="w-3 h-3 text-green-500" /><span className="text-[10px] text-green-500">{l('Совпадает', 'Сәйкес', 'Match')}</span></div>}
-              </div>
-            </div>
-
-            <label className="flex items-start gap-2.5 mb-6 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={agreeTerms}
-                onChange={e => { setAgreeTerms(e.target.checked); setError(''); }}
-                className="w-3.5 h-3.5 rounded accent-gray-900 mt-0.5"
-              />
-              <span className="text-xs text-slate-600">
-                {l('Я принимаю', 'Мен қабылдаймын', 'I accept the')}{' '}
-                <a href="#/terms" target="_blank" rel="noreferrer" className="text-gray-900 hover:underline">
-                  {l('условия использования', 'пайдалану шарттары', 'terms of use')}
-                </a>{' '}
-                {l('и', 'және', 'and')}{' '}
-                <a href="#/privacy" target="_blank" rel="noreferrer" className="text-gray-900 hover:underline">
-                  {l('политику конфиденциальности', 'құпиялылық саясаты', 'privacy policy')}
-                </a>
-                <span className="text-red-400 ml-0.5">*</span>
-              </span>
-            </label>
-
-            <button onClick={handleSignup} disabled={isLoading || !password || !confirmPassword || !agreeTerms} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Создать аккаунт', 'Аккаунт жасау', 'Create account')} <ArrowRight className="w-4 h-4" /></>}
-            </button>
-          </div>
-        );
 
       /* ===== OTP VERIFICATION (dev mode: code is shown on screen) ===== */
       case 'otp':
@@ -755,7 +552,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </div>
             )}
 
-            <button onClick={() => { setStep('login-email'); setPassword(''); setError(''); setDevResetToken(''); }} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
+            <button onClick={() => { setStep('console'); setTab('login'); setPassword(''); setError(''); setDevResetToken(''); }} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
               {l('Вернуться к входу', 'Кіруге оралу', 'Back to login')}
             </button>
             <p className="text-xs text-slate-500 mt-4">{l('Не получили? Проверьте папку спам', 'Алмадыңыз ба? Спам қалтасын тексеріңіз', "Didn't receive it? Check spam folder")}</p>
@@ -767,13 +564,9 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
   };
 
   // Step indicator
-  const signupSteps = ['signup-email', 'signup-name', 'signup-password', 'otp'];
-  const currentSignupStep = signupSteps.indexOf(step);
-  const isSignupFlow = currentSignupStep >= 0;
-
   return (
     <div
-      className="min-h-screen flex relative overflow-hidden"
+      className="min-h-screen flex flex-col relative overflow-hidden"
       style={{ background: 'linear-gradient(135deg, #e8f3ee 0%, #e3eef5 45%, #efe9f6 100%)' }}
     >
       {/* ─── Liquid-glass ambient background ──────────────────────────
@@ -789,123 +582,46 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
              style={{ background: 'radial-gradient(circle at 50% 50%, #a78bfa, transparent 68%)' }} />
       </div>
 
-      {/* Left side - Features (desktop only) — glass panel */}
-      <div className="hidden lg:flex lg:w-[45%] xl:w-[50%] bg-white/30 backdrop-blur-2xl border-r border-white/60 flex-col justify-between p-12 relative overflow-hidden">
-        <div
-          className="absolute -top-24 -left-24 w-96 h-96 rounded-[4rem] blur-3xl pointer-events-none"
-          style={{ background: 'linear-gradient(135deg, var(--accent-200), var(--accent-100))' }}
-        />
-        <div className="relative">
-          <div className="flex items-center gap-3 mb-16">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden bg-white/80 ring-1 ring-white/60 backdrop-blur-xl">
-              <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
-            </div>
-            <div>
-              <div className="text-sm text-slate-900">Utir Soft</div>
-              <div className="text-[10px] text-slate-500">{l('Платформа управления', 'Басқару платформасы', 'Management Platform')}</div>
-            </div>
-          </div>
-
-          <h2 className="text-3xl text-slate-900 mb-3 max-w-md leading-tight tracking-tight">
-            {l('Единая платформа от заявки до сдачи объекта',
-               'Өтінімнен нысанды тапсыруға дейінгі бірыңғай платформа',
-               'One platform from lead to handover')}
-          </h2>
-          <p className="text-sm text-slate-500 mb-12 max-w-sm">
-            {l('Мебель, окна, потолки, двери, стройка и др. — выберите свою нишу при настройке, а платформа подстроится под её этапы и материалы.',
-               'Жиһаз, терезе, төбе, есік, құрылыс және т.б. — өз салаңызды таңдаңыз, платформа кезеңдерге және материалдарға бейімделеді.',
-               'Furniture, windows, ceilings, doors, construction & more — pick your niche during setup and the platform adapts its stages and materials.')}
-          </p>
-
-          <div className="space-y-3">
-            {features.map((f, i) => (
-              <div key={i} className="flex items-start gap-4 p-4 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 rounded-3xl shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] hover:bg-white/75 transition-all">
-                <div className="w-10 h-10 bg-white/60 ring-1 ring-white/60 rounded-2xl flex items-center justify-center flex-shrink-0">
-                  <f.icon className="w-5 h-5 text-slate-700" />
-                </div>
-                <div>
-                  <div className="text-sm text-slate-900 mb-0.5">{f.label}</div>
-                  <div className="text-xs text-slate-500">{f.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Top bar — back (on sub-screens) + language switcher */}
+      <div className="flex items-center justify-between p-4 sm:p-6 flex-shrink-0 relative">
+        <div>
+          {step !== 'console' && (
+            <button onClick={goBack} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 bg-white/50 ring-1 ring-white/60 backdrop-blur-xl px-3 py-1.5 rounded-xl transition-all">
+              <ArrowLeft className="w-3.5 h-3.5" />{l('Назад', 'Артқа', 'Back')}
+            </button>
+          )}
         </div>
-
-        <div className="relative flex items-center gap-4 text-[10px] text-slate-500">
-          <span>© 2026 Utir Soft</span>
-          <span>•</span>
-          <span>{l('Сделано в Казахстане 🇰🇿', 'Қазақстанда жасалған 🇰🇿', 'Made in Kazakhstan 🇰🇿')}</span>
+        <div className="flex gap-1 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 p-1 rounded-2xl">
+          {(['kz', 'ru', 'eng'] as const).map(lang => (
+            <button
+              key={lang}
+              onClick={() => onLanguageChange(lang)}
+              className={`px-2.5 py-1 rounded-xl text-[10px] transition-all ${
+                language === lang ? 'bg-emerald-600 text-white shadow-[0_2px_8px_-2px_var(--accent-shadow)]' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              {lang.toUpperCase()}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Right side - Auth Form */}
-      <div className="flex-1 flex flex-col min-h-screen relative">
-        {/* Top bar */}
-        <div className="flex items-center justify-between p-4 sm:p-6 flex-shrink-0">
-          <div>
-            {step !== 'welcome' && (
-              <button onClick={goBack} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 bg-white/50 ring-1 ring-white/60 backdrop-blur-xl px-3 py-1.5 rounded-xl transition-all">
-                <ArrowLeft className="w-3.5 h-3.5" />{l('Назад', 'Артқа', 'Back')}
-              </button>
-            )}
-          </div>
-          {/* Language switcher — glass capsules */}
-          <div className="flex gap-1 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 p-1 rounded-2xl">
-            {(['kz', 'ru', 'eng'] as const).map(lang => (
-              <button
-                key={lang}
-                onClick={() => onLanguageChange(lang)}
-                className={`px-2.5 py-1 rounded-xl text-[10px] transition-all ${
-                  language === lang ? 'bg-emerald-600 text-white shadow-[0_2px_8px_-2px_var(--accent-shadow)]' : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                {lang.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Form container */}
-        <div className="flex-1 flex items-center justify-center px-4 sm:px-8">
-          <div className="w-full max-w-[420px]">
-            {/* Mobile logo (only on welcome) */}
-            {step === 'welcome' && (
-              <div className="lg:hidden flex items-center justify-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden bg-white/70 ring-1 ring-white/60 backdrop-blur-xl">
-                  <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
-                </div>
-                <span className="text-sm font-medium text-slate-900">Utir Soft</span>
+      {/* Centered glass console */}
+      <div className="flex-1 flex items-center justify-center px-4 pb-8 relative">
+        <div className="w-full max-w-[400px]">
+          {/* Console — liquid-glass surface: frosted, specular top-edge
+              highlight + deep layered shadow. Holds tabs + active form. */}
+          <div className="bg-white/40 backdrop-blur-2xl backdrop-saturate-200 border border-white/50 rounded-[2rem] p-6 sm:p-8 shadow-[0_24px_64px_-20px_rgba(15,23,42,0.30),inset_0_1px_0_0_rgba(255,255,255,0.7)]">
+            {error && (
+              <div className="bg-rose-100/70 text-rose-700 text-xs px-4 py-2.5 rounded-2xl ring-1 ring-rose-200/60 mb-4 flex items-center gap-2 backdrop-blur-xl">
+                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full flex-shrink-0" />{error}
               </div>
             )}
-
-            {/* Form card — liquid-glass surface: translucent, frosted,
-                with a specular top-edge highlight + layered shadow. */}
-            <div className="bg-white/40 backdrop-blur-2xl backdrop-saturate-200 border border-white/50 rounded-[2rem] p-6 sm:p-8 shadow-[0_16px_48px_-16px_rgba(15,23,42,0.25),inset_0_1px_0_0_rgba(255,255,255,0.65)]">
-              {/* Signup step indicator */}
-              {isSignupFlow && (
-                <div className="flex items-center gap-1 mb-6">
-                  {signupSteps.map((s, i) => (
-                    <div key={s} className={`h-1 flex-1 rounded-full transition-all ${i <= currentSignupStep ? 'bg-emerald-600' : 'bg-white/60 ring-1 ring-white/40'}`} />
-                  ))}
-                </div>
-              )}
-
-              {/* Error */}
-              {error && (
-                <div className="bg-rose-100/70 text-rose-700 text-xs px-4 py-2.5 rounded-2xl ring-1 ring-rose-200/60 mb-4 flex items-center gap-2 backdrop-blur-xl">
-                  <div className="w-1.5 h-1.5 bg-rose-500 rounded-full flex-shrink-0" />{error}
-                </div>
-              )}
-
-              {renderStepContent()}
-            </div>
+            {renderStepContent()}
           </div>
-        </div>
 
-        {/* Bottom */}
-        <div className="p-4 sm:p-6 flex-shrink-0">
-          <p className="text-center text-[10px] text-slate-400">
+          {/* Legal */}
+          <p className="text-center text-[10px] text-slate-400 mt-5">
             {l('Продолжая, вы соглашаетесь с ', 'Жалғастыра отырып, сіз ', 'By continuing, you agree to our ')}
             <a href="#/terms" className="underline hover:text-slate-600">{l('Условиями', 'Шарттармен', 'Terms')}</a>
             {l(' и ', ' және ', ' & ')}
