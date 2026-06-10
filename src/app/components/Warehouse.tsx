@@ -801,8 +801,72 @@ export function Warehouse({ language }: WarehouseProps) {
           const tb = store.deals.find(d => d.id === b.dealId)?.createdAt || '';
           return tb.localeCompare(ta);
         });
+        // ─── Дашборд цеха: дедлайны производства + график монтажей ──
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const weekEnd = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+        const dlOf = (o: ProdOrder) => store.deals.find(d => d.id === o.dealId)?.completionDate || '';
+        const activeNotDone = prodOrders.filter(o => o.status !== 'done');
+        const overdueProd = activeNotDone.filter(o => { const x = dlOf(o); return x && x < todayStr; }).sort((a, b) => dlOf(a).localeCompare(dlOf(b)));
+        const todayProd = activeNotDone.filter(o => dlOf(o) === todayStr);
+        const montages = store.deals
+          .filter(d => d.installationDate && d.installationDate >= todayStr && d.installationDate <= weekEnd && !['completed', 'rejected'].includes(d.status))
+          .sort((a, b) => (a.installationDate || '').localeCompare(b.installationDate || ''));
+        const showWorkshop = overdueProd.length > 0 || todayProd.length > 0 || montages.length > 0;
         return (
         <div className="space-y-4">
+          {/* Дашборд цеха — что горит сегодня + график монтажей */}
+          {showWorkshop && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-white/60 flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="text-sm text-gray-900">{l('Дедлайны производства', 'Өндіріс мерзімдері', 'Production deadlines')}</span>
+                </div>
+                {overdueProd.length === 0 && todayProd.length === 0 ? (
+                  <div className="px-5 py-4 text-xs text-emerald-600">{l('На сегодня всё в срок', 'Бүгін бәрі мерзімінде', 'On track for today')}</div>
+                ) : (
+                  <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+                    {overdueProd.map(o => (
+                      <div key={`o${o.id}`} className="px-5 py-2 flex items-center justify-between text-xs gap-2">
+                        <span className="text-gray-800 truncate">{o.client} · {o.name}</span>
+                        <span className="text-rose-600 flex-shrink-0">{l('просрочено', 'өтті', 'overdue')} · {dlOf(o)}</span>
+                      </div>
+                    ))}
+                    {todayProd.map(o => (
+                      <div key={`t${o.id}`} className="px-5 py-2 flex items-center justify-between text-xs gap-2">
+                        <span className="text-gray-800 truncate">{o.client} · {o.name}</span>
+                        <span className="text-amber-600 flex-shrink-0">{l('сегодня', 'бүгін', 'today')}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-white/60 flex items-center gap-2">
+                  <Wrench className="w-3.5 h-3.5 text-sky-500" />
+                  <span className="text-sm text-gray-900">{l('График монтажей (неделя)', 'Монтаж кестесі (апта)', 'Installations (week)')}</span>
+                </div>
+                {montages.length === 0 ? (
+                  <div className="px-5 py-4 text-xs text-gray-400">{l('Монтажей не запланировано', 'Монтаж жоспарланбаған', 'No installations scheduled')}</div>
+                ) : (
+                  <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+                    {montages.map(d => (
+                      <div key={d.id} className="px-5 py-2 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-gray-800 truncate">{d.customerName}</span>
+                          <span className={`flex-shrink-0 tabular-nums ${d.installationDate === todayStr ? 'text-amber-600' : 'text-gray-500'}`}>{d.installationDate === todayStr ? l('сегодня', 'бүгін', 'today') : d.installationDate}</span>
+                        </div>
+                        {(d.siteAddress || d.address || d.measurer) && (
+                          <div className="text-[10px] text-gray-400 truncate">{d.siteAddress || d.address}{d.measurer ? ` · ${d.measurer}` : ''}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Toolbar — search, status chips, sort */}
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex-1 relative">
