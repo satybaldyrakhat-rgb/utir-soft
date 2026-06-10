@@ -5,6 +5,7 @@ import { Finance } from './Finance';
 import { AI_MODELS } from './AIAssistant';
 import { api } from '../utils/api';
 import { getNiche, type NicheConfig } from '../utils/niches';
+import { plural } from '../utils/translations';
 // PDF generator is heavy (jspdf + html2canvas) — load only when needed.
 import type { PaymentDealRow } from '../utils/pdfReports';
 
@@ -115,7 +116,7 @@ function computeDealInsights(deals: Deal[], language: 'kz' | 'ru' | 'eng'): Insi
     insights.push({
       kind: 'bad',
       title: l(
-        `${overdue.length} ${overdue.length === 1 ? 'просроченная сделка' : 'просроченных сделок'}`,
+        `${overdue.length} ${plural(overdue.length, 'просроченная сделка', 'просроченные сделки', 'просроченных сделок')}`,
         `${overdue.length} мерзімі өткен мәміле`,
         `${overdue.length} overdue deals`,
       ),
@@ -131,7 +132,7 @@ function computeDealInsights(deals: Deal[], language: 'kz' | 'ru' | 'eng'): Insi
   if (noPrepay.length > 0) {
     insights.push({
       kind: 'warn',
-      title: l(`${noPrepay.length} сделок без аванса`, `${noPrepay.length} аванссыз`, `${noPrepay.length} deals without prepayment`),
+      title: l(`${noPrepay.length} ${plural(noPrepay.length, 'сделка', 'сделки', 'сделок')} без аванса`, `${noPrepay.length} аванссыз`, `${noPrepay.length} deals without prepayment`),
       desc: l('Запросить 30% предоплату для старта производства', '30% алдын ала төлем сұрау', 'Request 30% prepayment'),
     });
   }
@@ -729,7 +730,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
   };
 
   const kpis = [
-    { label: l('Всего к оплате', 'Барлығы төлеуге', 'Total billed'), value: fmtShort(totals.billed) + ' ₸', sub: `${enriched.length} ${l('сделок', 'мәміле', 'deals')}`, icon: Wallet, tone: 'bg-white/60 text-slate-700 ring-1 ring-white/60' },
+    { label: l('Всего к оплате', 'Барлығы төлеуге', 'Total billed'), value: fmtShort(totals.billed) + ' ₸', sub: `${enriched.length} ${l(plural(enriched.length, 'сделка', 'сделки', 'сделок'), 'мәміле', 'deals')}`, icon: Wallet, tone: 'bg-white/60 text-slate-700 ring-1 ring-white/60' },
     { label: l('Получено', 'Алынды', 'Received'), value: fmtShort(totals.paid) + ' ₸', sub: totals.billed ? `${Math.round(totals.paid / totals.billed * 100)}% ${l('от плана', 'жоспардан', 'of plan')}` : '—', icon: CheckCircle2, tone: 'bg-emerald-50 text-emerald-700' },
     { label: l('Остаток', 'Қалдық', 'Outstanding'), value: fmtShort(totals.due) + ' ₸', sub: l('к получению', 'алуға', 'pending'), icon: Clock, tone: 'bg-amber-50 text-amber-700' },
     { label: l('Просрочено', 'Мерзімі өтті', 'Overdue'), value: fmtShort(totals.overdue) + ' ₸', sub: l('требует внимания', 'назар аудару', 'needs attention'), icon: AlertCircle, tone: 'bg-rose-50 text-rose-700' },
