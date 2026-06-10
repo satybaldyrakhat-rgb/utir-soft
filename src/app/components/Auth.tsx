@@ -337,9 +337,9 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             </div>
             <h1 className="text-2xl text-gray-900 mb-1 text-center">{l('Добро пожаловать', 'Қош келдіңіз', 'Welcome')}</h1>
             <p className="text-sm text-slate-500 mb-8 text-center max-w-[300px]">
-              {l('CRM для замерных ниш: мебель, окна, потолки, двери, жалюзи',
-                 'Өлшеу салалары үшін CRM: жиһаз, терезе, төбе, есік, перде',
-                 'CRM for measure-based businesses: furniture, windows, ceilings, doors, blinds')}
+              {l('CRM для производства и услуг под заказ — мебель, окна, потолки, стройка и др.',
+                 'Өндіріс пен тапсырыс қызметтеріне арналған CRM — жиһаз, терезе, төбе, құрылыс және т.б.',
+                 'CRM for custom manufacturing & services — furniture, windows, ceilings, construction & more')}
             </p>
 
             <div className="w-full space-y-2.5 mb-6">
@@ -891,7 +891,10 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
         {/* Bottom */}
         <div className="p-4 sm:p-6 flex-shrink-0">
           <p className="text-center text-[10px] text-slate-400">
-            {l('Нажимая "Продолжить", вы соглашаетесь с условиями использования', 'Жалғастыруды басу арқылы сіз пайдалану шарттарымен келісесіз', 'By clicking "Continue", you agree to our terms of use')}
+            {l('Продолжая, вы соглашаетесь с ', 'Жалғастыра отырып, сіз ', 'By continuing, you agree to our ')}
+            <a href="#/terms" className="underline hover:text-slate-600">{l('Условиями', 'Шарттармен', 'Terms')}</a>
+            {l(' и ', ' және ', ' & ')}
+            <a href="#/privacy" className="underline hover:text-slate-600">{l('Политикой конфиденциальности', 'Құпиялылық саясатымен', 'Privacy Policy')}</a>
           </p>
         </div>
       </div>
