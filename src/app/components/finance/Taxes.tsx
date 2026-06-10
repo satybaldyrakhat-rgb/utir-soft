@@ -260,6 +260,81 @@ export function Taxes() {
     .filter(r => r.applicable && statusOf(r) !== 'paid')
     .sort((a, b) => a.due.localeCompare(b.due))[0];
 
+  // ─── Налоговый календарь ──────────────────────────────────────────
+  // Прогноз ближайших статутных сроков РК (сдача отчётности + уплата)
+  // на ~6 месяцев вперёд, в зависимости от налогового режима, статуса
+  // плательщика НДС и наличия сотрудников. Стандартные сроки РК; точные
+  // даты бухгалтер сверяет (могут смещаться при выходных/праздниках).
+  const hasEmployees = activeEmployees.length > 0;
+  const taxCalendar = useMemo(() => {
+    type Ev = { id: string; date: string; kind: 'report' | 'pay'; title: string; form?: string; period: string };
+    const evs: Ev[] = [];
+    // Формат без сдвига часового пояса (toISOString() уводит локальную
+    // полночь в UTC и срок «25» превращается в «24» в Алматы).
+    const iso = (y: number, mi: number, day: number) => `${y}-${String(mi + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const MON = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+    const now = new Date();
+    // Идём от прошлого месяца до +7 месяцев — захватываем только что
+    // прошедшие сроки (чтобы показать просрочку) и ближайшие будущие.
+    for (let off = -1; off <= 7; off++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + off, 1);
+      const Y = d.getFullYear(), mi = d.getMonth();
+      const prevM = (mi + 11) % 12;
+      const prevMY = mi === 0 ? Y - 1 : Y;
+      // 1) Уплата зарплатных налогов — ежемесячно до 25-го (за пред. месяц).
+      if (hasEmployees) evs.push({ id: `pay-pr-${Y}-${mi}`, date: iso(Y, mi, 25), kind: 'pay',
+        title: 'Уплата зарплатных налогов (ОПВ, ИПН, СО, ОСМС)', period: `${MON[prevM]} ${prevMY}` });
+      // 2) Квартальная отчётность — в феврале/мае/августе/ноябре за
+      //    предыдущий квартал: 200.00 (ЗП), 300.00 (НДС), 913.00 (розница).
+      if ([1, 4, 7, 10].includes(mi)) {
+        const qEndMi = (mi + 10) % 12;           // месяц окончания квартала (−2)
+        const qEndY = mi === 1 ? Y - 1 : Y;
+        const q = Math.floor(qEndMi / 3) + 1;
+        const qLabel = `Q${q} ${qEndY}`;
+        if (hasEmployees) evs.push({ id: `r200-${Y}-${mi}`, date: iso(Y, mi, 15), kind: 'report', form: '200.00',
+          title: 'Декларация по зарплатным налогам (ф. 200.00)', period: qLabel });
+        if (vatPayer) {
+          evs.push({ id: `r300-${Y}-${mi}`, date: iso(Y, mi, 15), kind: 'report', form: '300.00',
+            title: 'Декларация по НДС (ф. 300.00)', period: qLabel });
+          evs.push({ id: `p300-${Y}-${mi}`, date: iso(Y, mi, 25), kind: 'pay', form: '300.00',
+            title: 'Уплата НДС', period: qLabel });
+        }
+        if (regime === 'retail') {
+          evs.push({ id: `r913-${Y}-${mi}`, date: iso(Y, mi, 15), kind: 'report', form: '913.00',
+            title: 'Декларация по розничному налогу (ф. 913.00)', period: qLabel });
+          evs.push({ id: `p913-${Y}-${mi}`, date: iso(Y, mi, 25), kind: 'pay', form: '913.00',
+            title: 'Уплата розничного налога', period: qLabel });
+        }
+      }
+      // 3) Упрощёнка (910.00) — полугодие: отчёт до 15-го и уплата до 25-го
+      //    в августе (за 1 полуг.) и феврале (за 2 полуг. прошлого года).
+      if (regime === 'simplified' && (mi === 7 || mi === 1)) {
+        const half = mi === 7 ? `1 полугодие ${Y}` : `2 полугодие ${Y - 1}`;
+        evs.push({ id: `r910-${Y}-${mi}`, date: iso(Y, mi, 15), kind: 'report', form: '910.00',
+          title: 'Декларация по упрощёнке (ф. 910.00)', period: half });
+        evs.push({ id: `p910-${Y}-${mi}`, date: iso(Y, mi, 25), kind: 'pay', form: '910.00',
+          title: 'Уплата налога по упрощёнке', period: half });
+      }
+      // 4) ОУР — годовая декларация в марте за прошлый год (КПН 100.00 для
+      //    ТОО / ИПН 220.00 для ИП), уплата до 10 апреля.
+      if (regime === 'general' && mi === 2) {
+        const form = isIP ? '220.00' : '100.00';
+        const title = isIP ? 'Годовая декларация ИПН (ф. 220.00)' : 'Годовая декларация КПН (ф. 100.00)';
+        evs.push({ id: `rann-${Y}`, date: iso(Y, 2, 31), kind: 'report', form, title, period: `${Y - 1} год` });
+        evs.push({ id: `pann-${Y}`, date: iso(Y, 3, 10), kind: 'pay', form, title: isIP ? 'Уплата ИПН за год' : 'Уплата КПН за год', period: `${Y - 1} год` });
+      }
+    }
+    const todayMs = new Date(now.toISOString().slice(0, 10)).getTime();
+    const horizon = todayMs + 200 * 86400000;
+    const past = todayMs - 21 * 86400000;
+    return evs
+      .filter(e => { const ms = new Date(e.date).getTime(); return ms >= past && ms <= horizon; })
+      .map(e => ({ ...e, days: Math.round((new Date(e.date).getTime() - todayMs) / 86400000) }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 10);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regime, vatPayer, isIP, hasEmployees]);
+
   // ─── Actions ────────────────────────────────────────────────────
   async function markPaid(r: TaxRow) {
     if (!r.applicable) return;
@@ -400,6 +475,49 @@ export function Taxes() {
           <div className="text-base text-gray-900">{nearestDue ? nearestDue.due.slice(8, 10) + '.' + nearestDue.due.slice(5, 7) : '—'}</div>
           <div className="text-[10px] text-rose-600 mt-1">{nearestDue ? `${nearestDue.shortLabel} · ${fmt(nearestDue.amount)}` : 'Всё оплачено'}</div>
         </div>
+      </div>
+
+      {/* ─── Налоговый календарь ─────────────────────────────────── */}
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Calendar className="w-4 h-4 text-emerald-600" />
+          <span className="text-sm text-gray-900">Налоговый календарь</span>
+          <span className="text-[11px] text-gray-400">· ближайшие сроки</span>
+        </div>
+        {taxCalendar.length === 0 ? (
+          <div className="text-xs text-gray-400 py-3">Нет сроков в ближайшие месяцы. Проверьте налоговый режим в Настройках.</div>
+        ) : (
+          <div className="space-y-1.5">
+            {taxCalendar.map(e => {
+              const overdue = e.days < 0;
+              const soon = e.days >= 0 && e.days <= 7;
+              const countdown = overdue ? `просрочено ${Math.abs(e.days)} дн`
+                : e.days === 0 ? 'сегодня'
+                : e.days === 1 ? 'завтра'
+                : `через ${e.days} дн`;
+              return (
+                <div key={e.id} className="flex items-center gap-3 px-3 py-2 rounded-2xl bg-white/50 ring-1 ring-white/60">
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${overdue ? 'bg-rose-500' : soon ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${e.kind === 'report' ? 'bg-sky-50 text-sky-700' : 'bg-violet-50 text-violet-700'}`}>
+                    {e.kind === 'report' ? 'отчёт' : 'уплата'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] text-gray-800 truncate">{e.title}</div>
+                    <div className="text-[10px] text-gray-400">{e.period}{e.form ? ` · ф. ${e.form}` : ''}</div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-[11px] text-gray-700 tabular-nums">{e.date.slice(8, 10)}.{e.date.slice(5, 7)}.{e.date.slice(0, 4)}</div>
+                    <div className={`text-[10px] ${overdue ? 'text-rose-600' : soon ? 'text-amber-600' : 'text-gray-400'}`}>{countdown}</div>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="text-[10px] text-gray-400 pt-1.5 flex items-start gap-1.5">
+              <AlertCircle className="w-3 h-3 flex-shrink-0 mt-px" />
+              Стандартные сроки РК. При выходных/праздниках срок сдвигается — сверяйте с бухгалтером и кабинетом egov / Кабинет налогоплательщика.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ─── Warning if requisites not configured for VAT/IP ──────── */}
