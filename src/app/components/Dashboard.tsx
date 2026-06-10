@@ -19,7 +19,7 @@ import {
   TrendingUp, TrendingDown, Plus, ArrowUpRight, ArrowRight,
   Clock, CheckCircle2, Circle, ShoppingBag, Users, DollarSign,
   Package, Palette, ChevronRight, X, Sparkles, MessageCircle,
-  Rocket, Wallet,
+  Rocket, Wallet, AlertTriangle, ShieldCheck, Banknote, HandCoins,
 } from 'lucide-react';
 import { t } from '../utils/translations';
 import { useDataStore } from '../utils/dataStore';
@@ -227,6 +227,73 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
   const overdueCount  = openTasks.filter(t => t.dueDate && t.dueDate < todayStr).length;
   const completedToday = store.tasks.filter(t => t.status === 'done' && t.completedAt?.slice(0, 10) === todayStr).length;
   const totalForBar = Math.max(1, completedToday + openTasks.length);
+
+  // ─── Owner snapshot: деньги + точки внимания (риски) ───────────────
+  // Сводка «глазами собственника»: сколько денег на руках, сколько
+  // должны, и автоматические красные флаги (зависшие сделки, просрочки
+  // производства/монтажа, брак, лиды без ответственного, убыток).
+  // Та же логика, что в PDF-отчёте собственника (Finance → owner), но
+  // живая и с переходами в нужный модуль одним кликом.
+  const owner = useMemo(() => {
+    const completedTx = store.transactions.filter(tx => tx.status === 'completed');
+    const accBal = (acc: 'cash' | 'bank' | 'kaspi') => completedTx
+      .filter(tx => (tx.account || 'bank') === acc)
+      .reduce((s, tx) => s + (tx.type === 'income' ? tx.amount : -tx.amount), 0);
+    const moneyTotal = accBal('cash') + accBal('bank') + accBal('kaspi');
+
+    const activeD = store.deals.filter(d => d.status !== 'rejected');
+    const recvDeals = activeD.filter(d => (d.amount || 0) > (d.paidAmount || 0));
+    const receivables = recvDeals.reduce((s, d) => s + ((d.amount || 0) - (d.paidAmount || 0)), 0);
+
+    // Прибыль за текущий месяц — для флага убыточности.
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+    const monthTx = completedTx.filter(tx => tx.date && new Date(tx.date).getTime() >= monthStart);
+    const monthIncome = monthTx.filter(tx => tx.type === 'income').reduce((s, tx) => s + tx.amount, 0);
+    const monthExpense = monthTx.filter(tx => tx.type === 'expense').reduce((s, tx) => s + tx.amount, 0);
+    const monthProfit = monthIncome - monthExpense;
+
+    const PROD = ['production', 'assembly', 'manufacturing', 'installation'];
+    const liveD = activeD.filter(d => d.status !== 'completed');
+    const overdueProd = store.deals.filter(d => PROD.includes(d.status) && d.completionDate && d.completionDate < todayStr).length;
+    const overdueInstall = liveD.filter(d => d.installationDate && d.installationDate < todayStr).length;
+    const rework = liveD.filter(d => d.defect).length;
+    const unassigned = liveD.filter(d => !d.ownerId).length;
+    const staleTouch = liveD.filter(d => d.nextActionAt && d.nextActionAt < todayStr).length;
+
+    type Risk = { id: string; sev: 'high' | 'mid'; text: string; page: string };
+    const risks: Risk[] = [];
+    if (monthProfit < 0) risks.push({ id: 'loss', sev: 'high', page: 'finance',
+      text: l(`Месяц убыточный: расходы превышают доход на ${fmtKZT(-monthProfit)}`,
+              `Ай шығынды: шығыс кірістен ${fmtKZT(-monthProfit)} артық`,
+              `Month in the red: expenses exceed income by ${fmtKZT(-monthProfit)}`) });
+    if (overdueInstall > 0) risks.push({ id: 'install', sev: 'high', page: 'sales',
+      text: l(`${overdueInstall} монтажей с просроченной датой`,
+              `${overdueInstall} монтаж мерзімі өтіп кеткен`,
+              `${overdueInstall} installations past their date`) });
+    if (overdueProd > 0) risks.push({ id: 'prod', sev: 'high', page: 'warehouse',
+      text: l(`${overdueProd} заказов с просроченным дедлайном производства`,
+              `${overdueProd} тапсырыс өндіріс мерзімінен өтті`,
+              `${overdueProd} orders past production deadline`) });
+    if (rework > 0) risks.push({ id: 'rework', sev: 'mid', page: 'warehouse',
+      text: l(`${rework} заказов на переделке (брак)`,
+              `${rework} тапсырыс қайта жасауда (ақау)`,
+              `${rework} orders in rework (defect)`) });
+    if (staleTouch > 0) risks.push({ id: 'touch', sev: 'mid', page: 'sales',
+      text: l(`${staleTouch} сделок с просроченным следующим шагом`,
+              `${staleTouch} мәміленің келесі қадамы өтіп кетті`,
+              `${staleTouch} deals with an overdue next step`) });
+    if (unassigned > 0) risks.push({ id: 'unassigned', sev: 'mid', page: 'sales',
+      text: l(`${unassigned} активных сделок без ответственного`,
+              `${unassigned} белсенді мәміле жауаптысыз`,
+              `${unassigned} active deals without an owner`) });
+    if (receivables > 0) risks.push({ id: 'recv', sev: 'mid', page: 'finance',
+      text: l(`Дебиторка ${fmtKZT(receivables)} по ${recvDeals.length} сделкам`,
+              `Дебиторлық ${fmtKZT(receivables)}, ${recvDeals.length} мәміле`,
+              `Receivables ${fmtKZT(receivables)} across ${recvDeals.length} deals`) });
+
+    return { moneyTotal, receivables, recvCount: recvDeals.length, risks };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.transactions, store.deals, todayStr, language]);
 
   // ─── Activity feed ────────────────────────────────────────────────
   const activities = store.activityLogs.slice(0, 5);
@@ -611,6 +678,72 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
             );
           })}
         </div>
+
+        {/* ─── Owner panel: деньги + точки внимания ──────────── */}
+        {/* Сводка для собственника. Money-блок виден только при доступе
+            к финансам; список рисков фильтруется по видимым модулям. */}
+        {(() => {
+          const visibleRisks = owner.risks.filter(r => canSee(r.page));
+          const showMoney = canSee('finance');
+          if (!showMoney && visibleRisks.length === 0) return null;
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+              {showMoney && (
+                <div className={`${GLASS} p-5`}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-7 h-7 rounded-xl bg-emerald-100/70 text-emerald-700 ring-1 ring-white/60 flex items-center justify-center">
+                      <Wallet className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-sm text-slate-900">{l('Деньги и долги', 'Ақша және қарыз', 'Money & debts')}</span>
+                  </div>
+                  <button onClick={() => onNavigate?.('finance')} className="w-full text-left group">
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-1">
+                      <Banknote className="w-3 h-3 text-emerald-600" /> {l('Деньги на счетах', 'Шоттардағы ақша', 'Money on accounts')}
+                    </div>
+                    <div className={`text-2xl tabular-nums tracking-tight mb-3 ${owner.moneyTotal < 0 ? 'text-rose-600' : 'text-slate-900'}`}>{fmtKZT(owner.moneyTotal)}</div>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-1">
+                      <HandCoins className="w-3 h-3 text-amber-600" /> {l('Должны нам (дебиторка)', 'Бізге қарыз (дебиторлық)', 'Owed to us (receivables)')}
+                    </div>
+                    <div className="text-lg tabular-nums tracking-tight text-slate-800">
+                      {fmtKZT(owner.receivables)}
+                      {owner.recvCount > 0 && <span className="text-[11px] text-slate-400 ml-1.5">· {owner.recvCount} {l('сделок', 'мәміле', 'deals')}</span>}
+                    </div>
+                  </button>
+                </div>
+              )}
+              <div className={`${GLASS} p-5 ${showMoney ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className={`w-7 h-7 rounded-xl ring-1 ring-white/60 flex items-center justify-center ${visibleRisks.length > 0 ? 'bg-rose-100/70 text-rose-600' : 'bg-emerald-100/70 text-emerald-700'}`}>
+                    {visibleRisks.length > 0 ? <AlertTriangle className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                  </div>
+                  <span className="text-sm text-slate-900">{l('Точки внимания', 'Назар аудару', 'Needs attention')}</span>
+                  {visibleRisks.length > 0 && (
+                    <span className="ml-auto text-[11px] text-rose-600 bg-rose-50 ring-1 ring-rose-100/60 px-2 py-0.5 rounded-full">{visibleRisks.length}</span>
+                  )}
+                </div>
+                {visibleRisks.length === 0 ? (
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 py-3">
+                    <CheckCircle2 className="w-4 h-4" /> {l('Всё под контролем — критичных рисков нет', 'Бәрі бақылауда — сыни тәуекел жоқ', 'All under control — no critical risks')}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {visibleRisks.map(r => (
+                      <button
+                        key={r.id}
+                        onClick={() => onNavigate?.(r.page)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl bg-white/40 ring-1 ring-white/60 hover:bg-white/70 transition-all text-left group"
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${r.sev === 'high' ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                        <span className="text-[12px] text-slate-700 flex-1">{r.text}</span>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ─── Main grid: revenue + tasks ───────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
