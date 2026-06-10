@@ -536,6 +536,12 @@ export function buildDailySummary(db: Database.Database, teamId: string): string
   const debtDeals = deals.filter(d => !['completed', 'rejected'].includes(d.status) && (d.amount || 0) > (d.paidAmount || 0));
   const debt = debtDeals.reduce((s, d) => s + ((d.amount || 0) - (d.paidAmount || 0)), 0);
   const stale = deals.filter(d => d.status === 'new' && d.createdAt && (now - new Date(d.createdAt).getTime()) > 3 * 86400000).length;
+  // Крупные сделки — РОП должен лично контролировать большие деньги.
+  const activeBig = deals.filter(d => !['completed', 'rejected', 'new'].includes(d.status) && (d.amount || 0) > 0);
+  const bigInWork = activeBig.slice().sort((a, b) => (b.amount || 0) - (a.amount || 0)).slice(0, 3);
+  const avgActive = activeBig.length ? activeBig.reduce((s, d) => s + (d.amount || 0), 0) / activeBig.length : 0;
+  const bigThreshold = Math.max(1_000_000, avgActive * 1.3);
+  const bigStalled = activeBig.filter(d => d.createdAt && (now - new Date(d.createdAt).getTime()) > 7 * 86400000 && (d.amount || 0) >= bigThreshold);
 
   const dateNice = new Date().toLocaleDateString('ru-RU', { timeZone: SUMMARY_TZ, day: 'numeric', month: 'long' });
   const lines: string[] = [`☀️ <b>Доброе утро! Сводка на ${dateNice}</b>`, ''];
@@ -551,9 +557,15 @@ export function buildDailySummary(db: Database.Database, teamId: string): string
     instToday.slice(0, 5).forEach(d => lines.push(`• 🔧 Монтаж — ${d.customerName || '—'}${d.siteAddress || d.address ? ' · ' + (d.siteAddress || d.address) : ''}`));
   }
 
+  if (bigInWork.length) {
+    lines.push('', `💎 <b>Крупные в работе</b>`);
+    bigInWork.forEach(d => lines.push(`• ${d.customerName || '—'} — <b>${fmt(d.amount || 0)}</b>`));
+  }
+
   const attention: string[] = [];
   if (debt > 0) attention.push(`• 💰 Дебиторка: <b>${fmt(debt)}</b> по ${debtDeals.length} сделкам`);
   if (stale > 0) attention.push(`• ⏳ Без движения >3 дней: <b>${stale}</b> новых заявок`);
+  if (bigStalled.length) attention.push(`• 🧊 Крупные без движения >7 дней: <b>${bigStalled.length}</b> (${fmt(bigStalled.reduce((s, d) => s + (d.amount || 0), 0))})`);
   if (attention.length) { lines.push('', `⚠️ <b>Требует внимания</b>`, ...attention); }
 
   lines.push('', `<i>Открыть платформу для деталей.</i>`);
