@@ -1010,9 +1010,12 @@ app.post('/api/auth/phone/verify', rateLimit('phone'), (req, res) => {
 // Gated on env credentials. When keys are missing the /api/auth/<p> route
 // bounces back to the app with ?oauth=notconfigured so the UI can explain.
 // Setup steps: см. SETUP-OAUTH.md в корне репозитория.
-const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+// Trim env values — pasting into hosting dashboards (Railway raw editor)
+// easily introduces stray spaces/tabs/newlines which corrupt redirect URLs.
+const envUrl = (v: string | undefined) => (v || '').trim().replace(/\/+$/, '');
+const APP_URL = envUrl(process.env.APP_URL) || 'http://localhost:5173';
 function oauthRedirectUri(req: any, provider: string): string {
-  const base = process.env.OAUTH_CALLBACK_BASE || `${req.protocol}://${req.get('host')}`;
+  const base = envUrl(process.env.OAUTH_CALLBACK_BASE) || `${req.protocol}://${req.get('host')}`;
   return `${base}/api/auth/${provider}/callback`;
 }
 // Find-or-create a user from a verified social profile, return a JWT.
@@ -1031,7 +1034,7 @@ function upsertOAuthUser(opts: { email: string; name: string; provider: string }
 }
 
 app.get('/api/auth/google', (req, res) => {
-  const cid = process.env.GOOGLE_CLIENT_ID;
+  const cid = (process.env.GOOGLE_CLIENT_ID || '').trim();
   if (!cid) return res.redirect(`${APP_URL}/?oauth=notconfigured`);
   const params = new URLSearchParams({
     client_id: cid, redirect_uri: oauthRedirectUri(req, 'google'),
@@ -1042,7 +1045,7 @@ app.get('/api/auth/google', (req, res) => {
 app.get('/api/auth/google/callback', async (req, res) => {
   try {
     const code = String(req.query.code || '');
-    const cid = process.env.GOOGLE_CLIENT_ID, secret = process.env.GOOGLE_CLIENT_SECRET;
+    const cid = (process.env.GOOGLE_CLIENT_ID || '').trim(), secret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
     if (!code || !cid || !secret) return res.redirect(`${APP_URL}/?oauth=failed`);
     const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1058,7 +1061,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
 });
 
 app.get('/api/auth/facebook', (req, res) => {
-  const aid = process.env.FACEBOOK_APP_ID;
+  const aid = (process.env.FACEBOOK_APP_ID || '').trim();
   if (!aid) return res.redirect(`${APP_URL}/?oauth=notconfigured`);
   const params = new URLSearchParams({
     client_id: aid, redirect_uri: oauthRedirectUri(req, 'facebook'),
@@ -1069,7 +1072,7 @@ app.get('/api/auth/facebook', (req, res) => {
 app.get('/api/auth/facebook/callback', async (req, res) => {
   try {
     const code = String(req.query.code || '');
-    const aid = process.env.FACEBOOK_APP_ID, secret = process.env.FACEBOOK_APP_SECRET;
+    const aid = (process.env.FACEBOOK_APP_ID || '').trim(), secret = (process.env.FACEBOOK_APP_SECRET || '').trim();
     if (!code || !aid || !secret) return res.redirect(`${APP_URL}/?oauth=failed`);
     const tokenResp = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${new URLSearchParams({
       client_id: aid, client_secret: secret, redirect_uri: oauthRedirectUri(req, 'facebook'), code,
