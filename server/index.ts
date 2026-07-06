@@ -297,6 +297,13 @@ migrateColumn('users', 'terms_accepted_at', 'TEXT');
 // AI assistant settings (Block F.4 — per-module permissions for Telegram bot)
 // Stored as a JSON blob of the same shape as AISettings on the frontend.
 migrateColumn('users', 'ai_settings', 'TEXT');
+// Phone auth (SMS code) + OAuth provider tracking. Phone/social users may
+// not have a real email — signup synthesises a unique placeholder so the
+// NOT NULL UNIQUE constraint on `email` still holds.
+migrateColumn('users', 'phone', 'TEXT');
+migrateColumn('users', 'phone_verified', 'INTEGER DEFAULT 0');
+migrateColumn('users', 'phone_code', 'TEXT');
+migrateColumn('users', 'auth_provider', "TEXT DEFAULT 'password'");
 
 // First time email_verified column appears → all pre-existing users predate verification, mark them verified.
 if (verifiedJustAdded) {
@@ -595,6 +602,7 @@ const RATE_LIMITS: Record<string, { max: number; windowMs: number }> = {
   'resend-code': { max: 5,  windowMs: 15 * 60 * 1000 },  // 5 / 15min
   'forgot':      { max: 3,  windowMs: 15 * 60 * 1000 },  // 3 / 15min — strict, prevents email-spam-via-form
   'lead':        { max: 20, windowMs: 60 * 60 * 1000 },  // 20 / hour per IP — public lead form
+  'phone':       { max: 8,  windowMs: 15 * 60 * 1000 },  // 8 / 15min — SMS code requests
 };
 function rateLimit(bucket: keyof typeof RATE_LIMITS) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -906,6 +914,184 @@ app.get('/api/auth/check-reset-token', (req, res) => {
   if (row.used_at) return res.json({ valid: false, reason: 'used' });
   if (new Date(row.expires_at).getTime() < Date.now()) return res.json({ valid: false, reason: 'expired' });
   res.json({ valid: true });
+});
+
+// ─── Owner-user provisioning helper ───────────────────────────────
+// Creates a brand-new own-team owner (no invite): user row + employees
+// row + default integrations. Mirrors the scaffolding in /api/auth/signup
+// so phone- and OAuth-signups land in exactly the same shape.
+function provisionOwnerUser(opts: {
+  name: string; email: string; company: string;
+  passwordHash?: string | null; phone?: string | null;
+  provider?: string; emailVerified?: boolean; phoneVerified?: boolean;
+}): string {
+  const id = newId('u_');
+  const teamId = id;
+  const role = 'admin';
+  db.prepare(
+    `INSERT INTO users
+       (id, email, password_hash, name, company, email_verified, phone, phone_verified, auth_provider, terms_accepted_at, team_id, team_role)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?)`
+  ).run(
+    id, opts.email.toLowerCase(), opts.passwordHash || '', opts.name.trim(), (opts.company || '').trim(),
+    opts.emailVerified ? 1 : 0, opts.phone || null, opts.phoneVerified ? 1 : 0,
+    opts.provider || 'password', teamId, role,
+  );
+  const empId = newId('e');
+  const initial = (opts.name.trim().charAt(0) || '?').toUpperCase();
+  const employeeData = {
+    id: empId, name: opts.name.trim(), email: opts.email.toLowerCase(), phone: opts.phone || '',
+    role, department: '', status: 'active', salary: 0,
+    joinDate: new Date().toISOString().slice(0, 10), lastActive: new Date().toISOString(), avatar: initial,
+    permissions: { sales: true, finance: true, warehouse: false, chats: true, analytics: true, settings: true },
+    performance: { ordersCompleted: 0, rating: 0, efficiency: 0 },
+  };
+  db.prepare('INSERT INTO employees (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(empId, id, teamId, JSON.stringify(employeeData));
+  seedIntegrations(id);
+  return id;
+}
+
+// ─── Phone auth (SMS code) ────────────────────────────────────────
+// Normalise KZ phones to +7XXXXXXXXXX. Accepts 8XXXXXXXXXX / 10-digit input.
+function normPhone(raw: string): string | null {
+  let d = String(raw || '').replace(/\D/g, '');
+  if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
+  if (d.length === 10) d = '7' + d;
+  if (d.length !== 11 || d[0] !== '7') return null;
+  return '+' + d;
+}
+
+// DEV MODE: no SMS gateway wired → returns {ok:false} so the caller surfaces
+// the code to the client (mirrors the email-OTP dev fallback). Plug a real
+// provider (Mobizon / SMSC.kz / Twilio) here and return {ok:true} on send.
+async function sendSms(_phone: string, _code: string): Promise<{ ok: boolean }> {
+  if (!process.env.SMS_API_KEY) return { ok: false };
+  // TODO: real provider call using SMS_API_KEY / SMS_SENDER here.
+  return { ok: false };
+}
+
+app.post('/api/auth/phone/start', rateLimit('phone'), async (req, res) => {
+  const { phone, mode, name, company } = req.body || {};
+  const norm = normPhone(phone);
+  if (!norm) return res.status(400).json({ error: 'invalid phone' });
+  const code = genVerificationCode();
+  const existing = db.prepare('SELECT id FROM users WHERE phone = ?').get(norm) as any;
+  if (mode === 'signup') {
+    if (existing) return res.status(409).json({ error: 'phone already registered' });
+    if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
+    if (!company || !String(company).trim()) return res.status(400).json({ error: 'company required' });
+    const placeholderEmail = `${norm.replace('+', '')}@phone.utir`;
+    const id = provisionOwnerUser({ name, email: placeholderEmail, company, phone: norm, provider: 'phone' });
+    db.prepare('UPDATE users SET phone_code = ? WHERE id = ?').run(code, id);
+  } else {
+    if (!existing) return res.status(404).json({ error: 'phone not found' });
+    db.prepare('UPDATE users SET phone_code = ? WHERE id = ?').run(code, existing.id);
+  }
+  const sms = await sendSms(norm, code);
+  res.json({ ok: true, smsSent: sms.ok, code: sms.ok ? undefined : code });
+});
+
+app.post('/api/auth/phone/verify', rateLimit('phone'), (req, res) => {
+  const { phone, code } = req.body || {};
+  const norm = normPhone(phone);
+  if (!norm) return res.status(400).json({ error: 'invalid phone' });
+  const user = db.prepare('SELECT id, name, email, company, phone_code, team_role, disabled_at FROM users WHERE phone = ?').get(norm) as any;
+  if (!user) return res.status(404).json({ error: 'phone not found' });
+  if (user.disabled_at) return res.status(403).json({ error: 'account disabled' });
+  if (!user.phone_code || String(user.phone_code) !== String(code).trim()) return res.status(400).json({ error: 'invalid code' });
+  db.prepare('UPDATE users SET phone_verified = 1, phone_code = NULL WHERE id = ?').run(user.id);
+  seedIntegrations(user.id);
+  logActivity(user.id, { user: user.name, action: 'Вошёл по номеру телефона', target: norm, type: 'login', page: 'auth' });
+  const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token, user: { id: user.id, email: user.email, name: user.name, company: user.company || '', phone: norm, emailVerified: true, teamRole: user.team_role || 'admin' } });
+});
+
+// ─── Google / Facebook OAuth (authorization-code flow) ────────────
+// Gated on env credentials. When keys are missing the /api/auth/<p> route
+// bounces back to the app with ?oauth=notconfigured so the UI can explain.
+// Setup steps: см. SETUP-OAUTH.md в корне репозитория.
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+function oauthRedirectUri(req: any, provider: string): string {
+  const base = process.env.OAUTH_CALLBACK_BASE || `${req.protocol}://${req.get('host')}`;
+  return `${base}/api/auth/${provider}/callback`;
+}
+// Find-or-create a user from a verified social profile, return a JWT.
+function upsertOAuthUser(opts: { email: string; name: string; provider: string }): string {
+  const email = String(opts.email || '').toLowerCase();
+  if (!email) throw new Error('no email from provider');
+  const found = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as any;
+  const id = found ? found.id : provisionOwnerUser({
+    name: opts.name || email, email, company: opts.name || 'Моя компания',
+    provider: opts.provider, emailVerified: true,
+  });
+  db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(id);
+  seedIntegrations(id);
+  logActivity(id, { user: opts.name || email, action: `Вошёл через ${opts.provider}`, target: email, type: 'login', page: 'auth' });
+  return jwt.sign({ sub: id }, JWT_SECRET, { expiresIn: '30d' });
+}
+
+app.get('/api/auth/google', (req, res) => {
+  const cid = process.env.GOOGLE_CLIENT_ID;
+  if (!cid) return res.redirect(`${APP_URL}/?oauth=notconfigured`);
+  const params = new URLSearchParams({
+    client_id: cid, redirect_uri: oauthRedirectUri(req, 'google'),
+    response_type: 'code', scope: 'openid email profile', prompt: 'select_account',
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+});
+app.get('/api/auth/google/callback', async (req, res) => {
+  try {
+    const code = String(req.query.code || '');
+    const cid = process.env.GOOGLE_CLIENT_ID, secret = process.env.GOOGLE_CLIENT_SECRET;
+    if (!code || !cid || !secret) return res.redirect(`${APP_URL}/?oauth=failed`);
+    const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ code, client_id: cid, client_secret: secret, redirect_uri: oauthRedirectUri(req, 'google'), grant_type: 'authorization_code' }).toString(),
+    });
+    const tk: any = await tokenResp.json();
+    if (!tk.access_token) return res.redirect(`${APP_URL}/?oauth=failed`);
+    const profResp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: `Bearer ${tk.access_token}` } });
+    const profile: any = await profResp.json();
+    const token = upsertOAuthUser({ email: profile.email, name: profile.name || profile.email, provider: 'google' });
+    res.redirect(`${APP_URL}/?token=${token}`);
+  } catch { res.redirect(`${APP_URL}/?oauth=failed`); }
+});
+
+app.get('/api/auth/facebook', (req, res) => {
+  const aid = process.env.FACEBOOK_APP_ID;
+  if (!aid) return res.redirect(`${APP_URL}/?oauth=notconfigured`);
+  const params = new URLSearchParams({
+    client_id: aid, redirect_uri: oauthRedirectUri(req, 'facebook'),
+    response_type: 'code', scope: 'email public_profile',
+  });
+  res.redirect(`https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`);
+});
+app.get('/api/auth/facebook/callback', async (req, res) => {
+  try {
+    const code = String(req.query.code || '');
+    const aid = process.env.FACEBOOK_APP_ID, secret = process.env.FACEBOOK_APP_SECRET;
+    if (!code || !aid || !secret) return res.redirect(`${APP_URL}/?oauth=failed`);
+    const tokenResp = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${new URLSearchParams({
+      client_id: aid, client_secret: secret, redirect_uri: oauthRedirectUri(req, 'facebook'), code,
+    }).toString()}`);
+    const tk: any = await tokenResp.json();
+    if (!tk.access_token) return res.redirect(`${APP_URL}/?oauth=failed`);
+    const profResp = await fetch(`https://graph.facebook.com/me?fields=id,name,email&access_token=${encodeURIComponent(tk.access_token)}`);
+    const profile: any = await profResp.json();
+    if (!profile.email) return res.redirect(`${APP_URL}/?oauth=noemail`);
+    const token = upsertOAuthUser({ email: profile.email, name: profile.name || profile.email, provider: 'facebook' });
+    res.redirect(`${APP_URL}/?token=${token}`);
+  } catch { res.redirect(`${APP_URL}/?oauth=failed`); }
+});
+
+// Report which social providers are configured — the UI shows the buttons
+// but explains "нужна настройка" when a provider has no keys yet.
+app.get('/api/auth/providers', (_req, res) => {
+  res.json({
+    google: !!process.env.GOOGLE_CLIENT_ID,
+    facebook: !!process.env.FACEBOOK_APP_ID,
+    sms: !!process.env.SMS_API_KEY,
+  });
 });
 
 // ─── GENERIC CRUD ROUTER FACTORY ───────────────────────

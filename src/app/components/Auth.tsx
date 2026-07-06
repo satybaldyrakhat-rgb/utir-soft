@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Eye, EyeOff, ArrowLeft, Check, Loader2, Mail, ShieldCheck, ArrowRight, Package, ChevronRight } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Check, Loader2, Mail, ShieldCheck, ArrowRight, Package, ChevronRight, Phone } from 'lucide-react';
 import profileLogo from '../../imports/utirsoft.png';
 import { api, setToken } from '../utils/api';
 
@@ -17,6 +17,11 @@ type AuthStep = 'console' | 'otp' | 'forgot' | 'forgot-sent';
 export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
   const [step, setStep] = useState<AuthStep>('console');
   const [tab, setTab] = useState<'login' | 'signup'>('login');
+  // Auth method within a tab: email/password or phone/SMS-code.
+  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
+  const [phone, setPhone] = useState('');
+  // Which flow the OTP screen is verifying — email confirmation or phone login.
+  const [otpFor, setOtpFor] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -77,6 +82,78 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
   }, []);
 
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+
+  // ── OAuth return handler ────────────────────────────────────────
+  // After Google/Facebook the backend redirects to /?token=<jwt> (success)
+  // or /?oauth=<reason> (not configured / failed). Pick it up on mount.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const oauthToken = p.get('token');
+      const oauthErr = p.get('oauth');
+      if (oauthToken) {
+        setToken(oauthToken);
+        window.history.replaceState({}, '', window.location.pathname);
+        window.dispatchEvent(new Event('utir:auth-changed'));
+        window.location.reload();
+        return;
+      }
+      if (oauthErr) {
+        setError(oauthErr === 'notconfigured'
+          ? l('Вход через Google/Facebook ещё не настроен администратором.', 'Google/Facebook кіру әлі бапталмаған.', 'Google/Facebook sign-in is not configured yet.')
+          : oauthErr === 'noemail'
+            ? l('Аккаунт не отдал email. Разрешите доступ к email или войдите иначе.', 'Аккаунт email бермеді.', 'The account did not share an email.')
+            : l('Не удалось войти через соцсеть. Попробуйте ещё раз.', 'Әлеуметтік желі арқылы кіру сәтсіз.', 'Social sign-in failed. Try again.'));
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // API origin for full-page OAuth redirects (buttons are <a> to the backend).
+  // In prod the API lives on another origin (Railway) → use VITE_API_BASE_URL.
+  const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
+
+  // Format a KZ phone for display: +7 700 000 00 00. Stores raw digits.
+  const formatKzPhone = (raw: string): string => {
+    let d = raw.replace(/\D/g, '');
+    // Disambiguate the country code by LENGTH (KZ national numbers also start
+    // with 7): 11 digits ⇒ has country code (7…/8…) → drop it → 10 national.
+    if (d.length === 11 && d[0] === '8') d = d.slice(1);
+    else if (d.length === 11 && d[0] === '7') d = d.slice(1);
+    const p = d.slice(0, 10); // national part, up to 10 digits
+    let out = '+7';
+    if (p.length > 0) out += ' ' + p.slice(0, 3);
+    if (p.length >= 4) out += ' ' + p.slice(3, 6);
+    if (p.length >= 7) out += ' ' + p.slice(6, 8);
+    if (p.length >= 9) out += ' ' + p.slice(8, 10);
+    return out;
+  };
+
+  // Request an SMS code (phone login/signup) then jump to the OTP screen.
+  const handlePhoneStart = async () => {
+    let digits = phone.replace(/\D/g, '');
+    // Drop country code (7/8) if present so we validate the 10 national digits.
+    if (digits.length === 11 && (digits[0] === '7' || digits[0] === '8')) digits = digits.slice(1);
+    if (digits.length < 10) { setError(l('Введите номер телефона полностью', 'Телефон нөмірін толық енгізіңіз', 'Enter the full phone number')); return; }
+    if (tab === 'signup') {
+      if (!name.trim()) { setError(l('Введите имя', 'Атыңызды енгізіңіз', 'Enter your name')); return; }
+      if (!company.trim()) { setError(l('Введите название компании', 'Компания атауын енгізіңіз', 'Enter your company name')); return; }
+      if (!agreeTerms) { setError(l('Необходимо принять условия использования', 'Пайдалану шарттарын қабылдау керек', 'You must accept the terms of use')); return; }
+    }
+    setIsLoading(true); setError('');
+    try {
+      const r = await api.post<{ ok: boolean; smsSent?: boolean; code?: string }>('/api/auth/phone/start', { phone, mode: tab, name, company });
+      if (r.code) setDevVerificationCode(r.code);
+      setOtpFor('phone'); setStep('otp');
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (msg === 'phone already registered') setError(l('Этот номер уже зарегистрирован — войдите.', 'Бұл нөмір тіркелген — кіріңіз.', 'This number is already registered — sign in.'));
+      else if (msg === 'phone not found') setError(l('Номер не найден — сначала зарегистрируйтесь.', 'Нөмір табылмады — алдымен тіркеліңіз.', 'Number not found — sign up first.'));
+      else if (msg === 'invalid phone') setError(l('Некорректный номер телефона', 'Қате телефон нөмірі', 'Invalid phone number'));
+      else setError(msg || l('Не удалось отправить код', 'Код жіберілмеді', 'Could not send code'));
+    } finally { setIsLoading(false); }
+  };
 
   // OTP timer
   useEffect(() => {
@@ -200,10 +277,18 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     if (code.length < 6) { setError(l('Введите все 6 цифр', 'Барлық 6 цифрды енгізіңіз', 'Enter all 6 digits')); return; }
     setIsLoading(true); setError('');
     try {
-      await api.post('/api/auth/verify-email', { code });
-      // Verified — finalise the session.
-      window.dispatchEvent(new Event('utir:auth-changed'));
-      onLogin({ name, email });
+      if (otpFor === 'phone') {
+        // Phone login/signup — verify code, receive token + user.
+        const data = await api.post<{ token: string; user: { name: string; email: string } }>('/api/auth/phone/verify', { phone, code });
+        setToken(data.token);
+        window.dispatchEvent(new Event('utir:auth-changed'));
+        onLogin({ name: data.user.name, email: data.user.email });
+      } else {
+        // Email confirmation — token already set at signup/login time.
+        await api.post('/api/auth/verify-email', { code });
+        window.dispatchEvent(new Event('utir:auth-changed'));
+        onLogin({ name, email });
+      }
     } catch (err: any) {
       const msg = String(err?.message || '');
       if (msg === 'invalid code') setError(l('Неверный код', 'Қате код', 'Invalid code'));
@@ -212,6 +297,9 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
       setIsLoading(false);
     }
   };
+
+  // Resend depends on which flow the OTP screen serves.
+  const resendCurrent = () => otpFor === 'phone' ? handlePhoneStart() : handleResendCode();
 
   const handleResendCode = async () => {
     setIsLoading(true); setError('');
@@ -338,7 +426,61 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               ))}
             </div>
 
-            {tab === 'login' ? (
+            {/* Method switch: Email / Телефон */}
+            <div className="flex gap-1 p-1 mb-4 bg-white/30 ring-1 ring-white/40 rounded-2xl backdrop-blur-xl">
+              {(['email', 'phone'] as const).map(m => (
+                <button
+                  key={m}
+                  onClick={() => { setAuthMethod(m); setError(''); }}
+                  className={`flex-1 py-1.5 rounded-xl text-[13px] inline-flex items-center justify-center gap-1.5 transition-all ${authMethod === m ? 'bg-white/90 text-slate-900 shadow-[0_2px_10px_-3px_rgba(15,23,42,0.2)]' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  {m === 'email' ? <Mail className="w-3.5 h-3.5" /> : <Phone className="w-3.5 h-3.5" />}
+                  {m === 'email' ? 'Email' : l('Телефон', 'Телефон', 'Phone')}
+                </button>
+              ))}
+            </div>
+
+            {authMethod === 'phone' ? (
+              /* ---------- PHONE (login + signup) ---------- */
+              <div className="space-y-3">
+                {tab === 'signup' && (
+                  <>
+                    <div>
+                      <label className="block text-[11px] text-slate-500 mb-1.5">{l('Ваше имя', 'Атыңыз', 'Your name')}</label>
+                      <input type="text" value={name} onChange={e => { setName(e.target.value); setError(''); }} placeholder={l('Иван Петров', 'Айбек Серіков', 'John Doe')} className={fieldCls} />
+                    </div>
+                    {!hasValidInvite && (
+                      <div>
+                        <label className="block text-[11px] text-slate-500 mb-1.5">{l('Название компании', 'Компания атауы', 'Company name')}</label>
+                        <input type="text" value={company} onChange={e => { setCompany(e.target.value); setError(''); }} placeholder={l('ТОО «Ваша компания»', 'ЖШС «Сіздің компания»', 'Your Company LLP')} className={fieldCls} />
+                      </div>
+                    )}
+                  </>
+                )}
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1.5">{l('Номер телефона', 'Телефон нөмірі', 'Phone number')}</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                    <input type="tel" value={phone ? formatKzPhone(phone) : ''} onChange={e => { setPhone(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handlePhoneStart()} placeholder="+7 700 000 00 00" autoFocus className={`${fieldCls} pl-10 tracking-wide`} />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1.5">{l('Пришлём 6-значный код в SMS', '6 санды кодты SMS-пен жібереміз', "We'll text a 6-digit code")}</p>
+                </div>
+                {tab === 'signup' && !hasValidInvite && (
+                  <label className="flex items-start gap-2.5 cursor-pointer pt-0.5">
+                    <input type="checkbox" checked={agreeTerms} onChange={e => { setAgreeTerms(e.target.checked); setError(''); }} className="w-3.5 h-3.5 rounded accent-emerald-600 mt-0.5" />
+                    <span className="text-xs text-slate-600">
+                      {l('Я принимаю', 'Мен қабылдаймын', 'I accept the')}{' '}
+                      <a href="#/terms" className="text-slate-900 hover:underline">{l('условия', 'шарттар', 'terms')}</a>
+                      {l(' и ', ' және ', ' & ')}
+                      <a href="#/privacy" className="text-slate-900 hover:underline">{l('политику', 'саясат', 'policy')}</a>
+                    </span>
+                  </label>
+                )}
+                <button onClick={handlePhoneStart} disabled={isLoading} className="w-full py-3 mt-1 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Получить код', 'Код алу', 'Get code')} <ArrowRight className="w-4 h-4" /></>}
+                </button>
+              </div>
+            ) : tab === 'login' ? (
               /* ---------- LOGIN ---------- */
               <div className="space-y-3">
                 <div>
@@ -437,6 +579,25 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </div>
             )}
 
+            {/* Social sign-in — Google / Facebook. Full-page redirect to the
+                backend OAuth route (works once keys are added; otherwise the
+                backend bounces back with a friendly "not configured" note). */}
+            <div className="flex items-center gap-3 my-5">
+              <div className="h-px bg-white/60 flex-1" />
+              <span className="text-[10px] text-slate-400">{l('или', 'немесе', 'or')}</span>
+              <div className="h-px bg-white/60 flex-1" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <a href={`${apiBase}/api/auth/google`} className="flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-white/70 ring-1 ring-white/70 backdrop-blur-xl hover:bg-white transition-all text-sm text-slate-700 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7)]">
+                <svg viewBox="0 0 24 24" className="w-4 h-4"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                Google
+              </a>
+              <a href={`${apiBase}/api/auth/facebook`} className="flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-white/70 ring-1 ring-white/70 backdrop-blur-xl hover:bg-white transition-all text-sm text-slate-700 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7)]">
+                <svg viewBox="0 0 24 24" className="w-4 h-4"><path fill="#1877F2" d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z"/></svg>
+                Facebook
+              </a>
+            </div>
+
             {/* Client cabinet entry — secondary, divided from the form,
                 refined glass row with icon chip + chevron. */}
             <div className="mt-6 pt-5 border-t border-white/50">
@@ -465,15 +626,17 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
               <ShieldCheck className="w-7 h-7 text-gray-900" />
             </div>
-            <h2 className="text-xl text-gray-900 mb-1">{l('Подтвердите email', 'Email-ді растаңыз', 'Verify your email')}</h2>
+            <h2 className="text-xl text-gray-900 mb-1">{otpFor === 'phone' ? l('Подтвердите номер', 'Нөмірді растаңыз', 'Verify your phone') : l('Подтвердите email', 'Email-ді растаңыз', 'Verify your email')}</h2>
             <p className="text-sm text-slate-500 mb-1">{l('Введите 6-значный код для', 'Растау үшін 6 санды кодты енгізіңіз', 'Enter the 6-digit code for')}</p>
-            <p className="text-sm text-gray-900 mb-5">{email}</p>
+            <p className="text-sm text-gray-900 mb-5">{otpFor === 'phone' ? formatKzPhone(phone) : email}</p>
 
-            {/* Dev mode banner — real email sending is OFF; surface the code right here. */}
+            {/* Dev mode banner — real email/SMS sending is OFF; surface the code right here. */}
             {devVerificationCode && (
               <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-5 text-left">
                 <div className="text-[10px] uppercase tracking-wider text-amber-700 mb-1">
-                  {l('Демо-режим · email не отправляется', 'Демо-режим · email жіберілмейді', 'Demo mode · no email is sent')}
+                  {otpFor === 'phone'
+                    ? l('Демо-режим · SMS не отправляется', 'Демо-режим · SMS жіберілмейді', 'Demo mode · no SMS is sent')
+                    : l('Демо-режим · email не отправляется', 'Демо-режим · email жіберілмейді', 'Demo mode · no email is sent')}
                 </div>
                 <div className="text-sm text-amber-900 flex items-center justify-between gap-3">
                   <span>{l('Ваш код:', 'Сіздің кодыңыз:', 'Your code:')}</span>
@@ -503,7 +666,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             {otpTimer > 0 ? (
               <p className="text-xs text-slate-500 mb-6">{l('Отправить повторно через', 'Қайта жіберу', 'Resend in')} <span className="text-gray-900">{otpTimer}{l('с', 'с', 's')}</span></p>
             ) : (
-              <button onClick={handleResendCode} disabled={isLoading} className="text-xs text-gray-900 hover:underline mb-6 disabled:opacity-40">{l('Отправить код повторно', 'Кодты қайта жіберу', 'Resend code')}</button>
+              <button onClick={resendCurrent} disabled={isLoading} className="text-xs text-gray-900 hover:underline mb-6 disabled:opacity-40">{l('Отправить код повторно', 'Кодты қайта жіберу', 'Resend code')}</button>
             )}
 
             <button onClick={handleOtpVerify} disabled={isLoading || otp.join('').length < 6} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
