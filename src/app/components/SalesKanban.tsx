@@ -910,6 +910,8 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                           l={l}
                           teamNiche={store.niche}
                           showNicheChip={store.secondaryNiches.length > 0}
+                          owners={owners}
+                          onAssign={(ownerId: string) => store.updateDeal(deal.id, { ownerId })}
                         />
                       ))}
                     </div>
@@ -1163,7 +1165,7 @@ function DealCard(props: {
 }) {
   const { deal, selected, onToggleSelect, onOpen, onReject, onDelete, onMove,
           onDragStart, onDragEnd, iconMap, priorityConf, canWrite, isMobile, language, l,
-          teamNiche, showNicheChip, owners, onAssign } = props;
+          teamNiche, showNicheChip, owners = [], onAssign } = props;
   const [moveOpen, setMoveOpen] = useState(false);
   const currentStage = statusToStage(deal.status);
   const priority = priorityConf(deal.priority);
