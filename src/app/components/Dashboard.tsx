@@ -53,9 +53,12 @@ interface DashboardProps {
 }
 
 // Shared glass-card class — centralised so every surface shares the same
-// translucency / blur / border / shadow.
-const GLASS = 'bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl';
-const GLASS_HOVER = 'transition-all hover:bg-white/70 hover:shadow-[0_16px_48px_-12px_rgba(15,23,42,0.18)] hover:-translate-y-0.5';
+// translucency / blur / border / shadow. Matches the Auth console's
+// liquid-glass treatment: frosted fill + a specular top-edge highlight
+// (inset white line) that catches light like real glass, over a deep
+// layered drop shadow.
+const GLASS = 'bg-white/50 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl';
+const GLASS_HOVER = 'transition-all duration-300 hover:bg-white/65 hover:shadow-[0_22px_56px_-16px_rgba(15,23,42,0.26),inset_0_1px_0_0_rgba(255,255,255,0.75)] hover:-translate-y-1';
 
 // Format KZT amount with smart units. For small businesses < 1k we keep
 // the literal value so "850 ₸" isn't shown as "0K ₸".
@@ -365,7 +368,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
   if (!store.loaded) {
     return (
       <div className="min-h-full relative">
-        <div className="relative p-4 md:p-8 max-w-[1400px] mx-auto">
+        <div className="relative px-4 py-5 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
           <div className="mb-8 space-y-3">
             <div className="h-3 w-32 bg-white/60 rounded-full animate-pulse" />
             <div className="h-9 w-64 bg-white/60 rounded-2xl animate-pulse" />
@@ -446,11 +449,11 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
 
     return (
       <div className="min-h-full relative">
-        <div className="relative p-4 md:p-8 max-w-[1100px] mx-auto">
+        <div className="relative px-4 py-5 sm:p-6 lg:p-8 max-w-[1100px] mx-auto">
           {/* Greeting */}
           <div className="mb-8">
             <p className="text-[11px] text-slate-400 mb-2 capitalize tracking-widest uppercase">{today}</p>
-            <h1 className="text-slate-900 mb-1 text-3xl md:text-4xl font-medium tracking-tight">
+            <h1 className="text-slate-900 mb-1 text-[26px] sm:text-3xl md:text-4xl font-medium tracking-tight">
               {getGreeting()}{firstName ? `, ${firstName}` : ''} 👋
             </h1>
             <p className="text-sm text-slate-500 max-w-2xl">
@@ -593,7 +596,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
 
   return (
     <div className="min-h-full relative">
-      <div className="relative p-4 md:p-8 max-w-[1400px] mx-auto">
+      <div className="relative px-4 py-5 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
 
         {/* ─── Greeting ────────────────────────────────────────── */}
         <div className="mb-8">
@@ -604,7 +607,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
                 {' · '}
                 <span className="inline-flex items-center gap-1 normal-case tracking-normal text-slate-500"><NicheIcon niche={niche} className="w-3 h-3" /> {nicheName}</span>
               </p>
-              <h1 className="text-slate-900 mb-1 text-3xl md:text-4xl font-medium tracking-tight">
+              <h1 className="text-slate-900 mb-1 text-[26px] sm:text-3xl md:text-4xl font-medium tracking-tight">
                 {getGreeting()}{firstName ? `, ${firstName}` : ''}
               </h1>
               <p className="text-sm text-slate-500">
@@ -648,24 +651,24 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
         </div>
 
         {/* ─── Metric Cards ──────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5 sm:mb-6">
           {kpiCards.map(card => {
             const Icon = card.icon;
             return (
               <button
                 key={card.id}
                 onClick={() => onNavigate?.(card.page)}
-                className={`${GLASS} ${GLASS_HOVER} p-5 text-left relative overflow-hidden group`}
+                className={`${GLASS} ${GLASS_HOVER} p-4 sm:p-5 text-left relative overflow-hidden group`}
               >
                 <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full bg-gradient-to-br ${card.tint} blur-2xl opacity-70 group-hover:opacity-100 transition-opacity`} />
                 <div className="relative">
-                  <div className="flex items-center justify-between mb-5">
-                    <span className="text-[11px] text-slate-500 tracking-wide">{card.label}</span>
-                    <div className={`w-9 h-9 rounded-2xl flex items-center justify-center ${card.iconCls} ring-1 ring-white/60 backdrop-blur-xl`}>
+                  <div className="flex items-start justify-between gap-2 mb-4 sm:mb-5">
+                    <span className="text-[11px] text-slate-500 tracking-wide leading-tight">{card.label}</span>
+                    <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-2xl flex items-center justify-center ${card.iconCls} ring-1 ring-white/60 backdrop-blur-xl flex-shrink-0`}>
                       <Icon className="w-4 h-4" />
                     </div>
                   </div>
-                  <div className="text-2xl text-slate-900 tracking-tight mb-2 tabular-nums">{card.value}</div>
+                  <div className="text-xl sm:text-2xl text-slate-900 tracking-tight mb-2 tabular-nums">{card.value}</div>
                   <div className="flex items-center justify-between">
                     <div className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full ${card.up ? 'text-emerald-700 bg-emerald-100/60' : 'text-rose-700 bg-rose-100/60'} ring-1 ring-white/40`}>
                       {card.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -687,7 +690,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
           const showMoney = canSee('finance');
           if (!showMoney && visibleRisks.length === 0) return null;
           return (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
               {showMoney && (
                 <div className={`${GLASS} p-5`}>
                   <div className="flex items-center gap-2 mb-4">
@@ -746,10 +749,10 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
         })()}
 
         {/* ─── Main grid: revenue + tasks ───────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-4">
           {/* Revenue chart */}
           <div
-            className={`lg:col-span-2 ${GLASS} ${GLASS_HOVER} p-6 cursor-pointer`}
+            className={`lg:col-span-2 ${GLASS} ${GLASS_HOVER} p-5 sm:p-6 cursor-pointer`}
             onClick={() => onNavigate?.('analytics')}
           >
             <div className="flex items-center justify-between mb-6">
@@ -827,7 +830,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
 
           {/* Tasks widget — heading + filter now match (open tasks
               due today or overdue), and overdue count is highlighted. */}
-          <div className={`${GLASS} p-6 flex flex-col`}>
+          <div className={`${GLASS} p-5 sm:p-6 flex flex-col`}>
             <div className="flex items-center justify-between mb-1">
               <div className="text-sm text-slate-900">{l('Что нужно сделать', 'Қазір не істеу', 'What to do now')}</div>
             </div>
@@ -917,9 +920,9 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
         </div>
 
         {/* ─── Orders + Activity ─────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
           {/* Recent orders */}
-          <div className={`lg:col-span-2 ${GLASS} p-6`}>
+          <div className={`lg:col-span-2 ${GLASS} p-5 sm:p-6`}>
             <div className="flex items-center justify-between mb-5">
               <div className="text-sm text-slate-900">{l('Последние заказы', 'Соңғы тапсырыстар', 'Recent orders')}</div>
               <button
@@ -952,7 +955,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
                 return (
                   <div
                     key={deal.id}
-                    className="flex items-center gap-4 p-3 rounded-2xl bg-white/30 hover:bg-white/70 ring-1 ring-white/40 transition-all cursor-pointer group"
+                    className="flex items-center gap-3 sm:gap-4 p-2.5 sm:p-3 rounded-2xl bg-white/30 hover:bg-white/70 ring-1 ring-white/40 transition-all cursor-pointer group"
                     onClick={() => setSelectedOrder(deal)}
                   >
                     <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 ring-1 ring-white/70 flex items-center justify-center text-sm text-slate-600 flex-shrink-0">
@@ -986,7 +989,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
 
           {/* Activity feed — "live" badge removed (was a lie, no polling).
               Timestamp now relative-formatted for readability. */}
-          <div className={`${GLASS} p-6`}>
+          <div className={`${GLASS} p-5 sm:p-6`}>
             <div className="flex items-center justify-between mb-5">
               <div className="text-sm text-slate-900">{l('Активность', 'Белсенділік', 'Activity')}</div>
               <span className="text-[10px] text-slate-400">{activities.length}</span>
@@ -1026,7 +1029,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
         {/* ─── Weekly orders — real empty state ─────────────── */}
         {store.deals.length > 0 ? (
           <div
-            className={`mt-4 ${GLASS} ${GLASS_HOVER} p-6 cursor-pointer`}
+            className={`mt-3 sm:mt-4 ${GLASS} ${GLASS_HOVER} p-5 sm:p-6 cursor-pointer`}
             onClick={() => onNavigate?.('analytics')}
           >
             <div className="flex items-center justify-between mb-5">

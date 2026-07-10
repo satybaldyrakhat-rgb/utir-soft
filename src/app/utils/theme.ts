@@ -28,12 +28,12 @@ export interface ThemeDef {
   label: { ru: string; kz: string; eng: string };
 }
 
-// Order matters — first item is shown leftmost in the picker. Black is
-// the platform default; the brand emerald sits right after so users can
-// easily switch back to it.
+// Order matters — first item is shown leftmost in the picker. Brand
+// emerald is the platform default (matches the logo + the sign-in screen);
+// classic black sits right after for users who prefer a neutral accent.
 export const THEMES: ThemeDef[] = [
-  { id: 'black',   swatch: '#0f172a', label: { ru: 'Чёрный (по умолчанию)', kz: 'Қара (әдепкі)',    eng: 'Black (default)' } },
-  { id: 'emerald', swatch: '#10b981', label: { ru: 'Изумруд (бренд)',       kz: 'Зүмірет (бренд)',  eng: 'Emerald (brand)' } },
+  { id: 'emerald', swatch: '#10b981', label: { ru: 'Изумруд (по умолчанию)', kz: 'Зүмірет (әдепкі)', eng: 'Emerald (default)' } },
+  { id: 'black',   swatch: '#0f172a', label: { ru: 'Чёрный',                 kz: 'Қара',             eng: 'Black' } },
   { id: 'teal',    swatch: '#14b8a6', label: { ru: 'Бирюзовый',             kz: 'Көгілдір',         eng: 'Teal' } },
   { id: 'cyan',    swatch: '#06b6d4', label: { ru: 'Голубой',               kz: 'Көк-жасыл',        eng: 'Cyan' } },
   { id: 'sky',     swatch: '#0ea5e9', label: { ru: 'Небесный',              kz: 'Аспан',            eng: 'Sky' } },
@@ -52,7 +52,7 @@ export function loadTheme(): ThemeId {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && THEMES.some(t => t.id === saved)) return saved as ThemeId;
   } catch { /* localStorage blocked */ }
-  return 'black';
+  return 'emerald';
 }
 
 export function saveTheme(id: ThemeId) {
