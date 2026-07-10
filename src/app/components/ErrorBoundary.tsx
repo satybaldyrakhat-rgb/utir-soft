@@ -13,6 +13,26 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
   componentDidCatch(error: Error) {
     // Surface in console for debugging; production crash details still log.
     console.error('Render crash caught by ErrorBoundary:', error);
+
+    // Deploy-cache recovery: сразу после нового деплоя уже открытая (или
+    // закешированная) вкладка ссылается на chunk-файлы, которых больше нет на
+    // сервере → динамический import падает. Это не баг кода, а устаревший кеш,
+    // поэтому один раз тихо перезагружаемся, чтобы подтянуть свежий index +
+    // chunks. Ловим только ошибки загрузки модулей (реальные краши рендера так
+    // не выглядят и продолжают показывать экран). Guard по времени — чтобы не
+    // уйти в цикл перезагрузок, если что-то не так.
+    const msg = String((error && error.message) || '');
+    const isChunkError = /dynamically imported module|Loading chunk|ChunkLoadError|module script failed|Failed to fetch/i.test(msg);
+    if (isChunkError) {
+      try {
+        const key = 'utir-chunk-reload-at';
+        const last = Number(sessionStorage.getItem(key) || 0);
+        if (Date.now() - last > 10000) {
+          sessionStorage.setItem(key, String(Date.now()));
+          window.location.reload();
+        }
+      } catch { /* sessionStorage недоступен — просто покажем экран ошибки */ }
+    }
   }
 
   render() {
