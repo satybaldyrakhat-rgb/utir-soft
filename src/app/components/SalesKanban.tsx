@@ -442,6 +442,66 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                 <Download className="w-3.5 h-3.5" />
                 {l('Экспорт', 'Экспорт', 'Export')}
               </button>
+              <button
+                onClick={() => {
+                  // Собираем уникальных клиентов из сделок. Ключ — нормализованный
+                  // телефон, а если телефона нет — имя в нижнем регистре.
+                  type ClientAgg = {
+                    name: string; phone: string; address: string;
+                    orders: number; total: number; paid: number;
+                    sources: Set<string>; products: Set<string>;
+                    first: string; last: string;
+                  };
+                  const map = new Map<string, ClientAgg>();
+                  for (const d of store.deals) {
+                    // Нормализуем телефон по последним 10 цифрам, чтобы +7 700… и
+                    // 8 700… (один и тот же KZ-номер) склеивались в одного клиента.
+                    const digits = (d.phone || '').replace(/\D/g, '');
+                    const norm = digits.length >= 10 ? digits.slice(-10) : digits;
+                    const key = norm || (d.customerName || '').trim().toLowerCase();
+                    if (!key) continue;
+                    let c = map.get(key);
+                    if (!c) {
+                      c = { name: d.customerName || '', phone: d.phone || '', address: d.address || '',
+                        orders: 0, total: 0, paid: 0, sources: new Set(), products: new Set(),
+                        first: d.createdAt || '', last: d.createdAt || '' };
+                      map.set(key, c);
+                    }
+                    c.orders += 1;
+                    c.total += Number(d.amount) || 0;
+                    c.paid += Number(d.paidAmount) || 0;
+                    if (d.source) c.sources.add(d.source);
+                    if (d.product) c.products.add(d.product);
+                    if (!c.name && d.customerName) c.name = d.customerName;
+                    if (!c.address && d.address) c.address = d.address;
+                    if (d.createdAt) {
+                      if (!c.first || d.createdAt < c.first) c.first = d.createdAt;
+                      if (!c.last || d.createdAt > c.last) c.last = d.createdAt;
+                    }
+                  }
+                  const clients = Array.from(map.values()).sort((a, b) => b.total - a.total);
+                  const fmtDate = (iso: string) => (iso ? iso.slice(0, 10) : '');
+                  const cols: CsvColumn<ClientAgg>[] = [
+                    { header: 'Клиент',          value: 'name' },
+                    { header: 'Телефон',         value: 'phone' },
+                    { header: 'Адрес',           value: 'address' },
+                    { header: 'Заказов',         value: 'orders' },
+                    { header: 'Сумма',           value: 'total' },
+                    { header: 'Оплачено',        value: 'paid' },
+                    { header: 'Долг',            value: (c) => c.total - c.paid },
+                    { header: 'Источники',       value: (c) => Array.from(c.sources).join(' / ') },
+                    { header: 'Продукты',        value: (c) => Array.from(c.products).join(' / ') },
+                    { header: 'Первый заказ',    value: (c) => fmtDate(c.first) },
+                    { header: 'Последний заказ', value: (c) => fmtDate(c.last) },
+                  ];
+                  downloadCsv(todayStampedName('clients'), rowsToCsv(clients, cols));
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs text-slate-600 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl transition-all"
+                title={l('Экспорт уникальных клиентов в CSV (Excel)', 'Клиенттерді CSV-ге жүктеу', 'Export unique clients to CSV')}
+              >
+                <Users className="w-3.5 h-3.5" />
+                {l('Клиенты', 'Клиенттер', 'Clients')}
+              </button>
               {canWrite && (
                 <button
                   onClick={() => setShowImport(true)}
