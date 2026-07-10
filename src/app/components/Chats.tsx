@@ -7,12 +7,17 @@ import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
 import { NicheIcon } from './NicheIcon';
 import { toast } from '../utils/toast';
+import { api } from '../utils/api';
 
 interface Message {
   id: string;
   text: string;
   time: string;
   isUser: boolean;
+  // 'out' — написали мы (команда), 'in' — входящее от клиента. Управляет
+  // выравниванием пузыря; isUser выводится из него для ChatMessageTypes.
+  direction?: 'in' | 'out';
+  createdAt?: string;
   read?: boolean;
   type?: 'text' | 'voice' | 'file' | 'image' | 'video' | 'call';
   fileUrl?: string;
@@ -33,9 +38,6 @@ interface Chat {
   messages: Message[];
   orderId?: string;
 }
-
-// Chats start empty — populated only when real messengers are connected via Settings → Integrations.
-const mockChats: Chat[] = [];
 
 interface ChatsProps { language: 'kz' | 'ru' | 'eng'; }
 
@@ -120,10 +122,18 @@ export function Chats({ language }: ChatsProps) {
                  'Hi! We noticed our chat got interrupted. Can we help you with your choice? 😊'),
   });
 
-  const [chats] = useState<Chat[]>(mockChats);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [loadingChats, setLoadingChats] = useState(true);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [newMessage, setNewMessage] = useState('');
+  // «Новый диалог» — форма создания треда в командном инбоксе.
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [ncName, setNcName] = useState('');
+  const [ncPlatform, setNcPlatform] = useState<Chat['platform']>('telegram');
+  const [ncFirstMessage, setNcFirstMessage] = useState('');
+  const [ncSaving, setNcSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlatforms, setSelectedPlatforms] = useState<Chat['platform'][]>([]);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
@@ -171,44 +181,138 @@ export function Chats({ language }: ChatsProps) {
   // caption so the user just clicks Send.
   const dropPendingShare = (chat: Chat) => {
     if (!pendingShare) return;
-    setMessages(prev => [
-      ...prev,
-      {
-        id: String(Date.now()) + '-share',
-        text: '',
-        time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-        isUser: false,
-        read: false,
-        type: 'image',
-        fileUrl: pendingShare.imageUrl,
-        fileName: `concept-${pendingShare.provider || 'design'}.png`,
-      },
-    ]);
-    if (pendingShare.caption) setNewMessage(pendingShare.caption);
+    const share = pendingShare;
     setPendingShare(null);
     setShareBanner('');
+    if (share.caption) setNewMessage(share.caption);
+    // Persist the shared concept as an outgoing image in this thread.
+    api.post<{ message: any; conversation: any }>(`/api/conversations/${chat.id}/messages`, {
+      direction: 'out', type: 'image', text: '',
+      fileUrl: share.imageUrl, fileName: `concept-${share.provider || 'design'}.png`,
+    }).then(res => {
+      setMessages(prev => [...prev, mapMsg(res.message)]);
+      setChats(prev => prev.map(c => c.id === chat.id
+        ? { ...c, lastMessage: res.conversation?.lastMessage || '📷 Фото', time: fmtTime(res.conversation?.lastMessageAt) }
+        : c));
+    }).catch(() => { /* ignore */ });
   };
+
+  // ─── Backend wiring (командный инбокс) ──────────────────────────
+  // Диалоги и сообщения хранятся на сервере (per-team). Список грузим
+  // на входе; сообщения — лениво при открытии диалога.
+  const fmtTime = (iso?: string): string => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString(language === 'eng' ? 'en-GB' : 'ru-RU', { hour: '2-digit', minute: '2-digit' });
+  };
+  // Бэкенд-сообщение → форма для ChatMessageTypes. direction управляет
+  // выравниванием; isUser=(входящее) отдаёт компонентам правильный стиль
+  // (наши — цветной пузырь справа с галочками, клиента — белый слева).
+  const mapMsg = (m: any): Message => ({
+    id: m.id,
+    text: m.text || '',
+    time: fmtTime(m.createdAt),
+    createdAt: m.createdAt,
+    direction: m.direction === 'in' ? 'in' : 'out',
+    // isUser=true → «наше» сообщение (справа, изумрудный пузырь, галочки).
+    isUser: (m.direction || 'out') === 'out',
+    read: m.read,
+    type: m.type || 'text',
+    fileUrl: m.fileUrl, fileName: m.fileName, fileSize: m.fileSize,
+    duration: m.duration, callStatus: m.callStatus,
+  });
+  const mapConv = (c: any): Chat => ({
+    id: c.id,
+    name: c.name || l('Без имени', 'Атауы жоқ', 'Untitled'),
+    lastMessage: c.lastMessage || '',
+    time: fmtTime(c.lastMessageAt || c.createdAt),
+    platform: (['whatsapp', 'instagram', 'telegram', 'tiktok'].includes(c.platform) ? c.platform : 'telegram') as Chat['platform'],
+    online: !!c.online,
+    unreadCount: c.unreadCount || 0,
+    messages: [],
+    orderId: c.orderId,
+  });
+
+  const refreshChats = async () => {
+    try {
+      const rows = await api.get<any[]>('/api/conversations');
+      setChats(rows.map(mapConv));
+    } catch { /* сеть/доступ — оставляем текущий список */ }
+    finally { setLoadingChats(false); }
+  };
+
+  useEffect(() => {
+    if (chatsLevel === 'none') { setLoadingChats(false); return; }
+    refreshChats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const platformDot = (p: Chat['platform']) => <PlatformIcon platform={p} size="sm" />;
   const platformName = (p: Chat['platform']) => ({ whatsapp: 'WhatsApp', instagram: 'Instagram', telegram: 'Telegram', tiktok: 'TikTok' }[p]);
   const platformBadge = (p: Chat['platform']) => ({ whatsapp: 'bg-green-50 text-green-700 border-green-200', instagram: 'bg-pink-50 text-pink-700 border-pink-200', telegram: 'bg-blue-50 text-blue-700 border-blue-200', tiktok: 'bg-gray-50 text-slate-700 border-gray-200' }[p]);
 
-  const handleChatSelect = (chat: Chat) => {
+  const handleChatSelect = async (chat: Chat) => {
     setSelectedChat(chat);
-    setMessages(chat.messages);
-    // If AIDesign handed us a concept while we were on the list — drop
-    // it into this chat as the first thing the user sees.
-    if (pendingShare) {
-      // Defer one tick so the messages state update from this same call
-      // doesn't race the share-drop.
-      setTimeout(() => dropPendingShare(chat), 0);
+    setMessages([]);
+    setLoadingMessages(true);
+    try {
+      const rows = await api.get<any[]>(`/api/conversations/${chat.id}/messages`);
+      setMessages(rows.map(mapMsg));
+    } catch { /* сеть — покажем пустой тред */ }
+    finally { setLoadingMessages(false); }
+    // Открытие диалога сбрасывает счётчик непрочитанных.
+    if (chat.unreadCount && chat.unreadCount > 0) {
+      setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unreadCount: 0 } : c));
+      api.patch(`/api/conversations/${chat.id}`, { unreadCount: 0 }).catch(() => { /* ignore */ });
+    }
+    // Если AIDesign передал концепт, пока мы были в списке — вставляем его
+    // в этот диалог первым делом (после того как загрузили историю).
+    if (pendingShare) setTimeout(() => dropPendingShare(chat), 0);
+  };
+
+  // Отправка нашего (исходящего) сообщения: оптимистично добавляем в тред
+  // и синхронизируем превью в списке диалогов из ответа сервера.
+  const postMessage = async (payload: Partial<Message> & { text?: string }) => {
+    if (!selectedChat || !canWrite) return;
+    const convId = selectedChat.id;
+    try {
+      const res = await api.post<{ message: any; conversation: any }>(`/api/conversations/${convId}/messages`, { direction: 'out', ...payload });
+      setMessages(prev => [...prev, mapMsg(res.message)]);
+      setChats(prev => prev.map(c => c.id === convId
+        ? { ...c, lastMessage: res.conversation?.lastMessage || '', time: fmtTime(res.conversation?.lastMessageAt) }
+        : c));
+    } catch {
+      toast(l('Не удалось отправить', 'Жіберілмеді', 'Could not send'));
     }
   };
   const handleSendMessage = () => {
-    if (newMessage.trim() && selectedChat) {
-      setMessages([...messages, { id: String(Date.now()), text: newMessage, time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), isUser: false, read: false }]);
-      setNewMessage('');
-    }
+    const text = newMessage.trim();
+    if (!text || !selectedChat) return;
+    setNewMessage('');
+    postMessage({ text, type: 'text' });
+  };
+
+  // Создание нового диалога. Опциональное первое сообщение считается
+  // входящим (от клиента), чтобы тред сразу выглядел как переписка.
+  const createConversation = async () => {
+    const name = ncName.trim();
+    if (!name) { toast(l('Введите имя контакта', 'Байланыс атын енгізіңіз', 'Enter a contact name')); return; }
+    setNcSaving(true);
+    try {
+      const conv = await api.post<any>('/api/conversations', { name, platform: ncPlatform });
+      const first = ncFirstMessage.trim();
+      if (first) {
+        await api.post(`/api/conversations/${conv.id}/messages`, { direction: 'in', type: 'text', text: first, senderName: name });
+      }
+      await refreshChats();
+      setShowNewChat(false); setNcName(''); setNcFirstMessage(''); setNcPlatform('telegram');
+      handleChatSelect(mapConv({ ...conv, lastMessage: first, lastMessageAt: new Date().toISOString() }));
+    } catch (e: any) {
+      toast(String(e?.message || '').includes('read-only')
+        ? l('Только просмотр для вашей роли', 'Сіздің рөлге тек көру', 'View-only for your role')
+        : l('Не удалось создать диалог', 'Диалог құрылмады', 'Could not create dialog'));
+    } finally { setNcSaving(false); }
   };
   const togglePlatform = (p: Chat['platform']) => setSelectedPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
   const filteredChats = chats.filter(c => {
@@ -220,16 +324,16 @@ export function Chats({ language }: ChatsProps) {
 
   const handleSendFile = (type: 'document' | 'image' | 'video') => {
     const d = { document: { fileName: 'Договор.pdf', fileSize: '1.2 MB', type: 'file' as const }, image: { fileName: 'Дизайн.jpg', fileUrl: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=600', type: 'image' as const }, video: { fileName: 'Обзор.mp4', fileSize: '5.8 MB', type: 'video' as const } }[type];
-    setMessages([...messages, { id: String(Date.now()), text: '', time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), isUser: false, read: false, ...d }]);
     setShowAttachmentMenu(false);
+    postMessage({ type: d.type, text: '', fileName: d.fileName, fileSize: (d as any).fileSize, fileUrl: (d as any).fileUrl });
   };
   const startRecording = () => { setIsRecording(true); setRecordingDuration(0); const i = setInterval(() => setRecordingDuration(p => p + 1), 1000); (window as any).recInt = i; };
   const stopRecording = () => { clearInterval((window as any).recInt); setIsRecording(false); };
-  const sendVoiceMessage = () => { setMessages([...messages, { id: String(Date.now()), text: '', time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), isUser: false, read: false, type: 'voice', duration: `0:${recordingDuration.toString().padStart(2, '0')}` }]); stopRecording(); setRecordingDuration(0); };
+  const sendVoiceMessage = () => { postMessage({ type: 'voice', text: '', duration: `0:${recordingDuration.toString().padStart(2, '0')}` }); stopRecording(); setRecordingDuration(0); };
   const cancelRecording = () => { stopRecording(); setRecordingDuration(0); };
   const toggleVoicePlay = (id: string) => { if (playingVoiceId === id) setPlayingVoiceId(null); else { setPlayingVoiceId(id); setTimeout(() => setPlayingVoiceId(null), 3000); } };
   const startCall = () => { setShowCallModal(true); setIsInCall(false); setCallDuration(0); setTimeout(() => { setIsInCall(true); const i = setInterval(() => setCallDuration(p => p + 1), 1000); (window as any).callInt = i; }, 2000); };
-  const endCall = () => { clearInterval((window as any).callInt); setMessages([...messages, { id: String(Date.now()), text: translations.call[language], time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), isUser: false, read: false, type: 'call', callStatus: 'outgoing', duration: `${Math.floor(callDuration / 60)}:${(callDuration % 60).toString().padStart(2, '0')}` }]); setShowCallModal(false); setIsInCall(false); setCallDuration(0); };
+  const endCall = () => { clearInterval((window as any).callInt); postMessage({ type: 'call', text: translations.call[language], callStatus: 'outgoing', duration: `${Math.floor(callDuration / 60)}:${(callDuration % 60).toString().padStart(2, '0')}` }); setShowCallModal(false); setIsInCall(false); setCallDuration(0); };
   const formatDuration = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
   const tabItems = [
@@ -239,7 +343,7 @@ export function Chats({ language }: ChatsProps) {
   ];
 
   const Toggle = ({ value, onChange }: { value: boolean; onChange: () => void }) => (
-    <button onClick={onChange} className={`relative w-10 h-5 rounded-full transition-colors ${value ? 'bg-gray-900' : 'bg-gray-200'}`}>
+    <button onClick={onChange} className={`relative w-10 h-5 rounded-full transition-colors ${value ? 'bg-emerald-600' : 'bg-gray-200'}`}>
       <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-5' : ''}`} />
     </button>
   );
@@ -332,36 +436,53 @@ export function Chats({ language }: ChatsProps) {
                   <input type="text" placeholder={l('Поиск...', 'Іздеу...', 'Search...')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
                 </div>
                 <div className="flex gap-1 overflow-x-auto pb-0.5">
-                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(false); }} className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-all ${selectedPlatforms.length === 0 && !showUnreadOnly ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-400'}`}>{l('Все', 'Бәрі', 'All')} {chats.length}</button>
-                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(true); }} className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-all ${showUnreadOnly ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-400'}`}>{l('Новые', 'Жаңа', 'New')} {chats.filter(c => c.unreadCount).length}</button>
+                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(false); }} className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-all ${selectedPlatforms.length === 0 && !showUnreadOnly ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-400'}`}>{l('Все', 'Бәрі', 'All')} {chats.length}</button>
+                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(true); }} className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-all ${showUnreadOnly ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-400'}`}>{l('Новые', 'Жаңа', 'New')} {chats.filter(c => c.unreadCount).length}</button>
                   {(['whatsapp', 'telegram', 'instagram'] as Chat['platform'][]).map(p => (
-                    <button key={p} onClick={() => togglePlatform(p)} className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap flex items-center gap-1 transition-all ${selectedPlatforms.includes(p) ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-400'}`}>{platformDot(p)} {platformName(p)?.slice(0, 2)}</button>
+                    <button key={p} onClick={() => togglePlatform(p)} className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap flex items-center gap-1 transition-all ${selectedPlatforms.includes(p) ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-400'}`}>{platformDot(p)} {platformName(p)?.slice(0, 2)}</button>
                   ))}
                 </div>
+                {canWrite && (
+                  <button onClick={() => setShowNewChat(true)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_var(--accent-shadow)] transition-all">
+                    <Plus className="w-3.5 h-3.5" /> {l('Новый диалог', 'Жаңа диалог', 'New chat')}
+                  </button>
+                )}
               </div>
               <div className="flex-1 overflow-y-auto">
-                {filteredChats.length === 0 ? (
+                {loadingChats ? (
+                  <div className="p-3 space-y-2">
+                    {[0, 1, 2, 3].map(i => <div key={i} className="h-16 bg-white/50 rounded-2xl animate-pulse" />)}
+                  </div>
+                ) : filteredChats.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full p-8 text-center">
                     <MessageCircle className="w-10 h-10 text-gray-200 mb-3" />
                     <p className="text-sm text-slate-700 mb-1">
                       {chats.length === 0
-                        ? l('Подключите мессенджеры', 'Мессенджерлерді қосыңыз', 'Connect messengers')
+                        ? l('Пока нет диалогов', 'Әзірге диалог жоқ', 'No conversations yet')
                         : l('Чатов не найдено', 'Чаттар табылмады', 'No chats found')}
                     </p>
                     {chats.length === 0 ? (
                       <>
                         <p className="text-[11px] text-slate-400 max-w-[240px] leading-relaxed mb-3">
                           {l(
-                            'WhatsApp, Instagram, Telegram — заявки клиентов из всех каналов в одной ленте.',
-                            'WhatsApp, Instagram, Telegram — клиенттердің барлық арналары бір лентада.',
-                            'WhatsApp, Instagram, Telegram — leads from all channels in one feed.',
+                            'Создайте первый диалог с клиентом — вся переписка сохраняется и видна всей команде.',
+                            'Клиентпен бірінші диалогты бастаңыз — жазысу сақталып, бүкіл командаға көрінеді.',
+                            'Start the first client conversation — the whole thread is saved and shared with your team.',
                           )}
                         </p>
+                        {canWrite && (
+                          <button
+                            onClick={() => setShowNewChat(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[11px] hover:bg-emerald-700 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_var(--accent-shadow)] transition-all mb-2"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> {l('Новый диалог', 'Жаңа диалог', 'New chat')}
+                          </button>
+                        )}
                         <button
                           onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'settings', tab: 'integrations' } }))}
-                          className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[11px] hover:bg-emerald-700 ring-1 ring-white/10 transition-all"
+                          className="text-[11px] text-slate-400 hover:text-slate-700 transition-colors"
                         >
-                          {l('Открыть Интеграции', 'Интеграциялар', 'Open Integrations')}
+                          {l('или подключить мессенджеры →', 'немесе мессенджерлерді қосу →', 'or connect messengers →')}
                         </button>
                       </>
                     ) : (
@@ -382,9 +503,9 @@ export function Chats({ language }: ChatsProps) {
                         </div>
                         <div className="flex items-center justify-between">
                           <p className="text-xs text-slate-400 truncate flex-1">{chat.lastMessage}</p>
-                          {chat.unreadCount && chat.unreadCount > 0 && (
-                            <span className="ml-2 min-w-[18px] h-[18px] bg-gray-900 rounded-full flex items-center justify-center text-[10px] text-white px-1">{chat.unreadCount}</span>
-                          )}
+                          {chat.unreadCount ? (
+                            <span className="ml-2 min-w-[18px] h-[18px] bg-emerald-600 rounded-full flex items-center justify-center text-[10px] text-white px-1">{chat.unreadCount}</span>
+                          ) : null}
                         </div>
                         <div className="mt-1 flex items-center gap-1">{platformDot(chat.platform)}<span className="text-[10px] text-slate-300">{platformName(chat.platform)}</span></div>
                       </div>
@@ -437,7 +558,7 @@ export function Chats({ language }: ChatsProps) {
                     <div className="mb-2 max-w-3xl mx-auto bg-red-50 rounded-xl px-4 py-2.5 flex items-center gap-3">
                       <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                       <span className="text-xs text-red-600 flex-1">{l('Запись', 'Жазу', 'Recording')} {formatDuration(recordingDuration)}</span>
-                      <button onClick={sendVoiceMessage} className="px-3 py-1 bg-gray-900 text-white rounded-lg text-xs">{l('Отправить', 'Жіберу', 'Send')}</button>
+                      <button onClick={sendVoiceMessage} className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs">{l('Отправить', 'Жіберу', 'Send')}</button>
                       <button onClick={cancelRecording} className="px-3 py-1 bg-white text-gray-600 rounded-lg text-xs border border-gray-200">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
                     </div>
                   )}
@@ -463,7 +584,7 @@ export function Chats({ language }: ChatsProps) {
                       style={{ minHeight: '38px', maxHeight: '100px' }}
                     />
                     <button onClick={isRecording ? stopRecording : startRecording} disabled={!canWrite} className={`p-2 rounded-lg transition-all ${isRecording ? 'bg-red-500 text-white' : 'hover:bg-white/50 text-gray-400'} disabled:opacity-40 disabled:cursor-not-allowed`}>{isRecording ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}</button>
-                    <button onClick={handleSendMessage} disabled={!newMessage.trim() || !canWrite} className={`p-2 rounded-lg transition-all ${newMessage.trim() && canWrite ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-300'}`}><Send className="w-4 h-4" /></button>
+                    <button onClick={handleSendMessage} disabled={!newMessage.trim() || !canWrite} className={`p-2 rounded-lg transition-all ${newMessage.trim() && canWrite ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-300'}`}><Send className="w-4 h-4" /></button>
                   </div>
                 </div>
               </div>
@@ -496,7 +617,7 @@ export function Chats({ language }: ChatsProps) {
                   ['agent',     l('AI-агент', 'AI-агент', 'AI Agent')],
                   ['scenarios', l('Сценарии Instagram', 'Instagram сценарийлері', 'Instagram scenarios')],
                 ] as [typeof aiAgentSubTab, string][]).map(([id, label]) => (
-                  <button key={id} onClick={() => setAiAgentSubTab(id)} className={`px-4 py-2 rounded-xl text-xs transition-all ${aiAgentSubTab === id ? 'bg-gray-900 text-white' : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-400 hover:text-gray-600'}`}>{label}</button>
+                  <button key={id} onClick={() => setAiAgentSubTab(id)} className={`px-4 py-2 rounded-xl text-xs transition-all ${aiAgentSubTab === id ? 'bg-emerald-600 text-white' : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-400 hover:text-gray-600'}`}>{label}</button>
                 ))}
               </div>
 
@@ -769,6 +890,59 @@ export function Chats({ language }: ChatsProps) {
             <div className="text-sm text-slate-900 mb-1">{selectedChat?.name}</div>
             <div className="text-xs text-slate-400 mb-4">{isInCall ? formatDuration(callDuration) : l('Вызов...', 'Қоңырау...', 'Calling...')}</div>
             <button onClick={endCall} className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mx-auto hover:bg-red-600"><Phone className="w-5 h-5 text-white rotate-[135deg]" /></button>
+          </div>
+        </div>
+      )}
+
+      {/* New-conversation modal — creates a shared team thread. */}
+      {showNewChat && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => !ncSaving && setShowNewChat(false)}>
+          <div
+            className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md p-6 shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg text-slate-900 tracking-tight">{l('Новый диалог', 'Жаңа диалог', 'New conversation')}</h2>
+              <button onClick={() => !ncSaving && setShowNewChat(false)} className="w-8 h-8 bg-white/60 hover:bg-white ring-1 ring-white/60 rounded-2xl flex items-center justify-center transition-colors"><X className="w-4 h-4 text-slate-500" /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] text-slate-500 mb-1.5">{l('Имя контакта', 'Байланыс аты', 'Contact name')}</label>
+                <input
+                  autoFocus value={ncName} onChange={e => setNcName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !ncFirstMessage && createConversation()}
+                  placeholder={l('Напр. Айгерім (кухня)', 'Мыс. Айгерім (ас үй)', 'e.g. Aigerim (kitchen)')}
+                  className="w-full px-4 py-3 bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm text-slate-800 focus:outline-none focus:bg-white/80 focus:ring-2 focus:ring-emerald-500/40 placeholder:text-slate-400 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-500 mb-1.5">{l('Канал', 'Арна', 'Channel')}</label>
+                <div className="flex gap-1.5">
+                  {(['whatsapp', 'telegram', 'instagram', 'tiktok'] as Chat['platform'][]).map(p => (
+                    <button
+                      key={p} onClick={() => setNcPlatform(p)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-2xl text-[11px] ring-1 transition-all ${ncPlatform === p ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_6px_18px_-8px_var(--accent-shadow)]' : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80'}`}
+                    >
+                      {platformDot(p)} {platformName(p)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-500 mb-1.5">{l('Первое сообщение от клиента (необязательно)', 'Клиенттің алғашқы хабары (міндетті емес)', "Client's first message (optional)")}</label>
+                <textarea
+                  value={ncFirstMessage} onChange={e => setNcFirstMessage(e.target.value)} rows={2}
+                  placeholder={l('Здравствуйте! Интересует кухня…', 'Сәлеметсіз бе! Ас үй қызықтырады…', 'Hi! I am interested in a kitchen…')}
+                  className="w-full px-4 py-3 bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm text-slate-800 focus:outline-none focus:bg-white/80 focus:ring-2 focus:ring-emerald-500/40 placeholder:text-slate-400 transition-all resize-none"
+                />
+              </div>
+              <button
+                onClick={createConversation} disabled={ncSaving || !ncName.trim()}
+                className="w-full py-3 mt-1 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {ncSaving ? l('Создание…', 'Құрылуда…', 'Creating…') : <>{l('Создать диалог', 'Диалог құру', 'Create conversation')} <ArrowRight className="w-4 h-4" /></>}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -239,6 +239,30 @@ CREATE TABLE IF NOT EXISTS ai_chat_sessions (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ai_chat_sessions_user ON ai_chat_sessions(user_id);
+
+-- Чаты (внутренний инбокс). Диалог = разговор с клиентом/контактом,
+-- общий для всей команды. data JSON: { name, platform, orderId?, avatar?,
+-- lastMessage, lastMessageAt, unreadCount, online }.
+CREATE TABLE IF NOT EXISTS conversations (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_conversations_team ON conversations(team_id);
+
+-- Сообщения внутри диалога. data JSON: { text, type, direction:'in'|'out',
+-- senderName, fileUrl?, fileName?, fileSize?, duration?, read, createdAt }.
+CREATE TABLE IF NOT EXISTS messages (
+  id TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL,
+  team_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
 `);
 
 // Idempotent migration: add columns if missing. Returns true when column was just added.
@@ -1575,6 +1599,103 @@ app.post('/api/deals/:id/history/:entryId/rollback', authMiddleware, requirePerm
   // Webhook fan-out so external systems learn about the rollback too.
   emitEvent(req.teamId!, 'deal.updated', { dealId: req.params.id, changes: rollbackDiff, deal: updated, rolledBackFrom: req.params.entryId });
   res.json({ ok: true, changes: rollbackDiff, deal: updated });
+});
+
+// ─── ЧАТЫ: диалоги + сообщения (внутренний командный инбокс) ──────
+// Диалоги общие для всей команды (team_id). Права — по модулю 'chats':
+// view = читать, full = писать/создавать/удалять. Сообщения лежат в
+// отдельной таблице и грузятся по conversation_id, чтобы не тащить всю
+// переписку сразу. direction: 'out' — написали мы, 'in' — входящее.
+app.get('/api/conversations', authMiddleware, requirePermission('chats'), (req: AuthedRequest, res) => {
+  const rows = db.prepare('SELECT id, data FROM conversations WHERE team_id = ?').all(req.teamId!) as any[];
+  const list = rows.map(r => ({ ...JSON.parse(r.data), id: r.id }));
+  // Свежие диалоги сверху — по времени последнего сообщения.
+  list.sort((a, b) => String(b.lastMessageAt || '').localeCompare(String(a.lastMessageAt || '')));
+  res.json(list);
+});
+
+app.post('/api/conversations', authMiddleware, requirePermission('chats'), (req: AuthedRequest, res) => {
+  const body = req.body || {};
+  const id = body.id || newId('c');
+  const now = new Date().toISOString();
+  const data = {
+    name: String(body.name || 'Без имени').slice(0, 120),
+    platform: body.platform || 'telegram',
+    orderId: body.orderId || undefined,
+    avatar: body.avatar || undefined,
+    online: false,
+    unreadCount: 0,
+    lastMessage: body.lastMessage || '',
+    lastMessageAt: body.lastMessageAt || now,
+    createdAt: now,
+    ...body, id,
+  };
+  db.prepare('INSERT INTO conversations (id, team_id, user_id, data) VALUES (?, ?, ?, ?)')
+    .run(id, req.teamId!, req.userId!, JSON.stringify(data));
+  res.json(data);
+});
+
+app.patch('/api/conversations/:id', authMiddleware, requirePermission('chats'), (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT data FROM conversations WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  const updated = { ...JSON.parse(row.data), ...req.body, id: req.params.id };
+  db.prepare('UPDATE conversations SET data = ? WHERE id = ? AND team_id = ?')
+    .run(JSON.stringify(updated), req.params.id, req.teamId!);
+  res.json(updated);
+});
+
+app.delete('/api/conversations/:id', authMiddleware, requirePermission('chats'), (req: AuthedRequest, res) => {
+  db.prepare('DELETE FROM messages WHERE conversation_id = ? AND team_id = ?').run(req.params.id, req.teamId!);
+  db.prepare('DELETE FROM conversations WHERE id = ? AND team_id = ?').run(req.params.id, req.teamId!);
+  res.json({ ok: true });
+});
+
+app.get('/api/conversations/:id/messages', authMiddleware, requirePermission('chats'), (req: AuthedRequest, res) => {
+  const conv = db.prepare('SELECT id FROM conversations WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!);
+  if (!conv) return res.status(404).json({ error: 'not found' });
+  const rows = db.prepare('SELECT id, data FROM messages WHERE conversation_id = ? AND team_id = ? ORDER BY rowid ASC').all(req.params.id, req.teamId!) as any[];
+  res.json(rows.map(r => ({ ...JSON.parse(r.data), id: r.id })));
+});
+
+app.post('/api/conversations/:id/messages', authMiddleware, requirePermission('chats'), (req: AuthedRequest, res) => {
+  const conv = db.prepare('SELECT data FROM conversations WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
+  if (!conv) return res.status(404).json({ error: 'not found' });
+  const body = req.body || {};
+  const id = body.id || newId('m');
+  const now = new Date().toISOString();
+  const direction = body.direction === 'in' ? 'in' : 'out';
+  const msg = {
+    text: String(body.text || ''),
+    type: body.type || 'text',
+    direction,
+    senderName: body.senderName || undefined,
+    fileUrl: body.fileUrl || undefined,
+    fileName: body.fileName || undefined,
+    fileSize: body.fileSize || undefined,
+    duration: body.duration || undefined,
+    read: direction === 'out',
+    createdAt: now,
+    ...body, id, direction,
+  };
+  db.prepare('INSERT INTO messages (id, conversation_id, team_id, user_id, data) VALUES (?, ?, ?, ?, ?)')
+    .run(id, req.params.id, req.teamId!, req.userId!, JSON.stringify(msg));
+  // Обновляем превью и счётчик непрочитанных в самом диалоге.
+  const prev = JSON.parse(conv.data);
+  const preview = msg.type === 'text' ? msg.text
+    : msg.type === 'image' ? '📷 Фото'
+    : msg.type === 'voice' ? '🎤 Голосовое'
+    : msg.type === 'file'  ? '📎 Файл'
+    : msg.type === 'call'  ? '📞 Звонок'
+    : msg.text;
+  const updatedConv = {
+    ...prev,
+    lastMessage: String(preview || '').slice(0, 140),
+    lastMessageAt: now,
+    unreadCount: direction === 'in' ? (prev.unreadCount || 0) + 1 : (prev.unreadCount || 0),
+  };
+  db.prepare('UPDATE conversations SET data = ? WHERE id = ? AND team_id = ?')
+    .run(JSON.stringify(updatedConv), req.params.id, req.teamId!);
+  res.json({ message: msg, conversation: updatedConv });
 });
 
 app.use('/api/deals', authMiddleware, requirePermission('orders'), makeCrud('deals', 'D'));

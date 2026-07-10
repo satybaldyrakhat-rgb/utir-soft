@@ -293,18 +293,7 @@ function AppContent() {
         // tabs at the top — same component we used to embed inside SalesKanban.
         return <PaymentsHub language={language} />;
       case 'chats':
-        return <ComingSoon
-          language={language}
-          title={language === 'kz' ? 'Чаттар' : language === 'eng' ? 'Chats' : 'Чаты'}
-          description={
-            language === 'kz'
-              ? 'WhatsApp Business, Instagram Direct, Telegram — барлық диалогтар бір терезеде. Қазір — Параметрлер → Интеграциялар арқылы қосыңыз.'
-              : language === 'eng'
-              ? 'WhatsApp Business, Instagram Direct, Telegram — all conversations in one window. Connect via Settings → Integrations.'
-              : 'WhatsApp Business, Instagram Direct, Telegram — все диалоги в одном окне. Пока — подключайте через Настройки → Интеграции.'
-          }
-          onBack={() => setCurrentPage('dashboard')}
-        />;
+        return <Chats language={language} />;
       case 'analytics':
         return <Analytics language={language} />;
       case 'tasks':
