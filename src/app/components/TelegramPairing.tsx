@@ -67,7 +67,7 @@ export function TelegramPairing({ language }: Props) {
   const serverIssue = status?.serverReady && (!status.serverReady.telegram || !status.serverReady.claude);
 
   return (
-    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
       <div className="flex items-center gap-2 mb-1">
         <Send className="w-4 h-4 text-emerald-600" />
         <div className="text-sm text-gray-900">{l('Подключение Telegram-бота', 'Telegram-ботты қосу', 'Connect Telegram bot')}</div>

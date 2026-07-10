@@ -212,7 +212,7 @@ export function CatalogsSettings({ language }: Props) {
       </div>
 
       {/* ─── Search ─────────────────────────────────────────────── */}
-      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-2 flex items-center gap-2">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-2 flex items-center gap-2">
         <Search className="w-3.5 h-3.5 text-gray-300 ml-2" />
         <input
           value={search}
@@ -251,7 +251,7 @@ export function CatalogsSettings({ language }: Props) {
           : all;
         const title = meta.titles[language];
         return (
-          <div key={meta.key} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+          <div key={meta.key} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-50 flex items-start justify-between gap-3 flex-wrap">
               <div className="flex items-start gap-3 min-w-0">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.cls}`}>

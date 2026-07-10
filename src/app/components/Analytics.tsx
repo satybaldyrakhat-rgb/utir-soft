@@ -343,7 +343,7 @@ export function Analytics({ language }: AnalyticsProps) {
     <div
       className="min-h-full relative"
     >
-    <div className="p-4 md:p-8 max-w-[1400px] mx-auto relative">
+    <div className="px-4 py-5 sm:p-6 lg:p-8 max-w-[1400px] mx-auto relative">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
         <div>
@@ -481,7 +481,7 @@ export function Analytics({ language }: AnalyticsProps) {
         // Empty-state hero — fresh user with no data sees a single CTA
         // card instead of a wall of zeroed KPIs + broken donut + zero-
         // width funnel that looks like a load error.
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
           <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-white/60 ring-1 ring-white/60 shadow-[0_8px_24px_-10px_rgba(15,23,42,0.18)] flex items-center justify-center text-slate-500"><NicheIcon niche={niche} className="w-7 h-7" /></div>
           <h2 className="text-xl text-slate-900 mb-2 tracking-tight">
             {l('Графики и метрики появятся автоматически', 'Графиктер мен метрикалар автоматты түрде шығады', 'Charts appear automatically')}
@@ -530,7 +530,7 @@ export function Analytics({ language }: AnalyticsProps) {
                 <button
                   key={i}
                   onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: card.page } }))}
-                  className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 text-left hover:bg-white/70 hover:shadow-lg transition-all"
+                  className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5 text-left hover:bg-white/70 hover:shadow-lg transition-all"
                   title={l('Перейти к деталям', 'Толығырақ көру', 'View details')}
                 >
                   <div className="flex items-center justify-between mb-4">
@@ -551,7 +551,7 @@ export function Analytics({ language }: AnalyticsProps) {
 
           {/* MoM — тренды месяц-к-месяцу. Ключевые метрики собственника
               «этот месяц vs прошлый» с динамикой ↑↓. */}
-          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 mb-6">
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5 mb-6">
             <div className="flex items-center gap-2 mb-5">
               <BarChart3 className="w-4 h-4 text-emerald-600" />
               <span className="text-sm text-gray-900">{l('Динамика месяц к месяцу', 'Айдан айға динамика', 'Month-over-month')}</span>
@@ -581,7 +581,7 @@ export function Analytics({ language }: AnalyticsProps) {
 
           {/* Niche breakdown — only for multi-niche teams */}
           {nicheBreakdown.length > 1 && (
-            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 mb-6">
+            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5 mb-6">
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <div className="text-sm text-gray-900 flex items-center gap-2">
@@ -638,7 +638,7 @@ export function Analytics({ language }: AnalyticsProps) {
           {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             {/* Revenue Area Chart */}
-            <div className="lg:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+            <div className="lg:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <div className="text-sm text-gray-900">
@@ -673,7 +673,7 @@ export function Analytics({ language }: AnalyticsProps) {
 
             {/* Product Types — Donut. Title is niche-aware so a windows
                 business doesn't see "Типы мебели" anywhere. */}
-            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
               <div className="text-sm text-gray-900 mb-4">
                 {niche.productTypeLabel[language]}
               </div>
@@ -726,7 +726,7 @@ export function Analytics({ language }: AnalyticsProps) {
               { n: ropStats.slow, label: l('Долго без реакции', 'Реакция жоқ', 'Slow response'), icon: Clock, cls: ropStats.slow > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-400' },
             ];
             return (
-              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 mb-6">
+              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4 mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2"><Target className="w-3.5 h-3.5 text-slate-500" strokeWidth={1.5} /><span className="text-sm text-gray-900">{l('Контроль РОПа', 'РОП бақылауы', 'Sales lead control')}</span></div>
                   <div className="text-[11px] text-gray-500">Win rate <b className="text-gray-900 tabular-nums">{ropStats.winRate}%</b> <span className="text-gray-400">({ropStats.won}/{ropStats.won + ropStats.lost})</span></div>
@@ -761,7 +761,7 @@ export function Analytics({ language }: AnalyticsProps) {
             return (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                 {cards.map((c, i) => (
-                  <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+                  <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
                     <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">{c.label}</div>
                     <div className="text-sm text-gray-900 tabular-nums">{c.value}</div>
                     {i === 3 && forecast.deptPlan > 0 && (
@@ -778,7 +778,7 @@ export function Analytics({ language }: AnalyticsProps) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             {/* Team performance — niche-neutral header (was "Эффективность мастеров"
                 which only made sense for furniture). */}
-            <div className="lg:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+            <div className="lg:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
               <div className="flex items-center justify-between mb-5">
                 <div className="text-sm text-gray-900">
                   {l('Эффективность команды', 'Команда тиімділігі', 'Team Performance')}
@@ -820,7 +820,7 @@ export function Analytics({ language }: AnalyticsProps) {
                   const planColor = planPct >= 80 ? 'bg-emerald-500' : planPct >= 40 ? 'bg-amber-400' : 'bg-red-400';
 
                   return (
-                    <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+                    <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
                       {/* Верхняя часть */}
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
@@ -841,7 +841,7 @@ export function Analytics({ language }: AnalyticsProps) {
                           </Dialog.Trigger>
                           <Dialog.Portal>
                             <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
-                            <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-6 w-[90vw] max-w-md z-50">
+                            <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-6 w-[90vw] max-w-md z-50">
                               <div className="flex items-start justify-between mb-4">
                                 <Dialog.Title className="text-base text-gray-900">
                                   {l('Профиль сотрудника', 'Қызметкер профилі', 'Employee profile')}: {master.name}
@@ -954,7 +954,7 @@ export function Analytics({ language }: AnalyticsProps) {
             </div>
 
             {/* Sources — empty state when no deals carry a source tag */}
-            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
               <div className="text-sm text-gray-900 mb-5">
                 {language === 'kz' ? 'Клиент көздері' : language === 'eng' ? 'Client Sources' : 'Источники клиентов'}
               </div>
@@ -1023,7 +1023,7 @@ export function Analytics({ language }: AnalyticsProps) {
               }
             }
             return (
-              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 mb-6">
+              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5 mb-6">
                 <div className="flex items-center justify-between mb-5">
                   <div>
                     <div className="text-sm text-gray-900">{l('Воронка: от показа до продажи', 'Воронка: көрсетуден сатылымға дейін', 'Funnel: from impression to sale')}</div>
@@ -1095,7 +1095,7 @@ export function Analytics({ language }: AnalyticsProps) {
           {/* Materials + Orders chart */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Orders mini chart */}
-            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
               <div className="flex items-center justify-between mb-5">
                 <div className="text-sm text-gray-900">
                   {language === 'kz' ? 'Ай бойынша тапсырыстар' : language === 'eng' ? 'Orders by Month' : 'Заказы по месяцам'}
@@ -1121,7 +1121,7 @@ export function Analytics({ language }: AnalyticsProps) {
             </div>
 
             {/* Popular Materials — empty state with Warehouse deeplink */}
-            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
               <div className="flex items-center justify-between mb-5">
                 <div className="text-sm text-gray-900">
                   {language === 'kz' ? 'Танымал материалдар' : language === 'eng' ? 'Popular Materials' : 'Популярные материалы'}
@@ -1198,7 +1198,7 @@ function TeamMetrics({ language }: { language: 'kz' | 'ru' | 'eng' }) {
 
   if (team.length === 0) {
     return (
-      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
         <Users className="w-10 h-10 text-gray-200 mx-auto mb-3" />
         <div className="text-sm text-gray-700 mb-1">
           {l('В команде пока никого', 'Командада әзірге ешкім жоқ', 'Team is empty')}
@@ -1281,7 +1281,7 @@ function TeamMetrics({ language }: { language: 'kz' | 'ru' | 'eng' }) {
           { label: l('Средняя конверсия','Орташа конверсия',       'Avg. conversion'),
             value: `${teamConversion}%`, icon: Percent },
         ].map((m, i) => (
-          <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] text-gray-400">{m.label}</span>
               <m.icon className="w-4 h-4 text-gray-300" />
@@ -1296,7 +1296,7 @@ function TeamMetrics({ language }: { language: 'kz' | 'ru' | 'eng' }) {
         {rows.map(r => {
           const tasksPercent = r.tasksTotal > 0 ? (r.tasksDone / r.tasksTotal) * 100 : 0;
           return (
-            <div key={r.emp.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+            <div key={r.emp.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-sm text-gray-600">
                   {r.emp.name?.charAt(0) || '?'}

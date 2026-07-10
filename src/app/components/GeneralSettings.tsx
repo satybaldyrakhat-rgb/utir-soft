@@ -508,7 +508,7 @@ function SectionCard({
   icon: Icon, cls, title, subtitle, children,
 }: { icon: any; cls: string; title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-50 flex items-start gap-3">
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${cls}`}>
           <Icon className="w-4 h-4" />

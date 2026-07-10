@@ -35,9 +35,10 @@ interface SalesKanbanProps {
   language: 'kz' | 'ru' | 'eng';
 }
 
-// Shared glass-card class — same vocabulary as Dashboard / AI Design.
-const GLASS_CARD = 'bg-white/65 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.12)] rounded-2xl';
-const GLASS_DEEP = 'bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl';
+// Shared glass-card class — same vocabulary as Dashboard / AI Design:
+// frosted fill + specular top-edge highlight over a layered shadow.
+const GLASS_CARD = 'bg-white/60 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_6px_20px_-10px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.6)] rounded-2xl';
+const GLASS_DEEP = 'bg-white/50 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl';
 
 // ─── Universal pipeline stages ───────────────────────────────────
 // Stages are the same across niches (the sales funnel doesn't change —
@@ -380,7 +381,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
     <>
       <div className="flex flex-col h-screen relative overflow-hidden">
         {/* ─── Header ─────────────────────────────────────────── */}
-        <div className="px-4 md:px-8 py-5 flex-shrink-0 relative">
+        <div className="px-4 sm:px-6 lg:px-8 py-5 flex-shrink-0 relative">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5">
             <div>
               <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">

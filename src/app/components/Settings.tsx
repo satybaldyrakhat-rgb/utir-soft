@@ -412,7 +412,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
     <div
       className="min-h-full relative"
     >
-    <div className="p-4 md:p-8 max-w-[1100px] mx-auto relative">
+    <div className="px-4 py-5 sm:p-6 lg:p-8 max-w-[1100px] mx-auto relative">
       {/* Header */}
       <div className="mb-7">
         <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Настройки', 'Баптаулар', 'Settings')}</p>
@@ -467,7 +467,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
           <TeamInvitePanel language={language} />
 
           {employees.length === 0 ? (
-            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
               <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Users className="w-6 h-6 text-gray-400" />
               </div>
@@ -526,11 +526,11 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
                   { label: l('Активны', 'Белсенді', 'Active'), value: employees.filter(e => e.status === 'active').length },
                   { label: tt('roleManager'), value: employees.filter(e => e.role === 'manager').length },
                   { label: tt('roleEmployee'), value: employees.filter(e => e.role === 'employee').length },
-                ].map((s, i) => <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4"><div className="text-[10px] text-gray-400 mb-2">{s.label}</div><div className="text-lg text-gray-900">{s.value}</div></div>)}
+                ].map((s, i) => <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4"><div className="text-[10px] text-gray-400 mb-2">{s.label}</div><div className="text-lg text-gray-900">{s.value}</div></div>)}
               </div>
 
               {/* Employee list */}
-              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl divide-y divide-gray-50">
+              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl divide-y divide-gray-50">
                 {filteredEmployees.map(emp => (
                   <div key={emp.id} className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50/50 transition-colors group">
                     <div className="relative flex-shrink-0">
@@ -571,7 +571,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
 
           {/* ===== Removed teammates (admin can restore access) ===== */}
           {removedEmployees.length > 0 && (
-            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+            <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
               <details>
                 <summary className="text-sm text-gray-900 cursor-pointer flex items-center justify-between select-none">
                   <span>{l('Удалённые сотрудники', 'Жойылған қызметкерлер', 'Removed teammates')}</span>
@@ -607,7 +607,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
           )}
 
           {/* ===== Role list (admin can rename / delete / add custom roles) ===== */}
-          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="text-sm text-gray-900">{l('Роли в команде', 'Командадағы рөлдер', 'Team roles')}</div>
               <AddRoleButton language={language} onAdd={(n) => store.addRole(n)} />
@@ -633,7 +633,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
           </div>
 
           {/* ===== Permissions matrix (merged from the old 'Роли и права' tab) ===== */}
-          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4 text-gray-400" />
@@ -773,7 +773,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
           <TelegramPairing language={language} />
 
           {/* Tone + Language */}
-          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <div className="text-sm text-gray-900 mb-3">{tt('aiClientTone')}</div>
               <div className="grid grid-cols-3 gap-2">
@@ -812,7 +812,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
           </div>
 
           {/* Per-module permissions */}
-          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
             <div className="text-sm text-gray-900 mb-1">{tt('aiAssistantPermissions')}</div>
             <div className="text-[11px] text-gray-400 mb-4">{tt('aiAssistantPermissionsHint')}</div>
             <div className="space-y-1.5">
@@ -847,7 +847,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
           </div>
 
           {/* Clarifying questions verbosity */}
-          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
             <div className="text-sm text-gray-900 mb-1">{tt('aiClarifying')}</div>
             <div className="text-[11px] text-gray-400 mb-3">{tt('aiClarifyingHint')}</div>
             <div className="space-y-1.5">
@@ -870,7 +870,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
           </div>
 
           {/* Interaction history placeholder */}
-          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
             <div className="text-sm text-gray-900 mb-1">{tt('aiAssistantHistory')}</div>
             <div className="text-[11px] text-gray-400 leading-relaxed">{tt('aiAssistantHistoryEmpty')}</div>
           </div>
@@ -1253,7 +1253,7 @@ function AiQuotasCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
   });
 
   return (
-    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
       <div className="flex items-center justify-between mb-1">
         <div className="text-sm text-gray-900">{l('Лимиты AI-генерации', 'AI-генерация лимиттері', 'AI generation limits')}</div>
         {dirty && (
@@ -1341,7 +1341,7 @@ function BrandKitCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
   };
 
   return (
-    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
       <div className="flex items-center justify-between mb-1">
         <div className="text-sm text-gray-900">{l('Бренд-стиль команды', 'Команда бренд-стилі', 'Team brand kit')}</div>
         {dirty && (
@@ -1615,7 +1615,7 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
     'deepseek';
 
   if (!loaded) return (
-    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 flex items-center justify-center text-gray-400 text-sm">
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-8 flex items-center justify-center text-gray-400 text-sm">
       <Loader2 className="w-4 h-4 animate-spin mr-2" /> {l('Загружаю настройки…', 'Баптауларды жүктеудемін…', 'Loading settings…')}
     </div>
   );
@@ -2335,7 +2335,7 @@ function RequisitesCard({ language }: { language: 'kz' | 'ru' | 'eng' }) {
   const up = (k: keyof Requisites, v: string) => setR(prev => ({ ...prev, [k]: v }));
   if (!loaded) return null;
   return (
-    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
       <div className="text-sm text-gray-900 mb-1">{l('Реквизиты для счетов', 'Шот реквизиттері', 'Invoice requisites')}</div>
       <div className="text-[11px] text-gray-400 mb-4">
         {l('Используются в PDF-счетах из раздела «Оплаты → Финансы → Создать счёт»',

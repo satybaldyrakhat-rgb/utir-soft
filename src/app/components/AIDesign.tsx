@@ -61,9 +61,10 @@ interface GenResult { id?: string; provider: ProviderId; ok: boolean; imageUrl?:
 interface HistoryEntry { id: string; userId: string; userName: string; provider: ProviderId; prompt: string; imageUrl: string | null; enhancedPrompt: string | null; createdAt: string }
 
 // Shared glass-card class — same vocabulary as the Dashboard so pages
-// feel like part of the same surface.
-const GLASS = 'bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl';
-const GLASS_HOVER = 'transition-all hover:bg-white/70 hover:shadow-[0_16px_48px_-12px_rgba(15,23,42,0.18)]';
+// feel like part of the same surface: frosted fill + specular top-edge
+// highlight over a deep layered shadow (liquid-glass, like the sign-in).
+const GLASS = 'bg-white/50 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl';
+const GLASS_HOVER = 'transition-all duration-300 hover:bg-white/65 hover:shadow-[0_22px_56px_-16px_rgba(15,23,42,0.26),inset_0_1px_0_0_rgba(255,255,255,0.75)]';
 
 // ─── Wizard data ──────────────────────────────────────────────────
 // Each room / style is paired with a short Russian phrase that goes into

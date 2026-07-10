@@ -719,7 +719,7 @@ export function Warehouse({ language }: WarehouseProps) {
     <div
       className="min-h-full relative"
     >
-    <div className="p-4 md:p-8 max-w-[1400px] mx-auto relative">
+    <div className="px-4 py-5 sm:p-6 lg:p-8 max-w-[1400px] mx-auto relative">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-4">
         <div>
@@ -792,7 +792,7 @@ export function Warehouse({ language }: WarehouseProps) {
           { label: l('Мало', 'Аз', 'Low Stock'), value: String(lowCount), sub: l('заказать', 'тапсыру', 'reorder'), icon: AlertTriangle, color: lowCount > 0 ? 'text-yellow-600' : '' },
           { label: l('Закончилось', 'Жоқ', 'Out of Stock'), value: String(outCount), sub: l('срочно', 'шұғыл', 'urgent'), icon: ShoppingCart, color: outCount > 0 ? 'text-red-600' : '' },
         ].map((c, i) => (
-          <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+          <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] text-slate-400">{c.label}</span>
               <div className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><c.icon className="w-3.5 h-3.5 text-slate-400" /></div>
@@ -842,7 +842,7 @@ export function Warehouse({ language }: WarehouseProps) {
           {/* Дашборд цеха — что горит сегодня + график монтажей */}
           {showWorkshop && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-white/60 flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5 text-amber-500" />
                   <span className="text-sm text-gray-900">{l('Дедлайны производства', 'Өндіріс мерзімдері', 'Production deadlines')}</span>
@@ -871,7 +871,7 @@ export function Warehouse({ language }: WarehouseProps) {
                   </div>
                 )}
               </div>
-              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+              <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-white/60 flex items-center gap-2">
                   <Wrench className="w-3.5 h-3.5 text-sky-500" />
                   <span className="text-sm text-gray-900">{l('График монтажей (неделя)', 'Монтаж кестесі (апта)', 'Installations (week)')}</span>
@@ -968,7 +968,7 @@ export function Warehouse({ language }: WarehouseProps) {
               const conf = orderConf(o.status);
               const Icon = conf.icon;
               return (
-                <div key={o.id} onClick={() => setSelectedOrder(o)} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 hover:shadow-sm transition-all cursor-pointer group">
+                <div key={o.id} onClick={() => setSelectedOrder(o)} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4 hover:shadow-sm transition-all cursor-pointer group">
                   {/* Header */}
                   <div className="flex items-center justify-between mb-3 gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-wrap">
@@ -1200,7 +1200,7 @@ export function Warehouse({ language }: WarehouseProps) {
               );
             })}
             {sortedOrders.length === 0 && (
-              <div className="md:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+              <div className="md:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
                 <Wrench className="w-10 h-10 text-gray-200 mx-auto mb-3" />
                 <div className="text-sm text-slate-900 mb-1">
                   {prodOrders.length === 0
@@ -1222,7 +1222,7 @@ export function Warehouse({ language }: WarehouseProps) {
       {/* ===== MATERIALS VIEW ===== */}
       {/* Потребность под заказы (резерв материалов + дефицит к закупке) */}
       {activeView === 'materials' && reservation.size > 0 && (
-        <div className="mb-4 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+        <div className="mb-4 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
           <div className="px-5 py-3.5 flex items-center justify-between border-b border-white/60 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
@@ -1268,7 +1268,7 @@ export function Warehouse({ language }: WarehouseProps) {
           // Brand-new team — no materials yet. Replace the empty table
           // with three clear paths: add manually, import CSV from Excel,
           // or ask AI to bulk-create from a free-text description.
-          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
             <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-white/60 ring-1 ring-white/60 shadow-[0_8px_24px_-10px_rgba(15,23,42,0.18)] flex items-center justify-center text-slate-500"><NicheIcon niche={niche} className="w-6 h-6" /></div>
             <h3 className="text-lg text-slate-900 mb-2 tracking-tight">
               {l('Здесь будут материалы', 'Материалдар осы жерде болады', 'Materials live here')}
@@ -1439,7 +1439,7 @@ export function Warehouse({ language }: WarehouseProps) {
           </div>
 
           {/* Materials Table */}
-          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
             {/* Header */}
             <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2 border-b border-white/60 text-[10px] text-slate-400">
               <div className="col-span-4">{l('Материал', 'Материал', 'Material')}</div>
@@ -1915,7 +1915,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
   }
 
   if (!loaded) return (
-    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 flex items-center justify-center text-slate-400 text-sm">
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-8 flex items-center justify-center text-slate-400 text-sm">
       <Loader2 className="w-4 h-4 animate-spin mr-2" /> {l('Загружаю шаблоны…', 'Жүктеуде…', 'Loading…')}
     </div>
   );
@@ -1944,7 +1944,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
       </div>
 
       {templates.length === 0 ? (
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
           <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <div className="text-sm text-slate-900 mb-1">{l('Пока нет шаблонов', 'Әзірге шаблондар жоқ', 'No templates yet')}</div>
           <div className="text-xs text-slate-400 mb-4">{l('Создайте первый шаблон чтобы быстро повторять типовые изделия', 'Типтік бұйымдарды тез қайталау үшін алғашқы шаблон жасаңыз', 'Create a template to reuse common items')}</div>
@@ -1957,7 +1957,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
           {templates.map(t => {
             const totals = bomTotals(t);
             return (
-              <div key={t.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 hover:shadow-sm transition-all">
+              <div key={t.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4 hover:shadow-sm transition-all">
                 <div className="w-full h-24 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center mb-3 relative">
                   <Package className="w-8 h-8 text-slate-300" />
                   <span className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 bg-white/80 rounded text-gray-600">{labelFor(t.type)}</span>
@@ -2198,7 +2198,7 @@ function NestingView({ language, prodOrders, deals }: {
 
   if (prodOrders.length === 0) {
     return (
-      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
         <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
         <div className="text-sm text-slate-900 mb-1">{l('Нет активных заказов', 'Белсенді тапсырыстар жоқ', 'No active orders')}</div>
         <div className="text-xs text-slate-400">{l('Раскрой работает на основе сделок в производстве — переведите сделку в нужный статус', 'Тілу өндірістегі мәмілелер негізінде жұмыс істейді — мәмілені тиісті күйге ауыстырыңыз', 'Nesting works from in-production deals')}</div>
@@ -2209,7 +2209,7 @@ function NestingView({ language, prodOrders, deals }: {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
       {/* Order picker + parts list */}
-      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
         <div className="text-[10px] text-slate-400 mb-1 uppercase tracking-wide">{l('Выберите заказ', 'Тапсырыс таңдаңыз', 'Select order')}</div>
         <select
           value={selectedDealId}
@@ -2243,7 +2243,7 @@ function NestingView({ language, prodOrders, deals }: {
       </div>
 
       {/* Sheet visualisation (illustrative only — not a real solver) */}
-      <div className="lg:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+      <div className="lg:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-sm text-gray-900">{l('Лист ЛДСП 2750×1830 мм', 'ЛДСП парағы 2750×1830 мм', 'MFC sheet 2750×1830 mm')}</div>
@@ -2270,7 +2270,7 @@ function NestingView({ language, prodOrders, deals }: {
 
       {/* Stats + actions */}
       <div className="space-y-3">
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
           <div className="text-sm text-slate-900 mb-3">{l('Статистика', 'Статистика', 'Stats')}</div>
           <div className="space-y-2.5 text-xs">
             <div className="flex justify-between"><span className="text-slate-500">Использовано</span><span className="text-gray-900">{utilizationPct}%</span></div>
@@ -2411,7 +2411,7 @@ function SuppliersView({
         // Empty state — hero CTA card. Search-empty state has its own
         // softer copy; absolute-empty state pushes the user to add.
         suppliers.length === 0 ? (
-          <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-10 text-center shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+          <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-10 text-center shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)]">
             <Truck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
             <h3 className="text-sm text-slate-900 mb-1.5">
               {l('Здесь будут поставщики', 'Жеткізушілер осы жерде болады', 'Suppliers live here')}
@@ -2441,7 +2441,7 @@ function SuppliersView({
             )}
           </div>
         ) : (
-          <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+          <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)]">
             {l('Ничего не найдено', 'Ештеңе табылмады', 'Nothing found')}
           </div>
         )
@@ -2569,13 +2569,13 @@ function PurchasesView({
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)]">
           {suppliers.length === 0
             ? l('Сначала добавьте поставщика во вкладке «Поставщики»', 'Алдымен «Жеткізушілер» қойындысында жеткізуші қосыңыз', 'Add a supplier in the Suppliers tab first')
             : l('Закупок пока нет', 'Сатып алулар жоқ', 'No purchases yet')}
         </div>
       ) : (
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 rounded-3xl overflow-hidden shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 rounded-3xl overflow-hidden shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)]">
           <div className="divide-y divide-white/50">
             {filtered.map(p => {
               const meta = STATUS_META[p.status];
@@ -3082,7 +3082,7 @@ function ReportsView({
       </div>
 
       {!hasAnyData ? (
-        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)]">
           <BarChart3 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
           {l('Данных пока нет — оформите первую закупку или спишите материал на сделку.',
              'Деректер әлі жоқ — алғашқы сатып алуды рәсімдеңіз немесе материалды мәмілеге жазыңыз.',

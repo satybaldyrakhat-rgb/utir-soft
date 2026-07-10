@@ -85,7 +85,7 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
             <div className="space-y-2.5">
               <div className="text-[11px] text-slate-400">{l('Переменные', 'Айнымалылар', 'Variables')}: {'{номер} {дата} {имя} {сумма} {время}'}</div>
               {templates.map(t => (
-                <div key={t.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-3.5">
+                <div key={t.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-3.5">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <textarea value={t.text} onChange={e => setTemplates(ts => ts.map(x => x.id === t.id ? { ...x, text: e.target.value } : x))}
                       rows={2} className="flex-1 text-xs bg-gray-50 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none" />

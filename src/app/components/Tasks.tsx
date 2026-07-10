@@ -198,7 +198,7 @@ export function Tasks({ language }: TasksProps) {
     <div
       className="min-h-full relative"
     >
-    <div className="p-4 md:p-8 relative max-w-[1400px] mx-auto">
+    <div className="px-4 py-5 sm:p-6 lg:p-8 relative max-w-[1400px] mx-auto">
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
         <div>
@@ -256,7 +256,7 @@ export function Tasks({ language }: TasksProps) {
 
       {/* Telegram Bot Panel — minimalist, honest empty state until Block F wires the real bot */}
       {showTelegramPanel && (
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden mb-6">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden mb-6">
           {/* Header */}
           <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -426,7 +426,7 @@ export function Tasks({ language }: TasksProps) {
       {/* EMPTY STATE — fresh team with 0 tasks. Replaces 4 empty
           columns + zeroed stat cards with a single clear CTA. */}
       {viewMode === 'board' && tasks.length === 0 && (
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
           <CheckCircle2 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
           <h3 className="text-lg text-slate-900 mb-1 tracking-tight">{l('Здесь будут задачи команды', 'Мұнда команда тапсырмалары болады', 'Team tasks will appear here')}</h3>
           <p className="text-xs text-slate-500 mb-5 max-w-md mx-auto leading-relaxed">

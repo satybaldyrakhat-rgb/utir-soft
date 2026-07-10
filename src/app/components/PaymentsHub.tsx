@@ -30,7 +30,7 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
     <div
       className="flex-1 overflow-y-auto relative"
     >
-      <div className="px-4 md:px-8 pt-6 max-w-[1400px] mx-auto relative">
+      <div className="px-4 sm:px-6 lg:px-8 pt-6 max-w-[1400px] mx-auto relative">
         <div className="flex items-end justify-between flex-wrap gap-3 mb-5">
           <div>
             <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Оплаты', 'Төлемдер', 'Payments')}</p>
@@ -60,7 +60,7 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
       </div>
 
       {section === 'deals' && (
-        <div className="px-4 md:px-8 pb-8 max-w-[1400px] space-y-5">
+        <div className="px-4 sm:px-6 lg:px-8 pb-8 max-w-[1400px] space-y-5">
           <AIFinancePanel language={language} variant="deals" deals={store.deals} transactions={store.transactions} />
           <DealPayments deals={store.deals} language={language} />
         </div>
@@ -68,7 +68,7 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
 
       {section === 'finance' && (
         <>
-          <div className="px-4 md:px-8 max-w-[1400px]">
+          <div className="px-4 sm:px-6 lg:px-8 max-w-[1400px]">
             <AIFinancePanel language={language} variant="finance" deals={store.deals} transactions={store.transactions} />
           </div>
           <div className="-mt-2">
@@ -799,7 +799,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
         {kpis.map((k, i) => {
           const Icon = k.icon;
           return (
-            <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 hover:shadow-sm transition-all">
+            <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4 hover:shadow-sm transition-all">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="text-[10px] text-gray-400 uppercase tracking-wide">{k.label}</div>
                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${k.tone}`}><Icon className="w-3 h-3" /></div>
@@ -811,7 +811,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
         })}
       </div>
 
-      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
         <div className="px-4 py-3 border-b border-white/60 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="text-sm text-gray-900">{l('Платежи по сделкам', 'Мәмілелер бойынша төлемдер', 'Payments by deal')}</div>

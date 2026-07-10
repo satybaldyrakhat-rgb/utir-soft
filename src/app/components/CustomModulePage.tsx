@@ -98,17 +98,17 @@ export function CustomModulePage({ moduleId, language, onNotFound }: Props) {
       </div>
 
       {fields.length === 0 ? (
-        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)]">
           {l('У модуля пока нет полей. Откройте Настройки → Модули и добавьте поля.',
              'Модульдің әзірге өрістері жоқ. Баптаулар → Модульдер ашып, өрістер қосыңыз.',
              'No fields yet. Open Settings → Modules and add fields.')}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 rounded-3xl p-12 text-center text-xs text-slate-500 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)]">
           {search ? l('Ничего не найдено', 'Ештеңе табылмады', 'Nothing found') : tt('recordsEmpty')}
         </div>
       ) : (
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 rounded-3xl overflow-hidden shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)]">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 rounded-3xl overflow-hidden shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)]">
           {/* Header row */}
           <div
             className="grid gap-3 px-5 py-3 border-b border-white/60 bg-white/30 text-[10px] uppercase tracking-wider text-slate-500"

@@ -207,7 +207,7 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
 
       {/* Add-spend inline form */}
       {spendOpen && canWrite && (
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 grid grid-cols-1 sm:grid-cols-5 gap-2 items-end">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4 grid grid-cols-1 sm:grid-cols-5 gap-2 items-end">
           <div className="sm:col-span-1">
             <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">{l('Канал', 'Арна', 'Channel')}</div>
             <select value={spend.channel} onChange={e => setSpend({ ...spend, channel: e.target.value })}
@@ -242,7 +242,7 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
         {kpis.map((k, i) => {
           const Icon = k.icon;
           return (
-            <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+            <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
               <div className="flex items-center justify-between mb-1">
                 <div className="text-[10px] text-gray-400 uppercase tracking-wide">{k.label}</div>
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${k.cls}`}><Icon className="w-3.5 h-3.5" strokeWidth={1.5} /></div>
@@ -255,7 +255,7 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
 
       {/* Auto-insights — что делать с бюджетом */}
       {insights.length > 0 && (
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-3.5 h-3.5 text-violet-500" strokeWidth={1.5} />
             <span className="text-sm text-gray-900">{l('Подсказки по рекламе', 'Жарнама бойынша кеңестер', 'Marketing insights')}</span>
@@ -278,7 +278,7 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
       {/* Lead-form link builder — paste in Instagram bio / ads, leads land
           in the funnel tagged with this source+campaign for clean ROI. */}
       {canWrite && leadCode && (
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <Link2 className="w-3.5 h-3.5 text-emerald-600" strokeWidth={1.5} />
             <span className="text-sm text-gray-900">{l('Ссылка на форму заявки', 'Өтінім сілтемесі', 'Lead form link')}</span>
@@ -310,7 +310,7 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
 
       {/* Empty state */}
       {channels.length === 0 ? (
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-10 text-center">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
           <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-white/60 ring-1 ring-white/60 shadow-[0_8px_24px_-10px_rgba(15,23,42,0.18)] flex items-center justify-center text-slate-500"><Megaphone className="w-6 h-6" strokeWidth={1.5} /></div>
           <div className="text-sm text-slate-900 mb-1">{l('Пока нет данных по каналам', 'Арналар бойынша дерек жоқ', 'No channel data yet')}</div>
           <div className="text-[11px] text-slate-400 leading-relaxed max-w-md mx-auto">
@@ -320,7 +320,7 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
           </div>
         </div>
       ) : (
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
           <div className="px-5 py-3.5 text-sm text-gray-900 border-b border-white/60">{l('Эффективность каналов', 'Арналар тиімділігі', 'Channel performance')}</div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -364,7 +364,7 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
 
       {/* Campaign breakdown */}
       {campaigns.length > 0 && (
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
           <div className="px-5 py-3.5 text-sm text-gray-900 border-b border-white/60">{l('По кампаниям', 'Науқандар бойынша', 'By campaign')}</div>
           <div className="divide-y divide-gray-50">
             {campaigns.map((c, i) => (
@@ -387,7 +387,7 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
       {/* Reviews + Referrals (отзывы + сарафан) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Отзывы клиентов */}
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
           <div className="px-5 py-3.5 flex items-center justify-between border-b border-white/60">
             <div className="flex items-center gap-2">
               <Star className="w-3.5 h-3.5 text-amber-400" strokeWidth={1.5} />
@@ -419,7 +419,7 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
         </div>
 
         {/* Сарафан */}
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl overflow-hidden">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
           <div className="px-5 py-3.5 flex items-center gap-2 border-b border-white/60">
             <Heart className="w-3.5 h-3.5 text-rose-400" strokeWidth={1.5} />
             <span className="text-sm text-gray-900">{l('Сарафан — кто рекомендует', 'Сарафан — кім ұсынады', 'Referrals')}</span>

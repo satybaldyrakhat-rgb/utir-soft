@@ -523,7 +523,7 @@ export function Finance({ language }: FinanceProps) {
           // Empty state — replaces 5 zeros with a single CTA card.
           // Drives the user toward entering their first transaction
           // (either manually via Orders sub-tab, or by asking AI).
-          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-8 text-center">
+          <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-8 text-center">
             <Wallet className="w-10 h-10 text-slate-300 mx-auto mb-3" />
             <div className="text-sm text-slate-900 mb-1">
               {l('Финансы пока пустые', 'Қаржы әлі бос', 'Finance is empty')}
@@ -562,7 +562,7 @@ export function Finance({ language }: FinanceProps) {
             {kpis.map((k, i) => {
               const Icon = k.icon;
               return (
-                <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-4 hover:shadow-sm transition-shadow">
+                <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4 hover:shadow-sm transition-shadow">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${k.iconWrap} mb-3`}>
                     <Icon className="w-4 h-4" />
                   </div>
@@ -576,7 +576,7 @@ export function Finance({ language }: FinanceProps) {
         )}
       </div>
 
-      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 hover:shadow-sm transition-shadow">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5 hover:shadow-sm transition-shadow">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div>
             <div className="text-sm text-gray-900">{l('Динамика выручки', 'Түсім динамикасы', 'Revenue dynamics')}</div>
@@ -607,7 +607,7 @@ export function Finance({ language }: FinanceProps) {
         </div>
       </div>
 
-      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-3 overflow-x-auto">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-3 overflow-x-auto">
         <div className="flex items-start gap-6 min-w-max">
           {TAB_GROUPS.map((group, gi) => (
             <div key={gi} className="flex flex-col gap-1.5">

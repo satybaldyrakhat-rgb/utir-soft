@@ -215,7 +215,7 @@ export function Calculator({ language }: CalcProps) {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2 space-y-4">
         {/* Step 1: Product Type */}
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
           <div className="text-[10px] text-slate-400 mb-2">{l('Шаг 1', '1-қадам', 'Step 1')}</div>
           <div className="text-sm text-slate-900 mb-3">{l('Тип изделия', 'Бұйым түрі', 'Product type')}</div>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -236,7 +236,7 @@ export function Calculator({ language }: CalcProps) {
         </div>
 
         {/* Step 2: Dimensions */}
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
           <div className="text-[10px] text-slate-400 mb-2">{l('Шаг 2', '2-қадам', 'Step 2')}</div>
           <div className="text-sm text-slate-900 mb-3">{l('Размеры (м)', 'Өлшемдері (м)', 'Dimensions (m)')}</div>
           <div className="grid grid-cols-3 gap-3">
@@ -262,7 +262,7 @@ export function Calculator({ language }: CalcProps) {
         </div>
 
         {/* Step 3: Materials */}
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
           <div className="text-[10px] text-slate-400 mb-2">{l('Шаг 3', '3-қадам', 'Step 3')}</div>
           <div className="text-sm text-slate-900 mb-3">{l('Материалы', 'Материалдар', 'Materials')}</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -287,7 +287,7 @@ export function Calculator({ language }: CalcProps) {
         </div>
 
         {/* Step 4: Add-ons */}
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
               <div className="text-[10px] text-slate-400">{l('Шаг 4', '4-қадам', 'Step 4')}</div>
@@ -299,7 +299,7 @@ export function Calculator({ language }: CalcProps) {
         </div>
 
         {/* Step 5: Services */}
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
               <div className="text-[10px] text-slate-400">{l('Шаг 5', '5-қадам', 'Step 5')}</div>
@@ -311,7 +311,7 @@ export function Calculator({ language }: CalcProps) {
         </div>
 
         {/* Markup */}
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
           <div className="text-sm text-slate-900 mb-3">{l('Наценка', 'Үстеме', 'Markup')}</div>
           <div className="flex items-center gap-3">
             <input
@@ -333,7 +333,7 @@ export function Calculator({ language }: CalcProps) {
 
       {/* Total panel */}
       <div className="space-y-3">
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5 sticky top-4">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5 sticky top-4">
           <div className="text-sm text-slate-900 mb-4">{l('Итого', 'Жиыны', 'Total')}</div>
           <div className="space-y-2.5 mb-4">
             <div className="flex justify-between text-xs">

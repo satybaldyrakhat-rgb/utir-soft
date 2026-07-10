@@ -111,7 +111,7 @@ export function ResetPassword({ language, onLanguageChange }: ResetPasswordProps
       </div>
 
       <div className="w-full max-w-[420px]">
-        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-6 sm:p-8">
+        <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-6 sm:p-8">
           {state.kind === 'checking' && (
             <div className="text-center py-8">
               <Loader2 className="w-7 h-7 text-slate-400 animate-spin mx-auto mb-3" />

@@ -82,7 +82,7 @@ export function TelegramInvitePanel({ language }: Props) {
     : '';
 
   return (
-    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.10)] rounded-3xl p-5">
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
       <div className="flex items-start gap-3 mb-4">
         <div className="w-10 h-10 rounded-2xl bg-sky-100/70 text-sky-700 ring-1 ring-white/60 flex items-center justify-center flex-shrink-0">
           <Send className="w-4.5 h-4.5" />
