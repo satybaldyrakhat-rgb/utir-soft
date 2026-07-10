@@ -9,6 +9,10 @@ import { NicheIcon } from './NicheIcon';
 import { toast } from '../utils/toast';
 import { api } from '../utils/api';
 
+// Shared liquid-glass surface — same vocabulary as Dashboard / SalesKanban:
+// frosted fill + specular top-edge highlight over a deep layered shadow.
+const GLASS = 'bg-white/50 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl';
+
 interface Message {
   id: string;
   text: string;
@@ -348,6 +352,12 @@ export function Chats({ language }: ChatsProps) {
     </button>
   );
 
+  // Glass filter-chip class for the conversation list toolbar.
+  const chipCls = (active: boolean) => `px-2.5 py-1.5 rounded-xl text-[11px] whitespace-nowrap transition-all ${
+    active ? 'bg-emerald-600 text-white shadow-[0_4px_12px_-4px_var(--accent-shadow)] ring-1 ring-white/10'
+           : 'bg-white/50 text-slate-500 ring-1 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+  }`;
+
   const currentScenario = scenariosData.find(s => s.id === scenarioModal);
 
   // ─── Defensive view-gate ────────────────────────────────────────
@@ -427,35 +437,35 @@ export function Chats({ language }: ChatsProps) {
       <div className="flex-1 overflow-hidden">
         {/* ===== CHATS TAB ===== */}
         {activeTab === 'chats' && (
-          <div className="flex h-full">
-            {/* Sidebar */}
-            <div className={`w-full md:w-80 lg:w-96 border-r border-gray-100 bg-white flex flex-col ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
-              <div className="p-3 space-y-2 border-b border-white/60 flex-shrink-0">
+          <div className="flex h-full gap-3 p-3 md:p-4">
+            {/* ─── Conversation list — floating glass card ────────── */}
+            <div className={`w-full md:w-80 lg:w-96 flex-col overflow-hidden ${GLASS} ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
+              <div className="p-3 space-y-2 border-b border-white/50 flex-shrink-0">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
-                  <input type="text" placeholder={l('Поиск...', 'Іздеу...', 'Search...')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input type="text" placeholder={l('Поиск диалогов...', 'Диалог іздеу...', 'Search chats...')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2.5 bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm text-slate-800 focus:outline-none focus:bg-white/80 focus:ring-2 focus:ring-emerald-500/40 placeholder:text-slate-400 transition-all" />
                 </div>
-                <div className="flex gap-1 overflow-x-auto pb-0.5">
-                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(false); }} className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-all ${selectedPlatforms.length === 0 && !showUnreadOnly ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-400'}`}>{l('Все', 'Бәрі', 'All')} {chats.length}</button>
-                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(true); }} className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-all ${showUnreadOnly ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-400'}`}>{l('Новые', 'Жаңа', 'New')} {chats.filter(c => c.unreadCount).length}</button>
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(false); }} className={chipCls(selectedPlatforms.length === 0 && !showUnreadOnly)}>{l('Все', 'Бәрі', 'All')} {chats.length}</button>
+                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(true); }} className={chipCls(showUnreadOnly)}>{l('Новые', 'Жаңа', 'New')} {chats.filter(c => c.unreadCount).length}</button>
                   {(['whatsapp', 'telegram', 'instagram'] as Chat['platform'][]).map(p => (
-                    <button key={p} onClick={() => togglePlatform(p)} className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap flex items-center gap-1 transition-all ${selectedPlatforms.includes(p) ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-400'}`}>{platformDot(p)} {platformName(p)?.slice(0, 2)}</button>
+                    <button key={p} onClick={() => togglePlatform(p)} className={`${chipCls(selectedPlatforms.includes(p))} inline-flex items-center gap-1`}>{platformDot(p)} {platformName(p)?.slice(0, 2)}</button>
                   ))}
                 </div>
                 {canWrite && (
-                  <button onClick={() => setShowNewChat(true)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_var(--accent-shadow)] transition-all">
+                  <button onClick={() => setShowNewChat(true)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_var(--accent-shadow)] transition-all">
                     <Plus className="w-3.5 h-3.5" /> {l('Новый диалог', 'Жаңа диалог', 'New chat')}
                   </button>
                 )}
               </div>
-              <div className="flex-1 overflow-y-auto">
+              <div className="nav-scroll flex-1 overflow-y-auto p-2 space-y-1">
                 {loadingChats ? (
-                  <div className="p-3 space-y-2">
-                    {[0, 1, 2, 3].map(i => <div key={i} className="h-16 bg-white/50 rounded-2xl animate-pulse" />)}
+                  <div className="space-y-2 p-1">
+                    {[0, 1, 2, 3].map(i => <div key={i} className="h-[68px] bg-white/50 rounded-2xl animate-pulse" />)}
                   </div>
                 ) : filteredChats.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                    <MessageCircle className="w-10 h-10 text-gray-200 mb-3" />
+                    <div className="w-14 h-14 rounded-2xl bg-white/50 ring-1 ring-white/60 flex items-center justify-center mb-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7)]"><MessageCircle className="w-6 h-6 text-emerald-500/70" /></div>
                     <p className="text-sm text-slate-700 mb-1">
                       {chats.length === 0
                         ? l('Пока нет диалогов', 'Әзірге диалог жоқ', 'No conversations yet')
@@ -480,7 +490,7 @@ export function Chats({ language }: ChatsProps) {
                         )}
                         <button
                           onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'settings', tab: 'integrations' } }))}
-                          className="text-[11px] text-slate-400 hover:text-slate-700 transition-colors"
+                          className="block mx-auto text-[11px] text-slate-400 hover:text-slate-700 transition-colors"
                         >
                           {l('или подключить мессенджеры →', 'немесе мессенджерлерді қосу →', 'or connect messengers →')}
                         </button>
@@ -490,24 +500,24 @@ export function Chats({ language }: ChatsProps) {
                     )}
                   </div>
                 ) : filteredChats.map(chat => (
-                  <button key={chat.id} onClick={() => handleChatSelect(chat)} className={`w-full px-3 py-3 border-b border-white/60 hover:bg-white/30 transition-colors text-left ${selectedChat?.id === chat.id ? 'bg-gray-50' : ''}`}>
+                  <button key={chat.id} onClick={() => handleChatSelect(chat)} className={`w-full p-2.5 rounded-2xl text-left transition-all ${selectedChat?.id === chat.id ? 'bg-emerald-500/10 ring-1 ring-emerald-500/25' : 'ring-1 ring-transparent hover:bg-white/60 hover:ring-white/60'}`}>
                     <div className="flex items-center gap-3">
                       <div className="relative flex-shrink-0">
-                        <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-slate-500 text-sm">{chat.name.charAt(0)}</div>
-                        {chat.online && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full" />}
+                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white text-sm font-medium ring-1 ring-white/50 shadow-[0_4px_12px_-4px_var(--accent-shadow-sm)]" style={{ background: 'linear-gradient(135deg, var(--accent-500), var(--accent-700))' }}>{chat.name.charAt(0)}</div>
+                        <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white ring-1 ring-white/70 flex items-center justify-center shadow-sm">{platformDot(chat.platform)}</span>
+                        {chat.online && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-sm text-gray-900 truncate pr-2">{chat.name}</span>
+                        <div className="flex items-center justify-between mb-0.5 gap-2">
+                          <span className="text-sm text-slate-900 truncate">{chat.name}</span>
                           <span className="text-[10px] text-slate-400 flex-shrink-0">{chat.time}</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-slate-400 truncate flex-1">{chat.lastMessage}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={`text-xs truncate flex-1 ${chat.unreadCount ? 'text-slate-600' : 'text-slate-400'}`}>{chat.lastMessage || '—'}</p>
                           {chat.unreadCount ? (
-                            <span className="ml-2 min-w-[18px] h-[18px] bg-emerald-600 rounded-full flex items-center justify-center text-[10px] text-white px-1">{chat.unreadCount}</span>
+                            <span className="min-w-[18px] h-[18px] bg-emerald-600 rounded-full flex items-center justify-center text-[10px] text-white px-1 shadow-sm flex-shrink-0">{chat.unreadCount}</span>
                           ) : null}
                         </div>
-                        <div className="mt-1 flex items-center gap-1">{platformDot(chat.platform)}<span className="text-[10px] text-slate-300">{platformName(chat.platform)}</span></div>
                       </div>
                     </div>
                   </button>
@@ -515,60 +525,81 @@ export function Chats({ language }: ChatsProps) {
               </div>
             </div>
 
-            {/* Chat Area */}
+            {/* ─── Thread — floating glass card ───────────────────── */}
             {selectedChat ? (
-              <div className="flex-1 flex flex-col bg-white">
-                <div className="px-4 py-3 border-b border-white/60 flex items-center gap-3 flex-shrink-0">
-                  <button onClick={() => setSelectedChat(null)} className="md:hidden p-1.5 hover:bg-white/70 rounded-lg">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              <div className={`flex-1 flex flex-col overflow-hidden ${GLASS}`}>
+                <div className="px-4 py-3 border-b border-white/50 flex items-center gap-3 flex-shrink-0">
+                  <button onClick={() => setSelectedChat(null)} className="md:hidden w-8 h-8 flex items-center justify-center hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl transition-all">
+                    <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                   </button>
-                  <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center text-slate-500 text-sm">{selectedChat.name.charAt(0)}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-gray-900 truncate">{selectedChat.name}</div>
-                    <div className="flex items-center gap-1.5 mt-0.5">{platformDot(selectedChat.platform)}<span className="text-[10px] text-slate-400">{platformName(selectedChat.platform)}</span>{selectedChat.online && <span className="text-[10px] text-green-500">• online</span>}</div>
+                  <div className="relative flex-shrink-0">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-sm font-medium ring-1 ring-white/50 shadow-[0_4px_12px_-4px_var(--accent-shadow-sm)]" style={{ background: 'linear-gradient(135deg, var(--accent-500), var(--accent-700))' }}>{selectedChat.name.charAt(0)}</div>
+                    <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white ring-1 ring-white/70 flex items-center justify-center shadow-sm">{platformDot(selectedChat.platform)}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {selectedChat.orderId && <button onClick={() => toast(`Заказ #${selectedChat.orderId}`)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-white/70 text-xs"><ShoppingCart className="w-3.5 h-3.5" />#{selectedChat.orderId}</button>}
-                    <button onClick={startCall} className="p-2 hover:bg-white/50 rounded-lg"><Phone className="w-4 h-4 text-slate-400" /></button>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-slate-900 truncate">{selectedChat.name}</div>
+                    <div className="flex items-center gap-1.5 mt-0.5"><span className="text-[10px] text-slate-400">{platformName(selectedChat.platform)}</span>{selectedChat.online && <span className="text-[10px] text-emerald-600">• online</span>}</div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {selectedChat.orderId && <button onClick={() => toast(`Заказ #${selectedChat.orderId}`)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/60 ring-1 ring-white/60 text-slate-600 rounded-xl hover:bg-white/90 text-xs transition-all"><ShoppingCart className="w-3.5 h-3.5" />#{selectedChat.orderId}</button>}
+                    <button onClick={startCall} className="w-9 h-9 flex items-center justify-center bg-white/50 ring-1 ring-white/60 hover:bg-white/80 rounded-xl transition-all"><Phone className="w-4 h-4 text-slate-500" /></button>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 bg-gray-50/30">
+                <div className="nav-scroll flex-1 overflow-y-auto p-4">
                   <div className="space-y-2.5 max-w-3xl mx-auto">
                     {selectedChat.orderId && (
-                      <div className="flex justify-center my-3"><span className="bg-white px-3 py-1 rounded-full text-[10px] text-slate-400 border border-gray-100">{l('Привязан к заказу', 'Тапсырысқа байланысты', 'Linked to order')} #{selectedChat.orderId}</span></div>
+                      <div className="flex justify-center my-3"><span className="bg-white/60 backdrop-blur-xl px-3 py-1 rounded-full text-[10px] text-slate-500 ring-1 ring-white/60">{l('Привязан к заказу', 'Тапсырысқа байланысты', 'Linked to order')} #{selectedChat.orderId}</span></div>
                     )}
-                    <div className="flex justify-center my-4"><span className="bg-white px-3 py-1 rounded-full text-[10px] text-slate-400 border border-gray-100">{l('Сегодня', 'Бүгін', 'Today')}</span></div>
-                    {messages.map(m => (
-                      <div key={m.id} className={`flex ${m.isUser ? 'justify-end' : 'justify-start'}`}>
-                        <div className="max-w-[75%] md:max-w-md">
-                          <TextMessage message={m} language={language} />
-                          <ImageMessage message={m} language={language} />
-                          <FileMessage message={m} language={language} />
-                          <VoiceMessage message={m} language={language} playingVoiceId={playingVoiceId} onToggleVoicePlay={toggleVoicePlay} />
-                          <CallMessage message={m} language={language} />
-                        </div>
+                    {loadingMessages ? (
+                      <div className="space-y-3 py-4">
+                        <div className="flex justify-start"><div className="h-10 w-44 bg-white/60 rounded-2xl animate-pulse" /></div>
+                        <div className="flex justify-end"><div className="h-10 w-56 bg-emerald-500/15 rounded-2xl animate-pulse" /></div>
+                        <div className="flex justify-start"><div className="h-10 w-36 bg-white/60 rounded-2xl animate-pulse" /></div>
                       </div>
-                    ))}
+                    ) : (
+                      <>
+                        {messages.length > 0 && (
+                          <div className="flex justify-center my-2"><span className="bg-white/60 backdrop-blur-xl px-3 py-1 rounded-full text-[10px] text-slate-500 ring-1 ring-white/60">{l('Сегодня', 'Бүгін', 'Today')}</span></div>
+                        )}
+                        {messages.map(m => (
+                          <div key={m.id} className={`flex ${m.isUser ? 'justify-end' : 'justify-start'}`}>
+                            <div className="max-w-[80%] md:max-w-md">
+                              <TextMessage message={m} language={language} />
+                              <ImageMessage message={m} language={language} />
+                              <FileMessage message={m} language={language} />
+                              <VoiceMessage message={m} language={language} playingVoiceId={playingVoiceId} onToggleVoicePlay={toggleVoicePlay} />
+                              <CallMessage message={m} language={language} />
+                            </div>
+                          </div>
+                        ))}
+                        {messages.length === 0 && (
+                          <div className="flex flex-col items-center justify-center py-16 text-center">
+                            <div className="w-12 h-12 rounded-2xl bg-white/50 ring-1 ring-white/60 flex items-center justify-center mb-3"><MessageCircle className="w-5 h-5 text-slate-300" /></div>
+                            <div className="text-xs text-slate-400">{l('Начните переписку — напишите первым', 'Жазысуды бастаңыз', 'Start the conversation — say hi')}</div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
 
-                <div className="p-3 border-t border-white/60 bg-white flex-shrink-0">
+                <div className="p-3 border-t border-white/50 flex-shrink-0">
                   {isRecording && (
-                    <div className="mb-2 max-w-3xl mx-auto bg-red-50 rounded-xl px-4 py-2.5 flex items-center gap-3">
-                      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                      <span className="text-xs text-red-600 flex-1">{l('Запись', 'Жазу', 'Recording')} {formatDuration(recordingDuration)}</span>
+                    <div className="mb-2 max-w-3xl mx-auto bg-rose-50/80 ring-1 ring-rose-100/60 rounded-2xl px-4 py-2.5 flex items-center gap-3">
+                      <span className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+                      <span className="text-xs text-rose-600 flex-1">{l('Запись', 'Жазу', 'Recording')} {formatDuration(recordingDuration)}</span>
                       <button onClick={sendVoiceMessage} className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs">{l('Отправить', 'Жіберу', 'Send')}</button>
-                      <button onClick={cancelRecording} className="px-3 py-1 bg-white text-gray-600 rounded-lg text-xs border border-gray-200">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
+                      <button onClick={cancelRecording} className="px-3 py-1 bg-white/70 text-slate-600 rounded-lg text-xs ring-1 ring-white/60">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
                     </div>
                   )}
-                  <div className="flex items-end gap-2 max-w-3xl mx-auto">
+                  <div className="flex items-end gap-1 max-w-3xl mx-auto bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-1.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]">
                     <div className="relative">
-                      <button onClick={() => setShowAttachmentMenu(!showAttachmentMenu)} className="p-2 hover:bg-white/50 rounded-lg"><Paperclip className="w-4 h-4 text-slate-400" /></button>
+                      <button onClick={() => setShowAttachmentMenu(!showAttachmentMenu)} className="w-9 h-9 flex items-center justify-center hover:bg-white/70 rounded-xl transition-all"><Paperclip className="w-4 h-4 text-slate-400" /></button>
                       {showAttachmentMenu && (
-                        <div className="absolute bottom-full left-0 mb-1 bg-white rounded-xl shadow-lg border border-gray-100 p-1.5 min-w-[160px] z-10">
-                          {[{ type: 'document' as const, icon: FileText, color: 'text-blue-500', label: l('Документ', 'Құжат', 'Document') }, { type: 'image' as const, icon: ImageIcon, color: 'text-green-500', label: l('Фото', 'Фото', 'Photo') }, { type: 'video' as const, icon: Film, color: 'text-purple-500', label: l('Видео', 'Видео', 'Video') }].map(a => (
-                            <button key={a.type} onClick={() => handleSendFile(a.type)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/50 rounded-lg text-xs"><a.icon className={`w-4 h-4 ${a.color}`} />{a.label}</button>
+                        <div className={`absolute bottom-full left-0 mb-2 p-1.5 min-w-[170px] z-10 ${GLASS}`}>
+                          {[{ type: 'document' as const, icon: FileText, color: 'text-sky-500', label: l('Документ', 'Құжат', 'Document') }, { type: 'image' as const, icon: ImageIcon, color: 'text-emerald-500', label: l('Фото', 'Фото', 'Photo') }, { type: 'video' as const, icon: Film, color: 'text-violet-500', label: l('Видео', 'Видео', 'Video') }].map(a => (
+                            <button key={a.type} onClick={() => handleSendFile(a.type)} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/60 rounded-xl text-xs text-slate-700 transition-colors"><a.icon className={`w-4 h-4 ${a.color}`} />{a.label}</button>
                           ))}
                         </div>
                       )}
@@ -580,23 +611,23 @@ export function Chats({ language }: ChatsProps) {
                       placeholder={canWrite ? l('Сообщение...', 'Хабарлама...', 'Message...') : l('Только просмотр', 'Тек көру', 'View only')}
                       readOnly={!canWrite}
                       rows={1}
-                      className="flex-1 px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none"
-                      style={{ minHeight: '38px', maxHeight: '100px' }}
+                      className="flex-1 px-2 py-2 bg-transparent text-sm text-slate-800 focus:outline-none placeholder:text-slate-400 resize-none"
+                      style={{ minHeight: '38px', maxHeight: '120px' }}
                     />
-                    <button onClick={isRecording ? stopRecording : startRecording} disabled={!canWrite} className={`p-2 rounded-lg transition-all ${isRecording ? 'bg-red-500 text-white' : 'hover:bg-white/50 text-gray-400'} disabled:opacity-40 disabled:cursor-not-allowed`}>{isRecording ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}</button>
-                    <button onClick={handleSendMessage} disabled={!newMessage.trim() || !canWrite} className={`p-2 rounded-lg transition-all ${newMessage.trim() && canWrite ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-300'}`}><Send className="w-4 h-4" /></button>
+                    <button onClick={isRecording ? stopRecording : startRecording} disabled={!canWrite} className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all ${isRecording ? 'bg-rose-500 text-white' : 'hover:bg-white/70 text-slate-400'} disabled:opacity-40 disabled:cursor-not-allowed`}>{isRecording ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}</button>
+                    <button onClick={handleSendMessage} disabled={!newMessage.trim() || !canWrite} className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all ${newMessage.trim() && canWrite ? 'bg-emerald-600 text-white shadow-[0_6px_16px_-6px_var(--accent-shadow)] hover:bg-emerald-700' : 'bg-white/40 text-slate-300'}`}><Send className="w-4 h-4" /></button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex-1 hidden md:flex items-center justify-center">
-                <div className="text-center max-w-sm">
-                  <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3"><MessageCircle className="w-6 h-6 text-slate-300" /></div>
-                  <div className="text-sm text-slate-400">{l('Выберите чат', 'Чат таңдаңыз', 'Select a chat')}</div>
-                  <div className="text-xs text-slate-300 mt-1">
+              <div className={`flex-1 hidden md:flex items-center justify-center ${GLASS}`}>
+                <div className="text-center max-w-sm px-6">
+                  <div className="w-16 h-16 rounded-3xl bg-white/50 ring-1 ring-white/60 flex items-center justify-center mx-auto mb-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7)]"><MessageCircle className="w-7 h-7 text-emerald-500/70" /></div>
+                  <div className="text-sm text-slate-700">{l('Выберите диалог', 'Диалог таңдаңыз', 'Select a conversation')}</div>
+                  <div className="text-xs text-slate-400 mt-1">
                     {pendingShare
                       ? l('Откройте чат — концепт автоматически прикрепится', 'Чатты ашыңыз — концепт автоматты қосылады', 'Open a chat — the concept will attach automatically')
-                      : l('Выберите диалог слева', 'Сол жақтан таңдаңыз', 'Pick a conversation')}
+                      : l('Выберите диалог слева или создайте новый', 'Сол жақтан таңдаңыз немесе жаңа құрыңыз', 'Pick one on the left or start a new one')}
                   </div>
                   {pendingShare && (
                     <img src={pendingShare.imageUrl} alt="" className="mt-4 mx-auto max-h-40 rounded-2xl ring-1 ring-white/60 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18)]" />
