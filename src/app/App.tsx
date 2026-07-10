@@ -416,8 +416,10 @@ function AppContent() {
         </div>
       )}
 
-      {/* Mobile Header — glass */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 bg-white/70 backdrop-blur-2xl backdrop-saturate-150 border-b border-white/60 z-40 px-4 py-3 flex items-center justify-between">
+      {/* Mobile Header — glass. `glass-layer` keeps the frosted bar on its
+          own GPU layer so content scrolling underneath doesn't re-raster
+          the blur every frame (that was the scroll stutter). */}
+      <div className="glass-layer lg:hidden fixed top-0 left-0 right-0 bg-white/70 backdrop-blur-2xl backdrop-saturate-150 border-b border-white/60 z-40 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden bg-white/80 ring-1 ring-white/60">
             <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
@@ -472,7 +474,7 @@ function AppContent() {
             System) so the sidebar reads like a hierarchy rather than a
             flat list. Custom modules sit between Work and System.
             Active state = emerald gradient pill (matches brand). */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1">
+        <nav className="nav-scroll flex-1 px-3 py-4 overflow-y-auto space-y-1">
           {(() => {
             // Section labels — only rendered above the first VISIBLE item
             // of each section, so we don't show a label for an empty
@@ -713,7 +715,7 @@ function AppContent() {
 
       {/* Main Content. Platform AI assistant lives in two places per user's request:
           Telegram-bot is the primary channel (Block F), but a floating in-platform popup is also kept here for quick UI prompts. */}
-      <main className="flex-1 overflow-y-auto pt-[57px] lg:pt-0 relative">
+      <main className="content-scroll flex-1 overflow-y-auto pt-[57px] lg:pt-0 relative">
         {renderPage()}
         <AIAssistant
           context={currentPage as 'dashboard' | 'ai-design' | 'sales' | 'warehouse' | 'finance' | 'chats' | 'analytics' | 'tasks' | 'settings'}

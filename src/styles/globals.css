@@ -232,3 +232,35 @@ html {
     min-height: 40px;
   }
 }
+
+/* ─── Smooth scrolling next to frosted glass ─────────────────────────
+   The sidebar and the mobile top-bar use backdrop-filter (frosted glass).
+   A scroll container that sits over / inside a backdrop-filter region
+   makes the browser re-rasterize the blur on every scroll frame — that's
+   the visible stutter when scrolling the menu. We lift each scroll
+   container onto its own compositor layer and turn on momentum + scroll
+   containment so scrolling stays buttery on phone, tablet and desktop.
+
+   `.nav-scroll` is used ONLY where there are no position:fixed children
+   (the sidebar menu) — translateZ there is safe. `.content-scroll` is for
+   the main column, which DOES host fixed overlays/modals, so it must not
+   establish a containing block: no transform/contain, only momentum +
+   overscroll + a scroll-position hint. */
+.nav-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  will-change: scroll-position;
+  transform: translateZ(0);
+}
+.content-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  will-change: scroll-position;
+}
+
+/* Keep the frosted bars on their own GPU layer so scrolling content
+   underneath them doesn't force a full blur re-raster each frame. */
+.glass-layer {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
