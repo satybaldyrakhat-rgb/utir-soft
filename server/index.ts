@@ -850,7 +850,7 @@ app.post('/api/auth/forgot-password', rateLimit('forgot'), async (req, res) => {
   ).run(token, user.id, expiresAt);
 
   // Build the reset link. Frontend listens on /#/reset-password?token=XXX.
-  const origin = (req.headers.origin as string) || (req.headers.referer as string)?.replace(/\/$/, '') || 'https://utir-soft.vercel.app';
+  const origin = (req.headers.origin as string) || (req.headers.referer as string)?.replace(/\/$/, '') || 'https://utir-soft.com';
   const link = `${origin}/#/reset-password?token=${token}`;
   const tpl = passwordResetTemplate(link);
   const emailResult = await sendEmail(email, tpl.subject, tpl.html, tpl.text);
@@ -2965,7 +2965,7 @@ invitationsRouter.post('/', requireAdmin, async (req: AuthedRequest, res) => {
   let emailSent = false;
   if (email && isEmailReady()) {
     try {
-      const origin = (req.headers.origin as string) || (req.headers.referer as string) || 'https://utir-soft.vercel.app';
+      const origin = (req.headers.origin as string) || (req.headers.referer as string) || 'https://utir-soft.com';
       const link = `${origin.replace(/\/$/, '')}/?invite=${code}`;
       const tpl = inviteTemplate(inviter?.name || 'Admin', inviter?.company || '', safeRole, link);
       const r = await sendEmail(String(email).toLowerCase(), tpl.subject, tpl.html, tpl.text);

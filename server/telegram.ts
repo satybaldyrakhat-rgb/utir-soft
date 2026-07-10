@@ -224,7 +224,7 @@ export function teamInviteLink(code: string): string {
 
 // ─── Public order-tracking link (Trackpage) ────────────────────────
 // Frontend base URL where the SPA serves the #/track/<code> route.
-const APP_URL = (process.env.PUBLIC_APP_URL || 'https://utir-soft.vercel.app').replace(/\/+$/, '');
+const APP_URL = (process.env.PUBLIC_APP_URL || 'https://utir-soft.com').replace(/\/+$/, '');
 export function trackLink(code: string): string { return `${APP_URL}/#/track/${code}`; }
 // Get the deal's existing public track code or mint a new one. Used by
 // the web "Ссылка для клиента" button and the bot completion messages.
