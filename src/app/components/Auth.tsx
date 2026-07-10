@@ -1,5 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { Eye, EyeOff, ArrowLeft, Check, Loader2, Mail, ShieldCheck, ArrowRight, Package, ChevronRight, Phone } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Check, Loader2, Mail, ShieldCheck, ArrowRight, Package, ChevronRight, ChevronDown, Phone, Sparkles, BarChart3, MessageCircle } from 'lucide-react';
+
+// Country dial codes for the phone-login field. Kazakhstan first (primary
+// market); the rest cover neighbouring CIS countries.
+const DIAL_CODES = [
+  { flag: '🇰🇿', code: '+7' },
+  { flag: '🇺🇿', code: '+998' },
+  { flag: '🇰🇬', code: '+996' },
+  { flag: '🇹🇯', code: '+992' },
+  { flag: '🇦🇿', code: '+994' },
+  { flag: '🇹🇲', code: '+993' },
+  { flag: '🇬🇪', code: '+995' },
+];
 import profileLogo from '../../imports/utirsoft.png';
 import { api, setToken } from '../utils/api';
 
@@ -20,6 +32,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
   // Auth method within a tab: email/password or phone/SMS-code.
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [phone, setPhone] = useState('');
+  const [dialCode, setDialCode] = useState('+7');
   // Which flow the OTP screen is verifying — email confirmation or phone login.
   const [otpFor, setOtpFor] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
@@ -130,6 +143,20 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     return out;
   };
 
+  // National part only (no dial code), grouped 3-3-2-2. The dial code lives in
+  // its own dropdown, so the input shows just the local number.
+  const formatNational = (raw: string): string => {
+    let d = raw.replace(/\D/g, '');
+    if (d.length === 11 && (d[0] === '7' || d[0] === '8')) d = d.slice(1);
+    d = d.slice(0, 10);
+    let out = '';
+    if (d.length > 0) out += d.slice(0, 3);
+    if (d.length >= 4) out += ' ' + d.slice(3, 6);
+    if (d.length >= 7) out += ' ' + d.slice(6, 8);
+    if (d.length >= 9) out += ' ' + d.slice(8, 10);
+    return out;
+  };
+
   // Request an SMS code (phone login/signup) then jump to the OTP screen.
   const handlePhoneStart = async () => {
     let digits = phone.replace(/\D/g, '');
@@ -143,7 +170,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
     }
     setIsLoading(true); setError('');
     try {
-      const r = await api.post<{ ok: boolean; smsSent?: boolean; code?: string }>('/api/auth/phone/start', { phone, mode: tab, name, company });
+      const r = await api.post<{ ok: boolean; smsSent?: boolean; code?: string }>('/api/auth/phone/start', { phone: `${dialCode} ${formatNational(phone)}`, mode: tab, name, company });
       if (r.code) setDevVerificationCode(r.code);
       setOtpFor('phone'); setStep('otp');
     } catch (err: any) {
@@ -404,8 +431,9 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
       case 'console':
         return (
           <div>
-            {/* Brand header inside the console */}
-            <div className="flex flex-col items-center mb-6">
+            {/* Brand header inside the console — hidden on desktop where the
+                hero panel already shows the logo (avoids a duplicate logo). */}
+            <div className="flex flex-col items-center mb-6 lg:hidden">
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3 overflow-hidden bg-white/60 ring-1 ring-white/60 backdrop-blur-xl shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18),inset_0_1px_0_0_rgba(255,255,255,0.7)]">
                 <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
               </div>
@@ -447,7 +475,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                   <>
                     <div>
                       <label className="block text-[11px] text-slate-500 mb-1.5">{l('Ваше имя', 'Атыңыз', 'Your name')}</label>
-                      <input type="text" value={name} onChange={e => { setName(e.target.value); setError(''); }} placeholder={l('Иван Петров', 'Айбек Серіков', 'John Doe')} className={fieldCls} />
+                      <input type="text" value={name} onChange={e => { setName(e.target.value); setError(''); }} placeholder={l('Ваше имя', 'Атыңыз', 'Your name')} className={fieldCls} />
                     </div>
                     {!hasValidInvite && (
                       <div>
@@ -459,9 +487,21 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                 )}
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1.5">{l('Номер телефона', 'Телефон нөмірі', 'Phone number')}</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                    <input type="tel" value={phone ? formatKzPhone(phone) : ''} onChange={e => { setPhone(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handlePhoneStart()} placeholder="+7 700 000 00 00" autoFocus className={`${fieldCls} pl-10 tracking-wide`} />
+                  <div className="flex items-stretch gap-2">
+                    <div className="relative flex-shrink-0">
+                      <select
+                        value={dialCode}
+                        onChange={e => setDialCode(e.target.value)}
+                        className="h-full appearance-none bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl pl-3 pr-8 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer transition-all"
+                        aria-label={l('Код страны', 'Ел коды', 'Country code')}
+                      >
+                        {DIAL_CODES.map(c => (
+                          <option key={c.flag} value={c.code}>{c.flag} {c.code}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                    </div>
+                    <input type="tel" inputMode="numeric" value={formatNational(phone)} onChange={e => { setPhone(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handlePhoneStart()} placeholder="700 000 00 00" autoFocus className={`${fieldCls} flex-1 tracking-wide`} />
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1.5">{l('Пришлём 6-значный код в SMS', '6 санды кодты SMS-пен жібереміз', "We'll text a 6-digit code")}</p>
                 </div>
@@ -487,7 +527,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                   <label className="block text-[11px] text-slate-500 mb-1.5">Email</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                    <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleLogin()} placeholder="name@company.kz" autoFocus className={`${fieldCls} pl-10`} />
+                    <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleLogin()} placeholder="example@mail.kz" autoFocus className={`${fieldCls} pl-10`} />
                   </div>
                 </div>
                 <div>
@@ -528,7 +568,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                 )}
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1.5">{l('Ваше имя', 'Атыңыз', 'Your name')}</label>
-                  <input type="text" value={name} onChange={e => { setName(e.target.value); setError(''); }} placeholder={l('Иван Петров', 'Айбек Серіков', 'John Doe')} autoFocus className={fieldCls} />
+                  <input type="text" value={name} onChange={e => { setName(e.target.value); setError(''); }} placeholder={l('Ваше имя', 'Атыңыз', 'Your name')} autoFocus className={fieldCls} />
                 </div>
                 {!hasValidInvite && (
                   <div>
@@ -540,7 +580,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
                   <label className="block text-[11px] text-slate-500 mb-1.5">Email</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                    <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} placeholder="name@company.kz" className={`${fieldCls} pl-10`} />
+                    <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} placeholder="example@mail.kz" className={`${fieldCls} pl-10`} />
                   </div>
                 </div>
                 <div>
@@ -598,21 +638,17 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               </a>
             </div>
 
-            {/* Client cabinet entry — secondary, divided from the form,
-                refined glass row with icon chip + chevron. */}
+            {/* Client cabinet entry — refined emerald-tinted glass pill so it
+                reads as a distinct client action, not a clash with the form. */}
             <div className="mt-6 pt-5 border-t border-white/50">
+              <div className="text-center text-[10px] uppercase tracking-[0.14em] text-slate-400 mb-2.5">{l('Вы клиент?', 'Сіз клиентсіз бе?', 'Are you a client?')}</div>
               <button
                 onClick={() => { window.location.hash = '#/cabinet'; }}
-                className="group w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-white/45 ring-1 ring-white/60 backdrop-blur-xl hover:bg-white/75 hover:ring-white/80 transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]"
+                className="group w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-sky-500/10 ring-1 ring-emerald-500/20 hover:ring-emerald-500/35 hover:from-emerald-500/15 hover:via-teal-500/15 hover:to-sky-500/15 backdrop-blur-xl transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]"
               >
-                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-100 to-amber-50 ring-1 ring-amber-200/50 flex items-center justify-center text-amber-600 flex-shrink-0 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7)]">
-                  <Package className="w-4 h-4" strokeWidth={1.75} />
-                </span>
-                <span className="flex-1 text-left">
-                  <span className="block text-[12px] text-slate-800 leading-tight">{l('Кабинет клиента', 'Клиент кабинеті', 'Client cabinet')}</span>
-                  <span className="block text-[10px] text-slate-400 leading-tight mt-0.5">{l('Отследить свой заказ', 'Тапсырысты қадағалау', 'Track your order')}</span>
-                </span>
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                <Package className="w-4 h-4 text-emerald-600 flex-shrink-0" strokeWidth={1.75} />
+                <span className="text-[13px] text-slate-700 group-hover:text-slate-900 transition-colors">{l('Отследить свой заказ', 'Тапсырысты қадағалау', 'Track your order')}</span>
+                <ChevronRight className="w-4 h-4 text-emerald-500/70 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
               </button>
             </div>
           </div>
@@ -628,7 +664,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             </div>
             <h2 className="text-xl text-gray-900 mb-1">{otpFor === 'phone' ? l('Подтвердите номер', 'Нөмірді растаңыз', 'Verify your phone') : l('Подтвердите email', 'Email-ді растаңыз', 'Verify your email')}</h2>
             <p className="text-sm text-slate-500 mb-1">{l('Введите 6-значный код для', 'Растау үшін 6 санды кодты енгізіңіз', 'Enter the 6-digit code for')}</p>
-            <p className="text-sm text-gray-900 mb-5">{otpFor === 'phone' ? formatKzPhone(phone) : email}</p>
+            <p className="text-sm text-gray-900 mb-5">{otpFor === 'phone' ? `${dialCode} ${formatNational(phone)}` : email}</p>
 
             {/* Dev mode banner — real email/SMS sending is OFF; surface the code right here. */}
             {devVerificationCode && (
@@ -679,6 +715,9 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
       case 'forgot':
         return (
           <div>
+            <button onClick={goBack} className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 mb-4 transition-colors">
+              <ArrowLeft className="w-4 h-4" /> {l('Назад', 'Артқа', 'Back')}
+            </button>
             <h2 className="text-xl text-gray-900 mb-1">{l('Сбросить пароль', 'Құпия сөзді қалпына келтіру', 'Reset Password')}</h2>
             <p className="text-sm text-slate-500 mb-6">{l('Введите email и мы отправим ссылку', 'Email енгізіңіз, біз сілтеме жібереміз', 'Enter your email and we will send a link')}</p>
 
@@ -686,7 +725,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
               <label className="block text-[11px] text-slate-500 mb-1.5">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleForgotPassword()} placeholder="name@company.kz" autoFocus className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
+                <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} onKeyDown={e => e.key === 'Enter' && handleForgotPassword()} placeholder="example@mail.kz" autoFocus className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
               </div>
             </div>
 
@@ -783,7 +822,48 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
 
       {/* Centered glass console */}
       <div className="flex-1 flex items-center justify-center px-4 pb-8 relative">
-        <div className="w-full max-w-[400px]">
+        <div className={`w-full ${step === 'console'
+          ? 'max-w-[400px] lg:max-w-[900px] lg:grid lg:grid-cols-[1fr_400px] lg:gap-14 lg:items-center'
+          : 'max-w-[400px]'}`}>
+
+          {/* Desktop-only hero — fills the wide canvas so the sign-in screen
+              feels intentional on large monitors. Hidden below lg. */}
+          {step === 'console' && (
+            <div className="hidden lg:flex flex-col justify-center gap-7 pr-2">
+              <div className="flex items-center gap-3.5">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white/60 ring-1 ring-white/60 backdrop-blur-xl shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18),inset_0_1px_0_0_rgba(255,255,255,0.7)]">
+                  <img src={profileLogo} alt="Utir Soft" className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <div className="text-2xl text-slate-900 tracking-tight font-medium">Utir Soft</div>
+                  <div className="text-sm text-slate-500">{l('Платформа управления бизнесом', 'Бизнесті басқару платформасы', 'Business management platform')}</div>
+                </div>
+              </div>
+              <h2 className="text-[28px] leading-[1.2] text-slate-900 font-medium tracking-tight max-w-md [text-wrap:balance]">
+                {l('Заказы, финансы и команда — в одном месте', 'Тапсырыстар, қаржы, команда — бір жерде', 'Orders, finance & team — in one place')}
+              </h2>
+              <div className="flex flex-col gap-2.5 max-w-md">
+                {[
+                  { icon: Sparkles, t: l('AI-инструменты', 'AI-құралдар', 'AI tools'), d: l('Помощник и генерация контента', 'Көмекші және контент', 'Assistant & content') },
+                  { icon: BarChart3, t: l('Финансы и аналитика', 'Қаржы және аналитика', 'Finance & analytics'), d: l('Учёт в тенге, отчёты, налоги', 'Теңгемен есеп, есептер', 'KZT accounting & reports') },
+                  { icon: MessageCircle, t: l('Заказы и команда', 'Тапсырыстар және команда', 'Orders & team'), d: l('Воронка, задачи, чаты, роли', 'Воронка, тапсырма, чат', 'Pipeline, tasks, chats') },
+                ].map((f, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/40 ring-1 ring-white/50 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]">
+                    <span className="w-9 h-9 rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/20 flex items-center justify-center text-emerald-600 flex-shrink-0">
+                      <f.icon className="w-4 h-4" strokeWidth={1.75} />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-sm text-slate-800 leading-tight">{f.t}</div>
+                      <div className="text-xs text-slate-500 leading-tight mt-0.5">{f.d}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Console column */}
+          <div className="w-full">
           {/* Console — liquid-glass surface: frosted, specular top-edge
               highlight + deep layered shadow. Holds tabs + active form. */}
           <div className="bg-white/40 backdrop-blur-2xl backdrop-saturate-200 border border-white/50 rounded-[2rem] p-6 sm:p-8 shadow-[0_24px_64px_-20px_rgba(15,23,42,0.30),inset_0_1px_0_0_rgba(255,255,255,0.7)]">
@@ -802,6 +882,7 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
             {l(' и ', ' және ', ' & ')}
             <a href="#/privacy" className="underline hover:text-slate-600">{l('Политикой конфиденциальности', 'Құпиялылық саясатымен', 'Privacy Policy')}</a>
           </p>
+          </div>
         </div>
       </div>
     </div>
