@@ -645,7 +645,7 @@ export function Analytics({ language }: AnalyticsProps) {
                     {language === 'kz' ? 'Ай бойынша сатылым' : language === 'eng' ? 'Sales by Month' : 'Продажи по месяцам'}
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5">
-                    {language === 'kz' ? 'Соңғы 6 ай' : language === 'eng' ? 'Last 6 months' : 'Последние 6 месяцев'}
+                    {language === 'kz' ? `Соңғы ${monthlySales.length} ай` : language === 'eng' ? `Last ${monthlySales.length} months` : `Последние ${monthlySales.length} месяцев`}
                   </div>
                 </div>
                 <div className="text-right">
