@@ -697,15 +697,28 @@ export function Warehouse({ language }: WarehouseProps) {
   const outCount = products.filter(p => p.status === 'outofstock').length;
   const activeOrders = prodOrders.filter(o => o.status !== 'done').length;
 
+  // Single source of truth for stock status — same rule as deductMaterials,
+  // PO-receive and CSV import: qty <= 0 → out, qty < minQty → low, else in stock.
+  const computeStockStatus = (quantity: number, minQty: number): Product['status'] =>
+    quantity <= 0 ? 'outofstock' : quantity < (minQty || 0) ? 'low' : 'instock';
+
   const handleAdd = () => {
     if (newProduct.name && newProduct.supplier && newProduct.cost > 0) {
-      store.addProduct({ ...newProduct, status: newProduct.quantity > 20 ? 'instock' : newProduct.quantity > 0 ? 'low' : 'outofstock', minQty: 10 });
+      const minQty = 10;
+      store.addProduct({ ...newProduct, status: computeStockStatus(newProduct.quantity, minQty), minQty });
       setNewProduct({ name: '', category: defaultCategory, quantity: 0, unit: 'лист', supplier: '', cost: 0, niche: '' as string }); setShowAddModal(false);
     }
   };
 
   const handleSaveEdit = () => {
-    if (selectedProduct) { store.updateProduct(selectedProduct.id, selectedProduct); setShowEditModal(false); setSelectedProduct(null); }
+    if (selectedProduct) {
+      // Recompute status from the edited quantity/minQty — previously it saved
+      // the stale status verbatim, so 2 → 200 stayed «нет в наличии» and broke
+      // the low/out counters and the banner.
+      const status = computeStockStatus(selectedProduct.quantity, selectedProduct.minQty);
+      store.updateProduct(selectedProduct.id, { ...selectedProduct, status });
+      setShowEditModal(false); setSelectedProduct(null);
+    }
   };
 
   const statusConf = (s: Product['status']) => (({ instock: { dot: 'bg-green-500', label: l('Есть', 'Бар', 'In stock'), bg: 'bg-green-50 text-green-600' }, low: { dot: 'bg-yellow-500', label: l('Мало', 'Аз', 'Low'), bg: 'bg-yellow-50 text-yellow-600' }, outofstock: { dot: 'bg-red-500', label: l('Нет', 'Жоқ', 'Out'), bg: 'bg-red-50 text-red-600' } } as Record<string, { dot: string; label: string; bg: string }>)[s] || { dot: 'bg-slate-400', label: String(s || '—'), bg: 'bg-slate-100 text-slate-600' });
