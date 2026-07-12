@@ -87,9 +87,14 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
 
 interface Insight { kind: 'good' | 'warn' | 'bad' | 'info'; title: string; desc: string }
 
+// Money actually received = the real deal.paidAmount field, NOT production
+// progress. Previously paid was derived as amount*progress/100, so a deal
+// built 50% but unpaid looked 50% paid. paidAmount is the single source of truth.
+const paidOf = (d: Deal) => Math.max(0, Math.min(d.amount || 0, d.paidAmount || 0));
+
 function dealStatus(d: Deal): 'paid' | 'partial' | 'pending' {
   const amt = d.amount || 0;
-  const paid = Math.round(amt * (d.progress || 0) / 100);
+  const paid = paidOf(d);
   return paid >= amt && amt > 0 ? 'paid' : paid > 0 ? 'partial' : 'pending';
 }
 
@@ -102,8 +107,8 @@ function computeDealInsights(deals: Deal[], language: 'kz' | 'ru' | 'eng'): Insi
   const enriched = active.map(d => ({
     d,
     amt: d.amount || 0,
-    paid: Math.round((d.amount || 0) * (d.progress || 0) / 100),
-    due: (d.amount || 0) - Math.round((d.amount || 0) * (d.progress || 0) / 100),
+    paid: paidOf(d),
+    due: (d.amount || 0) - paidOf(d),
     status: dealStatus(d),
     age: d.date ? today.getTime() - new Date(d.date).getTime() : 0,
   }));
@@ -216,7 +221,7 @@ function computeFinanceInsights(transactions: FinanceTransaction[], language: 'k
 function buildFinanceContext(deals: Deal[], transactions: FinanceTransaction[], niche: NicheConfig): string {
   const active = deals.filter(d => d.status !== 'rejected');
   const billed = active.reduce((s, d) => s + (d.amount || 0), 0);
-  const paid   = active.reduce((s, d) => s + Math.round((d.amount || 0) * (d.progress || 0) / 100), 0);
+  const paid   = active.reduce((s, d) => s + paidOf(d), 0);
   const due    = billed - paid;
   const done   = transactions.filter(t => t.status === 'completed');
   const income  = done.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
@@ -234,7 +239,7 @@ function buildFinanceContext(deals: Deal[], transactions: FinanceTransaction[], 
     `Сделки: всего ${active.length}, к оплате ${fmt(billed)}, получено ${fmt(paid)}, остаток ${fmt(due)}.`,
     `Просроченных сделок: ${overdue.length}.`,
     overdue.length > 0
-      ? `Топ должников: ${overdue.slice(0, 5).map(d => `${d.customerName} (${fmt((d.amount || 0) - Math.round((d.amount || 0) * (d.progress || 0) / 100))})`).join(', ')}.`
+      ? `Топ должников: ${overdue.slice(0, 5).map(d => `${d.customerName} (${fmt((d.amount || 0) - paidOf(d))})`).join(', ')}.`
       : '',
     `Финансовые операции: доходы ${fmt(income)}, расходы ${fmt(expense)}, прибыль ${fmt(profit)}.`,
     `Маржа: ${income > 0 ? (profit / income * 100).toFixed(1) : 0}%.`,
@@ -438,7 +443,7 @@ function AIFinancePanel({ language, variant = 'deals', deals, transactions }: {
           customerName: d.customerName,
           product: d.product,
           amount: d.amount || 0,
-          paid: Math.round((d.amount || 0) * (d.progress || 0) / 100),
+          paid: paidOf(d),
           status: dealStatus(d),
           date: d.date,
         }));
@@ -670,10 +675,11 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
 
   const enriched = active.map(d => {
     const amount = d.amount || 0;
-    const pct = d.progress || 0;
-    const paid = Math.round(amount * pct / 100);
+    const paid = paidOf(d);
     const due = amount - paid;
-    const status: StatusFilter = pct >= 100 ? 'paid' : pct > 0 ? 'partial' : 'pending';
+    // Payment percentage (money received / billed), not production progress.
+    const pct = amount > 0 ? Math.round(paid / amount * 100) : 0;
+    const status: StatusFilter = paid >= amount && amount > 0 ? 'paid' : paid > 0 ? 'partial' : 'pending';
     return { ...d, _amount: amount, _paid: paid, _due: due, _pct: pct, _status: status };
   });
 

@@ -36,7 +36,10 @@ export function OrderManagement({ language }: { language: 'kz' | 'ru' | 'eng' })
     const linkedExpenses = expenseByDeal.get(d.id) || 0;
     const hasRealExpenses = expenseByDeal.has(d.id);
     const profit = d.amount - linkedExpenses;
-    const status: Order['status'] = (d.progress || 0) >= 100 ? 'completed' : (d.progress || 0) > 0 ? 'partial' : 'pending';
+    // Payment status «Оплачен/Частично/Ожидает» — from real money received
+    // (paidAmount), not production progress.
+    const paid = Math.max(0, Math.min(d.amount || 0, d.paidAmount || 0));
+    const status: Order['status'] = paid >= (d.amount || 0) && (d.amount || 0) > 0 ? 'completed' : paid > 0 ? 'partial' : 'pending';
     return {
       id: d.id, name: d.product, client: d.customerName,
       master: (d as any).manager || d.designer || d.measurer || '—',

@@ -207,7 +207,8 @@ export function Finance({ language }: FinanceProps) {
         const today = new Date();
         const rows = active.map(d => {
           const amount = d.amount || 0;
-          const paid = Math.round(amount * (d.progress || 0) / 100);
+          // Real money received, not production progress.
+          const paid = Math.max(0, Math.min(amount, d.paidAmount || 0));
           const outstanding = amount - paid;
           const daysOverdue = d.date ? Math.max(0, Math.floor((today.getTime() - new Date(d.date).getTime()) / (24 * 3600 * 1000)) - 14) : 0;
           return { id: d.id, customerName: d.customerName, product: d.product, outstanding, daysOverdue };
@@ -221,7 +222,7 @@ export function Finance({ language }: FinanceProps) {
         const inflows: any[] = [];
         for (const d of store.deals) {
           if (d.status === 'rejected' || !d.amount) continue;
-          const paid = Math.round((d.amount || 0) * (d.progress || 0) / 100);
+          const paid = Math.max(0, Math.min(d.amount || 0, d.paidAmount || 0));
           const outstanding = (d.amount || 0) - paid;
           if (outstanding <= 0) continue;
           // Prefer planned dates when set. For deals without either
@@ -700,7 +701,7 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
         ? getNiche(selected.niche || store.niche).name.ru
         : undefined;
       if (docKind === 'invoice') {
-        const paidAmount = Math.round((selected.amount || 0) * (selected.progress || 0) / 100);
+        const paidAmount = Math.max(0, Math.min(selected.amount || 0, selected.paidAmount || 0));
         await pdf.generateInvoicePDF({
           id: selected.id,
           customerName: selected.customerName,
