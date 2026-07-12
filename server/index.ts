@@ -388,6 +388,9 @@ migrateColumn('team_settings', 'lead_form_code', 'TEXT');
 // Drives whether we show the first-time setup wizard. Once completed=true
 // the user won't see the wizard again unless explicitly reset.
 migrateColumn('team_settings', 'onboarding', 'TEXT');
+// Company profile shown in Settings → Общие (name/BIN/address/logo). Team-wide
+// branding used in invoice / akt PDF headers. Was localStorage-only before.
+migrateColumn('team_settings', 'company_profile', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -2708,6 +2711,43 @@ requisitesRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
   res.json({ ok: true, requisites: clean });
 });
 app.use('/api/team/requisites', requisitesRouter);
+
+// ─── Company profile (Settings → Общие) ──────────────────────────────
+// Team-wide company branding: name / BIN / address / contacts / logo.
+// Persisted so it syncs across devices and teammates (invoices/PDF use it).
+// Separate from `company_requisites` (legal/tax) — this is the lighter
+// profile card. Logo stored as a base64 data-URL (capped).
+const companyRouter = express.Router();
+companyRouter.use(authMiddleware);
+const DEFAULT_COMPANY = { companyName: '', companyBIN: '', companyAddress: '', companyEmail: '', companyPhone: '', companyLogo: '' };
+companyRouter.get('/', (req: AuthedRequest, res) => {
+  try {
+    const row = db.prepare('SELECT company_profile FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+    res.json(row?.company_profile ? { ...DEFAULT_COMPANY, ...JSON.parse(row.company_profile) } : DEFAULT_COMPANY);
+  } catch { res.json(DEFAULT_COMPANY); }
+});
+companyRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
+  const b = req.body || {};
+  const logo = String(b.companyLogo || '');
+  const clean = {
+    companyName:    String(b.companyName    || '').slice(0, 200),
+    companyBIN:     String(b.companyBIN     || '').slice(0, 20),
+    companyAddress: String(b.companyAddress || '').slice(0, 300),
+    companyEmail:   String(b.companyEmail   || '').slice(0, 100),
+    companyPhone:   String(b.companyPhone   || '').slice(0, 40),
+    // Cap the logo data-URL so a huge upload can't bloat the row. ~1MB base64.
+    companyLogo:    logo.startsWith('data:') ? logo.slice(0, 1_400_000) : '',
+  };
+  db.prepare(`
+    INSERT INTO team_settings (team_id, company_profile, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET
+      company_profile = excluded.company_profile,
+      updated_at = excluded.updated_at
+  `).run(req.teamId!, JSON.stringify(clean));
+  res.json({ ok: true, company: clean });
+});
+app.use('/api/team/company', companyRouter);
 
 // ─── Team catalogs (Product templates / Materials / Hardware / Addons /
 //     Furniture types) ─────────────────────────────────────────────

@@ -880,9 +880,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [addActivity]);
 
   const updateProfile = useCallback((updates: Partial<UserProfile>) => {
+    const COMPANY_KEYS: (keyof UserProfile)[] = ['companyName', 'companyBIN', 'companyAddress', 'companyEmail', 'companyPhone', 'companyLogo'];
     setProfile(prev => {
       const next = { ...prev, ...updates };
       saveProfile(next);
+      // If any company-branding field changed, persist it team-wide so it
+      // syncs across devices/teammates and reaches invoice/PDF headers.
+      if (getToken() && COMPANY_KEYS.some(k => k in updates)) {
+        api.put('/api/team/company', {
+          companyName: next.companyName, companyBIN: next.companyBIN,
+          companyAddress: next.companyAddress, companyEmail: next.companyEmail,
+          companyPhone: next.companyPhone, companyLogo: next.companyLogo,
+        }).catch(() => {});
+      }
       return next;
     });
   }, []);
@@ -1133,7 +1143,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Matrix-gated reads (deals/products/transactions/activity) may return
       // 403 for a role whose matrix entry is 'none'. Swallow so the UI still
       // boots — the sidebar item for that module is hidden anyway.
-      const [d, e, t, p, tx, ig, al, ai, rp, cat, prof] = await Promise.all([
+      const [d, e, t, p, tx, ig, al, ai, rp, cat, prof, comp] = await Promise.all([
         api.get<Deal[]>('/api/deals').catch(() => [] as Deal[]),
         api.get<Employee[]>('/api/employees'),
         api.get<Task[]>('/api/tasks'),
@@ -1149,6 +1159,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         // labels and the first-run wizard. Swallow errors to null so
         // a missing endpoint doesn't break the whole reload.
         api.get<{ niche: string; secondaryNiches?: string[]; onboarding: { completed: boolean; step?: string; completedAt?: string } } | null>('/api/team/profile').catch(() => null),
+        // Company branding (name/BIN/address/logo) — team-wide, backend-persisted.
+        api.get<Partial<UserProfile>>('/api/team/company').catch(() => null),
       ]);
       setDeals(d); setEmployees(e); setTasks(t); setProducts(p);
       setTransactions(tx); setIntegrations(ig); setActivityLogs(al);
@@ -1158,6 +1170,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setNicheState(prof.niche || 'furniture');
         setSecondaryNichesState(Array.isArray(prof.secondaryNiches) ? prof.secondaryNiches : []);
         setOnboardingState(prof.onboarding || { completed: false });
+      }
+      // Merge team-wide company branding over the local (personal) profile.
+      // Personal fields (name/avatar) stay local; company fields come from server.
+      if (comp) {
+        setProfile(prev => {
+          const next = { ...prev, ...comp };
+          saveProfile(next);
+          return next;
+        });
       }
       // If backend returned catalogs, use them as the source of truth (team-wide).
       // Local cache stays as offline fallback.
