@@ -27,6 +27,8 @@ export function MetaCapiDashboard({ language }: Props) {
   const [events, setEvents] = useState<Ev[]>([]);
   const [creatives, setCreatives] = useState<any[]>([]);
   const [crMeta, setCrMeta] = useState<{ configured: boolean; ok?: boolean; error?: string | null }>({ configured: false });
+  const [aud, setAud] = useState<{ adsConfigured: boolean; audienceId: string | null; syncedAt: string | null; count: number } | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
 
@@ -53,14 +55,16 @@ export function MetaCapiDashboard({ language }: Props) {
       setPixelId(c.pixelId || '');
       setTestCode(c.testEventCode || '');
       if (c.connected) {
-        const [s, e, cr] = await Promise.all([
+        const [s, e, cr, au] = await Promise.all([
           api.get<Stats>('/api/meta-capi/stats').catch(() => null),
           api.get<Ev[]>('/api/meta-capi/events').catch(() => []),
           api.get<{ configured: boolean; ok?: boolean; error?: string | null; creatives: any[] }>('/api/meta-capi/creatives').catch(() => null),
+          api.get<{ adsConfigured: boolean; audienceId: string | null; syncedAt: string | null; count: number }>('/api/meta-capi/audience').catch(() => null),
         ]);
         if (s) setStats(s);
         setEvents(e || []);
         if (cr) { setCreatives(cr.creatives || []); setCrMeta({ configured: cr.configured, ok: cr.ok, error: cr.error }); }
+        if (au) setAud(au);
       }
     } catch { /* ignore */ }
     finally { setLoading(false); }
@@ -78,6 +82,18 @@ export function MetaCapiDashboard({ language }: Props) {
       await load();
     } catch { toast(l('Не удалось сохранить', 'Сақталмады', 'Save failed')); }
     finally { setSaving(false); }
+  };
+
+  const syncAudience = async () => {
+    setSyncing(true);
+    try {
+      const r = await api.post<{ ok: boolean; count: number }>('/api/meta-capi/audience/sync', {});
+      toast(`${l('Выгружено клиентов', 'Клиент жүктелді', 'Clients uploaded')}: ${r.count}`, 'success');
+      await load();
+    } catch (e: any) {
+      const code = String(e?.message || '');
+      toast(code === 'meta_ads_not_configured' ? l('Сначала подключите Meta Ads', 'Алдымен Meta Ads қосыңыз', 'Connect Meta Ads first') : l('Не удалось синхронизировать', 'Синхрондау сәтсіз', 'Sync failed'));
+    } finally { setSyncing(false); }
   };
 
   const runTest = async () => {
@@ -196,6 +212,31 @@ export function MetaCapiDashboard({ language }: Props) {
           <div className="text-[11px] text-slate-400 mt-1.5">{l('Телефон, имя, город, external_id передаются. Добавьте email/fbc для роста EMQ.', 'Телефон, аты, қала, external_id. Email/fbc қосыңыз.', 'Phone, name, city, external_id sent. Add email/fbc.')}</div>
         </div>
       </div>
+
+      {/* Lookalike-аудитория */}
+      {aud?.adsConfigured && (
+        <div className={`${GLASS} p-5`}>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-violet-50 flex items-center justify-center flex-shrink-0"><Users className="w-5 h-5 text-violet-600" /></div>
+              <div>
+                <div className="text-sm text-slate-900 font-medium">{l('Lookalike — похожие на покупателей', 'Lookalike — сатып алушыларға ұқсас', 'Lookalike — similar to buyers')}</div>
+                <div className="text-xs text-slate-500 mt-0.5 max-w-lg">
+                  {aud.audienceId
+                    ? `${l('В аудитории', 'Аудиторияда', 'In audience')}: ${aud.count} ${l('клиентов', 'клиент', 'clients')} · ${l('обновлено', 'жаңартылды', 'updated')} ${ago(aud.syncedAt)}`
+                    : l('Выгрузите успешных клиентов в Meta — создайте по ним lookalike-аудиторию в Ads Manager.', 'Сәтті клиенттерді Meta-ға жүктеп, lookalike жасаңыз.', 'Upload successful clients to Meta and build a lookalike in Ads Manager.')}
+                </div>
+              </div>
+            </div>
+            {canWrite && (
+              <button onClick={syncAudience} disabled={syncing} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex-shrink-0">
+                {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />} {aud.audienceId ? l('Обновить аудиторию', 'Аудиторияны жаңарту', 'Update audience') : l('Выгрузить клиентов', 'Клиенттерді жүктеу', 'Upload clients')}
+              </button>
+            )}
+          </div>
+          {aud.audienceId && <div className="text-[11px] text-slate-400 mt-3">{l('Дальше: Ads Manager → Аудитории → Создать lookalike по этой аудитории.', 'Ары қарай: Ads Manager → Аудиториялар → осы аудитория бойынша lookalike.', 'Next: Ads Manager → Audiences → create a lookalike from this audience.')}</div>}
+        </div>
+      )}
 
       {/* ROI по креативам (Meta Marketing API) */}
       <div className={`${GLASS} overflow-hidden`}>

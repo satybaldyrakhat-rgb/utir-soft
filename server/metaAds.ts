@@ -1,6 +1,7 @@
-// ─── Meta Marketing API — расход и результаты по креативам ───────────
-// Тянет insights на уровне объявления (ad) из рекламного аккаунта, чтобы
-// показать ROI по каждому креативу: расход × заявки × продажи из Meta.
+// ─── Meta Marketing API — расход, ROI по креативам, аудитории ────────
+// Тянет insights на уровне объявления (ad) из рекламного аккаунта и
+// управляет Custom Audience для lookalike (выгрузка успешных клиентов).
+import { createHash } from 'crypto';
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v21.0';
 
 export interface CreativeRow {
@@ -63,4 +64,58 @@ export async function fetchCreativeInsights(cfg: MetaAdsConfig, datePreset = 'la
   } catch (e: any) {
     return { ok: false, creatives: [], error: String(e?.message || e) };
   }
+}
+
+// ─── Custom Audience для lookalike ───────────────────────────────────
+function sha256(v: string): string { return createHash('sha256').update(v).digest('hex'); }
+function normEmail(v?: string): string { return String(v || '').trim().toLowerCase(); }
+function normPhone(v?: string): string {
+  let d = String(v || '').replace(/\D/g, '');
+  if (d.length === 11 && d.startsWith('8')) d = '7' + d.slice(1);
+  return d;
+}
+
+// Строит payload для загрузки пользователей в аудиторию (хешируем email+phone).
+export function buildAudiencePayload(rows: Array<{ email?: string; phone?: string }>): { schema: string[]; data: string[][] } {
+  const data = rows.map(r => [
+    r.email ? sha256(normEmail(r.email)) : '',
+    r.phone && normPhone(r.phone) ? sha256(normPhone(r.phone)) : '',
+  ]).filter(row => row[0] || row[1]);
+  return { schema: ['EMAIL', 'PHONE'], data };
+}
+
+// Создаёт Custom Audience (seed для lookalike). Возвращает id.
+export async function createCustomAudience(cfg: MetaAdsConfig, name: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const acct = cfg.adAccountId.startsWith('act_') ? cfg.adAccountId : `act_${cfg.adAccountId}`;
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(acct)}/customaudiences`;
+  try {
+    const resp = await fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name, subtype: 'CUSTOM',
+        description: 'UTIR Soft — успешные клиенты (для lookalike)',
+        customer_file_source: 'USER_PROVIDED_ONLY',
+        access_token: cfg.accessToken,
+      }),
+    });
+    const json: any = await resp.json().catch(() => ({}));
+    if (!resp.ok || json?.error) return { ok: false, error: json?.error?.message || `HTTP ${resp.status}` };
+    return { ok: true, id: json.id };
+  } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
+}
+
+// Загружает хешированных пользователей в аудиторию.
+export async function addUsersToAudience(cfg: MetaAdsConfig, audienceId: string, rows: Array<{ email?: string; phone?: string }>): Promise<{ ok: boolean; received?: number; error?: string }> {
+  const payload = buildAudiencePayload(rows);
+  if (payload.data.length === 0) return { ok: true, received: 0 };
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(audienceId)}/users`;
+  try {
+    const resp = await fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload, access_token: cfg.accessToken }),
+    });
+    const json: any = await resp.json().catch(() => ({}));
+    if (!resp.ok || json?.error) return { ok: false, error: json?.error?.message || `HTTP ${resp.status}` };
+    return { ok: true, received: json.num_received ?? payload.data.length };
+  } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
 }

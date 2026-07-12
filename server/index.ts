@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
-import { fetchCreativeInsights } from './metaAds.js';
+import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
@@ -3134,6 +3134,60 @@ metaCapiRouter.get('/creatives', requireRole('manager'), async (req: AuthedReque
   const payload = { configured: true, ok: r.ok, error: r.error || null, creatives: r.creatives };
   if (r.ok) creativesCache.set(key, { at: Date.now(), data: payload });
   res.json(payload);
+});
+
+// ─── Lookalike: выгрузка успешных клиентов в Custom Audience ─────────
+// Собирает клиентов из выигранных сделок (хеш email/phone) и заливает в
+// Meta Custom Audience, чтобы затем построить lookalike в Ads Manager.
+function saveAudienceId(teamId: string, audienceId: string, count: number) {
+  let cfg: any = readMetaCapi(teamId);
+  cfg = { ...cfg, lookalikeAudienceId: audienceId, lookalikeSyncedAt: new Date().toISOString(), lookalikeCount: count };
+  db.prepare(`
+    INSERT INTO team_settings (team_id, meta_capi, updated_at) VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET meta_capi = excluded.meta_capi, updated_at = excluded.updated_at
+  `).run(teamId, JSON.stringify(cfg));
+}
+metaCapiRouter.get('/audience', requireRole('manager'), (req: AuthedRequest, res) => {
+  const cfg: any = readMetaCapi(req.teamId!);
+  const adsCfg = readMetaAdsConfig(req.teamId!);
+  res.json({
+    adsConfigured: !!(adsCfg.adAccountId && adsCfg.accessToken),
+    audienceId: cfg.lookalikeAudienceId || null,
+    syncedAt: cfg.lookalikeSyncedAt || null,
+    count: cfg.lookalikeCount || 0,
+  });
+});
+metaCapiRouter.post('/audience/sync', requireRole('admin'), async (req: AuthedRequest, res) => {
+  const adsCfg = readMetaAdsConfig(req.teamId!);
+  if (!adsCfg.adAccountId || !adsCfg.accessToken) return res.status(400).json({ error: 'meta_ads_not_configured' });
+
+  // Клиенты из выигранных сделок — уникальные по телефону/email.
+  const rows = db.prepare('SELECT data FROM deals WHERE team_id = ?').all(req.teamId!) as any[];
+  const seen = new Set<string>();
+  const clients: Array<{ email?: string; phone?: string }> = [];
+  for (const r of rows) {
+    try {
+      const d = JSON.parse(r.data);
+      if (d.status !== 'completed') continue;
+      const key = (d.phone || '').replace(/\D/g, '') || (d.email || '').toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      clients.push({ email: d.email, phone: d.phone });
+    } catch { /* skip */ }
+  }
+  if (clients.length === 0) return res.json({ ok: true, count: 0, note: 'no_won_clients' });
+
+  const cfg: any = readMetaCapi(req.teamId!);
+  let audienceId = cfg.lookalikeAudienceId as string | undefined;
+  if (!audienceId) {
+    const created = await createCustomAudience({ adAccountId: adsCfg.adAccountId, accessToken: adsCfg.accessToken }, 'UTIR — успешные клиенты');
+    if (!created.ok || !created.id) return res.status(502).json({ error: created.error || 'create_failed' });
+    audienceId = created.id;
+  }
+  const up = await addUsersToAudience({ adAccountId: adsCfg.adAccountId, accessToken: adsCfg.accessToken }, audienceId, clients);
+  if (!up.ok) return res.status(502).json({ error: up.error || 'upload_failed' });
+  saveAudienceId(req.teamId!, audienceId, clients.length);
+  res.json({ ok: true, audienceId, count: clients.length, received: up.received });
 });
 app.use('/api/meta-capi', metaCapiRouter);
 
