@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Search, Send, Paperclip, MessageCircle, Bot, Check, CheckCheck, Plus, X, Play, Pause, Edit2, Trash2, Copy, Users, TrendingUp, Calendar, Clock, Zap, MessageSquare, Settings, BarChart3, Eye, ArrowRight, Circle, ShoppingCart, ExternalLink, Phone, Mic, FileText, Image as ImageIcon, Film, StopCircle, Sparkles, Key, Heart, Hand, AlarmClock, Briefcase, Smile } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { TextMessage, ImageMessage, FileMessage, VoiceMessage, CallMessage } from './ChatMessageTypes';
@@ -141,12 +141,9 @@ export function Chats({ language }: ChatsProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlatforms, setSelectedPlatforms] = useState<Chat['platform'][]>([]);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
-  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(0);
-  const [showCallModal, setShowCallModal] = useState(false);
-  const [isInCall, setIsInCall] = useState(false);
-  const [callDuration, setCallDuration] = useState(0);
+  // Voice messages, calls and the fake file picker were removed until real
+  // audio/telephony/upload exists. Real file attachment now uses this input.
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
 
   // Pending hand-off from AIDesign — when AI Design fires
@@ -326,19 +323,34 @@ export function Chats({ language }: ChatsProps) {
     return s && f && u;
   });
 
-  const handleSendFile = (type: 'document' | 'image' | 'video') => {
-    const d = { document: { fileName: 'Договор.pdf', fileSize: '1.2 MB', type: 'file' as const }, image: { fileName: 'Дизайн.jpg', fileUrl: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=600', type: 'image' as const }, video: { fileName: 'Обзор.mp4', fileSize: '5.8 MB', type: 'video' as const } }[type];
-    setShowAttachmentMenu(false);
-    postMessage({ type: d.type, text: '', fileName: d.fileName, fileSize: (d as any).fileSize, fileUrl: (d as any).fileUrl });
+  // Real file attachment: read the picked file as a base64 data URL and send
+  // it as a real message (image / video / document by MIME). Same approach as
+  // document upload in ClientOrderModal. Capped at 8 MB.
+  const MAX_ATTACH = 8 * 1024 * 1024;
+  const humanSize = (bytes: number) => bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  const handleFilePicked = async (fileList: FileList | null) => {
+    const file = fileList?.[0];
+    if (file) {
+      if (file.size > MAX_ATTACH) {
+        toast(l('Файл больше 8 МБ', 'Файл 8 МБ-тан үлкен', 'File larger than 8 MB'));
+      } else {
+        try {
+          const dataUrl: string = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(String(r.result));
+            r.onerror = () => reject(r.error || new Error('read failed'));
+            r.readAsDataURL(file);
+          });
+          const kind = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file';
+          await postMessage({ type: kind as Message['type'], text: '', fileName: file.name, fileSize: humanSize(file.size), fileUrl: dataUrl });
+        } catch {
+          toast(l('Не удалось прикрепить файл', 'Файл тіркелмеді', 'Could not attach file'));
+        }
+      }
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
-  const startRecording = () => { setIsRecording(true); setRecordingDuration(0); const i = setInterval(() => setRecordingDuration(p => p + 1), 1000); (window as any).recInt = i; };
-  const stopRecording = () => { clearInterval((window as any).recInt); setIsRecording(false); };
-  const sendVoiceMessage = () => { postMessage({ type: 'voice', text: '', duration: `0:${recordingDuration.toString().padStart(2, '0')}` }); stopRecording(); setRecordingDuration(0); };
-  const cancelRecording = () => { stopRecording(); setRecordingDuration(0); };
   const toggleVoicePlay = (id: string) => { if (playingVoiceId === id) setPlayingVoiceId(null); else { setPlayingVoiceId(id); setTimeout(() => setPlayingVoiceId(null), 3000); } };
-  const startCall = () => { setShowCallModal(true); setIsInCall(false); setCallDuration(0); setTimeout(() => { setIsInCall(true); const i = setInterval(() => setCallDuration(p => p + 1), 1000); (window as any).callInt = i; }, 2000); };
-  const endCall = () => { clearInterval((window as any).callInt); postMessage({ type: 'call', text: translations.call[language], callStatus: 'outgoing', duration: `${Math.floor(callDuration / 60)}:${(callDuration % 60).toString().padStart(2, '0')}` }); setShowCallModal(false); setIsInCall(false); setCallDuration(0); };
-  const formatDuration = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
   const tabItems = [
     { id: 'chats' as const, icon: MessageCircle, label: l('Диалоги', 'Диалогтар', 'Dialogs') },
@@ -535,7 +547,6 @@ export function Chats({ language }: ChatsProps) {
                       <div className="text-[11px] text-slate-400 truncate">{platformName(selectedChat.platform)}{selectedChat.online && <span className="text-emerald-600"> · online</span>}</div>
                     </div>
                     {selectedChat.orderId && <button onClick={() => toast(`Заказ #${selectedChat.orderId}`)} className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-white/50 ring-1 ring-white/60 text-slate-600 rounded-xl hover:bg-white/80 text-xs transition-all"><ShoppingCart className="w-3.5 h-3.5" />#{selectedChat.orderId}</button>}
-                    <button onClick={startCall} className="w-9 h-9 flex items-center justify-center bg-white/50 ring-1 ring-white/60 hover:bg-white/80 rounded-xl transition-all flex-shrink-0"><Phone className="w-4 h-4 text-slate-500" /></button>
                   </div>
 
                   <div className="nav-scroll flex-1 overflow-y-auto px-4 py-5">
@@ -572,25 +583,15 @@ export function Chats({ language }: ChatsProps) {
                   </div>
 
                   <div className="px-3 pb-3 pt-2 flex-shrink-0">
-                    {isRecording && (
-                      <div className="mb-2 max-w-2xl mx-auto bg-rose-50/80 ring-1 ring-rose-100/60 rounded-2xl px-4 py-2.5 flex items-center gap-3">
-                        <span className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
-                        <span className="text-xs text-rose-600 flex-1">{l('Запись', 'Жазу', 'Recording')} {formatDuration(recordingDuration)}</span>
-                        <button onClick={sendVoiceMessage} className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs">{l('Отправить', 'Жіберу', 'Send')}</button>
-                        <button onClick={cancelRecording} className="px-3 py-1 bg-white/70 text-slate-600 rounded-lg text-xs ring-1 ring-white/60">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
-                      </div>
-                    )}
                     <div className="flex items-end gap-1 max-w-2xl mx-auto bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-[20px] p-1.5 focus-within:ring-2 focus-within:ring-emerald-500/40 focus-within:bg-white/75 transition-all">
-                      <div className="relative">
-                        <button onClick={() => setShowAttachmentMenu(!showAttachmentMenu)} className="w-9 h-9 flex items-center justify-center hover:bg-white/70 rounded-full transition-all"><Paperclip className="w-4 h-4 text-slate-400" /></button>
-                        {showAttachmentMenu && (
-                          <div className={`absolute bottom-full left-0 mb-2 p-1.5 min-w-[170px] z-10 ${GLASS}`}>
-                            {[{ type: 'document' as const, icon: FileText, color: 'text-sky-500', label: l('Документ', 'Құжат', 'Document') }, { type: 'image' as const, icon: ImageIcon, color: 'text-emerald-500', label: l('Фото', 'Фото', 'Photo') }, { type: 'video' as const, icon: Film, color: 'text-violet-500', label: l('Видео', 'Видео', 'Video') }].map(a => (
-                              <button key={a.type} onClick={() => handleSendFile(a.type)} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/60 rounded-xl text-xs text-slate-700 transition-colors"><a.icon className={`w-4 h-4 ${a.color}`} />{a.label}</button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.webp,.heic,.mp4,.mov,.webm"
+                        onChange={e => handleFilePicked(e.target.files)}
+                      />
+                      <button onClick={() => fileInputRef.current?.click()} disabled={!canWrite} title={l('Прикрепить файл', 'Файл тіркеу', 'Attach file')} className="w-9 h-9 flex items-center justify-center hover:bg-white/70 rounded-full transition-all disabled:opacity-40"><Paperclip className="w-4 h-4 text-slate-400" /></button>
                       <textarea
                         value={newMessage}
                         onChange={e => setNewMessage(e.target.value)}
@@ -601,7 +602,6 @@ export function Chats({ language }: ChatsProps) {
                         className="flex-1 px-2 py-2 bg-transparent text-sm text-slate-800 focus:outline-none placeholder:text-slate-400 resize-none"
                         style={{ minHeight: '38px', maxHeight: '120px' }}
                       />
-                      <button onClick={isRecording ? stopRecording : startRecording} disabled={!canWrite} className={`w-9 h-9 flex items-center justify-center rounded-full transition-all flex-shrink-0 ${isRecording ? 'bg-rose-500 text-white' : 'hover:bg-white/70 text-slate-400'} disabled:opacity-40`}>{isRecording ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}</button>
                       <button onClick={handleSendMessage} disabled={!newMessage.trim() || !canWrite} className={`w-9 h-9 flex items-center justify-center rounded-full transition-all flex-shrink-0 ${newMessage.trim() && canWrite ? 'bg-emerald-600 text-white shadow-[0_6px_16px_-6px_var(--accent-shadow)] hover:bg-emerald-700' : 'text-slate-300'}`}><Send className="w-4 h-4" /></button>
                     </div>
                   </div>
@@ -913,18 +913,6 @@ export function Chats({ language }: ChatsProps) {
         </div>
         );
       })()}
-
-      {/* Call Modal */}
-      {showCallModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-72 p-6 text-center shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/12 flex items-center justify-center mx-auto mb-3"><Phone className={`w-6 h-6 ${isInCall ? 'text-emerald-600' : 'text-slate-400'}`} /></div>
-            <div className="text-sm text-slate-900 mb-1">{selectedChat?.name}</div>
-            <div className="text-xs text-slate-400 mb-4">{isInCall ? formatDuration(callDuration) : l('Вызов...', 'Қоңырау...', 'Calling...')}</div>
-            <button onClick={endCall} className="w-12 h-12 bg-rose-500 rounded-full flex items-center justify-center mx-auto hover:bg-rose-600 transition-colors"><Phone className="w-5 h-5 text-white rotate-[135deg]" /></button>
-          </div>
-        </div>
-      )}
 
       {/* New-conversation modal — creates a shared team thread. */}
       {showNewChat && (
