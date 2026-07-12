@@ -18,7 +18,17 @@ import { INTEGRATION_CATALOG, getAllStatuses as getIntegrationStatuses, saveConf
 import { createHmac, randomBytes } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const JWT_SECRET = process.env.JWT_SECRET || 'utir-soft-dev-secret-change-me';
+// Dev flag: enables the local secret fallback and surfacing OTP/reset codes in
+// API responses when no email/SMS provider is configured. NEVER true in prod.
+const DEV = process.env.NODE_ENV !== 'production';
+// JWT secret must be set in production. In dev we allow a fixed fallback so
+// local login keeps working; in prod an unset secret is a hard startup error
+// (forgeable tokens otherwise).
+const JWT_SECRET = process.env.JWT_SECRET || (DEV ? 'utir-soft-dev-secret-change-me' : '');
+if (!JWT_SECRET) {
+  console.error('[FATAL] JWT_SECRET must be set in production (NODE_ENV=production). Refusing to start.');
+  process.exit(1);
+}
 const PORT = Number(process.env.PORT) || 4010;
 const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'utir.db');
 
@@ -517,7 +527,25 @@ function seedIntegrations(userId: string) {
 }
 
 const app = express();
-app.use(cors());
+// CORS: в проде ограничиваем список origin через env CORS_ORIGINS
+// (запятые). Без токена запросы (curl/мобильные/same-origin) всегда
+// разрешены. В dev — всё разрешено (localhost:5173 и т.п.). Если
+// CORS_ORIGINS не задан в проде — не ломаем деплой (разрешаем), но
+// предупреждаем в лог, чтобы админ включил ограничение.
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+if (!DEV && ALLOWED_ORIGINS.length === 0) {
+  console.warn('[security] CORS_ORIGINS не задан — CORS открыт. Укажите домены фронтенда, чтобы ограничить.');
+}
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);                       // curl / mobile / same-origin
+    if (DEV) return cb(null, true);                           // dev: любой origin
+    if (ALLOWED_ORIGINS.length === 0) return cb(null, true);  // не настроено — не ломаем прод
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 // Bumped to 25MB because AI-design img2img sends base64 images for the room
 // photo + up to 3 reference shots in one body.
 app.use(express.json({ limit: '25mb' }));
@@ -819,7 +847,8 @@ app.post('/api/auth/signup', rateLimit('signup'), async (req, res) => {
     user: { id, email, name, company: finalCompany, emailVerified: false, teamRole: joinRole },
     // Only include the code when no email was actually sent — protects against
     // leaking the code in the response once real email is wired up.
-    verificationCode: emailResult.ok ? undefined : verifyCode,
+    // Код возвращаем только в dev без отправленного письма — в проде никогда.
+    verificationCode: (!emailResult.ok && DEV) ? verifyCode : undefined,
     emailSent: emailResult.ok,
   });
 });
@@ -869,7 +898,7 @@ app.post('/api/auth/resend-code', rateLimit('resend-code'), authMiddleware, asyn
   const emailResult = await sendEmail(user.email, otp.subject, otp.html, otp.text);
   res.json({
     // Dev fallback: surface the code so the OTP screen still works when no email provider.
-    verificationCode: emailResult.ok ? undefined : code,
+    verificationCode: (!emailResult.ok && DEV) ? code : undefined,
     emailSent: emailResult.ok,
   });
 });
@@ -927,8 +956,8 @@ app.post('/api/auth/forgot-password', rateLimit('forgot'), async (req, res) => {
     ok: true,
     emailSent: emailResult.ok,
     // Dev fallback — when no email provider is configured, surface the
-    // token so the user can still complete the flow locally.
-    resetToken: emailResult.ok ? undefined : token,
+    // token so the user can still complete the flow locally. Never in prod.
+    resetToken: (!emailResult.ok && DEV) ? token : undefined,
   });
 });
 
@@ -1075,7 +1104,7 @@ app.post('/api/auth/phone/start', rateLimit('phone'), async (req, res) => {
     db.prepare('UPDATE users SET phone_code = ? WHERE id = ?').run(code, existing.id);
   }
   const sms = await sendSms(norm, code);
-  res.json({ ok: true, smsSent: sms.ok, code: sms.ok ? undefined : code });
+  res.json({ ok: true, smsSent: sms.ok, code: (!sms.ok && DEV) ? code : undefined });
 });
 
 app.post('/api/auth/phone/verify', rateLimit('phone'), (req, res) => {
