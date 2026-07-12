@@ -352,12 +352,6 @@ export function Chats({ language }: ChatsProps) {
     </button>
   );
 
-  // Glass filter-chip class for the conversation list toolbar.
-  const chipCls = (active: boolean) => `px-2.5 py-1.5 rounded-xl text-[11px] whitespace-nowrap transition-all ${
-    active ? 'bg-emerald-600 text-white shadow-[0_4px_12px_-4px_var(--accent-shadow)] ring-1 ring-white/10'
-           : 'bg-white/50 text-slate-500 ring-1 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
-  }`;
-
   const currentScenario = scenariosData.find(s => s.id === scenarioModal);
 
   // ─── Defensive view-gate ────────────────────────────────────────
@@ -437,204 +431,193 @@ export function Chats({ language }: ChatsProps) {
       <div className="flex-1 overflow-hidden">
         {/* ===== CHATS TAB ===== */}
         {activeTab === 'chats' && (
-          <div className="flex h-full gap-3 p-3 md:p-4">
-            {/* ─── Conversation list — floating glass card ────────── */}
-            <div className={`w-full md:w-80 lg:w-96 flex-col overflow-hidden ${GLASS} ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
-              <div className="p-3 space-y-2 border-b border-white/50 flex-shrink-0">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                  <input type="text" placeholder={l('Поиск диалогов...', 'Диалог іздеу...', 'Search chats...')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2.5 bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm text-slate-800 focus:outline-none focus:bg-white/80 focus:ring-2 focus:ring-emerald-500/40 placeholder:text-slate-400 transition-all" />
+          <div className="h-full p-3 md:p-4">
+            {/* One calm glass surface, split by a hairline: list + thread.
+                Minimalist: flat rows, soft round avatars, single accent. */}
+            <div className={`h-full flex overflow-hidden ${GLASS}`}>
+
+              {/* ─── Conversations column ──────────────────────────── */}
+              <div className={`w-full md:w-[340px] flex-col border-r border-white/50 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
+                {/* Search + new */}
+                <div className="flex items-center gap-2 p-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                    <input type="text" placeholder={l('Поиск', 'Іздеу', 'Search')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2.5 bg-white/50 ring-1 ring-white/60 rounded-2xl text-sm text-slate-800 focus:outline-none focus:bg-white/80 focus:ring-2 focus:ring-emerald-500/40 placeholder:text-slate-400 transition-all" />
+                  </div>
+                  {canWrite && (
+                    <button onClick={() => setShowNewChat(true)} title={l('Новый диалог', 'Жаңа диалог', 'New chat')} className="w-10 h-10 flex-shrink-0 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 hover:bg-emerald-700 transition-all">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
-                <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(false); }} className={chipCls(selectedPlatforms.length === 0 && !showUnreadOnly)}>{l('Все', 'Бәрі', 'All')} {chats.length}</button>
-                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(true); }} className={chipCls(showUnreadOnly)}>{l('Новые', 'Жаңа', 'New')} {chats.filter(c => c.unreadCount).length}</button>
+                {/* Segmented filter + compact per-channel toggles */}
+                <div className="flex items-center gap-1 px-3 pb-2.5">
+                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(false); }} className={`px-3 py-1.5 rounded-xl text-xs transition-all ${!showUnreadOnly ? 'bg-emerald-600 text-white shadow-[0_4px_12px_-4px_var(--accent-shadow)]' : 'text-slate-500 hover:bg-white/50'}`}>{l('Все', 'Барлығы', 'All')}</button>
+                  <button onClick={() => { setSelectedPlatforms([]); setShowUnreadOnly(true); }} className={`px-3 py-1.5 rounded-xl text-xs inline-flex items-center gap-1.5 transition-all ${showUnreadOnly ? 'bg-emerald-600 text-white shadow-[0_4px_12px_-4px_var(--accent-shadow)]' : 'text-slate-500 hover:bg-white/50'}`}>
+                    {l('Непрочит.', 'Оқылмаған', 'Unread')}
+                    {chats.filter(c => c.unreadCount).length > 0 && <span className={`text-[10px] px-1.5 rounded-full ${showUnreadOnly ? 'bg-white/25' : 'bg-emerald-100 text-emerald-700'}`}>{chats.filter(c => c.unreadCount).length}</span>}
+                  </button>
+                  <div className="flex-1" />
                   {(['whatsapp', 'telegram', 'instagram'] as Chat['platform'][]).map(p => (
-                    <button key={p} onClick={() => togglePlatform(p)} className={`${chipCls(selectedPlatforms.includes(p))} inline-flex items-center gap-1`}>{platformDot(p)} {platformName(p)?.slice(0, 2)}</button>
+                    <button key={p} onClick={() => togglePlatform(p)} title={platformName(p)} className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all [&>svg]:w-4 [&>svg]:h-4 ${selectedPlatforms.includes(p) ? 'bg-emerald-500/15 ring-1 ring-emerald-500/30' : 'opacity-45 hover:opacity-100 hover:bg-white/50'}`}>{platformDot(p)}</button>
                   ))}
                 </div>
-                {canWrite && (
-                  <button onClick={() => setShowNewChat(true)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_var(--accent-shadow)] transition-all">
-                    <Plus className="w-3.5 h-3.5" /> {l('Новый диалог', 'Жаңа диалог', 'New chat')}
-                  </button>
-                )}
-              </div>
-              <div className="nav-scroll flex-1 overflow-y-auto p-2 space-y-1">
-                {loadingChats ? (
-                  <div className="space-y-2 p-1">
-                    {[0, 1, 2, 3].map(i => <div key={i} className="h-[68px] bg-white/50 rounded-2xl animate-pulse" />)}
-                  </div>
-                ) : filteredChats.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-white/50 ring-1 ring-white/60 flex items-center justify-center mb-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7)]"><MessageCircle className="w-6 h-6 text-emerald-500/70" /></div>
-                    <p className="text-sm text-slate-700 mb-1">
-                      {chats.length === 0
-                        ? l('Пока нет диалогов', 'Әзірге диалог жоқ', 'No conversations yet')
-                        : l('Чатов не найдено', 'Чаттар табылмады', 'No chats found')}
-                    </p>
-                    {chats.length === 0 ? (
-                      <>
-                        <p className="text-[11px] text-slate-400 max-w-[240px] leading-relaxed mb-3">
-                          {l(
-                            'Создайте первый диалог с клиентом — вся переписка сохраняется и видна всей команде.',
-                            'Клиентпен бірінші диалогты бастаңыз — жазысу сақталып, бүкіл командаға көрінеді.',
-                            'Start the first client conversation — the whole thread is saved and shared with your team.',
+                <div className="h-px bg-white/50 mx-3 flex-shrink-0" />
+                {/* Rows */}
+                <div className="nav-scroll flex-1 overflow-y-auto py-1.5">
+                  {loadingChats ? (
+                    <div className="space-y-1 px-2">{[0, 1, 2, 3].map(i => <div key={i} className="h-16 bg-white/40 rounded-2xl animate-pulse" />)}</div>
+                  ) : filteredChats.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full px-8 text-center">
+                      <div className="w-14 h-14 rounded-full bg-white/50 ring-1 ring-white/60 flex items-center justify-center mb-3"><MessageCircle className="w-6 h-6 text-emerald-500/70" /></div>
+                      <p className="text-sm text-slate-700 mb-1">
+                        {chats.length === 0 ? l('Пока нет диалогов', 'Әзірге диалог жоқ', 'No conversations yet') : l('Ничего не найдено', 'Ештеңе табылмады', 'Nothing found')}
+                      </p>
+                      {chats.length === 0 ? (
+                        <>
+                          <p className="text-[11px] text-slate-400 max-w-[230px] leading-relaxed mb-3">
+                            {l('Создайте первый диалог — вся переписка сохраняется и видна команде.', 'Бірінші диалогты бастаңыз — жазысу сақталып, командаға көрінеді.', 'Start the first conversation — it is saved and shared with your team.')}
+                          </p>
+                          {canWrite && (
+                            <button onClick={() => setShowNewChat(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[11px] hover:bg-emerald-700 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_var(--accent-shadow)] transition-all">
+                              <Plus className="w-3.5 h-3.5" /> {l('Новый диалог', 'Жаңа диалог', 'New chat')}
+                            </button>
                           )}
-                        </p>
-                        {canWrite && (
-                          <button
-                            onClick={() => setShowNewChat(true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[11px] hover:bg-emerald-700 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_var(--accent-shadow)] transition-all mb-2"
-                          >
-                            <Plus className="w-3.5 h-3.5" /> {l('Новый диалог', 'Жаңа диалог', 'New chat')}
-                          </button>
-                        )}
-                        <button
-                          onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'settings', tab: 'integrations' } }))}
-                          className="block mx-auto text-[11px] text-slate-400 hover:text-slate-700 transition-colors"
-                        >
-                          {l('или подключить мессенджеры →', 'немесе мессенджерлерді қосу →', 'or connect messengers →')}
-                        </button>
-                      </>
-                    ) : (
-                      <p className="text-[11px] text-slate-400">{l('Сбросьте фильтры', 'Сүзгілерді тастаңыз', 'Reset filters')}</p>
-                    )}
-                  </div>
-                ) : filteredChats.map(chat => (
-                  <button key={chat.id} onClick={() => handleChatSelect(chat)} className={`w-full p-2.5 rounded-2xl text-left transition-all ${selectedChat?.id === chat.id ? 'bg-emerald-500/10 ring-1 ring-emerald-500/25' : 'ring-1 ring-transparent hover:bg-white/60 hover:ring-white/60'}`}>
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex-shrink-0">
-                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white text-sm font-medium ring-1 ring-white/50 shadow-[0_4px_12px_-4px_var(--accent-shadow-sm)]" style={{ background: 'linear-gradient(135deg, var(--accent-500), var(--accent-700))' }}>{chat.name.charAt(0)}</div>
-                        <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white ring-1 ring-white/70 flex items-center justify-center shadow-sm">{platformDot(chat.platform)}</span>
-                        {chat.online && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5 gap-2">
-                          <span className="text-sm text-slate-900 truncate">{chat.name}</span>
-                          <span className="text-[10px] text-slate-400 flex-shrink-0">{chat.time}</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={`text-xs truncate flex-1 ${chat.unreadCount ? 'text-slate-600' : 'text-slate-400'}`}>{chat.lastMessage || '—'}</p>
-                          {chat.unreadCount ? (
-                            <span className="min-w-[18px] h-[18px] bg-emerald-600 rounded-full flex items-center justify-center text-[10px] text-white px-1 shadow-sm flex-shrink-0">{chat.unreadCount}</span>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* ─── Thread — floating glass card ───────────────────── */}
-            {selectedChat ? (
-              <div className={`flex-1 flex flex-col overflow-hidden ${GLASS}`}>
-                <div className="px-4 py-3 border-b border-white/50 flex items-center gap-3 flex-shrink-0">
-                  <button onClick={() => setSelectedChat(null)} className="md:hidden w-8 h-8 flex items-center justify-center hover:bg-white/70 ring-1 ring-transparent hover:ring-white/60 rounded-xl transition-all">
-                    <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                  </button>
-                  <div className="relative flex-shrink-0">
-                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-sm font-medium ring-1 ring-white/50 shadow-[0_4px_12px_-4px_var(--accent-shadow-sm)]" style={{ background: 'linear-gradient(135deg, var(--accent-500), var(--accent-700))' }}>{selectedChat.name.charAt(0)}</div>
-                    <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white ring-1 ring-white/70 flex items-center justify-center shadow-sm">{platformDot(selectedChat.platform)}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-slate-900 truncate">{selectedChat.name}</div>
-                    <div className="flex items-center gap-1.5 mt-0.5"><span className="text-[10px] text-slate-400">{platformName(selectedChat.platform)}</span>{selectedChat.online && <span className="text-[10px] text-emerald-600">• online</span>}</div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {selectedChat.orderId && <button onClick={() => toast(`Заказ #${selectedChat.orderId}`)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/60 ring-1 ring-white/60 text-slate-600 rounded-xl hover:bg-white/90 text-xs transition-all"><ShoppingCart className="w-3.5 h-3.5" />#{selectedChat.orderId}</button>}
-                    <button onClick={startCall} className="w-9 h-9 flex items-center justify-center bg-white/50 ring-1 ring-white/60 hover:bg-white/80 rounded-xl transition-all"><Phone className="w-4 h-4 text-slate-500" /></button>
-                  </div>
-                </div>
-
-                <div className="nav-scroll flex-1 overflow-y-auto p-4">
-                  <div className="space-y-2.5 max-w-3xl mx-auto">
-                    {selectedChat.orderId && (
-                      <div className="flex justify-center my-3"><span className="bg-white/60 backdrop-blur-xl px-3 py-1 rounded-full text-[10px] text-slate-500 ring-1 ring-white/60">{l('Привязан к заказу', 'Тапсырысқа байланысты', 'Linked to order')} #{selectedChat.orderId}</span></div>
-                    )}
-                    {loadingMessages ? (
-                      <div className="space-y-3 py-4">
-                        <div className="flex justify-start"><div className="h-10 w-44 bg-white/60 rounded-2xl animate-pulse" /></div>
-                        <div className="flex justify-end"><div className="h-10 w-56 bg-emerald-500/15 rounded-2xl animate-pulse" /></div>
-                        <div className="flex justify-start"><div className="h-10 w-36 bg-white/60 rounded-2xl animate-pulse" /></div>
-                      </div>
-                    ) : (
-                      <>
-                        {messages.length > 0 && (
-                          <div className="flex justify-center my-2"><span className="bg-white/60 backdrop-blur-xl px-3 py-1 rounded-full text-[10px] text-slate-500 ring-1 ring-white/60">{l('Сегодня', 'Бүгін', 'Today')}</span></div>
-                        )}
-                        {messages.map(m => (
-                          <div key={m.id} className={`flex ${m.isUser ? 'justify-end' : 'justify-start'}`}>
-                            <div className="max-w-[80%] md:max-w-md">
-                              <TextMessage message={m} language={language} />
-                              <ImageMessage message={m} language={language} />
-                              <FileMessage message={m} language={language} />
-                              <VoiceMessage message={m} language={language} playingVoiceId={playingVoiceId} onToggleVoicePlay={toggleVoicePlay} />
-                              <CallMessage message={m} language={language} />
-                            </div>
-                          </div>
-                        ))}
-                        {messages.length === 0 && (
-                          <div className="flex flex-col items-center justify-center py-16 text-center">
-                            <div className="w-12 h-12 rounded-2xl bg-white/50 ring-1 ring-white/60 flex items-center justify-center mb-3"><MessageCircle className="w-5 h-5 text-slate-300" /></div>
-                            <div className="text-xs text-slate-400">{l('Начните переписку — напишите первым', 'Жазысуды бастаңыз', 'Start the conversation — say hi')}</div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-3 border-t border-white/50 flex-shrink-0">
-                  {isRecording && (
-                    <div className="mb-2 max-w-3xl mx-auto bg-rose-50/80 ring-1 ring-rose-100/60 rounded-2xl px-4 py-2.5 flex items-center gap-3">
-                      <span className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
-                      <span className="text-xs text-rose-600 flex-1">{l('Запись', 'Жазу', 'Recording')} {formatDuration(recordingDuration)}</span>
-                      <button onClick={sendVoiceMessage} className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs">{l('Отправить', 'Жіберу', 'Send')}</button>
-                      <button onClick={cancelRecording} className="px-3 py-1 bg-white/70 text-slate-600 rounded-lg text-xs ring-1 ring-white/60">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
-                    </div>
-                  )}
-                  <div className="flex items-end gap-1 max-w-3xl mx-auto bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-1.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]">
-                    <div className="relative">
-                      <button onClick={() => setShowAttachmentMenu(!showAttachmentMenu)} className="w-9 h-9 flex items-center justify-center hover:bg-white/70 rounded-xl transition-all"><Paperclip className="w-4 h-4 text-slate-400" /></button>
-                      {showAttachmentMenu && (
-                        <div className={`absolute bottom-full left-0 mb-2 p-1.5 min-w-[170px] z-10 ${GLASS}`}>
-                          {[{ type: 'document' as const, icon: FileText, color: 'text-sky-500', label: l('Документ', 'Құжат', 'Document') }, { type: 'image' as const, icon: ImageIcon, color: 'text-emerald-500', label: l('Фото', 'Фото', 'Photo') }, { type: 'video' as const, icon: Film, color: 'text-violet-500', label: l('Видео', 'Видео', 'Video') }].map(a => (
-                            <button key={a.type} onClick={() => handleSendFile(a.type)} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/60 rounded-xl text-xs text-slate-700 transition-colors"><a.icon className={`w-4 h-4 ${a.color}`} />{a.label}</button>
-                          ))}
-                        </div>
+                        </>
+                      ) : (
+                        <p className="text-[11px] text-slate-400">{l('Измените запрос или фильтр', 'Сұрауды өзгертіңіз', 'Try another search or filter')}</p>
                       )}
                     </div>
-                    <textarea
-                      value={newMessage}
-                      onChange={e => setNewMessage(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-                      placeholder={canWrite ? l('Сообщение...', 'Хабарлама...', 'Message...') : l('Только просмотр', 'Тек көру', 'View only')}
-                      readOnly={!canWrite}
-                      rows={1}
-                      className="flex-1 px-2 py-2 bg-transparent text-sm text-slate-800 focus:outline-none placeholder:text-slate-400 resize-none"
-                      style={{ minHeight: '38px', maxHeight: '120px' }}
-                    />
-                    <button onClick={isRecording ? stopRecording : startRecording} disabled={!canWrite} className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all ${isRecording ? 'bg-rose-500 text-white' : 'hover:bg-white/70 text-slate-400'} disabled:opacity-40 disabled:cursor-not-allowed`}>{isRecording ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}</button>
-                    <button onClick={handleSendMessage} disabled={!newMessage.trim() || !canWrite} className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all ${newMessage.trim() && canWrite ? 'bg-emerald-600 text-white shadow-[0_6px_16px_-6px_var(--accent-shadow)] hover:bg-emerald-700' : 'bg-white/40 text-slate-300'}`}><Send className="w-4 h-4" /></button>
-                  </div>
+                  ) : filteredChats.map(chat => {
+                    const active = selectedChat?.id === chat.id;
+                    return (
+                      <button key={chat.id} onClick={() => handleChatSelect(chat)} className={`relative w-full flex items-center gap-3 pl-4 pr-3 py-2.5 text-left transition-colors ${active ? 'bg-emerald-500/8' : 'hover:bg-white/45'}`}>
+                        {active && <span className="absolute left-1.5 top-1/2 -translate-y-1/2 h-7 w-1 rounded-full bg-emerald-600" />}
+                        <div className="relative flex-shrink-0">
+                          <div className="w-11 h-11 rounded-full flex items-center justify-center text-emerald-700 text-sm font-medium bg-gradient-to-br from-emerald-50 to-teal-50 ring-1 ring-emerald-100/70">{chat.name.charAt(0)}</div>
+                          <span className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full bg-white ring-1 ring-white/70 flex items-center justify-center shadow-sm [&>svg]:w-3 [&>svg]:h-3">{platformDot(chat.platform)}</span>
+                          {chat.online && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-[13.5px] truncate ${active || chat.unreadCount ? 'text-slate-900 font-medium' : 'text-slate-800'}`}>{chat.name}</span>
+                            <span className="text-[10px] text-slate-400 flex-shrink-0">{chat.time}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 mt-0.5">
+                            <p className={`text-xs truncate flex-1 ${chat.unreadCount ? 'text-slate-600' : 'text-slate-400'}`}>{chat.lastMessage || '—'}</p>
+                            {chat.unreadCount ? <span className="min-w-[18px] h-[18px] bg-emerald-600 rounded-full flex items-center justify-center text-[10px] text-white px-1 flex-shrink-0">{chat.unreadCount}</span> : null}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            ) : (
-              <div className={`flex-1 hidden md:flex items-center justify-center ${GLASS}`}>
-                <div className="text-center max-w-sm px-6">
-                  <div className="w-16 h-16 rounded-3xl bg-white/50 ring-1 ring-white/60 flex items-center justify-center mx-auto mb-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7)]"><MessageCircle className="w-7 h-7 text-emerald-500/70" /></div>
-                  <div className="text-sm text-slate-700">{l('Выберите диалог', 'Диалог таңдаңыз', 'Select a conversation')}</div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    {pendingShare
-                      ? l('Откройте чат — концепт автоматически прикрепится', 'Чатты ашыңыз — концепт автоматты қосылады', 'Open a chat — the concept will attach automatically')
-                      : l('Выберите диалог слева или создайте новый', 'Сол жақтан таңдаңыз немесе жаңа құрыңыз', 'Pick one on the left or start a new one')}
+
+              {/* ─── Thread column ─────────────────────────────────── */}
+              {selectedChat ? (
+                <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                  <div className="px-4 py-3 border-b border-white/50 flex items-center gap-3 flex-shrink-0">
+                    <button onClick={() => setSelectedChat(null)} className="md:hidden w-8 h-8 -ml-1 flex items-center justify-center hover:bg-white/60 rounded-xl transition-all">
+                      <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <div className="relative flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-emerald-700 text-sm font-medium bg-gradient-to-br from-emerald-50 to-teal-50 ring-1 ring-emerald-100/70">{selectedChat.name.charAt(0)}</div>
+                      <span className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full bg-white ring-1 ring-white/70 flex items-center justify-center shadow-sm [&>svg]:w-3 [&>svg]:h-3">{platformDot(selectedChat.platform)}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-slate-900 font-medium truncate">{selectedChat.name}</div>
+                      <div className="text-[11px] text-slate-400 truncate">{platformName(selectedChat.platform)}{selectedChat.online && <span className="text-emerald-600"> · online</span>}</div>
+                    </div>
+                    {selectedChat.orderId && <button onClick={() => toast(`Заказ #${selectedChat.orderId}`)} className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-white/50 ring-1 ring-white/60 text-slate-600 rounded-xl hover:bg-white/80 text-xs transition-all"><ShoppingCart className="w-3.5 h-3.5" />#{selectedChat.orderId}</button>}
+                    <button onClick={startCall} className="w-9 h-9 flex items-center justify-center bg-white/50 ring-1 ring-white/60 hover:bg-white/80 rounded-xl transition-all flex-shrink-0"><Phone className="w-4 h-4 text-slate-500" /></button>
                   </div>
-                  {pendingShare && (
-                    <img src={pendingShare.imageUrl} alt="" className="mt-4 mx-auto max-h-40 rounded-2xl ring-1 ring-white/60 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18)]" />
-                  )}
+
+                  <div className="nav-scroll flex-1 overflow-y-auto px-4 py-5">
+                    <div className="space-y-2 max-w-2xl mx-auto">
+                      {loadingMessages ? (
+                        <div className="space-y-3 py-2">
+                          <div className="flex justify-start"><div className="h-9 w-44 bg-white/50 rounded-2xl animate-pulse" /></div>
+                          <div className="flex justify-end"><div className="h-9 w-56 bg-emerald-500/12 rounded-2xl animate-pulse" /></div>
+                          <div className="flex justify-start"><div className="h-9 w-36 bg-white/50 rounded-2xl animate-pulse" /></div>
+                        </div>
+                      ) : messages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                          <div className="w-12 h-12 rounded-full bg-white/50 ring-1 ring-white/60 flex items-center justify-center mb-3"><MessageCircle className="w-5 h-5 text-slate-300" /></div>
+                          <div className="text-xs text-slate-400">{l('Пусто — напишите первым', 'Бос — бірінші жазыңыз', 'Empty — say hi first')}</div>
+                        </div>
+                      ) : (
+                        <>
+                          {selectedChat.orderId && <div className="text-center text-[10px] text-slate-400 mb-3">{l('Привязан к заказу', 'Тапсырысқа байланысты', 'Linked to order')} #{selectedChat.orderId}</div>}
+                          <div className="text-center text-[10px] uppercase tracking-wider text-slate-400 mb-3">{l('Сегодня', 'Бүгін', 'Today')}</div>
+                          {messages.map(m => (
+                            <div key={m.id} className={`flex ${m.isUser ? 'justify-end' : 'justify-start'}`}>
+                              <div className="max-w-[82%] md:max-w-[70%]">
+                                <TextMessage message={m} language={language} />
+                                <ImageMessage message={m} language={language} />
+                                <FileMessage message={m} language={language} />
+                                <VoiceMessage message={m} language={language} playingVoiceId={playingVoiceId} onToggleVoicePlay={toggleVoicePlay} />
+                                <CallMessage message={m} language={language} />
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="px-3 pb-3 pt-2 flex-shrink-0">
+                    {isRecording && (
+                      <div className="mb-2 max-w-2xl mx-auto bg-rose-50/80 ring-1 ring-rose-100/60 rounded-2xl px-4 py-2.5 flex items-center gap-3">
+                        <span className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+                        <span className="text-xs text-rose-600 flex-1">{l('Запись', 'Жазу', 'Recording')} {formatDuration(recordingDuration)}</span>
+                        <button onClick={sendVoiceMessage} className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs">{l('Отправить', 'Жіберу', 'Send')}</button>
+                        <button onClick={cancelRecording} className="px-3 py-1 bg-white/70 text-slate-600 rounded-lg text-xs ring-1 ring-white/60">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
+                      </div>
+                    )}
+                    <div className="flex items-end gap-1 max-w-2xl mx-auto bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-[20px] p-1.5 focus-within:ring-2 focus-within:ring-emerald-500/40 focus-within:bg-white/75 transition-all">
+                      <div className="relative">
+                        <button onClick={() => setShowAttachmentMenu(!showAttachmentMenu)} className="w-9 h-9 flex items-center justify-center hover:bg-white/70 rounded-full transition-all"><Paperclip className="w-4 h-4 text-slate-400" /></button>
+                        {showAttachmentMenu && (
+                          <div className={`absolute bottom-full left-0 mb-2 p-1.5 min-w-[170px] z-10 ${GLASS}`}>
+                            {[{ type: 'document' as const, icon: FileText, color: 'text-sky-500', label: l('Документ', 'Құжат', 'Document') }, { type: 'image' as const, icon: ImageIcon, color: 'text-emerald-500', label: l('Фото', 'Фото', 'Photo') }, { type: 'video' as const, icon: Film, color: 'text-violet-500', label: l('Видео', 'Видео', 'Video') }].map(a => (
+                              <button key={a.type} onClick={() => handleSendFile(a.type)} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/60 rounded-xl text-xs text-slate-700 transition-colors"><a.icon className={`w-4 h-4 ${a.color}`} />{a.label}</button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <textarea
+                        value={newMessage}
+                        onChange={e => setNewMessage(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                        placeholder={canWrite ? l('Сообщение', 'Хабарлама', 'Message') : l('Только просмотр', 'Тек көру', 'View only')}
+                        readOnly={!canWrite}
+                        rows={1}
+                        className="flex-1 px-2 py-2 bg-transparent text-sm text-slate-800 focus:outline-none placeholder:text-slate-400 resize-none"
+                        style={{ minHeight: '38px', maxHeight: '120px' }}
+                      />
+                      <button onClick={isRecording ? stopRecording : startRecording} disabled={!canWrite} className={`w-9 h-9 flex items-center justify-center rounded-full transition-all flex-shrink-0 ${isRecording ? 'bg-rose-500 text-white' : 'hover:bg-white/70 text-slate-400'} disabled:opacity-40`}>{isRecording ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}</button>
+                      <button onClick={handleSendMessage} disabled={!newMessage.trim() || !canWrite} className={`w-9 h-9 flex items-center justify-center rounded-full transition-all flex-shrink-0 ${newMessage.trim() && canWrite ? 'bg-emerald-600 text-white shadow-[0_6px_16px_-6px_var(--accent-shadow)] hover:bg-emerald-700' : 'text-slate-300'}`}><Send className="w-4 h-4" /></button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="flex-1 hidden md:flex items-center justify-center">
+                  <div className="text-center max-w-xs px-6">
+                    <div className="w-16 h-16 rounded-full bg-white/50 ring-1 ring-white/60 flex items-center justify-center mx-auto mb-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7)]"><MessageCircle className="w-7 h-7 text-emerald-500/70" /></div>
+                    <div className="text-sm text-slate-700">{l('Выберите диалог', 'Диалог таңдаңыз', 'Select a conversation')}</div>
+                    <div className="text-xs text-slate-400 mt-1">
+                      {pendingShare
+                        ? l('Откройте чат — концепт прикрепится', 'Чатты ашыңыз — концепт қосылады', 'Open a chat — the concept attaches')
+                        : l('Слева выберите диалог или создайте новый', 'Сол жақтан таңдаңыз немесе жаңасын құрыңыз', 'Pick one on the left or start a new one')}
+                    </div>
+                    {pendingShare && (
+                      <img src={pendingShare.imageUrl} alt="" className="mt-4 mx-auto max-h-40 rounded-2xl ring-1 ring-white/60 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18)]" />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
