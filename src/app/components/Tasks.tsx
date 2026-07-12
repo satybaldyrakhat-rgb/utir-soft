@@ -82,7 +82,7 @@ const columns = [
 ];
 
 const priorityConfig: Record<string, { label: { ru: string; kz: string; eng: string }; color: string; bg: string }> = {
-  low: { label: { ru: 'Низкий', kz: 'Төмен', eng: 'Low' }, color: 'text-gray-500', bg: 'bg-gray-100' },
+  low: { label: { ru: 'Низкий', kz: 'Төмен', eng: 'Low' }, color: 'text-slate-500', bg: 'bg-slate-100' },
   medium: { label: { ru: 'Средний', kz: 'Орташа', eng: 'Medium' }, color: 'text-blue-600', bg: 'bg-blue-50' },
   high: { label: { ru: 'Высокий', kz: 'Жоғары', eng: 'High' }, color: 'text-orange-600', bg: 'bg-orange-50' },
   urgent: { label: { ru: 'Срочно', kz: 'Шұғыл', eng: 'Urgent' }, color: 'text-red-600', bg: 'bg-red-50' },
@@ -144,6 +144,8 @@ export function Tasks({ language }: TasksProps) {
   const [showBotSettings, setShowBotSettings] = useState(false);
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  // Overflow «•••» menu — keeps the header minimal (Telegram / export / import).
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -191,6 +193,23 @@ export function Tasks({ language }: TasksProps) {
     return flow[current] || null;
   };
 
+  // CSV export moved out of JSX to keep the header minimal.
+  const exportTasks = () => {
+    const cols: CsvColumn<StoreTask>[] = [
+      { header: 'ID',           value: 'id' },
+      { header: 'Название',     value: 'title' },
+      { header: 'Описание',     value: 'description' },
+      { header: 'Категория',    value: 'category' },
+      { header: 'Статус',       value: 'status' },
+      { header: 'Приоритет',    value: 'priority' },
+      { header: 'Исполнитель',  value: (t) => store.getEmployeeById(t.assigneeId)?.name || '' },
+      { header: 'Срок',         value: 'dueDate' },
+      { header: 'Создано',      value: 'createdAt' },
+      { header: 'Выполнено',    value: 'completedAt' },
+    ];
+    downloadCsv(todayStampedName('tasks'), rowsToCsv(store.tasks, cols));
+  };
+
   return (
     // Liquid-glass page backdrop — same vocabulary as Dashboard / AI
     // Design / Sales. Wraps the whole page so cards / chips / modals
@@ -206,44 +225,34 @@ export function Tasks({ language }: TasksProps) {
           <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight mb-1">{l('Задачи команды', 'Команда тапсырмалары', 'Team tasks')}</h1>
           <p className="text-sm text-slate-500">{l('Ежедневные задачи сотрудников через Telegram-бот', 'Қызметкерлердің күнделікті тапсырмалары Telegram-бот арқылы', 'Daily employee tasks via Telegram bot')}</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setShowTelegramPanel(!showTelegramPanel)}
-            className="flex items-center gap-2 px-3 py-2 bg-[#2AABEE] text-white rounded-lg text-sm hover:bg-[#229ED9] transition-colors"
-          >
-            <Send className="w-4 h-4" />
-            {l('Telegram-бот', 'Telegram-бот', 'Telegram bot')}
-          </button>
-          <button
-            onClick={() => {
-              const cols: CsvColumn<StoreTask>[] = [
-                { header: 'ID',           value: 'id' },
-                { header: 'Название',     value: 'title' },
-                { header: 'Описание',     value: 'description' },
-                { header: 'Категория',    value: 'category' },
-                { header: 'Статус',       value: 'status' },
-                { header: 'Приоритет',    value: 'priority' },
-                { header: 'Исполнитель',  value: (t) => store.getEmployeeById(t.assigneeId)?.name || '' },
-                { header: 'Срок',         value: 'dueDate' },
-                { header: 'Создано',      value: 'createdAt' },
-                { header: 'Выполнено',    value: 'completedAt' },
-              ];
-              downloadCsv(todayStampedName('tasks'), rowsToCsv(store.tasks, cols));
-            }}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs text-slate-600 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl transition-all"
-            title={l('Скачать задачи в CSV', 'Тапсырмаларды CSV-ге жүктеу', 'Download tasks as CSV')}
-          >
-            <Download className="w-4 h-4" />
-            {l('Экспорт', 'Экспорт', 'Export')}
-          </button>
-          <button
-            onClick={() => setShowImport(true)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs text-slate-600 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl transition-all"
-            title={l('Загрузить задачи из CSV', 'Тапсырмаларды CSV-ден жүктеу', 'Import tasks from CSV')}
-          >
-            <Upload className="w-4 h-4" />
-            {l('Импорт', 'Импорт', 'Import')}
-          </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Overflow «•••» — Telegram bot, export, import tucked away */}
+          <div className="relative">
+            <button
+              onClick={() => setShowMoreMenu(v => !v)}
+              className={`flex items-center justify-center w-9 h-9 rounded-2xl ring-1 transition-all ${showMoreMenu ? 'bg-white/85 text-slate-700 ring-white/60' : 'bg-white/50 text-slate-500 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}
+              title={l('Ещё', 'Тағы', 'More')}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+            {showMoreMenu && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setShowMoreMenu(false)} />
+                <div className="absolute right-0 top-full mt-2 z-30 p-1.5 min-w-[230px] bg-white/50 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl">
+                  <button onClick={() => { setShowMoreMenu(false); setShowTelegramPanel(v => !v); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-slate-700 hover:bg-white/60 transition-colors">
+                    <Send className="w-4 h-4 text-[#2AABEE] flex-shrink-0" /><span className="flex-1 text-left">{l('Telegram-бот', 'Telegram-бот', 'Telegram bot')}</span>
+                  </button>
+                  <div className="h-px bg-white/50 my-1 mx-2" />
+                  <button onClick={() => { setShowMoreMenu(false); exportTasks(); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-slate-700 hover:bg-white/60 transition-colors">
+                    <Download className="w-4 h-4 text-slate-400 flex-shrink-0" /><span className="flex-1 text-left">{l('Экспорт (CSV)', 'Экспорт (CSV)', 'Export (CSV)')}</span>
+                  </button>
+                  <button onClick={() => { setShowMoreMenu(false); setShowImport(true); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-slate-700 hover:bg-white/60 transition-colors">
+                    <Upload className="w-4 h-4 text-slate-400 flex-shrink-0" /><span className="flex-1 text-left">{l('Импорт из CSV', 'CSV-ден импорт', 'Import from CSV')}</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <button
             onClick={() => setShowNewTaskModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
@@ -258,15 +267,15 @@ export function Tasks({ language }: TasksProps) {
       {showTelegramPanel && (
         <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden mb-6">
           {/* Header */}
-          <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-white/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-[#2AABEE]/10 rounded-xl flex items-center justify-center">
                 <Bot className="w-5 h-5 text-[#2AABEE]" />
               </div>
               <div>
-                <div className="text-sm text-gray-900">{l('Telegram-бот платформы', 'Платформаның Telegram-боты', 'Platform Telegram bot')}</div>
-                <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-                  <span className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
+                <div className="text-sm text-slate-900">{l('Telegram-бот платформы', 'Платформаның Telegram-боты', 'Platform Telegram bot')}</div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <span className="w-1.5 h-1.5 bg-slate-300 rounded-full" />
                   {l('Не подключён', 'Қосылмаған', 'Not connected')}
                 </div>
               </div>
@@ -274,7 +283,7 @@ export function Tasks({ language }: TasksProps) {
             <div className="flex items-center gap-2">
               <button onClick={() => setShowBotSettings(true)} className="px-3 py-1.5 bg-white/60 ring-1 ring-white/60 text-slate-700 rounded-xl text-xs hover:bg-white">{l('Настройки', 'Баптаулар', 'Settings')}</button>
               <button onClick={() => setShowTelegramPanel(false)} className="w-8 h-8 bg-white/60 ring-1 ring-white/60 rounded-2xl flex items-center justify-center hover:bg-white transition-colors">
-                <X className="w-3.5 h-3.5 text-gray-400" />
+                <X className="w-3.5 h-3.5 text-slate-400" />
               </button>
             </div>
           </div>
@@ -283,7 +292,7 @@ export function Tasks({ language }: TasksProps) {
           <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* How it will work */}
             <section>
-              <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Как это будет работать', 'Бұл қалай жұмыс істейді', 'How it will work')}</div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-3">{l('Как это будет работать', 'Бұл қалай жұмыс істейді', 'How it will work')}</div>
               <ol className="space-y-2.5">
                 {[
                   l('Сотрудник пишет боту свои задачи на день', 'Қызметкер ботқа күнделікті тапсырмаларын жазады', 'Employee writes their tasks for the day to the bot'),
@@ -291,8 +300,8 @@ export function Tasks({ language }: TasksProps) {
                   l('Сотрудник подтверждает — задачи попадают на платформу', 'Қызметкер растайды — тапсырмалар платформаға түседі', 'Employee confirms — tasks appear on the platform'),
                   l('По завершении сотрудник пишет отчёт боту', 'Аяқталған соң қызметкер ботқа есеп жазады', 'When finished, the employee sends a report to the bot'),
                 ].map((step, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-xs text-gray-600">
-                    <span className="w-5 h-5 flex-shrink-0 rounded-lg bg-gray-50 text-gray-500 text-[10px] flex items-center justify-center tabular-nums">{i + 1}</span>
+                  <li key={i} className="flex items-start gap-2.5 text-xs text-slate-600">
+                    <span className="w-5 h-5 flex-shrink-0 rounded-lg bg-white/50 text-slate-500 text-[10px] flex items-center justify-center tabular-nums">{i + 1}</span>
                     <span className="leading-relaxed">{step}</span>
                   </li>
                 ))}
@@ -301,13 +310,13 @@ export function Tasks({ language }: TasksProps) {
 
             {/* Connected employees — empty state */}
             <section>
-              <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">{l('Подключённые сотрудники', 'Қосылған қызметкерлер', 'Connected employees')}</div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-3">{l('Подключённые сотрудники', 'Қосылған қызметкерлер', 'Connected employees')}</div>
               <div className="bg-white/40 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-6 text-center">
-                <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-white border border-gray-100 flex items-center justify-center">
-                  <Send className="w-4 h-4 text-gray-300" />
+                <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-white border border-white/60 flex items-center justify-center">
+                  <Send className="w-4 h-4 text-slate-300" />
                 </div>
-                <div className="text-xs text-gray-700 mb-1">{l('Пока никто не подключён', 'Әзірге ешкім қосылмаған', 'No one is connected yet')}</div>
-                <div className="text-[11px] text-gray-400 leading-relaxed max-w-[260px] mx-auto">
+                <div className="text-xs text-slate-700 mb-1">{l('Пока никто не подключён', 'Әзірге ешкім қосылмаған', 'No one is connected yet')}</div>
+                <div className="text-[11px] text-slate-400 leading-relaxed max-w-[260px] mx-auto">
                   {l('Сотрудники появятся здесь после того, как Админ настроит Telegram-бот и пригласит команду.', 'Әкімші Telegram-ботты баптап, командаға шақыру жібергеннен кейін қызметкерлер осында пайда болады.', 'Employees will appear here after the Admin sets up the Telegram bot and invites the team.')}
                 </div>
               </div>
@@ -315,45 +324,42 @@ export function Tasks({ language }: TasksProps) {
           </div>
 
           {/* Footer hint */}
-          <div className="px-5 py-3 border-t border-gray-50 text-[11px] text-gray-400 flex items-center gap-1.5">
+          <div className="px-5 py-3 border-t border-white/50 text-[11px] text-slate-400 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 bg-amber-400 rounded-full" />
             {l('Полная интеграция Telegram-бота — в следующем обновлении. Сейчас задачи добавляются вручную.', 'Telegram-боттың толық интеграциясы — келесі жаңартуда. Қазір тапсырмалар қолмен қосылады.', 'Full Telegram bot integration is coming in the next update. For now, tasks are added manually.')}
           </div>
         </div>
       )}
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
-          <div className="text-xs text-gray-500 mb-1">{l('Всего на сегодня', 'Барлығы бүгінге', 'Total for today')}</div>
-          <div className="text-2xl text-gray-900">{stats.total}</div>
-        </div>
-        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
-          <div className="text-xs text-blue-500 mb-1">{l('Новые', 'Жаңа', 'New')}</div>
-          <div className="text-2xl text-gray-900">{stats.newCount}</div>
-        </div>
-        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
-          <div className="text-xs text-yellow-500 mb-1">{l('В работе', 'Жұмыста', 'In progress')}</div>
-          <div className="text-2xl text-gray-900">{stats.inProgress}</div>
-        </div>
-        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
-          <div className="text-xs text-purple-500 mb-1">{l('На проверке', 'Тексеруде', 'In review')}</div>
-          <div className="text-2xl text-gray-900">{stats.review}</div>
-        </div>
-        <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-4">
-          <div className="text-xs text-green-500 mb-1">{l('Выполнено', 'Орындалды', 'Done')}</div>
-          <div className="text-2xl text-gray-900">{stats.done}</div>
-          <div className="w-full h-1.5 bg-gray-100 rounded-full mt-2 overflow-hidden">
-            <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: stats.total > 0 ? `${(stats.done / stats.total) * 100}%` : '0%' }} />
+      {/* Stats cards — minimal glass tiles with a single accent dot */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 sm:gap-3 mb-6">
+        {[
+          { label: l('Всего на сегодня', 'Барлығы бүгінге', 'Total'), value: stats.total, dot: 'bg-slate-300' },
+          { label: l('Новые', 'Жаңа', 'New'), value: stats.newCount, dot: 'bg-sky-400' },
+          { label: l('В работе', 'Жұмыста', 'In progress'), value: stats.inProgress, dot: 'bg-amber-400' },
+          { label: l('На проверке', 'Тексеруде', 'In review'), value: stats.review, dot: 'bg-violet-400' },
+          { label: l('Выполнено', 'Орындалды', 'Done'), value: stats.done, dot: 'bg-emerald-500', progress: stats.total > 0 ? (stats.done / stats.total) * 100 : 0 },
+        ].map((s, i) => (
+          <div key={i} className="bg-white/50 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_8px_24px_-12px_rgba(15,23,42,0.14),inset_0_1px_0_0_rgba(255,255,255,0.6)] rounded-2xl p-3.5">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${s.dot} flex-shrink-0`} />
+              <span className="text-[11px] text-slate-500 truncate">{s.label}</span>
+            </div>
+            <div className="text-2xl text-slate-900 tabular-nums tracking-tight">{s.value}</div>
+            {s.progress !== undefined && (
+              <div className="w-full h-1.5 bg-white/60 rounded-full mt-2 overflow-hidden ring-1 ring-white/40">
+                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${s.progress}%` }} />
+              </div>
+            )}
           </div>
-        </div>
+        ))}
       </div>
 
       {/* Controls */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-2 flex-wrap">
-          {/* View mode */}
-          <div className="flex bg-gray-100 rounded-lg p-1">
+          {/* View mode — glass segmented, active is emerald */}
+          <div className="flex gap-1 bg-white/50 ring-1 ring-white/60 backdrop-blur-xl rounded-2xl p-1">
             {([
               { key: 'board' as ViewMode, label: l('Доска', 'Тақта', 'Board') },
               { key: 'list' as ViewMode, label: l('Список', 'Тізім', 'List') },
@@ -362,7 +368,7 @@ export function Tasks({ language }: TasksProps) {
               <button
                 key={v.key}
                 onClick={() => setViewMode(v.key)}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${viewMode === v.key ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`px-3 py-1.5 rounded-xl text-sm transition-all ${viewMode === v.key ? 'bg-emerald-600 text-white shadow-[0_4px_12px_-4px_var(--accent-shadow)]' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 {v.label}
               </button>
@@ -412,7 +418,7 @@ export function Tasks({ language }: TasksProps) {
         </div>
 
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             placeholder={l('Поиск задач...', 'Тапсырмаларды іздеу...', 'Search tasks...')}
@@ -467,8 +473,8 @@ export function Tasks({ language }: TasksProps) {
               <div key={col.id} className="min-h-[200px]">
                 <div className={`flex items-center gap-2 mb-3 px-1`}>
                   <Icon className={`w-4 h-4 ${col.color}`} />
-                  <span className="text-sm text-gray-700">{pickLang(col.title, language)}</span>
-                  <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded ml-1">{colTasks.length}</span>
+                  <span className="text-sm text-slate-700">{pickLang(col.title, language)}</span>
+                  <span className="text-[11px] bg-white/60 ring-1 ring-white/60 text-slate-500 px-1.5 py-0.5 rounded-full ml-1 tabular-nums">{colTasks.length}</span>
                 </div>
                 <div className="space-y-3">
                   {colTasks.map(task => (
@@ -494,31 +500,31 @@ export function Tasks({ language }: TasksProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/60 bg-white/30">
-                <th className="px-4 py-3 text-left text-xs text-gray-500">{l('Задача', 'Тапсырма', 'Task')}</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Категория', 'Санат', 'Category')}</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Исполнитель', 'Орындаушы', 'Assignee')}</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Приоритет', 'Басымдық', 'Priority')}</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Статус', 'Күй', 'Status')}</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Источник', 'Дереккөз', 'Source')}</th>
-                <th className="px-3 py-3 text-left text-xs text-gray-500">{l('Срок', 'Мерзім', 'Due')}</th>
+                <th className="px-4 py-3 text-left text-xs text-slate-500">{l('Задача', 'Тапсырма', 'Task')}</th>
+                <th className="px-3 py-3 text-left text-xs text-slate-500">{l('Категория', 'Санат', 'Category')}</th>
+                <th className="px-3 py-3 text-left text-xs text-slate-500">{l('Исполнитель', 'Орындаушы', 'Assignee')}</th>
+                <th className="px-3 py-3 text-left text-xs text-slate-500">{l('Приоритет', 'Басымдық', 'Priority')}</th>
+                <th className="px-3 py-3 text-left text-xs text-slate-500">{l('Статус', 'Күй', 'Status')}</th>
+                <th className="px-3 py-3 text-left text-xs text-slate-500">{l('Источник', 'Дереккөз', 'Source')}</th>
+                <th className="px-3 py-3 text-left text-xs text-slate-500">{l('Срок', 'Мерзім', 'Due')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-white/50">
               {filteredTasks.map(task => {
                 const pr = priorityConfig[task.priority];
                 return (
                   <tr key={task.id} className="hover:bg-white/30 transition-colors cursor-pointer" onClick={() => setSelectedTask(task)}>
                     <td className="px-4 py-3">
-                      <div className="text-gray-900">{task.title}</div>
-                      <div className="text-xs text-gray-400 truncate max-w-[250px]">{task.description}</div>
+                      <div className="text-slate-900">{task.title}</div>
+                      <div className="text-xs text-slate-400 truncate max-w-[250px]">{task.description}</div>
                     </td>
                     <td className="px-3 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColor(task.category, taskCategories)}`}>{task.category}</span>
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center text-[10px] text-gray-600">{task.assignee.avatar}</div>
-                        <span className="text-xs text-gray-700">{task.assignee.name.split(' ')[0]}</span>
+                        <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-[10px] text-slate-600">{task.assignee.avatar}</div>
+                        <span className="text-xs text-slate-700">{task.assignee.name.split(' ')[0]}</span>
                       </div>
                     </td>
                     <td className="px-3 py-3">
@@ -540,12 +546,12 @@ export function Tasks({ language }: TasksProps) {
                           <Send className="w-3 h-3" /> Telegram
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-gray-500">
+                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
                           <Smartphone className="w-3 h-3" /> {l('Платформа', 'Платформа', 'Platform')}
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-xs text-gray-600 whitespace-nowrap">{task.dueDate === today ? l('Сегодня', 'Бүгін', 'Today') : task.dueDate}</td>
+                    <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">{task.dueDate === today ? l('Сегодня', 'Бүгін', 'Today') : task.dueDate}</td>
                   </tr>
                 );
               })}
@@ -559,8 +565,8 @@ export function Tasks({ language }: TasksProps) {
         <div className="space-y-4">
           {teamEmployees.length === 0 && (
             <div className="bg-white/55 backdrop-blur-2xl ring-1 ring-white/60 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.10)] rounded-2xl p-8 text-center">
-              <div className="text-sm text-gray-500 mb-1">{l('Пока никого в команде', 'Әзірге командада ешкім жоқ', 'No one in the team yet')}</div>
-              <div className="text-xs text-gray-400">{l('Добавьте сотрудников в Настройках → Команда — они появятся здесь со своими задачами.', 'Қызметкерлерді Баптаулар → Команда бөлімінде қосыңыз — олар осында тапсырмаларымен пайда болады.', 'Add employees in Settings → Team — they will appear here with their tasks.')}</div>
+              <div className="text-sm text-slate-500 mb-1">{l('Пока никого в команде', 'Әзірге командада ешкім жоқ', 'No one in the team yet')}</div>
+              <div className="text-xs text-slate-400">{l('Добавьте сотрудников в Настройках → Команда — они появятся здесь со своими задачами.', 'Қызметкерлерді Баптаулар → Команда бөлімінде қосыңыз — олар осында тапсырмаларымен пайда болады.', 'Add employees in Settings → Team — they will appear here with their tasks.')}</div>
             </div>
           )}
           {teamEmployees.map(emp => {
@@ -574,26 +580,26 @@ export function Tasks({ language }: TasksProps) {
                   className="w-full flex items-center justify-between p-4 hover:bg-white/30 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-sm text-gray-600">{emp.avatar}</div>
+                    <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-sm text-slate-600">{emp.avatar}</div>
                     <div className="text-left">
-                      <div className="text-sm text-gray-900">{emp.name}</div>
-                      <div className="text-xs text-gray-500">{emp.role} · {emp.telegramUsername}</div>
+                      <div className="text-sm text-slate-900">{emp.name}</div>
+                      <div className="text-xs text-slate-500">{emp.role} · {emp.telegramUsername}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <div className="text-sm text-gray-900">{empDone}/{empTasks.length}</div>
-                      <div className="text-xs text-gray-400">{l('задач', 'тапсырма', 'tasks')}</div>
+                      <div className="text-sm text-slate-900">{empDone}/{empTasks.length}</div>
+                      <div className="text-xs text-slate-400">{l('задач', 'тапсырма', 'tasks')}</div>
                     </div>
-                    <div className="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="w-20 h-2 bg-white/60 rounded-full overflow-hidden">
                       <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: empTasks.length > 0 ? `${(empDone / empTasks.length) * 100}%` : '0%' }} />
                     </div>
-                    {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+                    {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                   </div>
                 </button>
                 {isExpanded && (
                   <div className="border-t border-white/60 p-4 space-y-2">
-                    {empTasks.length === 0 && <div className="text-sm text-gray-400 text-center py-4">{l('Нет задач', 'Тапсырма жоқ', 'No tasks')}</div>}
+                    {empTasks.length === 0 && <div className="text-sm text-slate-400 text-center py-4">{l('Нет задач', 'Тапсырма жоқ', 'No tasks')}</div>}
                     {empTasks.map(task => {
                       const statusCol = columns.find(c => c.id === task.status)!;
                       const StatusIcon = statusCol.icon;
@@ -606,7 +612,7 @@ export function Tasks({ language }: TasksProps) {
                           <div className="flex items-center gap-3">
                             <StatusIcon className={`w-4 h-4 ${statusCol.color}`} />
                             <div>
-                              <div className="text-sm text-gray-900">{task.title}</div>
+                              <div className="text-sm text-slate-900">{task.title}</div>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColor(task.category, taskCategories)}`}>{task.category}</span>
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded ${priorityConfig[task.priority].bg} ${priorityConfig[task.priority].color}`}>{pickLang(priorityConfig[task.priority].label, language)}</span>
@@ -746,12 +752,12 @@ function TaskCard({ task, categories, language, onClick, onMove }: { task: Task;
         {task.source === 'telegram' && <Send className="w-3 h-3 text-[#2AABEE]" />}
       </div>
 
-      <div className="text-sm text-gray-900 mb-2">{task.title}</div>
+      <div className="text-sm text-slate-900 mb-2">{task.title}</div>
 
       {/* Due-date chip — red when overdue, amber when due today */}
       {task.dueDate && (
         <div className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full mb-2 ${
-          isOverdue ? 'bg-rose-100 text-rose-700' : isDueToday ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'
+          isOverdue ? 'bg-rose-100 text-rose-700' : isDueToday ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
         }`}>
           <Calendar className="w-2.5 h-2.5" />
           {isOverdue ? l('Просрочено · ', 'Мерзімі өтті · ', 'Overdue · ') : isDueToday ? l('Сегодня · ', 'Бүгін · ', 'Today · ') : ''}{task.dueDate}
@@ -761,9 +767,9 @@ function TaskCard({ task, categories, language, onClick, onMove }: { task: Task;
       {subtasksTotal > 0 && (
         <div className="mb-2">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-gray-400">{subtasksDone}/{subtasksTotal}</span>
+            <span className="text-[10px] text-slate-400">{subtasksDone}/{subtasksTotal}</span>
           </div>
-          <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+          <div className="w-full h-1 bg-white/60 rounded-full overflow-hidden">
             <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${(subtasksDone / subtasksTotal) * 100}%` }} />
           </div>
         </div>
@@ -771,8 +777,8 @@ function TaskCard({ task, categories, language, onClick, onMove }: { task: Task;
 
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-1.5">
-          <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-[8px] text-gray-600">{task.assignee.avatar}</div>
-          <span className="text-[10px] text-gray-500">{task.assignee.name.split(' ')[0]}</span>
+          <div className="w-5 h-5 bg-slate-200 rounded-full flex items-center justify-center text-[8px] text-slate-600">{task.assignee.avatar}</div>
+          <span className="text-[10px] text-slate-500">{task.assignee.name.split(' ')[0]}</span>
         </div>
         {next && (
           // Always visible (was opacity-0 hover-only → invisible/unusable
@@ -836,12 +842,12 @@ function NewTaskModal({ employees, categories, language, deals, onClose, onAdd }
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-full max-w-md shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-white/60 flex items-center justify-between">
-          <h2 className="text-gray-900">{l('Новая задача', 'Жаңа тапсырма', 'New task')}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+          <h2 className="text-slate-900">{l('Новая задача', 'Жаңа тапсырма', 'New task')}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">{l('Название задачи *', 'Тапсырма атауы *', 'Task title *')}</label>
+            <label className="text-xs text-slate-500 mb-1 block">{l('Название задачи *', 'Тапсырма атауы *', 'Task title *')}</label>
             <input
               type="text"
               value={title}
@@ -851,7 +857,7 @@ function NewTaskModal({ employees, categories, language, deals, onClose, onAdd }
             />
           </div>
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">{l('Описание', 'Сипаттама', 'Description')}</label>
+            <label className="text-xs text-slate-500 mb-1 block">{l('Описание', 'Сипаттама', 'Description')}</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
@@ -862,14 +868,14 @@ function NewTaskModal({ employees, categories, language, deals, onClose, onAdd }
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">{l('Исполнитель', 'Орындаушы', 'Assignee')}</label>
+              <label className="text-xs text-slate-500 mb-1 block">{l('Исполнитель', 'Орындаушы', 'Assignee')}</label>
               <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
                 <option value="">{l('Не назначен', 'Тағайындалмаған', 'Unassigned')}</option>
                 {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">{l('Приоритет', 'Басымдық', 'Priority')}</label>
+              <label className="text-xs text-slate-500 mb-1 block">{l('Приоритет', 'Басымдық', 'Priority')}</label>
               <select value={priority} onChange={e => setPriority(e.target.value as Task['priority'])} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
                 <option value="low">{l('Низкий', 'Төмен', 'Low')}</option>
                 <option value="medium">{l('Средний', 'Орташа', 'Medium')}</option>
@@ -880,13 +886,13 @@ function NewTaskModal({ employees, categories, language, deals, onClose, onAdd }
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">{l('Категория', 'Санат', 'Category')}</label>
+              <label className="text-xs text-slate-500 mb-1 block">{l('Категория', 'Санат', 'Category')}</label>
               <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">{l('Срок', 'Мерзім', 'Due')}</label>
+              <label className="text-xs text-slate-500 mb-1 block">{l('Срок', 'Мерзім', 'Due')}</label>
               <input
                 type="date"
                 value={dueDate}
@@ -899,7 +905,7 @@ function NewTaskModal({ employees, categories, language, deals, onClose, onAdd }
               the task shows up there. Optional. */}
           {deals.length > 0 && (
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">{l('Связать со сделкой', 'Мәмілеге байланыстыру', 'Link to a deal')}</label>
+              <label className="text-xs text-slate-500 mb-1 block">{l('Связать со сделкой', 'Мәмілеге байланыстыру', 'Link to a deal')}</label>
               <select value={linkedDealId} onChange={e => setLinkedDealId(e.target.value)} className="w-full px-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 transition-all">
                 <option value="">{l('— без привязки —', '— байланыссыз —', '— no link —')}</option>
                 {deals.map(d => <option key={d.id} value={d.id}>{d.customerName}{d.product ? ` · ${d.product}` : ''}</option>)}
@@ -1017,10 +1023,10 @@ function TaskDetailModal({
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder={l('Название задачи', 'Тапсырма атауы', 'Task title')}
-                className="w-full text-gray-900 text-base bg-transparent border-0 border-b border-transparent hover:border-gray-200 focus:border-gray-300 focus:outline-none px-0 py-0.5"
+                className="w-full text-slate-900 text-base bg-transparent border-0 border-b border-transparent hover:border-slate-200 focus:border-slate-300 focus:outline-none px-0 py-0.5"
               />
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0">
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 flex-shrink-0">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -1029,7 +1035,7 @@ function TaskDetailModal({
         <div className="p-5 space-y-5">
           {/* Description */}
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">{l('Описание', 'Сипаттама', 'Description')}</label>
+            <label className="text-xs text-slate-500 mb-1 block">{l('Описание', 'Сипаттама', 'Description')}</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
@@ -1042,7 +1048,7 @@ function TaskDetailModal({
           {/* Assignee + Priority */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">{l('Исполнитель', 'Орындаушы', 'Assignee')}</label>
+              <label className="text-xs text-slate-500 mb-1 block">{l('Исполнитель', 'Орындаушы', 'Assignee')}</label>
               <select
                 value={assigneeId}
                 onChange={e => setAssigneeId(e.target.value)}
@@ -1058,7 +1064,7 @@ function TaskDetailModal({
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">{l('Приоритет', 'Басымдық', 'Priority')}</label>
+              <label className="text-xs text-slate-500 mb-1 block">{l('Приоритет', 'Басымдық', 'Priority')}</label>
               <select
                 value={priority}
                 onChange={e => setPriority(e.target.value as Task['priority'])}
@@ -1075,7 +1081,7 @@ function TaskDetailModal({
           {/* Category + Due date */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">{l('Категория', 'Санат', 'Category')}</label>
+              <label className="text-xs text-slate-500 mb-1 block">{l('Категория', 'Санат', 'Category')}</label>
               <select
                 value={category}
                 onChange={e => setCategory(e.target.value)}
@@ -1085,7 +1091,7 @@ function TaskDetailModal({
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">{l('Срок', 'Мерзім', 'Due')}</label>
+              <label className="text-xs text-slate-500 mb-1 block">{l('Срок', 'Мерзім', 'Due')}</label>
               <input
                 type="date"
                 value={dueDate}
@@ -1097,7 +1103,7 @@ function TaskDetailModal({
 
           {/* Status flow */}
           <div>
-            <label className="text-xs text-gray-500 mb-2 block">{l('Статус', 'Күй', 'Status')}</label>
+            <label className="text-xs text-slate-500 mb-2 block">{l('Статус', 'Күй', 'Status')}</label>
             <div className="flex items-center gap-1 flex-wrap">
               {columns.map((col, i) => {
                 const isActive = col.id === task.status;
@@ -1110,13 +1116,13 @@ function TaskDetailModal({
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors ${
                         isActive ? `${col.bg} ${col.color} border ${col.border}` :
                         isPast ? 'bg-green-50 text-green-600' :
-                        'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                        'bg-white/50 text-slate-400 hover:bg-white/70'
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
                       {pickLang(col.title, language)}
                     </button>
-                    {i < columns.length - 1 && <ArrowRight className="w-3 h-3 text-gray-300 flex-shrink-0" />}
+                    {i < columns.length - 1 && <ArrowRight className="w-3 h-3 text-slate-300 flex-shrink-0" />}
                   </div>
                 );
               })}
@@ -1126,12 +1132,12 @@ function TaskDetailModal({
           {/* Subtasks (read-only — separate editor would be a bigger feature) */}
           {task.subtasks && task.subtasks.length > 0 && (
             <div>
-              <div className="text-xs text-gray-500 mb-2">{l('Подзадачи', 'Ішкі тапсырмалар', 'Subtasks')} ({task.subtasks.filter(s => s.done).length}/{task.subtasks.length})</div>
+              <div className="text-xs text-slate-500 mb-2">{l('Подзадачи', 'Ішкі тапсырмалар', 'Subtasks')} ({task.subtasks.filter(s => s.done).length}/{task.subtasks.length})</div>
               <div className="space-y-1.5">
                 {task.subtasks.map(sub => (
                   <div key={sub.id} className="flex items-center gap-2 py-1">
-                    {sub.done ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4 text-gray-300" />}
-                    <span className={`text-sm ${sub.done ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{sub.title}</span>
+                    {sub.done ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4 text-slate-300" />}
+                    <span className={`text-sm ${sub.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{sub.title}</span>
                   </div>
                 ))}
               </div>
@@ -1150,7 +1156,7 @@ function TaskDetailModal({
           )}
 
           {/* Created / completed dates */}
-          <div className="flex items-center gap-6 text-xs text-gray-500 flex-wrap">
+          <div className="flex items-center gap-6 text-xs text-slate-500 flex-wrap">
             <div className="flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
               {l('Создано', 'Жасалды', 'Created')}: {new Date(task.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
@@ -1194,7 +1200,7 @@ function TaskDetailModal({
                 </button>
                 <button
                   onClick={() => setConfirmDelete(false)}
-                  className="px-3 py-1 text-gray-600 rounded text-xs hover:bg-white transition-colors"
+                  className="px-3 py-1 text-slate-600 rounded text-xs hover:bg-white transition-colors"
                 >
                   {l('Отмена', 'Болдырмау', 'Cancel')}
                 </button>
