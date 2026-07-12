@@ -573,6 +573,19 @@ function requireRole(min: 'admin' | 'manager' | 'employee') {
   };
 }
 
+// Reads open to any authed team member, writes (POST/PATCH/PUT/DELETE) require
+// `min` role. For resources everyone should SEE but only privileged roles may
+// CHANGE — e.g. the employee list (salaries!) or custom-module definitions.
+function requireRoleForWrites(min: 'admin' | 'manager' | 'employee') {
+  return (req: AuthedRequest, res: Response, next: NextFunction) => {
+    const isWrite = req.method !== 'GET' && req.method !== 'HEAD';
+    if (isWrite && !roleAtLeast(req.teamRole, min)) {
+      return res.status(403).json({ error: `requires ${min} role to modify` });
+    }
+    next();
+  };
+}
+
 // Append an entry to the user's activity log. Used by auth handlers so we can record
 // login/signup/verify events server-side (frontend can't insert before it has a token).
 function logActivity(userId: string, entry: Record<string, any>) {
@@ -1896,7 +1909,9 @@ app.post('/api/employees/:id/restore', authMiddleware, requireRole('admin'), (re
   res.json({ ok: true, restored: !!restoredUser });
 });
 
-app.use('/api/employees', makeCrud('employees', 'e'));
+// Все видят список команды (для назначений), но менять записи сотрудников
+// (включая salary) может только админ. Read — открыт, write — admin.
+app.use('/api/employees', authMiddleware, requireRoleForWrites('admin'), makeCrud('employees', 'e'));
 // Team-wide Telegram notification on task assignment. Runs BEFORE the generic
 // CRUD mount so POST /api/tasks lands here first — we insert manually, then
 // look up the assignee's Telegram pairing and ping them in their bot chat.
@@ -1986,8 +2001,9 @@ app.patch('/api/tasks/:id', authMiddleware, async (req: AuthedRequest, res) => {
 });
 
 app.use('/api/tasks', makeCrud('tasks', 't'));
-// Кастомные модули и их записи — team-scoped, доступны всей команде.
-app.use('/api/custom-modules', makeCrud('custom_modules', 'cm_'));
+// Кастомные модули: определения (создать/изменить/удалить модуль) — только
+// админ; читать модули и вести записи внутри них может вся команда.
+app.use('/api/custom-modules', authMiddleware, requireRoleForWrites('admin'), makeCrud('custom_modules', 'cm_'));
 app.use('/api/custom-records', makeCrud('custom_records', 'r_'));
 app.use('/api/products', authMiddleware, requirePermission('production'), makeCrud('products', 'p'));
 // Finance gated by the matrix (was requireRole('manager') — now matrix-driven
