@@ -347,8 +347,13 @@ export function Chats({ language }: ChatsProps) {
   ];
 
   const Toggle = ({ value, onChange }: { value: boolean; onChange: () => void }) => (
-    <button onClick={onChange} className={`relative w-10 h-5 rounded-full transition-colors ${value ? 'bg-emerald-600' : 'bg-gray-200'}`}>
-      <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-5' : ''}`} />
+    <button
+      onClick={onChange}
+      role="switch"
+      aria-checked={value}
+      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ring-1 ${value ? 'bg-emerald-600 ring-emerald-700/20' : 'bg-slate-200 ring-slate-300/40'}`}
+    >
+      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${value ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   );
 
@@ -645,7 +650,13 @@ export function Chats({ language }: ChatsProps) {
                         <Sparkles className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-sm text-slate-900">{l('AI-агент Utir', 'AI-агент Utir', 'Utir AI Agent')}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-900">{l('AI-агент Utir', 'AI-агент Utir', 'Utir AI Agent')}</span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20 flex-shrink-0">
+                            <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                            <span className="text-[9px] uppercase tracking-wider text-emerald-700">{l('Скоро', 'Жақында', 'Soon')}</span>
+                          </span>
+                        </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className={`w-1.5 h-1.5 rounded-full ${aiAgentEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                           <span className={`text-[11px] ${aiAgentEnabled ? 'text-emerald-600' : 'text-slate-400'}`}>
@@ -654,7 +665,10 @@ export function Chats({ language }: ChatsProps) {
                         </div>
                       </div>
                     </div>
-                    <Toggle value={aiAgentEnabled} onChange={() => canWrite && setAiAgentEnabled(!aiAgentEnabled)} />
+                    <div className="flex items-center gap-2.5 flex-shrink-0">
+                      <span className={`text-[11px] ${aiAgentEnabled ? 'text-slate-600' : 'text-slate-400'}`}>{aiAgentEnabled ? l('Вкл', 'Қосулы', 'On') : l('Выкл', 'Өшік', 'Off')}</span>
+                      <Toggle value={aiAgentEnabled} onChange={() => canWrite && setAiAgentEnabled(!aiAgentEnabled)} />
+                    </div>
                   </div>
 
                   {/* Channels */}

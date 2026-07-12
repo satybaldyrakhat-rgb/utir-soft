@@ -1252,18 +1252,24 @@ function DealCard(props: {
       {/* Top row */}
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2 min-w-0">
-          {canWrite && (
-            <input
-              type="checkbox"
-              checked={selected}
-              onClick={e => e.stopPropagation()}
-              onChange={() => onToggleSelect()}
-              className="w-3.5 h-3.5 rounded accent-emerald-600 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              title={l('Выбрать для массового действия', 'Жаппай әрекет үшін', 'Select for bulk')}
-            />
-          )}
-          <div className="w-8 h-8 bg-white/60 ring-1 ring-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
-            {iconMap(deal.icon)}
+          {/* Source badge — shows where the lead came from (Instagram /
+              WhatsApp / …). The bulk-select checkbox is overlaid on top and
+              only appears on hover / when selected, so it never reserves
+              empty space next to the logo. */}
+          <div className="relative w-8 h-8 flex-shrink-0">
+            <div className={`w-8 h-8 bg-white/60 ring-1 ring-white/60 rounded-xl flex items-center justify-center transition-opacity ${canWrite ? (selected ? 'opacity-0' : 'group-hover:opacity-0') : ''}`}>
+              {iconMap(deal.icon)}
+            </div>
+            {canWrite && (
+              <input
+                type="checkbox"
+                checked={selected}
+                onClick={e => e.stopPropagation()}
+                onChange={() => onToggleSelect()}
+                className={`absolute inset-0 m-auto w-4 h-4 rounded accent-emerald-600 cursor-pointer transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                title={l('Выбрать для массового действия', 'Жаппай әрекет үшін', 'Select for bulk')}
+              />
+            )}
           </div>
           <span className="text-xs text-slate-900 truncate">{deal.customerName}</span>
         </div>
