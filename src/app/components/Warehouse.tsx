@@ -721,50 +721,22 @@ export function Warehouse({ language }: WarehouseProps) {
     >
     <div className="px-4 py-5 sm:p-6 lg:p-8 max-w-[1400px] mx-auto relative">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-4">
-        <div>
-          <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">
-            {l('Производство', 'Өндіріс', 'Production')}
-            {' · '}
-            <span className="inline-flex items-center gap-1 normal-case tracking-normal text-slate-500"><NicheIcon niche={niche} className="w-3 h-3" /> {niche.name[language]}</span>
-          </p>
-          <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight">{l('Производство и склад', 'Өндіріс және қойма', 'Production & Warehouse')}</h1>
-          {!canWrite && (
-            <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-100/70 ring-1 ring-amber-200/40 px-2 py-0.5 rounded-full">
-              <Eye className="w-3 h-3" />
-              {l('Только просмотр', 'Тек қарау', 'View only')}
-            </div>
-          )}
-        </div>
-        <div className="flex items-stretch gap-1.5 min-w-0 w-full sm:w-auto">
-          {/* Horizontal-scroll tab strip — was wrapping into 3 rows on
-              phones which pushed the «Add» CTA below the fold. Now
-              scrolls horizontally with snap so the active tab is always
-              reachable. The Add button is anchored to the right of the
-              strip so it stays visible. */}
-          <div className="flex items-center gap-1.5 overflow-x-auto flex-1 min-w-0 -mx-1 px-1 snap-x">
-            {[
-              { id: 'production', label: l('Заказы',        'Тапсырыстар',  'Orders') },
-              { id: 'bom',        label: l('BOM',           'BOM',          'BOM') },
-              { id: 'calculator', label: l('Калькулятор',   'Калькулятор',  'Calculator') },
-              ...(hasNesting ? [{ id: 'nesting' as const, label: l('Раскрой', 'Раскрой', 'Nesting') }] : []),
-              { id: 'materials',  label: l('Склад',         'Қойма',        'Warehouse') },
-              { id: 'suppliers',  label: l('Поставщики',    'Жеткізушілер', 'Suppliers') },
-              { id: 'purchases',  label: l('Закупки',       'Сатып алулар', 'Purchases') },
-              { id: 'reports',    label: l('Отчёты',        'Есептер',      'Reports') },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveView(tab.id as any)}
-                className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all flex-shrink-0 snap-start ${
-                  activeView === tab.id
-                    ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
-                    : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+      <div className="mb-6">
+        {/* Row 1 — title + primary CTA */}
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="min-w-0">
+            <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">
+              {l('Производство', 'Өндіріс', 'Production')}
+              {' · '}
+              <span className="inline-flex items-center gap-1 normal-case tracking-normal text-slate-500"><NicheIcon niche={niche} className="w-3 h-3" /> {niche.name[language]}</span>
+            </p>
+            <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight">{l('Производство и склад', 'Өндіріс және қойма', 'Production & Warehouse')}</h1>
+            {!canWrite && (
+              <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-100/70 ring-1 ring-amber-200/40 px-2 py-0.5 rounded-full">
+                <Eye className="w-3 h-3" />
+                {l('Только просмотр', 'Тек қарау', 'View only')}
+              </div>
+            )}
           </div>
           {/* «Add» — context-aware: on Suppliers/Purchases/Materials tabs
               we open the right modal directly. Permission-gated. */}
@@ -780,6 +752,39 @@ export function Warehouse({ language }: WarehouseProps) {
               <Plus className="w-3.5 h-3.5" />{l('Добавить', 'Қосу', 'Add')}
             </button>
           )}
+        </div>
+        {/* Row 2 — tab strip on its own full-width row. Scrolls
+            horizontally with snap; edges fade out with a mask and the
+            scrollbar is hidden so tabs never bleed over the title / CTA. */}
+        <div
+          className="no-scrollbar flex items-center gap-1.5 overflow-x-auto snap-x pb-0.5"
+          style={{ WebkitMaskImage: 'linear-gradient(to right, transparent, black 14px, black calc(100% - 14px), transparent)', maskImage: 'linear-gradient(to right, transparent, black 14px, black calc(100% - 14px), transparent)' }}
+        >
+          {/* small leading spacer so the first tab isn't clipped by the mask */}
+          <div className="w-1 flex-shrink-0" aria-hidden />
+          {[
+            { id: 'production', label: l('Заказы',        'Тапсырыстар',  'Orders') },
+            { id: 'bom',        label: l('BOM',           'BOM',          'BOM') },
+            { id: 'calculator', label: l('Калькулятор',   'Калькулятор',  'Calculator') },
+            ...(hasNesting ? [{ id: 'nesting' as const, label: l('Раскрой', 'Раскрой', 'Nesting') }] : []),
+            { id: 'materials',  label: l('Склад',         'Қойма',        'Warehouse') },
+            { id: 'suppliers',  label: l('Поставщики',    'Жеткізушілер', 'Suppliers') },
+            { id: 'purchases',  label: l('Закупки',       'Сатып алулар', 'Purchases') },
+            { id: 'reports',    label: l('Отчёты',        'Есептер',      'Reports') },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveView(tab.id as any)}
+              className={`px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap ring-1 transition-all flex-shrink-0 snap-start ${
+                activeView === tab.id
+                  ? 'bg-emerald-600 text-white ring-white/10 shadow-[0_4px_12px_-2px_var(--accent-shadow)]'
+                  : 'bg-white/50 text-slate-600 ring-white/60 hover:bg-white/80 backdrop-blur-xl'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+          <div className="w-1 flex-shrink-0" aria-hidden />
         </div>
       </div>
 

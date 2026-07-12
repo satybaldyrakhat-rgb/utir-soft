@@ -264,3 +264,17 @@ html {
   transform: translateZ(0);
   backface-visibility: hidden;
 }
+
+/* Hide the horizontal scrollbar on tab strips / chip rows that scroll
+   sideways. The row still scrolls (touch, wheel, keyboard) — we only
+   drop the visible bar so a strip of tabs above content stays clean and
+   doesn't overlap the header. Paired with an edge-fade mask at the call
+   site so cut-off tabs fade out instead of hard-clipping. */
+.no-scrollbar {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;         /* Firefox */
+  -ms-overflow-style: none;      /* old Edge */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;                 /* Chrome / Safari */
+}
