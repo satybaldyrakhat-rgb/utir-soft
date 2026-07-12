@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Pencil, Plus, Trash2, Check, X } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
+import { api } from '../utils/api';
 import { toast } from '../utils/toast';
 
 interface CalcProps {
@@ -163,6 +164,35 @@ export function Calculator({ language }: CalcProps) {
       notes: `${l('Расчёт', 'Есеп', 'Estimate')}: ${calc.total.toLocaleString('ru-RU')} ₸`,
     });
     toast(l('Заказ создан и добавлен в воронку', 'Тапсырыс жасалды', 'Order created'), 'success');
+  };
+
+  // Persist the current calculator configuration as a real BOM template
+  // (/api/bom-templates) so it shows up in Производство → BOM. Maps the
+  // computed material cost + checked add-ons to material lines and the
+  // checked services to labour, preserving dims, markup and lead time.
+  const saveAsTemplate = async () => {
+    const materials = [
+      { mat: l('Материалы (расчёт)', 'Материалдар (есеп)', 'Materials (calc)'), sup: '', qty: 1, unit: 'компл', price: calc.materialsCost },
+      ...addons.filter(a => a.checked).map(a => ({ mat: a.label, sup: '', qty: 1, unit: 'шт', price: a.price })),
+    ];
+    const labourCost = services.filter(s => s.checked).reduce((sum, x) => sum + x.price, 0);
+    const template = {
+      name: `${l(product.ru, product.kz, product.eng)} ${dims.length}×${dims.width}×${dims.height}м`,
+      type: productId,
+      width: Math.round(Number(dims.length) * 1000),
+      height: Math.round(Number(dims.height) * 1000),
+      depth: Math.round(Number(dims.width) * 1000),
+      materials,
+      labourCost,
+      markupPct,
+      leadDays: product.days[0],
+    };
+    try {
+      await api.post('/api/bom-templates', template);
+      toast(l('Сохранено как BOM-шаблон', 'BOM-шаблон ретінде сақталды', 'Saved as BOM template'), 'success');
+    } catch {
+      toast(l('Не удалось сохранить шаблон', 'Шаблонды сақтау сәтсіз', 'Failed to save template'), 'error');
+    }
   };
 
   const fmt = (n: number) => n.toLocaleString('ru-RU');
@@ -380,7 +410,7 @@ export function Calculator({ language }: CalcProps) {
               {l('Создать заказ', 'Тапсырыс жасау', 'Create order')}
             </button>
             <button
-              onClick={() => toast(l('Шаблон сохранён', 'Шаблон сақталды', 'Template saved'), 'success')}
+              onClick={saveAsTemplate}
               className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors"
             >
               {l('Сохранить как шаблон', 'Шаблон ретінде сақтау', 'Save as template')}
