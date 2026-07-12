@@ -182,7 +182,7 @@ export function Warehouse({ language }: WarehouseProps) {
   // Default new-product category from the niche so the picker shows
   // sensible options (Плиты for furniture, Профиль for windows, etc.).
   const defaultCategory = niche.materialCategories[0] || 'Прочее';
-  const [newProduct, setNewProduct] = useState({ name: '', category: defaultCategory, quantity: 0, unit: 'лист', supplier: '', cost: 0, niche: '' as string });
+  const [newProduct, setNewProduct] = useState({ name: '', category: defaultCategory, quantity: 0, unit: 'лист', supplier: '', cost: 0, minQty: 10, niche: '' as string });
 
   // Suppliers & purchase orders — loaded from the server when their
   // tab opens (lazy: don't pay the network cost if the user never
@@ -704,9 +704,8 @@ export function Warehouse({ language }: WarehouseProps) {
 
   const handleAdd = () => {
     if (newProduct.name && newProduct.supplier && newProduct.cost > 0) {
-      const minQty = 10;
-      store.addProduct({ ...newProduct, status: computeStockStatus(newProduct.quantity, minQty), minQty });
-      setNewProduct({ name: '', category: defaultCategory, quantity: 0, unit: 'лист', supplier: '', cost: 0, niche: '' as string }); setShowAddModal(false);
+      store.addProduct({ ...newProduct, status: computeStockStatus(newProduct.quantity, newProduct.minQty) });
+      setNewProduct({ name: '', category: defaultCategory, quantity: 0, unit: 'лист', supplier: '', cost: 0, minQty: 10, niche: '' as string }); setShowAddModal(false);
     }
   };
 
@@ -1715,6 +1714,8 @@ export function Warehouse({ language }: WarehouseProps) {
                 <ModalInput label={l('Кол-во', 'Саны', 'Qty')} type="number" value={String(newProduct.quantity)} onChange={e => setNewProduct({ ...newProduct, quantity: Number((e.target as HTMLInputElement).value) })} />
                 <div><label className="block text-[11px] text-slate-400 mb-1">{l('Ед.', 'Бірл.', 'Unit')}</label><select value={newProduct.unit} onChange={e => setNewProduct({ ...newProduct, unit: e.target.value })} className="w-full px-3 py-2.5 bg-white/50 border-0 rounded-xl text-sm focus:outline-none"><option value="лист">{l('лист', 'парақ', 'sheet')}</option><option value="шт">{l('шт', 'дана', 'pcs')}</option><option value="м">м</option><option value="пара">{l('пара', 'жұп', 'pair')}</option></select></div>
               </div>
+              <ModalInput label={l('Мин. остаток', 'Мин. қалдық', 'Min stock')} type="number" value={String(newProduct.minQty)} onChange={e => setNewProduct({ ...newProduct, minQty: Number((e.target as HTMLInputElement).value) })} />
+              <p className="text-[11px] text-slate-400 -mt-1">{l('Ниже этого — пометка «Мало»', 'Осыдан төмен — «Аз» белгісі', 'Below this — flagged «Low»')}</p>
               <ModalInput label={l('Поставщик', 'Жеткізуші', 'Supplier')} value={newProduct.supplier} onChange={e => setNewProduct({ ...newProduct, supplier: (e.target as HTMLInputElement).value })} />
               <ModalInput label={l('Цена (₸)', 'Бағасы (₸)', 'Price (₸)')} type="number" value={String(newProduct.cost)} onChange={e => setNewProduct({ ...newProduct, cost: Number((e.target as HTMLInputElement).value) })} />
               {/* Niche tag (multi-niche teams only). Empty = applies to all. */}
