@@ -8,6 +8,8 @@ import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
+import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
+import { sendInstagramText, parseInboundInstagram, instagramConfigured, type InstagramConfig } from './instagram.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
@@ -1910,7 +1912,117 @@ app.post('/api/conversations/:id/messages', authMiddleware, requirePermission('c
   };
   db.prepare('UPDATE conversations SET data = ? WHERE id = ? AND team_id = ?')
     .run(JSON.stringify(updatedConv), req.params.id, req.teamId!);
+
+  // Исходящее в WhatsApp: если это ответ в WhatsApp-диалоге с привязанным
+  // клиентом — реально отправляем через Cloud API (best-effort).
+  if (direction === 'out' && prev.platform === 'whatsapp' && prev.externalId) {
+    const wa = readWhatsAppConfig(req.teamId!);
+    if (whatsAppConfigured(wa) && msg.type === 'text' && msg.text) {
+      void sendWhatsAppText(wa, prev.externalId, msg.text).catch(() => {});
+    }
+  }
+  // Исходящее в Instagram Direct — тем же best-effort способом.
+  if (direction === 'out' && prev.platform === 'instagram' && prev.externalId) {
+    const ig = readInstagramConfig(req.teamId!);
+    if (instagramConfigured(ig) && msg.type === 'text' && msg.text) {
+      void sendInstagramText(ig, prev.externalId, msg.text).catch(() => {});
+    }
+  }
+
   res.json({ message: msg, conversation: updatedConv });
+});
+
+// ─── Входящие сообщения (WhatsApp / Instagram) ───────────────────────
+function readWhatsAppConfig(teamId: string): Partial<WhatsAppConfig> {
+  try {
+    const row = db.prepare('SELECT integrations FROM team_settings WHERE team_id = ?').get(teamId) as any;
+    if (!row?.integrations) return {};
+    const cfg = JSON.parse(row.integrations)?.['whatsapp-business']?.config || {};
+    return { phoneNumberId: cfg.phoneNumberId, accessToken: cfg.accessToken };
+  } catch { return {}; }
+}
+// Ищем команду, чей WhatsApp phoneNumberId совпал с входящим (маппинг вебхука).
+function findTeamByWhatsAppPhone(phoneNumberId: string): string | null {
+  try {
+    const rows = db.prepare('SELECT team_id, integrations FROM team_settings WHERE integrations IS NOT NULL').all() as any[];
+    for (const r of rows) {
+      try {
+        const wa = JSON.parse(r.integrations)?.['whatsapp-business']?.config;
+        if (wa?.phoneNumberId && String(wa.phoneNumberId) === String(phoneNumberId)) return r.team_id;
+      } catch { /* skip */ }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+function readInstagramConfig(teamId: string): Partial<InstagramConfig> {
+  try {
+    const row = db.prepare('SELECT integrations FROM team_settings WHERE team_id = ?').get(teamId) as any;
+    if (!row?.integrations) return {};
+    const cfg = JSON.parse(row.integrations)?.['instagram-direct']?.config || {};
+    return { pageId: cfg.pageId, igUserId: cfg.igUserId, accessToken: cfg.accessToken };
+  } catch { return {}; }
+}
+// Ищем команду, чей Instagram igUserId совпал с recipient входящего сообщения.
+function findTeamByInstagramId(igUserId: string): string | null {
+  try {
+    const rows = db.prepare('SELECT team_id, integrations FROM team_settings WHERE integrations IS NOT NULL').all() as any[];
+    for (const r of rows) {
+      try {
+        const ig = JSON.parse(r.integrations)?.['instagram-direct']?.config;
+        if (ig?.igUserId && String(ig.igUserId) === String(igUserId)) return r.team_id;
+      } catch { /* skip */ }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+// Кладём входящее сообщение в инбокс: находим/создаём диалог по (platform +
+// externalId), добавляем сообщение direction:'in', растим unreadCount.
+function ingestInboundMessage(teamId: string, m: { platform: string; externalId: string; name?: string; text: string }) {
+  const now = new Date().toISOString();
+  const convs = db.prepare('SELECT id, data FROM conversations WHERE team_id = ?').all(teamId) as any[];
+  let convId: string | null = null;
+  let convData: any = null;
+  for (const c of convs) {
+    try { const d = JSON.parse(c.data); if (d.platform === m.platform && d.externalId === m.externalId) { convId = c.id; convData = d; break; } } catch { /* skip */ }
+  }
+  if (!convId) {
+    convId = newId('c');
+    convData = { name: m.name || m.externalId, platform: m.platform, externalId: m.externalId, online: false, unreadCount: 0, createdAt: now };
+    db.prepare('INSERT INTO conversations (id, team_id, user_id, data) VALUES (?, ?, ?, ?)').run(convId, teamId, m.platform, JSON.stringify({ ...convData, id: convId }));
+  }
+  const msgId = newId('m');
+  const msg = { id: msgId, text: m.text, type: 'text', direction: 'in', read: false, createdAt: now };
+  db.prepare('INSERT INTO messages (id, conversation_id, team_id, user_id, data) VALUES (?, ?, ?, ?, ?)').run(msgId, convId, teamId, m.platform, JSON.stringify(msg));
+  const upd = { ...convData, id: convId, name: convData.name || m.name || m.externalId, lastMessage: m.text.slice(0, 140), lastMessageAt: now, unreadCount: (convData.unreadCount || 0) + 1 };
+  db.prepare('UPDATE conversations SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(upd), convId, teamId);
+}
+
+// Верификация вебхука Meta (при подключении в App Dashboard).
+app.get('/api/webhooks/meta', (req, res) => {
+  const verifyToken = process.env.META_VERIFY_TOKEN || 'utir-verify';
+  if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === verifyToken) {
+    return res.status(200).send(String(req.query['hub.challenge'] || ''));
+  }
+  res.sendStatus(403);
+});
+// Приём входящих сообщений WhatsApp (и Instagram — Фаза 2).
+app.post('/api/webhooks/meta', (req, res) => {
+  // Отвечаем 200 сразу, чтобы Meta не ретраила; обработка — синхронно, но быстро.
+  try {
+    // WhatsApp (object: whatsapp_business_account)
+    const wa = parseInboundWhatsApp(req.body);
+    for (const m of wa) {
+      const teamId = m.phoneNumberId ? findTeamByWhatsAppPhone(m.phoneNumberId) : null;
+      if (teamId) ingestInboundMessage(teamId, { platform: 'whatsapp', externalId: m.from, name: m.name, text: m.text });
+    }
+    // Instagram Direct (object: instagram)
+    const ig = parseInboundInstagram(req.body);
+    for (const m of ig) {
+      const teamId = m.recipientId ? findTeamByInstagramId(m.recipientId) : null;
+      if (teamId) ingestInboundMessage(teamId, { platform: 'instagram', externalId: m.from, text: m.text });
+    }
+  } catch (e) { console.warn('[webhook/meta] failed', e); }
+  res.sendStatus(200);
 });
 
 app.use('/api/deals', authMiddleware, requirePermission('orders'), makeCrud('deals', 'D'));
@@ -3117,7 +3229,7 @@ function readMetaAdsConfig(teamId: string): { adAccountId?: string; accessToken?
     const row = db.prepare('SELECT integrations FROM team_settings WHERE team_id = ?').get(teamId) as any;
     if (!row?.integrations) return {};
     const all = JSON.parse(row.integrations);
-    return all?.['meta-ads'] || {};
+    return all?.['meta-ads']?.config || {};
   } catch { return {}; }
 }
 const creativesCache = new Map<string, { at: number; data: any }>();
