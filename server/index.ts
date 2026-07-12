@@ -928,6 +928,30 @@ app.post('/api/auth/reset-password', rateLimit('forgot'), async (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/auth/change-password { currentPassword, newPassword } — for a
+// logged-in user. Verifies the current password via bcrypt, then updates the
+// hash. Mirrors reset-password but authenticated instead of token-based.
+app.post('/api/auth/change-password', authMiddleware, async (req: AuthedRequest, res) => {
+  const currentPassword = String(req.body?.currentPassword || '');
+  const newPassword = String(req.body?.newPassword || '');
+  if (!currentPassword) return res.status(400).json({ error: 'current_required' });
+  const pwdCheck = passwordOk(newPassword);
+  if (!pwdCheck.ok) return res.status(400).json({ error: pwdCheck.reason });
+
+  const user = db.prepare('SELECT id, name, email, password_hash FROM users WHERE id = ?').get(req.userId!) as any;
+  if (!user) return res.status(404).json({ error: 'not_found' });
+
+  const ok = await bcrypt.compare(currentPassword, user.password_hash);
+  if (!ok) return res.status(400).json({ error: 'invalid_current' });
+  // Reject a no-op change so the user doesn't think they rotated it when they didn't.
+  if (await bcrypt.compare(newPassword, user.password_hash)) return res.status(400).json({ error: 'same_password' });
+
+  const hash = await bcrypt.hash(newPassword, 10);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, user.id);
+  logActivity(user.id, { user: user.name, action: 'Сменил пароль', target: user.email, type: 'settings', page: 'settings' });
+  res.json({ ok: true });
+});
+
 // GET /api/auth/check-reset-token?token=XXX → tells the frontend if the
 // link is still valid before rendering the new-password form. Avoids
 // the user typing a new password only to be told the link expired.

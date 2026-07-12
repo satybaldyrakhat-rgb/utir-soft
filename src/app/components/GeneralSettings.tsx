@@ -5,6 +5,7 @@ import {
   Palette, Factory, AlertTriangle, Sun, Moon, Monitor,
 } from 'lucide-react';
 import { useDataStore, type UserProfile } from '../utils/dataStore';
+import { api } from '../utils/api';
 import { confirmDialog } from '../utils/confirm';
 import { NICHES, type NicheId, getNiche } from '../utils/niches';
 import { THEMES, type ThemeId, loadTheme, saveTheme, type ColorMode, loadMode, saveMode } from '../utils/theme';
@@ -79,6 +80,34 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
+  // Change-password inline form (expands under the account section).
+  const [showPwd, setShowPwd] = useState(false);
+  const [pwdCur, setPwdCur] = useState('');
+  const [pwdNew, setPwdNew] = useState('');
+  const [pwdRep, setPwdRep] = useState('');
+  const [pwdBusy, setPwdBusy] = useState(false);
+  const [pwdErr, setPwdErr] = useState('');
+
+  const submitPassword = async () => {
+    setPwdErr('');
+    if (pwdNew.length < 8 || !/[A-Za-zА-Яа-яЁё]/.test(pwdNew) || !/\d/.test(pwdNew)) {
+      setPwdErr(l('Минимум 8 символов, буква и цифра', 'Кемінде 8 таңба, әріп пен сан', 'Min 8 chars, a letter and a digit')); return;
+    }
+    if (pwdNew !== pwdRep) { setPwdErr(l('Пароли не совпадают', 'Құпия сөздер сәйкес емес', 'Passwords do not match')); return; }
+    setPwdBusy(true);
+    try {
+      await api.post('/api/auth/change-password', { currentPassword: pwdCur, newPassword: pwdNew });
+      toast(l('Пароль изменён', 'Құпия сөз өзгертілді', 'Password changed'), 'success');
+      setShowPwd(false); setPwdCur(''); setPwdNew(''); setPwdRep('');
+    } catch (e: any) {
+      const code = String(e?.message || '');
+      setPwdErr(
+        code === 'invalid_current' ? l('Неверный текущий пароль', 'Ағымдағы құпия сөз қате', 'Wrong current password')
+        : code === 'same_password' ? l('Новый пароль совпадает со старым', 'Жаңа құпия сөз ескісімен бірдей', 'New password is the same')
+        : l('Не удалось сменить пароль', 'Ауыстыру сәтсіз', 'Could not change password'),
+      );
+    } finally { setPwdBusy(false); }
+  };
   // Per-user accent theme — stored in localStorage, applied immediately
   // via saveTheme() which writes the data-theme attribute on <html>.
   const [theme, setThemeState] = useState<ThemeId>(loadTheme());
@@ -483,8 +512,8 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
             <Download className="w-3.5 h-3.5" /> {l('Экспорт моих данных', 'Деректерді экспорт', 'Export my data')}
           </button>
           <button
-            onClick={() => toast(l('Смена пароля скоро будет доступна. Пока — выйдите и используйте «Восстановить пароль».', 'Құпия сөзді ауыстыру жақын арада қол жетімді болады. Әзірге шығып, «Құпия сөзді қалпына келтіру» қолданыңыз.', 'Password change coming soon. For now sign out and use «Reset password».'))}
-            className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs text-gray-700 border border-gray-100"
+            onClick={() => { setShowPwd(v => !v); setPwdErr(''); }}
+            className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border ${showPwd ? 'bg-gray-100 text-gray-900 border-gray-200' : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-100'}`}
           >
             <Lock className="w-3.5 h-3.5" /> {l('Сменить пароль', 'Пароль ауыстыру', 'Change password')}
           </button>
@@ -497,6 +526,31 @@ export function GeneralSettings({ language, onLanguageChange, onLogout, requisit
             </button>
           )}
         </div>
+        {showPwd && (
+          <div className="mt-3 p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2.5 max-w-md">
+            <input type="password" autoComplete="current-password" value={pwdCur} onChange={e => setPwdCur(e.target.value)}
+              placeholder={l('Текущий пароль', 'Ағымдағы құпия сөз', 'Current password')}
+              className="w-full px-3 py-2.5 bg-white rounded-xl text-xs border border-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-300" />
+            <input type="password" autoComplete="new-password" value={pwdNew} onChange={e => setPwdNew(e.target.value)}
+              placeholder={l('Новый пароль', 'Жаңа құпия сөз', 'New password')}
+              className="w-full px-3 py-2.5 bg-white rounded-xl text-xs border border-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-300" />
+            <input type="password" autoComplete="new-password" value={pwdRep} onChange={e => setPwdRep(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !pwdBusy) submitPassword(); }}
+              placeholder={l('Повторите новый', 'Жаңасын қайталаңыз', 'Repeat new')}
+              className="w-full px-3 py-2.5 bg-white rounded-xl text-xs border border-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-300" />
+            {pwdErr && <p className="text-[11px] text-rose-600">{pwdErr}</p>}
+            <div className="flex gap-2 pt-1">
+              <button onClick={submitPassword} disabled={pwdBusy || !pwdCur || !pwdNew}
+                className="flex-1 px-3 py-2.5 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 disabled:opacity-40">
+                {pwdBusy ? l('Сохранение…', 'Сақталуда…', 'Saving…') : l('Сохранить пароль', 'Құпия сөзді сақтау', 'Save password')}
+              </button>
+              <button onClick={() => { setShowPwd(false); setPwdErr(''); setPwdCur(''); setPwdNew(''); setPwdRep(''); }}
+                className="px-3 py-2.5 bg-white text-gray-600 rounded-xl text-xs border border-gray-200 hover:bg-gray-50">
+                {l('Отмена', 'Болдырмау', 'Cancel')}
+              </button>
+            </div>
+          </div>
+        )}
       </SectionCard>
     </div>
   );
