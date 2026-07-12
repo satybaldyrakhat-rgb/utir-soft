@@ -976,6 +976,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       saveModules(next);
       return next;
     });
+    // Custom modules are team-wide — persist edits (label/fields/roleAccess/
+    // enabled) to the backend. Built-in module prefs stay local for now.
+    if (after?.custom) api.patch(`/api/custom-modules/${id}`, updates).catch(() => {});
     // Targeted activity entry — only for the meaningful flips, not every label keystroke.
     if (before && after && before.enabled !== after.enabled) {
       addActivity({
@@ -1024,6 +1027,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       saveModules(next);
       return next;
     });
+    // Persist team-wide so the module is visible to the whole team.
+    api.post('/api/custom-modules', full).catch(() => {});
     addActivity({
       user: 'Вы', actor: 'human',
       action: 'Создал кастомный модуль',
@@ -1043,9 +1048,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       saveModules(next);
       return next;
     });
-    // Also drop the data rows that belonged to this module.
+    api.delete(`/api/custom-modules/${id}`).catch(() => {});
+    // Also drop the data rows that belonged to this module (local + backend).
     setCustomRecords(prev => {
       if (!prev[id]) return prev;
+      for (const rec of prev[id]) api.delete(`/api/custom-records/${rec.id}`).catch(() => {});
       const next = { ...prev };
       delete next[id];
       saveCustomRecords(next);
@@ -1071,6 +1078,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       saveCustomRecords(next);
       return next;
     });
+    api.post('/api/custom-records', record).catch(() => {});
     const modLabel = modules.find(m => m.id === moduleId)?.labels.ru || moduleId;
     addActivity({
       user: 'Вы', actor: 'human',
@@ -1082,12 +1090,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [addActivity, modules]);
 
   const updateCustomRecord = useCallback((moduleId: string, recordId: string, values: Record<string, any>) => {
+    const updatedAt = new Date().toISOString();
     setCustomRecords(prev => {
       const list = prev[moduleId] || [];
-      const next = { ...prev, [moduleId]: list.map(r => r.id === recordId ? { ...r, values, updatedAt: new Date().toISOString() } : r) };
+      const next = { ...prev, [moduleId]: list.map(r => r.id === recordId ? { ...r, values, updatedAt } : r) };
       saveCustomRecords(next);
       return next;
     });
+    api.patch(`/api/custom-records/${recordId}`, { values, updatedAt }).catch(() => {});
     const modLabel = modules.find(m => m.id === moduleId)?.labels.ru || moduleId;
     addActivity({
       user: 'Вы', actor: 'human',
@@ -1104,6 +1114,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       saveCustomRecords(next);
       return next;
     });
+    api.delete(`/api/custom-records/${recordId}`).catch(() => {});
     const modLabel = modules.find(m => m.id === moduleId)?.labels.ru || moduleId;
     addActivity({
       user: 'Вы', actor: 'human',
@@ -1143,7 +1154,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Matrix-gated reads (deals/products/transactions/activity) may return
       // 403 for a role whose matrix entry is 'none'. Swallow so the UI still
       // boots — the sidebar item for that module is hidden anyway.
-      const [d, e, t, p, tx, ig, al, ai, rp, cat, prof, comp] = await Promise.all([
+      const [d, e, t, p, tx, ig, al, ai, rp, cat, prof, comp, customMods, customRecs] = await Promise.all([
         api.get<Deal[]>('/api/deals').catch(() => [] as Deal[]),
         api.get<Employee[]>('/api/employees'),
         api.get<Task[]>('/api/tasks'),
@@ -1161,6 +1172,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         api.get<{ niche: string; secondaryNiches?: string[]; onboarding: { completed: boolean; step?: string; completedAt?: string } } | null>('/api/team/profile').catch(() => null),
         // Company branding (name/BIN/address/logo) — team-wide, backend-persisted.
         api.get<Partial<UserProfile>>('/api/team/company').catch(() => null),
+        // Custom modules + their records — team-wide (были только в localStorage).
+        api.get<PlatformModule[]>('/api/custom-modules').catch(() => null),
+        api.get<CustomRecord[]>('/api/custom-records').catch(() => null),
       ]);
       setDeals(d); setEmployees(e); setTasks(t); setProducts(p);
       setTransactions(tx); setIntegrations(ig); setActivityLogs(al);
@@ -1179,6 +1193,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
           saveProfile(next);
           return next;
         });
+      }
+      // Custom modules — backend is the source of truth. Keep the local
+      // built-in modules (+ their enable/order prefs), replace custom ones
+      // with the team-wide set from the server.
+      if (customMods) {
+        setModules(prev => {
+          const builtins = prev.filter(m => !m.custom);
+          const merged = [...builtins, ...customMods.map(m => ({ ...m, custom: true }))];
+          saveModules(merged);
+          return merged;
+        });
+      }
+      // Custom records — group by moduleId, newest first (matches local prepend).
+      if (customRecs) {
+        const byModule: CustomRecordsByModule = {};
+        for (const r of customRecs) (byModule[r.moduleId] = byModule[r.moduleId] || []).push(r);
+        for (const k of Object.keys(byModule)) byModule[k].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+        setCustomRecords(byModule);
+        saveCustomRecords(byModule);
       }
       // If backend returned catalogs, use them as the source of truth (team-wide).
       // Local cache stays as offline fallback.

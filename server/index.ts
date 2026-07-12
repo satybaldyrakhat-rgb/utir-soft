@@ -263,6 +263,29 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
+
+-- Кастомные модули (конструктор модулей) — определения модулей, созданных
+-- пользователем: id, enabled, custom, icon, fields[], labels, roleAccess.
+-- Team-scoped, чтобы модуль видели все в команде, а не только автор.
+CREATE TABLE IF NOT EXISTS custom_modules (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  team_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_custom_modules_team ON custom_modules(team_id);
+
+-- Записи внутри кастомных модулей: id, moduleId, createdAt, updatedAt,
+-- values{}. Team-scoped.
+CREATE TABLE IF NOT EXISTS custom_records (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  team_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_custom_records_team ON custom_records(team_id);
 `);
 
 // Idempotent migration: add columns if missing. Returns true when column was just added.
@@ -1963,6 +1986,9 @@ app.patch('/api/tasks/:id', authMiddleware, async (req: AuthedRequest, res) => {
 });
 
 app.use('/api/tasks', makeCrud('tasks', 't'));
+// Кастомные модули и их записи — team-scoped, доступны всей команде.
+app.use('/api/custom-modules', makeCrud('custom_modules', 'cm_'));
+app.use('/api/custom-records', makeCrud('custom_records', 'r_'));
 app.use('/api/products', authMiddleware, requirePermission('production'), makeCrud('products', 'p'));
 // Finance gated by the matrix (was requireRole('manager') — now matrix-driven
 // so admin can hand finance to specific roles without touching code).
