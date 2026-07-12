@@ -17,6 +17,7 @@ import {
   Phone, X, Users, Mail, Calendar, TrendingUp, XCircle, Plus, Search,
   Archive, Download, Upload, RotateCcw, Trash2, Filter, ArrowUpDown,
   ChevronDown, MoveRight, Eye, Sparkles, MessageCircle, AlertTriangle, Clock,
+  MoreHorizontal,
 } from 'lucide-react';
 import { ClientOrderModal } from './ClientOrderModal';
 import { NewDealModal } from './NewDealModal';
@@ -133,6 +134,10 @@ export function SalesKanban({ language }: SalesKanbanProps) {
   const [mobileStage, setMobileStage] = useState<string>('new');
 
   // ─── Filters + sorting + bulk ──────────────────────────────────
+  // Overflow «•••» menu — collects the secondary toolbar actions
+  // (archive / export / import) so the header stays minimal: one primary
+  // «New deal» button + a compact more-menu.
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filterSource, setFilterSource] = useState<string>('');
   const [filterOwner, setFilterOwner] = useState<string>('');
@@ -371,6 +376,84 @@ export function SalesKanban({ language }: SalesKanbanProps) {
     } as any)[p] || null;
   };
 
+  // ─── CSV exports (moved out of JSX to keep the toolbar minimal) ──
+  const exportDeals = () => {
+    const ownerName = (id: string | undefined) => id ? (store.getEmployeeById(id)?.name || '') : '';
+    const cols: CsvColumn<Deal>[] = [
+      { header: 'ID',           value: 'id' },
+      { header: 'Клиент',       value: 'customerName' },
+      { header: 'Телефон',      value: 'phone' },
+      { header: 'Адрес',        value: 'address' },
+      { header: 'Продукт',      value: 'product' },
+      { header: niche.productTypeLabel[language], value: 'furnitureType' },
+      { header: 'Сумма',        value: 'amount' },
+      { header: 'Оплачено',     value: 'paidAmount' },
+      { header: 'Статус',       value: 'status' },
+      { header: 'Источник',     value: 'source' },
+      { header: 'Замерщик',     value: 'measurer' },
+      { header: 'Дизайнер',     value: 'designer' },
+      { header: 'Ответственный',value: (d) => ownerName(d.ownerId) },
+      { header: 'Дата замера',  value: 'measurementDate' },
+      { header: 'Готовность',   value: 'completionDate' },
+      { header: 'Установка',    value: 'installationDate' },
+      { header: 'Создано',      value: 'createdAt' },
+      { header: 'Заметки',      value: 'notes' },
+    ];
+    downloadCsv(todayStampedName('deals'), rowsToCsv(store.deals, cols));
+  };
+
+  const exportClients = () => {
+    // Собираем уникальных клиентов из сделок. Ключ — нормализованный
+    // телефон, а если телефона нет — имя в нижнем регистре.
+    type ClientAgg = {
+      name: string; phone: string; address: string;
+      orders: number; total: number; paid: number;
+      sources: Set<string>; products: Set<string>;
+      first: string; last: string;
+    };
+    const map = new Map<string, ClientAgg>();
+    for (const d of store.deals) {
+      const digits = (d.phone || '').replace(/\D/g, '');
+      const norm = digits.length >= 10 ? digits.slice(-10) : digits;
+      const key = norm || (d.customerName || '').trim().toLowerCase();
+      if (!key) continue;
+      let c = map.get(key);
+      if (!c) {
+        c = { name: d.customerName || '', phone: d.phone || '', address: d.address || '',
+          orders: 0, total: 0, paid: 0, sources: new Set(), products: new Set(),
+          first: d.createdAt || '', last: d.createdAt || '' };
+        map.set(key, c);
+      }
+      c.orders += 1;
+      c.total += Number(d.amount) || 0;
+      c.paid += Number(d.paidAmount) || 0;
+      if (d.source) c.sources.add(d.source);
+      if (d.product) c.products.add(d.product);
+      if (!c.name && d.customerName) c.name = d.customerName;
+      if (!c.address && d.address) c.address = d.address;
+      if (d.createdAt) {
+        if (!c.first || d.createdAt < c.first) c.first = d.createdAt;
+        if (!c.last || d.createdAt > c.last) c.last = d.createdAt;
+      }
+    }
+    const clients = Array.from(map.values()).sort((a, b) => b.total - a.total);
+    const fmtDate = (iso: string) => (iso ? iso.slice(0, 10) : '');
+    const cols: CsvColumn<ClientAgg>[] = [
+      { header: 'Клиент',          value: 'name' },
+      { header: 'Телефон',         value: 'phone' },
+      { header: 'Адрес',           value: 'address' },
+      { header: 'Заказов',         value: 'orders' },
+      { header: 'Сумма',           value: 'total' },
+      { header: 'Оплачено',        value: 'paid' },
+      { header: 'Долг',            value: (c) => c.total - c.paid },
+      { header: 'Источники',       value: (c) => Array.from(c.sources).join(' / ') },
+      { header: 'Продукты',        value: (c) => Array.from(c.products).join(' / ') },
+      { header: 'Первый заказ',    value: (c) => fmtDate(c.first) },
+      { header: 'Последний заказ', value: (c) => fmtDate(c.last) },
+    ];
+    downloadCsv(todayStampedName('clients'), rowsToCsv(clients, cols));
+  };
+
   // ─── Empty-state hero ─────────────────────────────────────────
   // When the team has zero non-rejected deals, render a centered hero
   // instead of six empty columns. Provides three clear paths:
@@ -399,124 +482,46 @@ export function SalesKanban({ language }: SalesKanbanProps) {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={() => setShowArchive(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs text-slate-600 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl transition-all"
-              >
-                <Archive className="w-3.5 h-3.5" />
-                {l('Архив отказов', 'Бас тарту', 'Rejected')}
-                {rejectedDeals.length > 0 && (
-                  <span className="ml-0.5 bg-rose-100/70 text-rose-700 text-[10px] px-1.5 py-0.5 rounded-full ring-1 ring-white/40 tabular-nums">
-                    {rejectedDeals.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  const ownerName = (id: string | undefined) => id ? (store.getEmployeeById(id)?.name || '') : '';
-                  const cols: CsvColumn<Deal>[] = [
-                    { header: 'ID',           value: 'id' },
-                    { header: 'Клиент',       value: 'customerName' },
-                    { header: 'Телефон',      value: 'phone' },
-                    { header: 'Адрес',        value: 'address' },
-                    { header: 'Продукт',      value: 'product' },
-                    { header: niche.productTypeLabel[language], value: 'furnitureType' },
-                    { header: 'Сумма',        value: 'amount' },
-                    { header: 'Оплачено',     value: 'paidAmount' },
-                    { header: 'Статус',       value: 'status' },
-                    { header: 'Источник',     value: 'source' },
-                    { header: 'Замерщик',     value: 'measurer' },
-                    { header: 'Дизайнер',     value: 'designer' },
-                    { header: 'Ответственный',value: (d) => ownerName(d.ownerId) },
-                    { header: 'Дата замера',  value: 'measurementDate' },
-                    { header: 'Готовность',   value: 'completionDate' },
-                    { header: 'Установка',    value: 'installationDate' },
-                    { header: 'Создано',      value: 'createdAt' },
-                    { header: 'Заметки',      value: 'notes' },
-                  ];
-                  downloadCsv(todayStampedName('deals'), rowsToCsv(store.deals, cols));
-                }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs text-slate-600 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl transition-all"
-                title={l('Скачать сделки в CSV (Excel)', 'CSV-ге жүктеп алу', 'Export deals to CSV')}
-              >
-                <Download className="w-3.5 h-3.5" />
-                {l('Экспорт', 'Экспорт', 'Export')}
-              </button>
-              <button
-                onClick={() => {
-                  // Собираем уникальных клиентов из сделок. Ключ — нормализованный
-                  // телефон, а если телефона нет — имя в нижнем регистре.
-                  type ClientAgg = {
-                    name: string; phone: string; address: string;
-                    orders: number; total: number; paid: number;
-                    sources: Set<string>; products: Set<string>;
-                    first: string; last: string;
-                  };
-                  const map = new Map<string, ClientAgg>();
-                  for (const d of store.deals) {
-                    // Нормализуем телефон по последним 10 цифрам, чтобы +7 700… и
-                    // 8 700… (один и тот же KZ-номер) склеивались в одного клиента.
-                    const digits = (d.phone || '').replace(/\D/g, '');
-                    const norm = digits.length >= 10 ? digits.slice(-10) : digits;
-                    const key = norm || (d.customerName || '').trim().toLowerCase();
-                    if (!key) continue;
-                    let c = map.get(key);
-                    if (!c) {
-                      c = { name: d.customerName || '', phone: d.phone || '', address: d.address || '',
-                        orders: 0, total: 0, paid: 0, sources: new Set(), products: new Set(),
-                        first: d.createdAt || '', last: d.createdAt || '' };
-                      map.set(key, c);
-                    }
-                    c.orders += 1;
-                    c.total += Number(d.amount) || 0;
-                    c.paid += Number(d.paidAmount) || 0;
-                    if (d.source) c.sources.add(d.source);
-                    if (d.product) c.products.add(d.product);
-                    if (!c.name && d.customerName) c.name = d.customerName;
-                    if (!c.address && d.address) c.address = d.address;
-                    if (d.createdAt) {
-                      if (!c.first || d.createdAt < c.first) c.first = d.createdAt;
-                      if (!c.last || d.createdAt > c.last) c.last = d.createdAt;
-                    }
-                  }
-                  const clients = Array.from(map.values()).sort((a, b) => b.total - a.total);
-                  const fmtDate = (iso: string) => (iso ? iso.slice(0, 10) : '');
-                  const cols: CsvColumn<ClientAgg>[] = [
-                    { header: 'Клиент',          value: 'name' },
-                    { header: 'Телефон',         value: 'phone' },
-                    { header: 'Адрес',           value: 'address' },
-                    { header: 'Заказов',         value: 'orders' },
-                    { header: 'Сумма',           value: 'total' },
-                    { header: 'Оплачено',        value: 'paid' },
-                    { header: 'Долг',            value: (c) => c.total - c.paid },
-                    { header: 'Источники',       value: (c) => Array.from(c.sources).join(' / ') },
-                    { header: 'Продукты',        value: (c) => Array.from(c.products).join(' / ') },
-                    { header: 'Первый заказ',    value: (c) => fmtDate(c.first) },
-                    { header: 'Последний заказ', value: (c) => fmtDate(c.last) },
-                  ];
-                  downloadCsv(todayStampedName('clients'), rowsToCsv(clients, cols));
-                }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs text-slate-600 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl transition-all"
-                title={l('Экспорт уникальных клиентов в CSV (Excel)', 'Клиенттерді CSV-ге жүктеу', 'Export unique clients to CSV')}
-              >
-                <Users className="w-3.5 h-3.5" />
-                {l('Клиенты', 'Клиенттер', 'Clients')}
-              </button>
-              {canWrite && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Overflow «•••» — secondary actions tucked away for a clean header */}
+              <div className="relative">
                 <button
-                  onClick={() => setShowImport(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs text-slate-600 bg-white/50 hover:bg-white/80 ring-1 ring-white/60 backdrop-blur-xl transition-all"
-                  title={l('Загрузить сделки из CSV', 'CSV-ден жүктеу', 'Import deals from CSV')}
+                  onClick={() => setShowMoreMenu(v => !v)}
+                  className={`relative flex items-center justify-center w-9 h-9 rounded-2xl ring-1 transition-all ${showMoreMenu ? 'bg-white/85 text-slate-700 ring-white/60' : 'bg-white/50 text-slate-500 ring-white/60 hover:bg-white/80 backdrop-blur-xl'}`}
+                  title={l('Ещё', 'Тағы', 'More')}
                 >
-                  <Upload className="w-3.5 h-3.5" />
-                  {l('Импорт', 'Импорт', 'Import')}
+                  <MoreHorizontal className="w-4 h-4" />
+                  {rejectedDeals.length > 0 && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full" />}
                 </button>
-              )}
+                {showMoreMenu && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setShowMoreMenu(false)} />
+                    <div className={`absolute right-0 top-full mt-2 z-30 p-1.5 min-w-[230px] ${GLASS_DEEP}`}>
+                      <button onClick={() => { setShowMoreMenu(false); setShowArchive(true); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-slate-700 hover:bg-white/60 transition-colors">
+                        <Archive className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <span className="flex-1 text-left">{l('Архив отказов', 'Бас тартулар архиві', 'Rejected archive')}</span>
+                        {rejectedDeals.length > 0 && <span className="bg-rose-100/70 text-rose-700 text-[10px] px-1.5 py-0.5 rounded-full tabular-nums">{rejectedDeals.length}</span>}
+                      </button>
+                      <div className="h-px bg-white/50 my-1 mx-2" />
+                      <button onClick={() => { setShowMoreMenu(false); exportDeals(); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-slate-700 hover:bg-white/60 transition-colors">
+                        <Download className="w-4 h-4 text-slate-400 flex-shrink-0" /><span className="flex-1 text-left">{l('Экспорт сделок (CSV)', 'Мәмілелер экспорты (CSV)', 'Export deals (CSV)')}</span>
+                      </button>
+                      <button onClick={() => { setShowMoreMenu(false); exportClients(); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-slate-700 hover:bg-white/60 transition-colors">
+                        <Users className="w-4 h-4 text-slate-400 flex-shrink-0" /><span className="flex-1 text-left">{l('Экспорт клиентов (CSV)', 'Клиенттер экспорты (CSV)', 'Export clients (CSV)')}</span>
+                      </button>
+                      {canWrite && (
+                        <button onClick={() => { setShowMoreMenu(false); setShowImport(true); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-slate-700 hover:bg-white/60 transition-colors">
+                          <Upload className="w-4 h-4 text-slate-400 flex-shrink-0" /><span className="flex-1 text-left">{l('Импорт из CSV', 'CSV-ден импорт', 'Import from CSV')}</span>
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
               {canWrite && (
                 <button
                   onClick={() => openNewDealAt()}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 backdrop-blur-xl text-white rounded-2xl text-xs shadow-[0_8px_24px_-8px_var(--accent-shadow)] hover:bg-emerald-700 ring-1 ring-white/10 transition-all"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs shadow-[0_8px_24px_-8px_var(--accent-shadow)] hover:bg-emerald-700 ring-1 ring-white/10 transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" />{l('Новая сделка', 'Жаңа мәміле', 'New Deal')}
                 </button>
