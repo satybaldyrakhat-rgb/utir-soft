@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Loader2, CheckCircle2, Send } from 'lucide-react';
 import { api } from '../utils/api';
 import { getNiche } from '../utils/niches';
+import { getFbTracking } from '../utils/fbTracking';
 
 // Public lead-capture form — opened at #/lead/<code>?c=<campaign>&s=<source>.
 // Submits straight into the team's funnel as a `new` deal tagged with the
@@ -47,7 +48,7 @@ export function LeadForm({ route }: Props) {
     setSubmit('sending');
     api.post(`/api/lead/${encodeURIComponent(code)}`, {
       name: form.name, phone: form.phone, product: form.product, comment: form.comment,
-      source, campaign,
+      source, campaign, ...getFbTracking(),
     })
       .then(() => setSubmit('done'))
       .catch(() => { setSubmit('idle'); setErr('Не удалось отправить. Попробуйте ещё раз.'); });

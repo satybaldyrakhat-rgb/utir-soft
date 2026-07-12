@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChefHat, Archive, Shirt, DoorOpen, Baby, Bed, Briefcase, Box, MapPin, ChevronLeft, ChevronRight, CheckCircle2, Calendar, Send } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { api } from '../utils/api';
+import { getFbTracking } from '../utils/fbTracking';
 
 const FURNITURE = [
   { id: 'kitchen', label: 'Кухня', icon: ChefHat },
@@ -57,6 +58,7 @@ export function Booking({ teamCode }: { teamCode?: string }) {
         const r = await api.post<{ ok: boolean; id: string }>(`/api/booking/${encodeURIComponent(teamCode)}`, {
           name, phone, product: productLabel, address,
           measurementDate, date: dateLabel, slot: selectedSlot, notes: combinedNotes,
+          ...getFbTracking(),
         });
         setTrackId(r.id);
       } else {

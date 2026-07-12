@@ -1696,14 +1696,16 @@ app.post('/api/lead/:code', rateLimit('lead'), (req, res) => {
     measurer: '', designer: '', materials: '',
     measurementDate: '', completionDate: '', installationDate: '',
     paymentMethods: {},
+    // Рекламная атрибуция: fbc из fbclid перехода + fbp cookie (если есть).
+    fbc: buildFbc(b), fbp: b.fbp ? String(b.fbp).slice(0, 100) : undefined,
     notes: comment ? `Заявка с лид-формы: ${comment}` : 'Заявка с лид-формы',
     createdAt: new Date().toISOString(),
   };
   db.prepare('INSERT INTO deals (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, 'lead-form', ts.team_id, JSON.stringify(deal));
   // Мгновенный пуш назначенному менеджеру в Telegram (best-effort).
   if (ownerId) { try { void notifyAssignment(db, ts.team_id, id, ownerId); } catch { /* ignore */ } }
-  // Meta CAPI — Lead из рекламы (с fbc/fbp/ip для атрибуции по креативу).
-  void emitCapiForDeal(ts.team_id, 'Lead', deal, { actionSource: 'website' });
+  // Meta CAPI — Lead из рекламы (с fbc/fbp/ip/ua для атрибуции по креативу).
+  void emitCapiForDeal(ts.team_id, 'Lead', deal, { actionSource: 'website', clientIp: clientIpOf(req), userAgent: req.headers['user-agent'] });
   res.json({ ok: true });
 });
 
@@ -1739,12 +1741,13 @@ app.post('/api/booking/:code', rateLimit('lead'), (req, res) => {
     measurer: '', designer: '', materials: '',
     measurementDate, completionDate: '', installationDate: '',
     paymentMethods: {},
+    fbc: buildFbc(b), fbp: b.fbp ? String(b.fbp).slice(0, 100) : undefined,
     notes: [notes, slot && `Слот: ${slot}`].filter(Boolean).join('\n') || 'Запись на замер с сайта',
     createdAt: new Date().toISOString(),
   };
   db.prepare('INSERT INTO deals (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, 'booking', ts.team_id, JSON.stringify(deal));
   if (ownerId) { try { void notifyAssignment(db, ts.team_id, id, ownerId); } catch { /* ignore */ } }
-  void emitCapiForDeal(ts.team_id, 'Lead', deal, { actionSource: 'website' });
+  void emitCapiForDeal(ts.team_id, 'Lead', deal, { actionSource: 'website', clientIp: clientIpOf(req), userAgent: req.headers['user-agent'] });
   res.json({ ok: true, id });
 });
 
@@ -3002,8 +3005,19 @@ function logMetaEvent(teamId: string, entry: Record<string, any>) {
       .run(newId('me_'), teamId, JSON.stringify({ ...entry, at: new Date().toISOString() }));
   } catch (e) { console.warn('[meta] log failed', e); }
 }
+// Собирает fbc из fbclid (формат Meta: fb.1.<ts>.<fbclid>), если явного fbc нет.
+function buildFbc(body: any): string | undefined {
+  if (body?.fbc) return String(body.fbc).slice(0, 255);
+  if (body?.fbclid) return `fb.1.${Date.now()}.${String(body.fbclid).slice(0, 200)}`;
+  return undefined;
+}
+function clientIpOf(req: Request): string | undefined {
+  const xf = (req.headers['x-forwarded-for'] as string) || '';
+  return xf.split(',')[0].trim() || (req.socket as any)?.remoteAddress || undefined;
+}
+
 // Отправляет событие сделки в Meta CAPI (если настроено) и пишет в лог.
-async function emitCapiForDeal(teamId: string, eventName: string, deal: any, opts?: { value?: number; eventId?: string; actionSource?: CapiEvent['actionSource']; stage?: string }) {
+async function emitCapiForDeal(teamId: string, eventName: string, deal: any, opts?: { value?: number; eventId?: string; actionSource?: CapiEvent['actionSource']; stage?: string; clientIp?: string; userAgent?: string }) {
   const cfg = readMetaCapi(teamId);
   if (!metaCapiConfigured(cfg)) return;
   const nameParts = String(deal.customerName || '').trim().split(/\s+/);
@@ -3014,6 +3028,7 @@ async function emitCapiForDeal(teamId: string, eventName: string, deal: any, opt
     user: {
       phone: deal.phone, firstName: nameParts[0], lastName: nameParts.slice(1).join(' ') || undefined,
       city: deal.city, externalId: deal.id, fbc: deal.fbc, fbp: deal.fbp,
+      clientIp: opts?.clientIp, userAgent: opts?.userAgent,
     },
     value: opts?.value,
     currency: opts?.value != null ? 'KZT' : undefined,
