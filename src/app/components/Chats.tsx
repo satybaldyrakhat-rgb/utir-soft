@@ -623,70 +623,70 @@ export function Chats({ language }: ChatsProps) {
 
         {/* ===== AI AGENT TAB ===== */}
         {activeTab === 'ai-agent' && (
-          <div className="h-full overflow-y-auto p-4 md:p-6">
+          <div className="nav-scroll h-full overflow-y-auto px-4 py-5 sm:p-6">
             <div className="max-w-3xl mx-auto">
-              {/* Sub-tabs */}
-              <div className="flex gap-1.5 mb-6">
+              {/* Sub-tabs — clean segmented */}
+              <div className="flex gap-1 mb-5">
                 {([
                   ['agent',     l('AI-агент', 'AI-агент', 'AI Agent')],
                   ['scenarios', l('Сценарии Instagram', 'Instagram сценарийлері', 'Instagram scenarios')],
                 ] as [typeof aiAgentSubTab, string][]).map(([id, label]) => (
-                  <button key={id} onClick={() => setAiAgentSubTab(id)} className={`px-4 py-2 rounded-xl text-xs transition-all ${aiAgentSubTab === id ? 'bg-emerald-600 text-white' : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-400 hover:text-gray-600'}`}>{label}</button>
+                  <button key={id} onClick={() => setAiAgentSubTab(id)} className={`px-3.5 py-1.5 rounded-xl text-xs transition-all ${aiAgentSubTab === id ? 'bg-emerald-600 text-white shadow-[0_4px_12px_-4px_var(--accent-shadow)]' : 'text-slate-500 hover:bg-white/50'}`}>{label}</button>
                 ))}
               </div>
 
               {/* ── Sub-tab 1: AI-агент ── */}
               {aiAgentSubTab === 'agent' && (
-                <div className="space-y-4">
-                  {/* Header card */}
-                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center flex-shrink-0">
-                        <Sparkles className="w-5 h-5 text-white" />
+                <div className="space-y-3">
+                  {/* Header */}
+                  <div className={`${GLASS} p-4 flex items-center justify-between gap-3`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-white shadow-[0_6px_16px_-6px_var(--accent-shadow)]" style={{ background: 'linear-gradient(135deg, var(--accent-500), var(--accent-700))' }}>
+                        <Sparkles className="w-5 h-5" />
                       </div>
-                      <div>
-                        <div className="text-sm text-gray-900">{l('AI-агент Utir', 'AI-агент Utir', 'Utir AI Agent')}</div>
+                      <div className="min-w-0">
+                        <div className="text-sm text-slate-900">{l('AI-агент Utir', 'AI-агент Utir', 'Utir AI Agent')}</div>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={`w-1.5 h-1.5 rounded-full ${aiAgentEnabled ? 'bg-green-500' : 'bg-gray-300'}`} />
-                          <span className={`text-[11px] ${aiAgentEnabled ? 'text-green-600' : 'text-gray-400'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${aiAgentEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                          <span className={`text-[11px] ${aiAgentEnabled ? 'text-emerald-600' : 'text-slate-400'}`}>
                             {aiAgentEnabled ? l('Активен', 'Белсенді', 'Active') : l('Отключён', 'Өшірілген', 'Disabled')}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-400">{l('Включить AI-агент', 'AI-агентті қосу', 'Enable AI Agent')}</span>
-                      <Toggle value={aiAgentEnabled} onChange={() => canWrite && setAiAgentEnabled(!aiAgentEnabled)} />
-                    </div>
+                    <Toggle value={aiAgentEnabled} onChange={() => canWrite && setAiAgentEnabled(!aiAgentEnabled)} />
                   </div>
 
                   {/* Channels */}
-                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
-                    <div className="text-[11px] text-slate-400 mb-3">{l('Каналы работы', 'Жұмыс арналары', 'Active channels')}</div>
-                    <div className="flex gap-4">
-                      {([['whatsapp', 'WhatsApp', 'bg-green-50 text-green-700'], ['instagram', 'Instagram', 'bg-pink-50 text-pink-700'], ['telegram', 'Telegram', 'bg-blue-50 text-blue-700']] as [keyof typeof aiChannels, string, string][]).map(([key, name, cls]) => (
-                        <label key={key} className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={aiChannels[key]} onChange={e => setAiChannels({ ...aiChannels, [key]: e.target.checked })} className="w-3.5 h-3.5 rounded accent-gray-900" />
-                          <span className={`px-2 py-0.5 rounded text-[11px] ${cls}`}>{name}</span>
-                        </label>
-                      ))}
+                  <div className={`${GLASS} p-4`}>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-3">{l('Каналы работы', 'Жұмыс арналары', 'Active channels')}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {([['whatsapp', 'WhatsApp'], ['instagram', 'Instagram'], ['telegram', 'Telegram']] as [keyof typeof aiChannels, string][]).map(([key, name]) => {
+                        const on = aiChannels[key];
+                        return (
+                          <button key={key} onClick={() => canWrite && setAiChannels({ ...aiChannels, [key]: !on })} className={`inline-flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl text-xs transition-all [&>svg]:w-4 [&>svg]:h-4 ${on ? 'bg-emerald-500/12 text-slate-800 ring-1 ring-emerald-500/25' : 'bg-white/50 text-slate-500 ring-1 ring-white/60 opacity-70 hover:opacity-100'}`}>
+                            {platformDot(key as Chat['platform'])} {name}
+                            {on && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Tone */}
-                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
-                    <div className="text-[11px] text-slate-400 mb-3">{l('Тон общения', 'Сөйлесу тоны', 'Conversation tone')}</div>
+                  <div className={`${GLASS} p-4`}>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-3">{l('Тон общения', 'Сөйлесу тоны', 'Conversation tone')}</div>
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { id: 'professional' as const, icon: Briefcase, label: l('Профессиональный', 'Кәсіби', 'Professional') },
                         { id: 'friendly'     as const, icon: Smile,     label: l('Дружелюбный',     'Достасу',  'Friendly') },
                         { id: 'casual'       as const, icon: Hand,      label: l('Неформальный',    'Бейресми', 'Casual') },
                       ].map(t => {
-                        const ToneIcon = t.icon;
+                        const ToneIcon = t.icon; const on = aiTone === t.id;
                         return (
-                        <button key={t.id} onClick={() => canWrite && setAiTone(t.id)} className={`p-3 rounded-xl border text-center transition-all ${aiTone === t.id ? 'border-gray-900 bg-gray-50' : 'border-gray-100'} ${!canWrite ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                          <ToneIcon className="w-4 h-4 mx-auto mb-1 text-slate-500" strokeWidth={1.5} />
-                          <div className="text-[10px] text-gray-600">{t.label}</div>
+                        <button key={t.id} onClick={() => canWrite && setAiTone(t.id)} className={`p-3 rounded-2xl ring-1 text-center transition-all ${on ? 'bg-emerald-500/10 ring-emerald-500/30' : 'bg-white/50 ring-white/60 hover:bg-white/70'} ${!canWrite ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                          <ToneIcon className={`w-4 h-4 mx-auto mb-1 ${on ? 'text-emerald-600' : 'text-slate-500'}`} strokeWidth={1.5} />
+                          <div className={`text-[10px] ${on ? 'text-emerald-700' : 'text-slate-600'}`}>{t.label}</div>
                         </button>
                         );
                       })}
@@ -694,82 +694,77 @@ export function Chats({ language }: ChatsProps) {
                   </div>
 
                   {/* Knowledge base */}
-                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
-                    <div className="text-[11px] text-slate-400 mb-3">{l('База знаний', 'Білім базасы', 'Knowledge base')}</div>
+                  <div className={`${GLASS} p-4`}>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-3">{l('База знаний', 'Білім базасы', 'Knowledge base')}</div>
                     <button
                       disabled={!canWrite}
-                      className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-200 rounded-xl text-xs text-slate-400 hover:border-gray-300 mb-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2.5 border border-dashed border-slate-300/70 rounded-2xl text-xs text-slate-400 hover:border-emerald-400 hover:text-emerald-600 mb-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Plus className="w-3.5 h-3.5" />{l('Загрузить файлы (PDF, DOCX, TXT)', 'Файлдарды жүктеу (PDF, DOCX, TXT)', 'Upload files (PDF, DOCX, TXT)')}
                     </button>
                     <div className="space-y-1.5 mb-3">
                       {aiKnowledgeFiles.map((f, i) => (
-                        <div key={i} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl">
-                          <FileText className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-                          <span className="text-xs text-slate-700 flex-1">{f}</span>
-                          <button className="p-0.5 hover:bg-gray-200 rounded"><X className="w-3 h-3 text-slate-400" /></button>
+                        <div key={i} className="flex items-center gap-2 px-3 py-2 bg-white/50 ring-1 ring-white/60 rounded-xl">
+                          <FileText className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                          <span className="text-xs text-slate-700 flex-1 truncate">{f}</span>
+                          <button className="p-0.5 hover:bg-white/70 rounded"><X className="w-3 h-3 text-slate-400" /></button>
                         </div>
                       ))}
                     </div>
-                    <div>
-                      <div className="text-[11px] text-slate-400 mb-1">{l('Дополнительные инструкции', 'Қосымша нұсқаулықтар', 'Additional instructions')}</div>
-                      <textarea
-                        value={aiInstructions}
-                        onChange={e => canWrite && setAiInstructions(e.target.value)}
-                        readOnly={!canWrite}
-                        rows={3}
-                        className="w-full px-3 py-2.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none"
-                      />
-                      <div className="text-[10px] text-slate-400 mt-1">
-                        {l(`Подсказки берутся из ниши «${niche.name.ru}» — можно дописать свои правила.`,
-                           `«${niche.name.kz}» салаға бейімделген нұсқаулықтар — өзіңіздікін қосуға болады.`,
-                           `Hints come from your niche "${niche.name.eng}" — feel free to add your own.`)}
-                      </div>
+                    <div className="text-[11px] text-slate-400 mb-1.5">{l('Дополнительные инструкции', 'Қосымша нұсқаулықтар', 'Additional instructions')}</div>
+                    <textarea
+                      value={aiInstructions}
+                      onChange={e => canWrite && setAiInstructions(e.target.value)}
+                      readOnly={!canWrite}
+                      rows={3}
+                      className="w-full px-3 py-2.5 bg-white/50 ring-1 ring-white/60 rounded-2xl text-xs text-slate-800 focus:outline-none focus:bg-white/80 focus:ring-2 focus:ring-emerald-500/40 placeholder:text-slate-400 transition-all resize-none"
+                    />
+                    <div className="text-[10px] text-slate-400 mt-1.5">
+                      {l(`Подсказки берутся из ниши «${niche.name.ru}» — можно дописать свои правила.`,
+                         `«${niche.name.kz}» салаға бейімделген нұсқаулықтар — өзіңіздікін қосуға болады.`,
+                         `Hints come from your niche "${niche.name.eng}" — feel free to add your own.`)}
                     </div>
                   </div>
 
                   {/* Transfer conditions */}
-                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
-                    <div className="text-[11px] text-slate-400 mb-3">{l('Передача менеджеру', 'Менеджерге беру', 'Hand off to manager')}</div>
-                    <div className="space-y-1">
+                  <div className={`${GLASS} p-4`}>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-3">{l('Передача менеджеру', 'Менеджерге беру', 'Hand off to manager')}</div>
+                    <div className="space-y-0.5">
                       {([
                         ['measurement', l('Клиент просит замер',         'Клиент өлшеу сұрайды',     'Client asks for measurement')],
                         ['discount',    l('Клиент спрашивает скидку больше 10%', 'Клиент 10%-дан жоғары жеңілдік сұрайды', 'Client asks for >10% discount')],
                         ['unknown',     l('AI не знает ответ',             'AI жауап білмейді',         'AI does not know the answer')],
                         ['longChat',    l('Клиент пишет более 5 минут',    'Клиент 5 минуттан көп жазады','Client typing for over 5 min')],
                       ] as [keyof typeof aiTransferConditions, string][]).map(([key, label]) => (
-                        <label key={key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl cursor-pointer hover:bg-white/50">
-                          <input type="checkbox" disabled={!canWrite} checked={aiTransferConditions[key]} onChange={e => canWrite && setAiTransferConditions({ ...aiTransferConditions, [key]: e.target.checked })} className="w-3.5 h-3.5 rounded accent-gray-900" />
+                        <label key={key} className="flex items-center gap-2.5 px-2 py-2 rounded-xl cursor-pointer hover:bg-white/50 transition-colors">
+                          <input type="checkbox" disabled={!canWrite} checked={aiTransferConditions[key]} onChange={e => canWrite && setAiTransferConditions({ ...aiTransferConditions, [key]: e.target.checked })} className="w-3.5 h-3.5 rounded accent-emerald-600" />
                           <span className="text-xs text-slate-700">{label}</span>
                         </label>
                       ))}
                     </div>
-                    <div className="mt-3 p-2.5 bg-gray-50 rounded-xl text-[10px] text-slate-400">
-                      {l('При срабатывании условия диалог переходит в раздел «Диалоги» с меткой', 'Шарт іске қосылса диалог «Диалогтар» бөліміне көшеді', 'When the condition is met, the dialog moves to "Dialogs" with a label')}
-                      {' '}<span className="text-orange-500">{l('Требует внимания', 'Назар аударыңыз', 'Needs attention')}</span>
+                    <div className="mt-3 p-2.5 bg-white/50 ring-1 ring-white/60 rounded-xl text-[10px] text-slate-500">
+                      {l('При срабатывании условия диалог переходит в «Диалоги» с меткой', 'Шарт іске қосылса диалог «Диалогтар» бөліміне көшеді', 'When met, the dialog moves to "Dialogs" with a label')}
+                      {' '}<span className="text-amber-600">{l('Требует внимания', 'Назар аударыңыз', 'Needs attention')}</span>
                     </div>
                   </div>
 
-                  {/* Stats — labels niche-aware. "Записано на замер" is
-                      furniture/windows speak; for blinds/ceilings/floors
-                      it's still "measurement" in spirit. We just call it
-                      "Бронирований/Bookings" so it reads cleanly everywhere. */}
-                  <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
-                    <div className="text-[11px] text-slate-400 mb-3">{l('Статистика за 30 дней', '30 күнге статистика', '30-day stats')}</div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {/* Stats */}
+                  <div className={`${GLASS} p-4`}>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-3">{l('Статистика за 30 дней', '30 күнге статистика', '30-day stats')}</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
                       {[
                         { label: l('Диалогов обработано', 'Өңделген диалогтар',  'Dialogs handled'),    value: '0' },
                         { label: l('Передано менеджеру',  'Менеджерге берілді',   'Passed to manager'),  value: '0' },
                         { label: l('Заявок на замер',      'Өлшеуге өтінімдер',    'Measurement requests'), value: '0' },
                         { label: l('Конверсия',            'Конверсия',            'Conversion'),           value: '—' },
                       ].map((s, i) => (
-                        <div key={i} className="bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3 text-center">
-                          <div className="text-lg text-gray-900">{s.value}</div>
+                        <div key={i} className="bg-white/50 ring-1 ring-white/60 rounded-2xl p-3 text-center">
+                          <div className="text-lg text-slate-900 tabular-nums">{s.value}</div>
                           <div className="text-[10px] text-slate-400 mt-0.5">{s.label}</div>
                         </div>
                       ))}
                     </div>
-                    <div className="text-[10px] text-slate-400 mt-2 text-center">
+                    <div className="text-[10px] text-slate-400 mt-2.5 text-center">
                       {l('Реальные цифры появятся после подключения каналов в Настройках.',
                          'Арналар қосылғаннан кейін нақты сандар шығады.',
                          'Real numbers appear once channels are connected in Settings.')}
@@ -797,18 +792,18 @@ export function Chats({ language }: ChatsProps) {
                         <div
                           key={sc.id}
                           onClick={() => setScenarioModal(sc.id)}
-                          className={`relative bg-white rounded-2xl border p-4 cursor-pointer hover:shadow-sm transition-all ${isActive ? 'border-green-200' : 'border-gray-100'}`}
+                          className={`relative ${GLASS} p-4 cursor-pointer transition-all hover:bg-white/65 ${isActive ? 'ring-2 ring-emerald-500/30' : ''}`}
                         >
-                          {isActive && <span className="absolute top-3 right-3 w-2 h-2 bg-green-500 rounded-full" />}
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${isActive ? 'bg-green-50' : 'bg-gray-50'}`}>
-                            <sc.icon className={`w-4 h-4 ${isActive ? 'text-green-600' : 'text-gray-400'}`} />
+                          {isActive && <span className="absolute top-3.5 right-3.5 w-2 h-2 bg-emerald-500 rounded-full" />}
+                          <div className={`w-9 h-9 rounded-2xl flex items-center justify-center mb-3 ${isActive ? 'bg-emerald-500/12 text-emerald-600' : 'bg-white/60 ring-1 ring-white/60 text-slate-400'}`}>
+                            <sc.icon className="w-4 h-4" />
                           </div>
                           <div className="text-sm text-slate-900 mb-1">{title}</div>
-                          <div className="text-[11px] text-slate-400 mb-3">{desc}</div>
+                          <div className="text-[11px] text-slate-400 mb-3 leading-relaxed">{desc}</div>
                           <button
                             onClick={e => { e.stopPropagation(); if (canWrite) setActiveScenarios(prev => ({ ...prev, [sc.id]: !prev[sc.id] })); }}
                             disabled={!canWrite}
-                            className={`px-3 py-1.5 rounded-lg text-[11px] transition-all disabled:opacity-50 disabled:cursor-not-allowed ${isActive ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-slate-500 border border-gray-100'}`}
+                            className={`px-3 py-1.5 rounded-xl text-[11px] transition-all disabled:opacity-50 disabled:cursor-not-allowed ${isActive ? 'bg-emerald-600 text-white shadow-[0_4px_12px_-4px_var(--accent-shadow)]' : 'bg-white/60 ring-1 ring-white/60 text-slate-600 hover:bg-white/90'}`}
                           >
                             {isActive
                               ? l('✓ Включён', '✓ Қосулы', '✓ On')
@@ -828,14 +823,23 @@ export function Chats({ language }: ChatsProps) {
         {activeTab === 'automation' && (
           <div className="h-full overflow-y-auto flex items-center justify-center p-6">
             <div className="text-center max-w-md">
-              <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><Zap className="w-6 h-6 text-slate-400" /></div>
-              <div className="text-sm text-slate-900 mb-1">{l('Автоматизация', 'Автоматтандыру', 'Automation')}</div>
-              <p className="text-xs text-slate-400 mb-6">{l('Триггеры, сценарии и автоматические действия', 'Триггерлер, сценарийлер және автоматты әрекеттер', 'Triggers, scenarios and automatic actions')}</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20 mb-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[10px] uppercase tracking-wider text-emerald-700">{l('Скоро', 'Жақында', 'Soon')}</span>
+              </div>
+              <div className="text-lg text-slate-900 mb-1 font-medium tracking-tight">{l('Автоматизация', 'Автоматтандыру', 'Automation')}</div>
+              <p className="text-xs text-slate-400 mb-6 max-w-xs mx-auto leading-relaxed">{l('Триггеры, сценарии и автоматические действия — реагируйте на события без ручной работы.', 'Триггерлер, сценарийлер және автоматты әрекеттер.', 'Triggers, scenarios and automatic actions.')}</p>
+              <div className="grid grid-cols-3 gap-2.5">
                 {[{ icon: Zap, label: l('Триггеры', 'Триггерлер', 'Triggers'), hint: l('Автоматические события', 'Автоматты оқиғалар', 'Auto events') },
                   { icon: Settings, label: l('Сценарии', 'Сценарийлер', 'Scenarios'), hint: l('Цепочки действий', 'Әрекеттер тізбегі', 'Action chains') },
                   { icon: TrendingUp, label: l('Аналитика', 'Аналитика', 'Analytics'), hint: l('Отслеживание', 'Бақылау', 'Tracking') },
-                ].map((c, i) => <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4"><c.icon className="w-5 h-5 text-slate-400 mb-2" /><div className="text-xs text-slate-900 mb-0.5">{c.label}</div><div className="text-[10px] text-slate-400">{c.hint}</div></div>)}
+                ].map((c, i) => (
+                  <div key={i} className={`${GLASS} p-4 text-left`}>
+                    <div className="w-9 h-9 rounded-2xl bg-white/60 ring-1 ring-white/60 flex items-center justify-center mb-2.5"><c.icon className="w-4 h-4 text-emerald-600" /></div>
+                    <div className="text-xs text-slate-900 mb-0.5">{c.label}</div>
+                    <div className="text-[10px] text-slate-400 leading-tight">{c.hint}</div>
+                  </div>
+                ))}
               </div>
               <button className="mt-6 px-5 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">{l('Настроить', 'Баптау', 'Configure')}</button>
             </div>
@@ -847,36 +851,36 @@ export function Chats({ language }: ChatsProps) {
       {scenarioModal && currentScenario && (() => {
         const title = (currentScenario.titleKey[language] || currentScenario.titleKey.ru).replace('{NICHE_KEYWORD}', nicheKeyword);
         return (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setScenarioModal(null)}>
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
-            <div className="p-5 border-b border-white/60 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                  <currentScenario.icon className="w-4 h-4 text-slate-500" />
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setScenarioModal(null)}>
+          <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl max-w-md w-full shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-white/50 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-2xl bg-emerald-500/12 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                  <currentScenario.icon className="w-4 h-4" />
                 </div>
-                <span className="text-sm text-gray-900">{title}</span>
+                <span className="text-sm text-slate-900 truncate">{title}</span>
               </div>
-              <button onClick={() => setScenarioModal(null)} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-400" /></button>
+              <button onClick={() => setScenarioModal(null)} className="w-8 h-8 bg-white/60 ring-1 ring-white/60 rounded-2xl flex items-center justify-center hover:bg-white transition-colors flex-shrink-0"><X className="w-4 h-4 text-slate-500" /></button>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1">{l('Текст сообщения', 'Хабарлама мәтіні', 'Message text')}</label>
+                <label className="block text-[11px] text-slate-500 mb-1.5">{l('Текст сообщения', 'Хабарлама мәтіні', 'Message text')}</label>
                 <textarea
                   value={scenarioTexts[scenarioModal] || ''}
                   onChange={e => canWrite && setScenarioTexts(prev => ({ ...prev, [scenarioModal]: e.target.value }))}
                   readOnly={!canWrite}
                   rows={4}
-                  className="w-full px-3 py-2.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all resize-none"
+                  className="w-full px-3 py-2.5 bg-white/55 ring-1 ring-white/60 rounded-2xl text-sm text-slate-800 focus:outline-none focus:bg-white/80 focus:ring-2 focus:ring-emerald-500/40 placeholder:text-slate-400 transition-all resize-none"
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-slate-400 mb-2">{l('Статус сценария', 'Сценарий күйі', 'Scenario status')}</label>
+                <label className="block text-[11px] text-slate-500 mb-2">{l('Статус сценария', 'Сценарий күйі', 'Scenario status')}</label>
                 <button
                   onClick={() => canWrite && setActiveScenarios(prev => ({ ...prev, [scenarioModal]: !prev[scenarioModal] }))}
                   disabled={!canWrite}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all disabled:opacity-50 ${activeScenarios[scenarioModal] ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-slate-500 border-gray-100'}`}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs ring-1 transition-all disabled:opacity-50 ${activeScenarios[scenarioModal] ? 'bg-emerald-500/12 text-emerald-700 ring-emerald-500/25' : 'bg-white/50 text-slate-500 ring-white/60'}`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${activeScenarios[scenarioModal] ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${activeScenarios[scenarioModal] ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                   {activeScenarios[scenarioModal]
                     ? l('Сценарий включён', 'Сценарий қосулы', 'Scenario enabled')
                     : l('Сценарий выключен', 'Сценарий өшірулі', 'Scenario disabled')}
@@ -884,7 +888,7 @@ export function Chats({ language }: ChatsProps) {
               </div>
             </div>
             <div className="p-5 pt-0 flex gap-2">
-              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">
+              <button onClick={() => setScenarioModal(null)} className="flex-1 px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-2xl text-xs text-slate-600 hover:bg-white transition-colors">
                 {l('Отмена', 'Бас тарту', 'Cancel')}
               </button>
               <button onClick={() => setScenarioModal(null)} disabled={!canWrite} className="flex-1 px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
@@ -898,12 +902,12 @@ export function Chats({ language }: ChatsProps) {
 
       {/* Call Modal */}
       {showCallModal && (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl w-72 p-6 text-center shadow-xl">
-            <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3"><Phone className={`w-6 h-6 ${isInCall ? 'text-green-500' : 'text-gray-400'}`} /></div>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 rounded-3xl w-72 p-6 text-center shadow-[0_24px_64px_-12px_var(--accent-shadow-sm)]">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/12 flex items-center justify-center mx-auto mb-3"><Phone className={`w-6 h-6 ${isInCall ? 'text-emerald-600' : 'text-slate-400'}`} /></div>
             <div className="text-sm text-slate-900 mb-1">{selectedChat?.name}</div>
             <div className="text-xs text-slate-400 mb-4">{isInCall ? formatDuration(callDuration) : l('Вызов...', 'Қоңырау...', 'Calling...')}</div>
-            <button onClick={endCall} className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mx-auto hover:bg-red-600"><Phone className="w-5 h-5 text-white rotate-[135deg]" /></button>
+            <button onClick={endCall} className="w-12 h-12 bg-rose-500 rounded-full flex items-center justify-center mx-auto hover:bg-rose-600 transition-colors"><Phone className="w-5 h-5 text-white rotate-[135deg]" /></button>
           </div>
         </div>
       )}
