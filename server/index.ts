@@ -1537,6 +1537,46 @@ app.post('/api/lead/:code', rateLimit('lead'), (req, res) => {
   res.json({ ok: true });
 });
 
+// Public: submit a measurement booking → creates a `new` deal carrying the
+// measurement date/slot. Mirrors /api/lead but for the multi-step booking
+// wizard, so a logged-out visitor can actually book (was silently dropped).
+// Returns the new deal id so the client can build the tracking link.
+app.post('/api/booking/:code', rateLimit('lead'), (req, res) => {
+  const code = String(req.params.code || '').toUpperCase();
+  const ts = db.prepare('SELECT team_id FROM team_settings WHERE lead_form_code = ?').get(code) as any;
+  if (!ts) return res.status(404).json({ error: 'not found' });
+
+  const b = req.body || {};
+  const name = String(b.name || '').trim().slice(0, 120);
+  const phone = String(b.phone || '').trim().slice(0, 40);
+  if (!name || !phone) return res.status(400).json({ error: 'name and phone required' });
+
+  const product = String(b.product || '').trim().slice(0, 200);
+  const address = String(b.address || '').trim().slice(0, 300);
+  const measurementDate = String(b.measurementDate || '').trim().slice(0, 30);
+  const dateLabel = String(b.date || '').trim().slice(0, 60);
+  const slot = String(b.slot || '').trim().slice(0, 60);
+  const notes = String(b.notes || '').trim().slice(0, 1000);
+
+  const id = newId('D');
+  const ownerId = pickLeastLoadedManager(ts.team_id);
+  const deal: any = {
+    id, customerName: name, phone, address, siteAddress: address,
+    product: product || 'Запись на замер', furnitureType: product || '',
+    amount: 0, paidAmount: 0, status: 'new', icon: 'phone', priority: 'medium',
+    date: dateLabel || new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
+    progress: 5, source: 'Сайт', ownerId: ownerId || undefined,
+    measurer: '', designer: '', materials: '',
+    measurementDate, completionDate: '', installationDate: '',
+    paymentMethods: {},
+    notes: [notes, slot && `Слот: ${slot}`].filter(Boolean).join('\n') || 'Запись на замер с сайта',
+    createdAt: new Date().toISOString(),
+  };
+  db.prepare('INSERT INTO deals (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, 'booking', ts.team_id, JSON.stringify(deal));
+  if (ownerId) { try { void notifyAssignment(db, ts.team_id, id, ownerId); } catch { /* ignore */ } }
+  res.json({ ok: true, id });
+});
+
 // Audit-trail readback. Returns the deal_history rows newest-first.
 // Same module-permission as deals read (orders), so view-only roles see it too.
 app.get('/api/deals/:id/history', authMiddleware, requirePermission('orders'), (req: AuthedRequest, res) => {

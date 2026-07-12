@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChefHat, Archive, Shirt, DoorOpen, Baby, Bed, Briefcase, Box, MapPin, ChevronLeft, ChevronRight, CheckCircle2, Calendar, Send } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
+import { api } from '../utils/api';
 
 const FURNITURE = [
   { id: 'kitchen', label: 'Кухня', icon: ChefHat },
@@ -15,9 +16,11 @@ const FURNITURE = [
 
 const SLOTS = ['9:00–11:00', '11:00–13:00', '14:00–16:00', '16:00–18:00'];
 
-export function Booking() {
+export function Booking({ teamCode }: { teamCode?: string }) {
   const store = useDataStore();
   const [step, setStep] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [furnitureType, setFurnitureType] = useState('');
   const [address, setAddress] = useState('');
   const [landmark, setLandmark] = useState('');
@@ -39,38 +42,44 @@ export function Booking() {
     return d;
   });
 
-  const submit = () => {
+  const submit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError('');
     const productLabel = FURNITURE.find(f => f.id === furnitureType)?.label || 'Изделие';
     const measurementDate = days[selectedDate || 0]?.toISOString().slice(0, 10) || '';
+    const dateLabel = days[selectedDate || 0]?.toLocaleDateString('ru-RU') || '';
+    const combinedNotes = [notes, landmark && `Ориентир: ${landmark}`].filter(Boolean).join('\n');
     try {
-      const created = store.addDeal({
-        customerName: name,
-        phone,
-        address,
-        product: productLabel,
-        furnitureType: productLabel,
-        amount: 0,
-        paidAmount: 0,
-        status: 'new',
-        icon: 'phone',
-        priority: 'medium',
-        date: days[selectedDate || 0]?.toLocaleDateString('ru-RU') || '',
-        progress: 5,
-        source: 'Сайт',
-        measurer: selectedMeasurer || '',
-        designer: '',
-        materials: '',
-        measurementDate,
-        completionDate: '',
-        installationDate: '',
-        paymentMethods: { cash: false, kaspiGold: false, kaspiQR: false, halykBank: false, cardTransfer: false, installment: false },
-        notes: [notes, landmark && `Ориентир: ${landmark}`, `Слот: ${selectedSlot}`].filter(Boolean).join('\n'),
-      });
-      setTrackId(created.id);
+      if (teamCode) {
+        // Public visitor — hit the tokenless booking endpoint. Only mark
+        // "done" on a real success, so we never fake a confirmation.
+        const r = await api.post<{ ok: boolean; id: string }>(`/api/booking/${encodeURIComponent(teamCode)}`, {
+          name, phone, product: productLabel, address,
+          measurementDate, date: dateLabel, slot: selectedSlot, notes: combinedNotes,
+        });
+        setTrackId(r.id);
+      } else {
+        // Logged-in convenience path (owner testing the flow inside the app).
+        const created = store.addDeal({
+          customerName: name, phone, address,
+          product: productLabel, furnitureType: productLabel,
+          amount: 0, paidAmount: 0, status: 'new', icon: 'phone', priority: 'medium',
+          date: dateLabel, progress: 5, source: 'Сайт',
+          measurer: '', designer: '', materials: '',
+          measurementDate, completionDate: '', installationDate: '',
+          paymentMethods: { cash: false, kaspiGold: false, kaspiQR: false, halykBank: false, cardTransfer: false, installment: false },
+          notes: [combinedNotes, `Слот: ${selectedSlot}`].filter(Boolean).join('\n'),
+        });
+        setTrackId(created.id);
+      }
+      setDone(true);
     } catch (err) {
       console.error('[booking submit]', err);
+      setSubmitError('Не удалось отправить запись. Проверьте соединение и попробуйте снова.');
+    } finally {
+      setSubmitting(false);
     }
-    setDone(true);
   };
 
   // Build and download an .ics calendar invite for the measurement visit,
@@ -126,7 +135,7 @@ export function Booking() {
   const canNext = (
     (step === 0 && furnitureType) ||
     (step === 1 && address) ||
-    (step === 2 && selectedDate !== null && selectedSlot && selectedMeasurer) ||
+    (step === 2 && selectedDate !== null && selectedSlot) ||
     (step === 3 && name && phone) ||
     (step === 4 && agree)
   );
@@ -200,30 +209,18 @@ export function Booking() {
                   </button>
                 ))}
               </div>
-              {selectedDate !== null && (() => {
-                const measurers = store.employees
-                  .filter(e => e.status === 'active' && (e.department === 'Замеры' || e.role === 'employee'))
-                  .map(e => e.name);
-                return (
-                  <div className="space-y-2">
-                    {SLOTS.map(slot => (
-                      <button key={slot} disabled={measurers.length === 0} onClick={() => { setSelectedSlot(slot); setSelectedMeasurer(measurers[0] || ''); }}
-                        className={`w-full p-3 rounded-xl flex items-center justify-between text-xs ${measurers.length === 0 ? 'bg-gray-50 text-slate-300 cursor-not-allowed' : selectedSlot === slot ? 'bg-gray-900 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
-                        <span>{slot}</span>
-                        <span className="text-[10px]">{measurers.length === 0 ? 'Нет свободных замерщиков' : `Свободно: ${measurers.join(', ')}`}</span>
-                      </button>
-                    ))}
-                    {selectedSlot && measurers.length > 1 && (
-                      <div className="flex gap-2 pt-2 flex-wrap">
-                        {measurers.map(m => (
-                          <button key={m} onClick={() => setSelectedMeasurer(m)}
-                            className={`px-3 py-1.5 rounded-lg text-xs ${selectedMeasurer === m ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-700'}`}>{m}</button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+              {selectedDate !== null && (
+                <div className="space-y-2">
+                  {SLOTS.map(slot => (
+                    <button key={slot} onClick={() => setSelectedSlot(slot)}
+                      className={`w-full p-3 rounded-xl flex items-center justify-between text-xs ${selectedSlot === slot ? 'bg-gray-900 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
+                      <span>{slot}</span>
+                      <span className="text-[10px]">{selectedSlot === slot ? 'Выбрано' : 'Свободно'}</span>
+                    </button>
+                  ))}
+                  <p className="text-[11px] text-slate-400 pt-1">Замерщика назначим автоматически и пришлём его имя в WhatsApp.</p>
+                </div>
+              )}
             </>
           )}
 
@@ -256,7 +253,7 @@ export function Booking() {
                 <div className="flex justify-between"><span className="text-slate-400">Тип</span><span className="text-gray-900">{FURNITURE.find(f => f.id === furnitureType)?.label}</span></div>
                 <div className="flex justify-between"><span className="text-slate-400">Адрес</span><span className="text-gray-900 text-right">{address}</span></div>
                 <div className="flex justify-between"><span className="text-slate-400">Дата</span><span className="text-gray-900">{days[selectedDate!]?.toLocaleDateString('ru-RU')} {selectedSlot}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Замерщик</span><span className="text-gray-900">{selectedMeasurer}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Замерщик</span><span className="text-gray-900">{selectedMeasurer || 'Будет назначен'}</span></div>
                 <div className="flex justify-between"><span className="text-slate-400">Имя</span><span className="text-gray-900">{name}</span></div>
                 <div className="flex justify-between"><span className="text-slate-400">Телефон</span><span className="text-gray-900">{phone}</span></div>
               </div>
@@ -281,12 +278,15 @@ export function Booking() {
               Далее <ChevronRight className="w-3.5 h-3.5" />
             </button>
           ) : (
-            <button onClick={submit} disabled={!agree}
+            <button onClick={submit} disabled={!agree || submitting}
               className="px-5 py-2.5 bg-emerald-500 text-white rounded-xl text-xs hover:bg-emerald-600 disabled:opacity-40">
-              Подтвердить запись
+              {submitting ? 'Отправка…' : 'Подтвердить запись'}
             </button>
           )}
         </div>
+        {submitError && (
+          <p className="mt-3 text-xs text-rose-600 text-right">{submitError}</p>
+        )}
       </div>
     </div>
   );

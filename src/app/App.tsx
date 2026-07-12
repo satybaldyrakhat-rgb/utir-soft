@@ -736,7 +736,12 @@ function PublicRouter({ children }: { children: React.ReactNode }) {
   if (hash.startsWith('#/track/')) return <ClientTrack orderId={hash.replace('#/track/', '')} />;
   if (hash.startsWith('#/lead/')) return <LeadForm route={hash.replace('#/lead/', '')} />;
   if (hash === '#/cabinet' || hash.startsWith('#/cabinet/')) return <ClientCabinetRoute />;
-  if (hash === '#/booking') return <Booking />;
+  // #/booking/CODE — public booking for a specific team (uses lead-form code).
+  // Bare #/booking works only for a logged-in user (their own team).
+  if (hash === '#/booking' || hash.startsWith('#/booking/')) {
+    const code = hash.startsWith('#/booking/') ? hash.replace('#/booking/', '') : undefined;
+    return <Booking teamCode={code} />;
+  }
   if (hash === '#/terms') return <Terms language={legalLang} onLanguageChange={setLegalLang} />;
   if (hash === '#/privacy') return <Privacy language={legalLang} onLanguageChange={setLegalLang} />;
   // Password-reset landing — opened from the email link
