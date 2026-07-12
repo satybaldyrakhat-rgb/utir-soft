@@ -106,13 +106,17 @@ export function Tasks({ language }: TasksProps) {
   const canWrite = store.canWriteModule('tasks');
   const taskCategories = buildCategories(niche);
 
+  // Today's date (YYYY-MM-DD) — used to count only tasks actually due today.
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   // Real team members from the store, projected into this component's `Employee` shape
   // for use in dropdowns and the "Сотрудники" view. Empty array means no team yet.
   const teamEmployees: Employee[] = store.employees.map(e => ({
     id: e.id, name: e.name, role: e.department, avatar: e.avatar,
     telegramUsername: '@' + e.name.split(' ')[0].toLowerCase(),
     telegramConnected: e.status === 'active',
-    tasksToday: store.tasks.filter(t => t.assigneeId === e.id).length,
+    // Only tasks due today and not yet done — not the employee's whole backlog.
+    tasksToday: store.tasks.filter(t => t.assigneeId === e.id && t.dueDate === todayStr && t.status !== 'done').length,
     tasksDone: store.tasks.filter(t => t.assigneeId === e.id && t.status === 'done').length,
   }));
 
@@ -121,7 +125,7 @@ export function Tasks({ language }: TasksProps) {
     const emp = store.getEmployeeById(st.assigneeId);
     return {
       id: st.id, title: st.title, description: st.description, status: st.status, priority: st.priority,
-      assignee: emp ? { id: emp.id, name: emp.name, role: emp.department, avatar: emp.avatar, telegramUsername: '@' + emp.name.split(' ')[0].toLowerCase(), telegramConnected: emp.status === 'active', tasksToday: store.tasks.filter(t => t.assigneeId === emp.id).length, tasksDone: store.tasks.filter(t => t.assigneeId === emp.id && t.status === 'done').length } : UNASSIGNED,
+      assignee: emp ? { id: emp.id, name: emp.name, role: emp.department, avatar: emp.avatar, telegramUsername: '@' + emp.name.split(' ')[0].toLowerCase(), telegramConnected: emp.status === 'active', tasksToday: store.tasks.filter(t => t.assigneeId === emp.id && t.dueDate === todayStr && t.status !== 'done').length, tasksDone: store.tasks.filter(t => t.assigneeId === emp.id && t.status === 'done').length } : UNASSIGNED,
       createdAt: st.createdAt, dueDate: st.dueDate, completedAt: st.completedAt,
       // Source derives from the stored field rather than always claiming
       // Telegram. Falls back to 'platform' for tasks created in-app.
