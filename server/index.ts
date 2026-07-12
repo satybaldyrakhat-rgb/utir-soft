@@ -1285,6 +1285,35 @@ function makeCrud(table: string, idPrefix: string, opts?: { lockable?: boolean }
 //   - view  → 403 on POST/PATCH/PUT/DELETE; GET allowed
 //   - full  → all methods allowed
 // Tasks intentionally stay open to every team member — no matrix key for it.
+
+// ─── Директорские алёрты бота (Настроить бота → алёрты) ──────────────
+// Событие в CRM → реальное сообщение в Telegram всем привязанным
+// админам/менеджерам команды, если этот тип алёрта включён в bot_settings.
+function readBotSettings(teamId: string): any {
+  try {
+    const row = db.prepare('SELECT bot_settings FROM team_settings WHERE team_id = ?').get(teamId) as any;
+    return row?.bot_settings ? JSON.parse(row.bot_settings) : {};
+  } catch { return {}; }
+}
+function bossChatIds(teamId: string): number[] {
+  const rows = db.prepare(
+    `SELECT tl.chat_id FROM telegram_links tl JOIN users u ON u.id = tl.user_id
+     WHERE u.team_id = ? AND tl.chat_id IS NOT NULL AND u.team_role IN ('admin','manager')`,
+  ).all(teamId) as any[];
+  return rows.map(r => r.chat_id as number).filter(Boolean);
+}
+async function sendBotAlert(teamId: string, alertKey: string, text: string) {
+  if (!isTelegramReady()) return;
+  const s = readBotSettings(teamId);
+  // Если настройки ещё не сохраняли — считаем алёрты включёнными (как дефолт).
+  const enabled = s.activeAlerts === undefined || (Array.isArray(s.activeAlerts) && s.activeAlerts.includes(alertKey));
+  if (!enabled) return;
+  const chatIds = bossChatIds(teamId);
+  for (const chatId of chatIds) {
+    try { await tgSendMessage(chatId, text); } catch { /* ignore per-recipient failure */ }
+  }
+}
+
 // Deal-status notifications. Intercept PATCH /api/deals/:id before the
 // generic CRUD: if `status` changed and the deal has an ownerId (or a
 // matched paired teammate), DM them on Telegram with the new stage.
@@ -1379,6 +1408,22 @@ app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (
     // External webhook fan-out — separate event from the generic update so
     // consumers can listen specifically for stage transitions.
     emitEvent(req.teamId!, 'deal.status_changed', { dealId: req.params.id, from: before.status, to: updated.status, deal: updated });
+
+    // Директорские алёрты в Telegram (реальная отправка по настройкам бота).
+    try {
+      const amt = Number(updated.amount) || 0;
+      const amtStr = `${Math.round(amt).toLocaleString('ru-RU').replace(/,/g, ' ')} ₸`;
+      if (updated.status === 'rejected') {
+        const reason = updated.rejectReason || updated.lostReason || updated.rejectionReason;
+        await sendBotAlert(req.teamId!, 'Отказ клиента',
+          `<b>❌ Отказ клиента</b>\n${updated.customerName || 'Сделка'}${amt ? ` · ${amtStr}` : ''}` +
+          `${reason ? `\nПричина: ${reason}` : ''}`);
+      }
+      if (updated.status === 'completed' && amt >= 1_000_000) {
+        await sendBotAlert(req.teamId!, 'Крупная сделка > 1 млн ₸',
+          `<b>💰 Крупная сделка закрыта</b>\n${updated.customerName || 'Сделка'} · ${amtStr}`);
+      }
+    } catch (e) { console.warn('[deals] bot alert failed', e); }
   }
   // Always emit a generic 'deal.updated' too (with the same diff that landed
   // in deal_history) so integrations that want all changes can subscribe once.
