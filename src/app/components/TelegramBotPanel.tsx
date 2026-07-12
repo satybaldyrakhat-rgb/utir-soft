@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { Bot, X, Bell, FileText, Package, MapPin, Users, Plus, Send } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Bot, X, Bell, FileText, Package, MapPin, Users, Plus, Check } from 'lucide-react';
+import { useDataStore } from '../utils/dataStore';
+import { api } from '../utils/api';
 
 interface Props { onClose: () => void; language?: 'kz' | 'ru' | 'eng'; }
 
@@ -11,14 +13,10 @@ const CLIENT_TEMPLATES = [
 ];
 
 const ALERTS = ['Крупная сделка > 1 млн ₸', 'Отказ клиента', 'Просрочка заказа', 'Потеря горячего лида'];
-const STOCK_LOW = [
-  { name: 'ЛДСП Egger White', qty: 3, min: 5 },
-  { name: 'Фурнитура Blum', qty: 12, min: 20 },
-  { name: 'Кромка ПВХ 2мм', qty: 8, min: 15 },
-];
 
 export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const store = useDataStore();
   const [tab, setTab] = useState<'tasks' | 'clients' | 'reports' | 'warehouse' | 'field'>('tasks');
   const [templates, setTemplates] = useState(CLIENT_TEMPLATES);
   const [bossGroup, setBossGroup] = useState('@UtirSoft_Boss');
@@ -26,6 +24,51 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
   const [activeAlerts, setActiveAlerts] = useState<string[]>(ALERTS);
   const [whAlerts, setWhAlerts] = useState({ inbound: true, supplier: true });
   const [fieldOpts, setFieldOpts] = useState({ photo: true, geo: true });
+  const [loaded, setLoaded] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [botOnline, setBotOnline] = useState<boolean | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Реальный список низкого остатка из склада (был захардкожен).
+  const lowStock = store.products
+    .filter(p => p.status === 'low' || p.status === 'outofstock')
+    .map(p => ({ name: p.name, qty: p.quantity, min: p.minQty }));
+
+  // Загрузка сохранённых настроек + статуса бота при открытии.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await api.get<any>('/api/team/bot-settings');
+        if (!cancelled && s) {
+          if (Array.isArray(s.templates)) setTemplates(s.templates);
+          if (s.reports) setReports(s.reports);
+          if (typeof s.bossGroup === 'string') setBossGroup(s.bossGroup);
+          if (Array.isArray(s.activeAlerts)) setActiveAlerts(s.activeAlerts);
+          if (s.whAlerts) setWhAlerts(s.whAlerts);
+          if (s.fieldOpts) setFieldOpts(s.fieldOpts);
+        }
+      } catch { /* оставим дефолты */ }
+      try {
+        const st = await api.get<any>('/api/telegram/link/status');
+        if (!cancelled) setBotOnline(!!st?.serverReady?.telegram);
+      } catch { if (!cancelled) setBotOnline(false); }
+      if (!cancelled) setLoaded(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Дебаунс-сохранение на бэкенд при любом изменении (после загрузки).
+  useEffect(() => {
+    if (!loaded) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      api.put('/api/team/bot-settings', { templates, reports, bossGroup, activeAlerts, whAlerts, fieldOpts })
+        .then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500); })
+        .catch(() => { /* напр. не админ — молча */ });
+    }, 600);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [loaded, templates, reports, bossGroup, activeAlerts, whAlerts, fieldOpts]);
 
   const tabs = [
     { id: 'tasks', label: l('Задачи сотрудников', 'Қызметкерлер тапсырмалары', 'Employee tasks'), icon: Users },
@@ -43,10 +86,20 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
             <div className="w-9 h-9 bg-sky-50 rounded-xl flex items-center justify-center"><Bot className="w-4 h-4 text-sky-600" /></div>
             <div>
               <div className="text-sm text-gray-900">{l('Telegram-бот Utir Soft', 'Utir Soft Telegram-боты', 'Utir Soft Telegram bot')}</div>
-              <div className="text-[10px] text-slate-400">@UtirSoftBot · {l('Онлайн', 'Онлайн', 'Online')}</div>
+              <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                @UtirSoftBot ·
+                {botOnline === null
+                  ? <span>…</span>
+                  : botOnline
+                    ? <span className="text-emerald-600">{l('Онлайн', 'Онлайн', 'Online')}</span>
+                    : <span className="text-slate-400">{l('Бот не подключён', 'Бот қосылмаған', 'Bot not connected')}</span>}
+              </div>
             </div>
           </div>
-          <button onClick={onClose}><X className="w-4 h-4 text-slate-400" /></button>
+          <div className="flex items-center gap-2">
+            {saved && <span className="flex items-center gap-1 text-[10px] text-emerald-600"><Check className="w-3 h-3" />{l('Сохранено', 'Сақталды', 'Saved')}</span>}
+            <button onClick={onClose}><X className="w-4 h-4 text-slate-400" /></button>
+          </div>
         </div>
 
         <div className="flex gap-1 px-4 pt-3 border-b border-white/60 overflow-x-auto">
@@ -97,7 +150,9 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
                   <div className="text-[10px] text-slate-400">{l('Триггер', 'Триггер', 'Trigger')}: {t.trigger}</div>
                 </div>
               ))}
-              <button className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 border border-dashed border-gray-200 rounded-xl text-xs text-slate-500 hover:bg-white/50">
+              <button
+                onClick={() => setTemplates(ts => [...ts, { id: `t${Date.now()}`, text: '', trigger: l('Новый триггер', 'Жаңа триггер', 'New trigger'), enabled: false }])}
+                className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 border border-dashed border-gray-200 rounded-xl text-xs text-slate-500 hover:bg-white/50">
                 <Plus className="w-3.5 h-3.5" /> {l('Создать новый шаблон', 'Жаңа үлгі жасау', 'Create new template')}
               </button>
             </div>
@@ -156,13 +211,14 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
             <div className="space-y-3">
               <div className="text-xs text-gray-900">{l('Алёрты при остатке ниже минимума', 'Қалдық минимумнан төмен болғанда ескерту', 'Alerts when stock is below minimum')}</div>
               <div className="space-y-2">
-                {STOCK_LOW.map(s => (
+                {lowStock.length === 0 ? (
+                  <div className="text-[11px] text-slate-400 py-2">{l('Сейчас все позиции в норме — нечего заказывать.', 'Қазір бәрі қалыпты — тапсырыс беретін ештеңе жоқ.', 'All items are in stock — nothing to order.')}</div>
+                ) : lowStock.map(s => (
                   <div key={s.name} className="bg-white border border-rose-100 rounded-2xl p-3 flex items-center justify-between">
                     <div>
                       <div className="text-xs text-gray-900">{s.name}</div>
                       <div className="text-[10px] text-rose-500">{s.qty} {l('шт', 'дана', 'pcs')} · {l('мин', 'мин', 'min')} {s.min}</div>
                     </div>
-                    <button className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-[10px] hover:bg-emerald-700">{l('Заказать', 'Тапсырыс беру', 'Order')}</button>
                   </div>
                 ))}
               </div>
@@ -174,9 +230,7 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
                 <input type="checkbox" checked={whAlerts.supplier} onChange={() => setWhAlerts(s => ({ ...s, supplier: !s.supplier }))} />
                 <span className="text-xs text-slate-700">{l('Запросы от производства в @UtirSoft_Warehouse', 'Өндірістен @UtirSoft_Warehouse-ке сұраулар', 'Requests from production to @UtirSoft_Warehouse')}</span>
               </label>
-              <button className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all">
-                <Send className="w-3.5 h-3.5" /> {l('Сделать заказ поставщику', 'Жеткізушіге тапсырыс беру', 'Place order with supplier')}
-              </button>
+              <p className="text-[11px] text-slate-400 pt-1">{l('Заказы поставщикам оформляются в разделе Производство → Закупки.', 'Жеткізушіге тапсырыстар Өндіріс → Сатып алулар бөлімінде рәсімделеді.', 'Supplier orders are placed in Production → Purchases.')}</p>
             </div>
           )}
 

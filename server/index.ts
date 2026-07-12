@@ -424,6 +424,9 @@ migrateColumn('team_settings', 'onboarding', 'TEXT');
 // Company profile shown in Settings → Общие (name/BIN/address/logo). Team-wide
 // branding used in invoice / akt PDF headers. Was localStorage-only before.
 migrateColumn('team_settings', 'company_profile', 'TEXT');
+// Telegram-bot settings (панель настроек бота): шаблоны клиентам, расписание
+// отчётов директору, алёрты, настройки склада/замерщиков. Team-wide.
+migrateColumn('team_settings', 'bot_settings', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -2843,6 +2846,60 @@ companyRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
   res.json({ ok: true, company: clean });
 });
 app.use('/api/team/company', companyRouter);
+
+// ─── Telegram-bot settings (Настроить бота) ──────────────────────────
+// Персистим настройки панели бота (шаблоны/отчёты/алёрты/склад/замерщики),
+// чтобы они сохранялись и синхронизировались на команду, а не жили в
+// локальном useState. Читать может вся команда, менять — админ.
+const botSettingsRouter = express.Router();
+botSettingsRouter.use(authMiddleware);
+const DEFAULT_BOT_SETTINGS = {
+  templates: [
+    { id: 't1', text: 'Здравствуйте! Ваш заказ #{номер} принят в производство', trigger: 'Смена статуса на "Производство"', enabled: true },
+    { id: 't2', text: 'Замер назначен на {дата} в {время}, замерщик {имя}', trigger: 'Создание задачи замера', enabled: true },
+    { id: 't3', text: 'Ваша мебель готова! Установка {дата}', trigger: 'Статус "Готов"', enabled: true },
+    { id: 't4', text: 'Завтра приедем устанавливать с {время}', trigger: 'За 1 день до установки', enabled: false },
+  ],
+  reports: { daily: true, weekly: true, monthly: false },
+  bossGroup: '@UtirSoft_Boss',
+  activeAlerts: ['Крупная сделка > 1 млн ₸', 'Отказ клиента', 'Просрочка заказа', 'Потеря горячего лида'],
+  whAlerts: { inbound: true, supplier: true },
+  fieldOpts: { photo: true, geo: true },
+};
+botSettingsRouter.get('/', (req: AuthedRequest, res) => {
+  try {
+    const row = db.prepare('SELECT bot_settings FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+    res.json(row?.bot_settings ? { ...DEFAULT_BOT_SETTINGS, ...JSON.parse(row.bot_settings) } : DEFAULT_BOT_SETTINGS);
+  } catch { res.json(DEFAULT_BOT_SETTINGS); }
+});
+botSettingsRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
+  const b = req.body || {};
+  // Light validation + size caps; keep the shape predictable.
+  const clean = {
+    templates: Array.isArray(b.templates) ? b.templates.slice(0, 50).map((t: any) => ({
+      id: String(t?.id || '').slice(0, 40) || newId('bt_'),
+      text: String(t?.text || '').slice(0, 500),
+      trigger: String(t?.trigger || '').slice(0, 120),
+      enabled: !!t?.enabled,
+    })) : DEFAULT_BOT_SETTINGS.templates,
+    reports: {
+      daily: !!(b.reports?.daily), weekly: !!(b.reports?.weekly), monthly: !!(b.reports?.monthly),
+    },
+    bossGroup: String(b.bossGroup || '').slice(0, 80),
+    activeAlerts: Array.isArray(b.activeAlerts) ? b.activeAlerts.slice(0, 20).map((s: any) => String(s).slice(0, 120)) : [],
+    whAlerts: { inbound: !!(b.whAlerts?.inbound), supplier: !!(b.whAlerts?.supplier) },
+    fieldOpts: { photo: !!(b.fieldOpts?.photo), geo: !!(b.fieldOpts?.geo) },
+  };
+  db.prepare(`
+    INSERT INTO team_settings (team_id, bot_settings, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET
+      bot_settings = excluded.bot_settings,
+      updated_at = excluded.updated_at
+  `).run(req.teamId!, JSON.stringify(clean));
+  res.json({ ok: true, settings: clean });
+});
+app.use('/api/team/bot-settings', botSettingsRouter);
 
 // ─── Team catalogs (Product templates / Materials / Hardware / Addons /
 //     Furniture types) ─────────────────────────────────────────────
