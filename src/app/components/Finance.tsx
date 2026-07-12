@@ -641,7 +641,7 @@ export function Finance({ language }: FinanceProps) {
       </div>
 
       <div>
-        {activeTab === 'orders' && <OrderManagement />}
+        {activeTab === 'orders' && <OrderManagement language={language} />}
         {activeTab === 'calendar' && <PaymentCalendar />}
         {activeTab === 'taxes' && <Taxes />}
         {activeTab === 'cashflow' && <CashFlow />}

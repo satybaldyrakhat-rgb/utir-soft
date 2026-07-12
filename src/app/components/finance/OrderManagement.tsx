@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { useDataStore } from '../../utils/dataStore';
+import { NewDealModal } from '../NewDealModal';
 
 type Order = { id: string; name: string; master: string; revenue: number; expenses: number; profit: number; margin: number; status: 'completed' | 'partial' | 'pending'; client?: string; hasRealExpenses: boolean; };
 
@@ -11,10 +12,11 @@ const STATUS: Record<Order['status'], { ru: string; cls: string }> = {
 };
 const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
 
-export function OrderManagement() {
+export function OrderManagement({ language }: { language: 'kz' | 'ru' | 'eng' }) {
   const store = useDataStore();
   const [filter, setFilter] = useState<'all' | Order['status']>('all');
   const [query, setQuery] = useState('');
+  const [showNewDeal, setShowNewDeal] = useState(false);
 
   // Real expenses come from FinanceTransaction rows that point back to the
   // deal via dealId (type='expense'). Previously we hardcoded 55% of revenue
@@ -83,7 +85,7 @@ export function OrderManagement() {
               <button key={f.id} onClick={() => setFilter(f.id)} className={`px-3 py-1.5 rounded-lg text-[11px] transition-colors ${filter === f.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>{f.label}</button>
             ))}
           </div>
-          <button className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700">
+          <button onClick={() => setShowNewDeal(true)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700">
             <Plus className="w-3.5 h-3.5" /> Заказ
           </button>
         </div>
@@ -133,6 +135,8 @@ export function OrderManagement() {
           )}
         </div>
       </div>
+
+      {showNewDeal && <NewDealModal language={language} onClose={() => setShowNewDeal(false)} />}
     </div>
   );
 }
