@@ -20,6 +20,7 @@ export function Booking() {
   const [step, setStep] = useState(0);
   const [furnitureType, setFurnitureType] = useState('');
   const [address, setAddress] = useState('');
+  const [landmark, setLandmark] = useState('');
   const [newBuild, setNewBuild] = useState(false);
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const [selectedSlot, setSelectedSlot] = useState('');
@@ -63,13 +64,41 @@ export function Booking() {
         completionDate: '',
         installationDate: '',
         paymentMethods: { cash: false, kaspiGold: false, kaspiQR: false, halykBank: false, cardTransfer: false, installment: false },
-        notes: notes ? `${notes}\nСлот: ${selectedSlot}` : `Слот: ${selectedSlot}`,
+        notes: [notes, landmark && `Ориентир: ${landmark}`, `Слот: ${selectedSlot}`].filter(Boolean).join('\n'),
       });
       setTrackId(created.id);
     } catch (err) {
       console.error('[booking submit]', err);
     }
     setDone(true);
+  };
+
+  // Build and download an .ics calendar invite for the measurement visit,
+  // so the client can add it to Apple/Google/Outlook calendars in one tap.
+  const saveToCalendar = () => {
+    const d = days[selectedDate || 0];
+    if (!d) return;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const parseHM = (s: string) => { const [h, m] = (s || '').trim().split(':').map(Number); return { h: h || 9, m: m || 0 }; };
+    const [startStr, endStr] = selectedSlot.split('–');
+    const st = parseHM(startStr), en = parseHM(endStr || startStr);
+    const dt = (hh: number, mm: number) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(hh)}${pad(mm)}00`;
+    const productLabel = FURNITURE.find(f => f.id === furnitureType)?.label || 'Замер';
+    const esc = (s: string) => (s || '').replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n');
+    const ics = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//UTIR Soft//Booking//RU', 'BEGIN:VEVENT',
+      `UID:${trackId || 'booking'}-${d.getTime()}@utir.kz`,
+      `DTSTART:${dt(st.h, st.m)}`,
+      `DTEND:${dt(en.h, en.m)}`,
+      `SUMMARY:${esc('Замер — ' + productLabel)}`,
+      `LOCATION:${esc(address)}`,
+      `DESCRIPTION:${esc((selectedMeasurer ? 'Замерщик: ' + selectedMeasurer + '. ' : '') + 'Телефон: ' + phone)}`,
+      'END:VEVENT', 'END:VCALENDAR',
+    ].join('\r\n');
+    const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'zamer.ics'; a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (done) {
@@ -86,7 +115,7 @@ export function Booking() {
           <p className="text-[11px] text-slate-400 mb-5">Ссылка для отслеживания: <a href={`#/track/${trackId}`} className="text-gray-900">utir.kz/track/{trackId}</a></p>
           <div className="space-y-2">
             <a href="https://t.me/UtirSoftBot" className="block w-full py-2.5 bg-sky-500 text-white rounded-xl text-xs hover:bg-sky-600 flex items-center justify-center gap-1.5"><Send className="w-3.5 h-3.5" /> Открыть в Telegram</a>
-            <button className="w-full py-2.5 bg-gray-100 text-slate-700 rounded-xl text-xs hover:bg-gray-200 flex items-center justify-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Сохранить в календарь</button>
+            <button onClick={saveToCalendar} className="w-full py-2.5 bg-gray-100 text-slate-700 rounded-xl text-xs hover:bg-gray-200 flex items-center justify-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Сохранить в календарь</button>
             <a href="#/" className="block w-full py-2.5 text-slate-500 rounded-xl text-xs hover:text-gray-900">На главную</a>
           </div>
         </div>
@@ -146,11 +175,11 @@ export function Booking() {
               <div className="space-y-3">
                 <input value={address} onChange={e => setAddress(e.target.value)} placeholder="ул. Абая 45, кв. 12"
                   className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
-                <div className="bg-gray-50 rounded-2xl h-48 flex items-center justify-center relative">
-                  <div className="absolute inset-0 bg-[linear-gradient(to_right,#0001_1px,transparent_1px),linear-gradient(to_bottom,#0001_1px,transparent_1px)] bg-[size:30px_30px] rounded-2xl" />
-                  <MapPin className="w-8 h-8 text-rose-500 relative" />
-                  <div className="absolute bottom-2 left-3 text-[10px] text-slate-400">2GIS</div>
-                </div>
+                <input value={landmark} onChange={e => setLandmark(e.target.value)} placeholder="Подъезд, этаж, код домофона, ориентир"
+                  className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                  <MapPin className="w-3 h-3 text-slate-400" /> Укажите точный адрес — замерщик приедет по нему.
+                </p>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={newBuild} onChange={() => setNewBuild(!newBuild)} />
                   <span className="text-xs text-slate-700">Это новостройка / квартира на ремонте</span>
