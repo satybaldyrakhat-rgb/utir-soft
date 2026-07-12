@@ -1419,7 +1419,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const paid = deals.filter(d => d.amount > 0);
     return paid.length ? Math.round(paid.reduce((s, d) => s + d.amount, 0) / paid.length) : 0;
   }, [deals]);
-  const getTotalClients = useCallback(() => deals.length, [deals]);
+  // Distinct clients, not deals — a repeat customer with 3 deals is 1 client.
+  // Dedup by normalized phone (digits only), falling back to customerName when
+  // the phone is empty. Same normalization as the client export in SalesKanban.
+  const getTotalClients = useCallback(() => {
+    const seen = new Set<string>();
+    for (const d of deals) {
+      const digits = (d.phone || '').replace(/\D/g, '');
+      const key = digits || `name:${(d.customerName || '').trim().toLowerCase()}`;
+      if (key && key !== 'name:') seen.add(key);
+    }
+    return seen.size;
+  }, [deals]);
 
   // Sidebar ids like 'sales' / 'warehouse' don't match matrix keys 'orders' /
   // 'production' — translate at the boundary so callers can pass either.
