@@ -122,6 +122,18 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
                     : period === 'quarter' ? l('квартал',  'тоқсан', 'quarter')
                     :                         l('всё время','барлық',  'all time');
 
+  // Revenue for the selected period — completed income transactions within
+  // the range (or all-time when period === 'all'). Keeps the KPI value in
+  // sync with its "· месяц/неделя" label instead of showing all-time.
+  const periodRevenue = useMemo(() => {
+    if (!periodRange) return totalRevenue;
+    const [s, e] = periodRange;
+    return store.transactions
+      .filter(tx => tx.type === 'income' && tx.status === 'completed' && tx.date &&
+        new Date(tx.date).getTime() >= s.getTime() && new Date(tx.date).getTime() <= e.getTime())
+      .reduce((acc, tx) => acc + tx.amount, 0);
+  }, [periodRange, store.transactions, totalRevenue]);
+
   // ─── Trends (period-aware) ────────────────────────────────────────
   // Compares the current period to the previous period of the same
   // length. "+∞" was the worst — replaced with localized "Новое" when
@@ -563,7 +575,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
     {
       id: 'revenue', show: canSee('finance'),
       label: l(`Выручка · ${periodLabel}`, `Табыс · ${periodLabel}`, `Revenue · ${periodLabel}`),
-      value: fmtKZT(totalRevenue),
+      value: fmtKZT(periodRevenue),
       change: trends.revenue.txt, up: trends.revenue.up,
       icon: TrendingUp, page: 'finance',
       tint: 'from-emerald-200/80 to-emerald-100/40', iconCls: 'text-emerald-700 bg-emerald-100/80',
