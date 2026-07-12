@@ -27,6 +27,7 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
   const [loaded, setLoaded] = useState(false);
   const [saved, setSaved] = useState(false);
   const [botOnline, setBotOnline] = useState<boolean | null>(null);
+  const [preview, setPreview] = useState('');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Реальный список низкого остатка из склада (был захардкожен).
@@ -53,6 +54,10 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
         const st = await api.get<any>('/api/telegram/link/status');
         if (!cancelled) setBotOnline(!!st?.serverReady?.telegram);
       } catch { if (!cancelled) setBotOnline(false); }
+      try {
+        const dp = await api.get<{ text: string }>('/api/telegram/daily-preview');
+        if (!cancelled) setPreview(dp?.text || '');
+      } catch { /* превью недоступно — покажем плейсхолдер */ }
       if (!cancelled) setLoaded(true);
     })();
     return () => { cancelled = true; };
@@ -196,12 +201,9 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
                 </div>
               </div>
               <div className="bg-sky-50 rounded-2xl p-3.5">
-                <div className="text-[10px] text-slate-500 mb-1.5">{l('Превью отчёта', 'Есеп алдын ала қарау', 'Report preview')}</div>
-                <div className="bg-white rounded-xl p-3 text-xs text-slate-700 space-y-1">
-                  <div>📊 {l('Отчёт за 09.05.2026', '09.05.2026 есебі', 'Report for 09.05.2026')}</div>
-                  <div>{l('Продажи: 4.2 млн ₸ (+12%)', 'Сатылым: 4.2 млн ₸ (+12%)', 'Sales: 4.2M ₸ (+12%)')}</div>
-                  <div>{l('Новых заявок: 8', 'Жаңа өтінімдер: 8', 'New requests: 8')}</div>
-                  <div>{l('В работе: 23 заказа', 'Жұмыста: 23 тапсырыс', 'In progress: 23 orders')}</div>
+                <div className="text-[10px] text-slate-500 mb-1.5">{l('Превью отчёта — реальные данные', 'Есеп алдын ала қарау — нақты деректер', 'Report preview — real data')}</div>
+                <div className="bg-white rounded-xl p-3 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                  {preview ? preview.replace(/<[^>]+>/g, '') : l('Отчёт формируется из ваших данных…', 'Есеп деректеріңізден құралады…', 'Report is built from your data…')}
                 </div>
               </div>
             </div>

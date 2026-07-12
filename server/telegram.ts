@@ -562,11 +562,26 @@ export function buildDailySummary(db: Database.Database, teamId: string): string
     bigInWork.forEach(d => lines.push(`• ${d.customerName || '—'} — <b>${fmt(d.amount || 0)}</b>`));
   }
 
+  // Просрочка по плановым срокам (производство / установка), не завершено.
+  const overdue = deals.filter(d => !['completed', 'rejected'].includes(d.status) &&
+    ((d.completionDate && d.completionDate < today) || (d.installationDate && d.installationDate < today)));
+
   const attention: string[] = [];
+  if (overdue.length) attention.push(`• 🔴 Просрочка по сроку: <b>${overdue.length}</b> заказ(ов)`);
   if (debt > 0) attention.push(`• 💰 Дебиторка: <b>${fmt(debt)}</b> по ${debtDeals.length} сделкам`);
   if (stale > 0) attention.push(`• ⏳ Без движения >3 дней: <b>${stale}</b> новых заявок`);
   if (bigStalled.length) attention.push(`• 🧊 Крупные без движения >7 дней: <b>${bigStalled.length}</b> (${fmt(bigStalled.reduce((s, d) => s + (d.amount || 0), 0))})`);
   if (attention.length) { lines.push('', `⚠️ <b>Требует внимания</b>`, ...attention); }
+
+  // Низкий остаток на складе — чтобы вовремя дозаказать материалы.
+  const prodRows = (db.prepare('SELECT data FROM products WHERE team_id = ?').all(teamId) as any[])
+    .map(r => { try { return JSON.parse(r.data); } catch { return null; } }).filter(Boolean);
+  const lowStock = prodRows.filter(p => p && (p.status === 'low' || p.status === 'outofstock'));
+  if (lowStock.length) {
+    lines.push('', `📦 <b>Низкий остаток (${lowStock.length})</b>`);
+    lowStock.slice(0, 6).forEach(p => lines.push(`• ${p.name} — <b>${p.quantity}</b> (мин ${p.minQty || 0})`));
+    if (lowStock.length > 6) lines.push(`• …и ещё ${lowStock.length - 6}`);
+  }
 
   lines.push('', `<i>Открыть платформу для деталей.</i>`);
   return lines.join('\n');
@@ -586,6 +601,16 @@ function getSummaryState(db: Database.Database, teamId: string): { enabled: bool
   if (!row?.daily_summary) return { enabled: true }; // on by default
   try { const s = JSON.parse(row.daily_summary); return { enabled: s.enabled !== false, lastSent: s.lastSent }; }
   catch { return { enabled: true }; }
+}
+// Тумблер «Ежедневный отчёт» из панели бота (bot_settings.reports.daily).
+// Если панель не сохранялась — считаем включённым.
+function reportsDailyEnabled(db: Database.Database, teamId: string): boolean {
+  try {
+    const row = db.prepare('SELECT bot_settings FROM team_settings WHERE team_id = ?').get(teamId) as any;
+    if (!row?.bot_settings) return true;
+    const s = JSON.parse(row.bot_settings);
+    return s?.reports?.daily !== false;
+  } catch { return true; }
 }
 function setSummaryLastSent(db: Database.Database, teamId: string, date: string) {
   const cur = getSummaryState(db, teamId);
@@ -611,6 +636,7 @@ async function dailySummaryTick(db: Database.Database) {
     if (!teamId) continue;
     const state = getSummaryState(db, teamId);
     if (!state.enabled || state.lastSent === today) continue;
+    if (!reportsDailyEnabled(db, teamId)) continue;  // выключено в панели бота
     try {
       const text = buildDailySummary(db, teamId);
       for (const chatId of summaryRecipients(db, teamId)) {
