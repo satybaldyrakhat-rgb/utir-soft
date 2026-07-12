@@ -12,7 +12,10 @@ import tools from './aiTools.js';
 // so we don't need to update this string when Anthropic ships minor revs.
 // Override via ANTHROPIC_MODEL env var if you want a cheaper / faster model
 // for tool dispatching (e.g. 'claude-haiku-4-5' for ~10x lower cost).
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-8';
+// Any legacy Opus id (4.0–4.7) auto-upgrades to 4.8 so a stale Railway env
+// can never pin the bot to an outdated flagship.
+const RAW_MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-8';
+const MODEL = /^claude-opus-4-[0-7]$/.test(RAW_MODEL) ? 'claude-opus-4-8' : RAW_MODEL;
 
 function buildSystemPrompt(): string {
   const today = new Date();
