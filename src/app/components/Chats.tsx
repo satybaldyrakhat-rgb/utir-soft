@@ -8,6 +8,7 @@ import { getNiche } from '../utils/niches';
 import { NicheIcon } from './NicheIcon';
 import { toast } from '../utils/toast';
 import { api } from '../utils/api';
+import { useAutoRefresh } from '../utils/useAutoRefresh';
 
 // Shared liquid-glass surface — same vocabulary as Dashboard / SalesKanban:
 // frosted fill + specular top-edge highlight over a deep layered shadow.
@@ -248,6 +249,24 @@ export function Chats({ language }: ChatsProps) {
     refreshChats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Тихое автообновление каждые 12с: подтягиваем список диалогов и, если
+  // открыт чат, его сообщения — без спиннеров, чтобы не сбрасывать ввод и
+  // позицию скролла. Хук сам паузится, когда вкладка скрыта. Инлайн-функция
+  // безопасна: useAutoRefresh держит ссылку на последнюю версию колбэка.
+  useAutoRefresh(async () => {
+    if (chatsLevel === 'none') return;
+    try {
+      const rows = await api.get<any[]>('/api/conversations');
+      setChats(rows.map(mapConv));
+    } catch { /* сеть — оставляем текущее */ }
+    if (selectedChat) {
+      try {
+        const rows = await api.get<any[]>(`/api/conversations/${selectedChat.id}/messages`);
+        setMessages(rows.map(mapMsg));
+      } catch { /* сеть — оставляем текущий тред */ }
+    }
+  }, 12000);
 
   const platformDot = (p: Chat['platform']) => <PlatformIcon platform={p} size="sm" />;
   const platformName = (p: Chat['platform']) => ({ whatsapp: 'WhatsApp', instagram: 'Instagram', telegram: 'Telegram', tiktok: 'TikTok' }[p]);
