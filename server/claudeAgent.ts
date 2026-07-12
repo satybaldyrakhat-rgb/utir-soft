@@ -7,12 +7,12 @@ import Anthropic from '@anthropic-ai/sdk';
 import Database from 'better-sqlite3';
 import tools from './aiTools.js';
 
-// Default to Anthropic's latest flagship — Claude Opus 4.7 (1M context).
-// The undated alias 'claude-opus-4-7' auto-resolves to the latest snapshot,
+// Default to Anthropic's latest flagship — Claude Opus 4.8 (1M context).
+// The undated alias 'claude-opus-4-8' auto-resolves to the latest snapshot,
 // so we don't need to update this string when Anthropic ships minor revs.
 // Override via ANTHROPIC_MODEL env var if you want a cheaper / faster model
 // for tool dispatching (e.g. 'claude-haiku-4-5' for ~10x lower cost).
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-7';
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-8';
 
 function buildSystemPrompt(): string {
   const today = new Date();

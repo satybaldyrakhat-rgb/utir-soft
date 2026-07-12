@@ -1420,7 +1420,7 @@ type SectionId = 'brain' | 'persona' | 'behavior' | 'hours' | 'channels' | 'test
 // Model id strings = the actual API model id we send to each provider.
 // Keep this list in sync with server/clientAi.ts ALL_CLIENT_AI_MODELS.
 type ClientAIModelId =
-  | 'claude-opus-4-7' | 'claude-sonnet-4-7'
+  | 'claude-opus-4-8' | 'claude-sonnet-4-7'
   | 'claude-opus-4-5' | 'claude-sonnet-4-5' | 'claude-haiku-4-5'
   | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano'
   | 'gpt-4o' | 'gpt-4o-mini'
@@ -1465,7 +1465,7 @@ const DEFAULT_DAY_UI: DaySlot = { enabled: true, start: '09:00', end: '20:00' };
 const DEFAULT_CLIENT_AI_UI: ClientAIConfigUI = {
   enabled: false,
   channels: { instagram: false, whatsapp: false },
-  aiModel: 'claude-opus-4-7',
+  aiModel: 'claude-opus-4-8',
   creativity: 0.7,
   botName: '',
   tone: 'polite',
@@ -1640,9 +1640,9 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
     {
       family: 'anthropic', title: 'Anthropic Claude',
       options: [
-        { id: 'claude-opus-4-7',   name: 'Claude Opus 4.7',   tone: l('Флагман · 1M контекст, самая умная', 'Флагман · 1M контекст', 'Flagship · 1M ctx'), badge: l('новое', 'жаңа', 'new') },
+        { id: 'claude-opus-4-8',   name: 'Claude Opus 4.8',   tone: l('Флагман · 1M контекст, самая умная', 'Флагман · 1M контекст', 'Flagship · 1M ctx'), badge: l('новое', 'жаңа', 'new') },
         { id: 'claude-sonnet-4-7', name: 'Claude Sonnet 4.7', tone: l('Быстрее Opus, почти не уступает',    'Тез әрі сапалы',        'Fast + smart') },
-        { id: 'claude-opus-4-5',   name: 'Claude Opus 4.5',   tone: l('Прошлый флагман, дешевле 4.7',       'Алдыңғы флагман',        'Previous gen') },
+        { id: 'claude-opus-4-5',   name: 'Claude Opus 4.5',   tone: l('Прошлый флагман, дешевле 4.8',       'Алдыңғы флагман',        'Previous gen') },
         { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', tone: l('Баланс качества и скорости',         'Баланс',                  'Balanced') },
         { id: 'claude-haiku-4-5',  name: 'Claude Haiku 4.5',  tone: l('Самая быстрая и дешёвая',            'Тез',                     'Fastest / cheap'), badge: '⚡' },
       ],

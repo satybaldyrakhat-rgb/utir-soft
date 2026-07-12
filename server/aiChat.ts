@@ -4,7 +4,7 @@
 //   1. utir-ai  → Claude with platform tools (full CRM control). Returns
 //                 either a text reply or a tool-use proposal that the UI
 //                 must confirm via /api/ai-chat/execute.
-//   2. claude   → Claude Opus 4.7 (1M context), pure text chat (no tool execution).
+//   2. claude   → Claude Opus 4.8 (1M context), pure text chat (no tool execution).
 //   3. gemini   → Google Gemini 2.5 Pro, pure text chat.
 //   4. chatgpt  → OpenAI GPT-5, pure text chat.
 //   5. deepseek → DeepSeek chat (OpenAI-compatible at api.deepseek.com),
@@ -63,7 +63,7 @@ export function chatProviderStatuses(): ChatProviderStatus[] {
   return [
     { id: 'utir-ai',  name: 'UTIR AI',         short: 'управление платформой', enabled: !!ANTHROPIC_KEY, envVar: 'ANTHROPIC_API_KEY', canControl: true },
     { id: 'gemini',   name: 'Gemini 2.5 Pro',  short: 'gemini-2.5-pro',        enabled: !!GEMINI_KEY,    envVar: 'GEMINI_API_KEY' },
-    { id: 'claude',   name: 'Claude Opus 4.7', short: 'claude-opus-4-7 · 1M',  enabled: !!ANTHROPIC_KEY, envVar: 'ANTHROPIC_API_KEY' },
+    { id: 'claude',   name: 'Claude Opus 4.8', short: 'claude-opus-4-8 · 1M',  enabled: !!ANTHROPIC_KEY, envVar: 'ANTHROPIC_API_KEY' },
     { id: 'chatgpt',  name: 'GPT-5',           short: 'gpt-5',                 enabled: !!OPENAI_KEY,    envVar: 'OPENAI_API_KEY' },
     { id: 'deepseek', name: 'DeepSeek V3',     short: 'deepseek-chat',         enabled: !!DEEPSEEK_KEY,  envVar: 'DEEPSEEK_API_KEY' },
   ];
@@ -87,7 +87,7 @@ async function chatClaude(messages: ChatMessage[]): Promise<ChatResult> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-7',
+        model: 'claude-opus-4-8',
         max_tokens: 1024,
         system: SYSTEM_PROMPT_GENERIC,
         messages: messages.map(m => ({ role: m.role, content: m.content })),

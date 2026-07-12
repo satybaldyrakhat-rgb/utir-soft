@@ -28,9 +28,9 @@ interface AIModelDef {
 // Display names must match what server/aiChat.ts actually requests from each
 // provider's API — keep these in sync when bumping model versions.
 export const AI_MODELS: AIModelDef[] = [
-  { id: 'utir-ai',  name: 'UTIR AI',           short: 'UTIR AI',   desc: 'Управляет платформой · Claude Opus 4.7 + инструменты', descKz: 'Платформаны басқарады · Claude Opus 4.7 + құралдар', descEng: 'Runs the platform · Claude Opus 4.7 + tools' },
+  { id: 'utir-ai',  name: 'UTIR AI',           short: 'UTIR AI',   desc: 'Управляет платформой · Claude Opus 4.8 + инструменты', descKz: 'Платформаны басқарады · Claude Opus 4.8 + құралдар', descEng: 'Runs the platform · Claude Opus 4.8 + tools' },
   { id: 'gemini',   name: 'Gemini 2.5 Pro',    short: 'Gemini 2.5', desc: 'Google · gemini-2.5-pro, мультимодальный', descKz: 'Google · gemini-2.5-pro, мультимодалды', descEng: 'Google · gemini-2.5-pro, multimodal' },
-  { id: 'claude',   name: 'Claude Opus 4.7',   short: 'Opus 4.7',   desc: 'Anthropic · claude-opus-4-7, 1M контекст, флагман', descKz: 'Anthropic · claude-opus-4-7, 1M контекст, флагман', descEng: 'Anthropic · claude-opus-4-7, 1M context, flagship' },
+  { id: 'claude',   name: 'Claude Opus 4.8',   short: 'Opus 4.8',   desc: 'Anthropic · claude-opus-4-8, 1M контекст, флагман', descKz: 'Anthropic · claude-opus-4-8, 1M контекст, флагман', descEng: 'Anthropic · claude-opus-4-8, 1M context, flagship' },
   { id: 'chatgpt',  name: 'GPT-5',             short: 'GPT-5',      desc: 'OpenAI · gpt-5, флагман, мультимодальный', descKz: 'OpenAI · gpt-5, флагман, мультимодалды', descEng: 'OpenAI · gpt-5, flagship, multimodal' },
   { id: 'deepseek', name: 'DeepSeek V3',       short: 'DeepSeek V3', desc: 'DeepSeek · deepseek-chat, лучший баланс цена/качество', descKz: 'DeepSeek · deepseek-chat, баға/сапа теңгерімі', descEng: 'DeepSeek · deepseek-chat, best price/quality balance' },
 ];
