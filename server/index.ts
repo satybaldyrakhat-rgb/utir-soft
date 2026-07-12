@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
+import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
@@ -296,6 +297,16 @@ CREATE TABLE IF NOT EXISTS custom_records (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_custom_records_team ON custom_records(team_id);
+
+-- Лог отправленных в Meta CAPI событий (для дашборда «Реклама»): data =
+-- { eventName, dealId, value, currency, status:'ok'|'err', paramCount, error }.
+CREATE TABLE IF NOT EXISTS meta_events (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_meta_events_team ON meta_events(team_id);
 `);
 
 // Idempotent migration: add columns if missing. Returns true when column was just added.
@@ -427,6 +438,8 @@ migrateColumn('team_settings', 'company_profile', 'TEXT');
 // Telegram-bot settings (панель настроек бота): шаблоны клиентам, расписание
 // отчётов директору, алёрты, настройки склада/замерщиков. Team-wide.
 migrateColumn('team_settings', 'bot_settings', 'TEXT');
+// Meta Conversions API (CAPI) конфиг: pixelId (dataset), capiToken, testEventCode.
+migrateColumn('team_settings', 'meta_capi', 'TEXT');
 if (teamIdJustAdded) {
   db.exec(`UPDATE users SET team_id = id WHERE team_id IS NULL`);
   db.exec(`UPDATE users SET team_role = 'admin' WHERE team_role IS NULL`);
@@ -1425,6 +1438,21 @@ app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (
       }
     } catch (e) { console.warn('[deals] bot alert failed', e); }
   }
+
+  // Meta CAPI — событие в рекламный кабинет (если подключён). Независимо от
+  // Telegram. Purchase на оплате, Lose_Deal на отказе, StageChange на этапе.
+  if (statusChanged) {
+    try {
+      const amt = Number(updated.amount) || 0;
+      if (updated.status === 'completed' && amt > 0) {
+        await emitCapiForDeal(req.teamId!, 'Purchase', updated, { value: amt, eventId: `Purchase-${updated.id}` });
+      } else if (updated.status === 'rejected') {
+        await emitCapiForDeal(req.teamId!, 'Lose_Deal', updated, { eventId: `Lose-${updated.id}` });
+      } else {
+        await emitCapiForDeal(req.teamId!, 'StageChange', updated, { eventId: `StageChange-${updated.id}-${updated.status}`, stage: updated.status });
+      }
+    } catch (e) { console.warn('[deals] capi emit failed', e); }
+  }
   // Always emit a generic 'deal.updated' too (with the same diff that landed
   // in deal_history) so integrations that want all changes can subscribe once.
   if (Object.keys(changes).length > 0) {
@@ -1674,6 +1702,8 @@ app.post('/api/lead/:code', rateLimit('lead'), (req, res) => {
   db.prepare('INSERT INTO deals (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, 'lead-form', ts.team_id, JSON.stringify(deal));
   // Мгновенный пуш назначенному менеджеру в Telegram (best-effort).
   if (ownerId) { try { void notifyAssignment(db, ts.team_id, id, ownerId); } catch { /* ignore */ } }
+  // Meta CAPI — Lead из рекламы (с fbc/fbp/ip для атрибуции по креативу).
+  void emitCapiForDeal(ts.team_id, 'Lead', deal, { actionSource: 'website' });
   res.json({ ok: true });
 });
 
@@ -1714,6 +1744,7 @@ app.post('/api/booking/:code', rateLimit('lead'), (req, res) => {
   };
   db.prepare('INSERT INTO deals (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, 'booking', ts.team_id, JSON.stringify(deal));
   if (ownerId) { try { void notifyAssignment(db, ts.team_id, id, ownerId); } catch { /* ignore */ } }
+  void emitCapiForDeal(ts.team_id, 'Lead', deal, { actionSource: 'website' });
   res.json({ ok: true, id });
 });
 
@@ -2957,6 +2988,113 @@ app.get('/api/telegram/daily-preview', authMiddleware, requireRole('manager'), (
     res.json({ text });
   } catch { res.json({ text: '' }); }
 });
+
+// ─── Meta Conversions API (CAPI) ─────────────────────────────────────
+function readMetaCapi(teamId: string): Partial<CapiConfig> {
+  try {
+    const row = db.prepare('SELECT meta_capi FROM team_settings WHERE team_id = ?').get(teamId) as any;
+    return row?.meta_capi ? JSON.parse(row.meta_capi) : {};
+  } catch { return {}; }
+}
+function logMetaEvent(teamId: string, entry: Record<string, any>) {
+  try {
+    db.prepare('INSERT INTO meta_events (id, team_id, data) VALUES (?, ?, ?)')
+      .run(newId('me_'), teamId, JSON.stringify({ ...entry, at: new Date().toISOString() }));
+  } catch (e) { console.warn('[meta] log failed', e); }
+}
+// Отправляет событие сделки в Meta CAPI (если настроено) и пишет в лог.
+async function emitCapiForDeal(teamId: string, eventName: string, deal: any, opts?: { value?: number; eventId?: string; actionSource?: CapiEvent['actionSource']; stage?: string }) {
+  const cfg = readMetaCapi(teamId);
+  if (!metaCapiConfigured(cfg)) return;
+  const nameParts = String(deal.customerName || '').trim().split(/\s+/);
+  const ev: CapiEvent = {
+    eventName,
+    actionSource: opts?.actionSource || 'system_generated',
+    eventId: opts?.eventId || `${eventName}-${deal.id}`,
+    user: {
+      phone: deal.phone, firstName: nameParts[0], lastName: nameParts.slice(1).join(' ') || undefined,
+      city: deal.city, externalId: deal.id, fbc: deal.fbc, fbp: deal.fbp,
+    },
+    value: opts?.value,
+    currency: opts?.value != null ? 'KZT' : undefined,
+    customData: { crm_id: deal.id, ...(opts?.stage ? { stage: opts.stage } : {}) },
+  };
+  try {
+    const res = await sendCapiEvent(cfg as CapiConfig, ev, Math.floor(Date.now() / 1000));
+    logMetaEvent(teamId, { eventName, dealId: deal.id, value: opts?.value ?? null, currency: ev.currency ?? null, status: res.ok ? 'ok' : 'err', paramCount: res.paramCount, error: res.error ?? null });
+  } catch (e: any) {
+    logMetaEvent(teamId, { eventName, dealId: deal.id, value: opts?.value ?? null, status: 'err', paramCount: 0, error: String(e?.message || e) });
+  }
+}
+
+// Конфиг подключения (токен не отдаём — только факт наличия).
+const metaCapiRouter = express.Router();
+metaCapiRouter.use(authMiddleware);
+metaCapiRouter.get('/config', (req: AuthedRequest, res) => {
+  const c = readMetaCapi(req.teamId!);
+  res.json({ pixelId: c.pixelId || '', testEventCode: c.testEventCode || '', connected: metaCapiConfigured(c) });
+});
+metaCapiRouter.put('/config', requireRole('admin'), (req: AuthedRequest, res) => {
+  const b = req.body || {};
+  const prev = readMetaCapi(req.teamId!);
+  const clean: CapiConfig = {
+    pixelId: String(b.pixelId || '').trim().slice(0, 40),
+    // Пустой токен в запросе = оставить прежний (форма не показывает токен).
+    capiToken: b.capiToken ? String(b.capiToken).trim().slice(0, 400) : (prev.capiToken || ''),
+    testEventCode: String(b.testEventCode || '').trim().slice(0, 40),
+  };
+  db.prepare(`
+    INSERT INTO team_settings (team_id, meta_capi, updated_at) VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET meta_capi = excluded.meta_capi, updated_at = excluded.updated_at
+  `).run(req.teamId!, JSON.stringify(clean));
+  res.json({ ok: true, connected: metaCapiConfigured(clean) });
+});
+// Тест-отправка Lead-события (с test_event_code видно в Meta → Test Events).
+metaCapiRouter.post('/test', requireRole('admin'), async (req: AuthedRequest, res) => {
+  const cfg = readMetaCapi(req.teamId!);
+  if (!metaCapiConfigured(cfg)) return res.status(400).json({ error: 'not_configured' });
+  const result = await sendCapiEvent(cfg as CapiConfig, {
+    eventName: 'Lead',
+    actionSource: 'system_generated',
+    eventId: `test-${Date.now()}`,
+    user: { email: 'test@utir-soft.com', phone: '+77010000000', firstName: 'Test', externalId: 'test' },
+    customData: { test: true },
+  }, Math.floor(Date.now() / 1000));
+  logMetaEvent(req.teamId!, { eventName: 'Lead(test)', dealId: null, value: null, status: result.ok ? 'ok' : 'err', paramCount: result.paramCount, error: result.error ?? null });
+  res.json(result);
+});
+// Статистика для дашборда «Реклама».
+metaCapiRouter.get('/stats', requireRole('manager'), (req: AuthedRequest, res) => {
+  const rows = db.prepare('SELECT data, created_at FROM meta_events WHERE team_id = ? ORDER BY rowid DESC LIMIT 2000').all(req.teamId!) as any[];
+  const events = rows.map(r => { try { return { ...JSON.parse(r.data), created_at: r.created_at }; } catch { return null; } }).filter(Boolean) as any[];
+  const cfg = readMetaCapi(req.teamId!);
+  const ok = events.filter(e => e.status === 'ok');
+  const leads = ok.filter(e => e.eventName === 'Lead');
+  const purchases = ok.filter(e => e.eventName === 'Purchase');
+  const purchaseValue = purchases.reduce((s, e) => s + (Number(e.value) || 0), 0);
+  const maxParams = ok.reduce((m, e) => Math.max(m, Number(e.paramCount) || 0), 0);
+  // Грубая оценка EMQ по среднему покрытию параметров (0–10). Для ориентира.
+  const avgParams = ok.length ? ok.reduce((s, e) => s + (Number(e.paramCount) || 0), 0) / ok.length : 0;
+  res.json({
+    connected: metaCapiConfigured(cfg),
+    totals: {
+      events: ok.length,
+      leads: leads.length,
+      purchases: purchases.length,
+      purchaseValue,
+      errors: events.length - ok.length,
+    },
+    emqApprox: Math.min(10, Math.round(avgParams * 1.2 * 10) / 10),
+    paramCoverage: maxParams,
+    lastEventAt: events[0]?.at || events[0]?.created_at || null,
+  });
+});
+// Последние события / покупки для таблиц дашборда.
+metaCapiRouter.get('/events', requireRole('manager'), (req: AuthedRequest, res) => {
+  const rows = db.prepare('SELECT data, created_at FROM meta_events WHERE team_id = ? ORDER BY rowid DESC LIMIT 100').all(req.teamId!) as any[];
+  res.json(rows.map(r => { try { return { ...JSON.parse(r.data), created_at: r.created_at }; } catch { return null; } }).filter(Boolean));
+});
+app.use('/api/meta-capi', metaCapiRouter);
 
 // ─── Team catalogs (Product templates / Materials / Hardware / Addons /
 //     Furniture types) ─────────────────────────────────────────────
