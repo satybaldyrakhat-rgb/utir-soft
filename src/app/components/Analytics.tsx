@@ -3,6 +3,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import { TrendingUp, TrendingDown, ArrowUpRight, ChevronRight, ShoppingBag, DollarSign, Users, Target, BarChart3, Percent, ArrowRight, Star, X, Sparkles, Eye, Download, Clock, Calendar } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { MarketingDashboard } from './MarketingDashboard';
+import { MetaCapiDashboard } from './MetaCapiDashboard';
 import { t, plural } from '../utils/translations';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
@@ -474,7 +475,10 @@ export function Analytics({ language }: AnalyticsProps) {
       )}
 
       {activeTab === 'ads' && store.getModuleLevel('marketing') !== 'none' ? (
-        <MarketingDashboard language={language} />
+        <div className="space-y-6">
+          <MetaCapiDashboard language={language} />
+          <MarketingDashboard language={language} />
+        </div>
       ) : activeTab === 'team' ? (
         <TeamMetrics language={language} />
       ) : store.deals.length === 0 ? (
