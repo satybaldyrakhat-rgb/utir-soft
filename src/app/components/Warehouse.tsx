@@ -708,8 +708,8 @@ export function Warehouse({ language }: WarehouseProps) {
     if (selectedProduct) { store.updateProduct(selectedProduct.id, selectedProduct); setShowEditModal(false); setSelectedProduct(null); }
   };
 
-  const statusConf = (s: Product['status']) => ({ instock: { dot: 'bg-green-500', label: l('Есть', 'Бар', 'In stock'), bg: 'bg-green-50 text-green-600' }, low: { dot: 'bg-yellow-500', label: l('Мало', 'Аз', 'Low'), bg: 'bg-yellow-50 text-yellow-600' }, outofstock: { dot: 'bg-red-500', label: l('Нет', 'Жоқ', 'Out'), bg: 'bg-red-50 text-red-600' } }[s]);
-  const orderConf = (s: ProdOrder['status']) => ({ working: { icon: Wrench, label: l('В работе', 'Жұмыста', 'Working'), color: 'text-blue-600 bg-blue-50', bar: 'bg-blue-500' }, done: { icon: CheckCircle, label: l('Готово', 'Дайын', 'Done'), color: 'text-green-600 bg-green-50', bar: 'bg-green-500' }, started: { icon: Clock, label: l('Начали', 'Бастадық', 'Started'), color: 'text-orange-600 bg-orange-50', bar: 'bg-orange-500' }, paused: { icon: Clock, label: l('Пауза', 'Тоқтатылды', 'Paused'), color: 'text-gray-600 bg-gray-100', bar: 'bg-gray-400' } }[s]);
+  const statusConf = (s: Product['status']) => (({ instock: { dot: 'bg-green-500', label: l('Есть', 'Бар', 'In stock'), bg: 'bg-green-50 text-green-600' }, low: { dot: 'bg-yellow-500', label: l('Мало', 'Аз', 'Low'), bg: 'bg-yellow-50 text-yellow-600' }, outofstock: { dot: 'bg-red-500', label: l('Нет', 'Жоқ', 'Out'), bg: 'bg-red-50 text-red-600' } } as Record<string, { dot: string; label: string; bg: string }>)[s] || { dot: 'bg-slate-400', label: String(s || '—'), bg: 'bg-slate-100 text-slate-600' });
+  const orderConf = (s: ProdOrder['status']) => ({ working: { icon: Wrench, label: l('В работе', 'Жұмыста', 'Working'), color: 'text-blue-600 bg-blue-50', bar: 'bg-blue-500' }, done: { icon: CheckCircle, label: l('Готово', 'Дайын', 'Done'), color: 'text-green-600 bg-green-50', bar: 'bg-green-500' }, started: { icon: Clock, label: l('Начали', 'Бастадық', 'Started'), color: 'text-orange-600 bg-orange-50', bar: 'bg-orange-500' }, paused: { icon: Clock, label: l('Пауза', 'Тоқтатылды', 'Paused'), color: 'text-slate-600 bg-slate-100', bar: 'bg-slate-400' } }[s]);
 
   const ModalInput = ({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
     <div><label className="block text-[11px] text-slate-400 mb-1">{label}</label><input className="w-full px-3 py-2.5 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" {...props} /></div>
@@ -795,9 +795,9 @@ export function Warehouse({ language }: WarehouseProps) {
           <div key={i} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] text-slate-400">{c.label}</span>
-              <div className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><c.icon className="w-3.5 h-3.5 text-slate-400" /></div>
+              <div className="w-7 h-7 bg-white/50 rounded-lg flex items-center justify-center"><c.icon className="w-3.5 h-3.5 text-slate-400" /></div>
             </div>
-            <div className={`text-lg mb-0.5 ${c.color || 'text-gray-900'}`}>{c.value}</div>
+            <div className={`text-lg mb-0.5 ${c.color || 'text-slate-900'}`}>{c.value}</div>
             <div className="text-[10px] text-slate-400">{c.sub}</div>
           </div>
         ))}
@@ -845,7 +845,7 @@ export function Warehouse({ language }: WarehouseProps) {
               <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-white/60 flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="text-sm text-gray-900">{l('Дедлайны производства', 'Өндіріс мерзімдері', 'Production deadlines')}</span>
+                  <span className="text-sm text-slate-900">{l('Дедлайны производства', 'Өндіріс мерзімдері', 'Production deadlines')}</span>
                   {defectActive > 0 && (
                     <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-rose-600 bg-rose-50 ring-1 ring-rose-100/60 px-1.5 py-0.5 rounded-full">
                       <AlertTriangle className="w-2.5 h-2.5" /> {l('переделок', 'қайта жасау', 'rework')}: {defectActive}
@@ -855,16 +855,16 @@ export function Warehouse({ language }: WarehouseProps) {
                 {overdueProd.length === 0 && todayProd.length === 0 ? (
                   <div className="px-5 py-4 text-xs text-emerald-600">{l('На сегодня всё в срок', 'Бүгін бәрі мерзімінде', 'On track for today')}</div>
                 ) : (
-                  <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+                  <div className="divide-y divide-white/50 max-h-64 overflow-y-auto">
                     {overdueProd.map(o => (
                       <div key={`o${o.id}`} className="px-5 py-2 flex items-center justify-between text-xs gap-2">
-                        <span className="text-gray-800 truncate">{o.client} · {o.name}</span>
+                        <span className="text-slate-800 truncate">{o.client} · {o.name}</span>
                         <span className="text-rose-600 flex-shrink-0">{l('просрочено', 'өтті', 'overdue')} · {dlOf(o)}</span>
                       </div>
                     ))}
                     {todayProd.map(o => (
                       <div key={`t${o.id}`} className="px-5 py-2 flex items-center justify-between text-xs gap-2">
-                        <span className="text-gray-800 truncate">{o.client} · {o.name}</span>
+                        <span className="text-slate-800 truncate">{o.client} · {o.name}</span>
                         <span className="text-amber-600 flex-shrink-0">{l('сегодня', 'бүгін', 'today')}</span>
                       </div>
                     ))}
@@ -874,22 +874,22 @@ export function Warehouse({ language }: WarehouseProps) {
               <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-white/60 flex items-center gap-2">
                   <Wrench className="w-3.5 h-3.5 text-sky-500" />
-                  <span className="text-sm text-gray-900">{l('График монтажей (неделя)', 'Монтаж кестесі (апта)', 'Installations (week)')}</span>
+                  <span className="text-sm text-slate-900">{l('График монтажей (неделя)', 'Монтаж кестесі (апта)', 'Installations (week)')}</span>
                 </div>
                 {montages.length === 0 ? (
-                  <div className="px-5 py-4 text-xs text-gray-400">{l('Монтажей не запланировано', 'Монтаж жоспарланбаған', 'No installations scheduled')}</div>
+                  <div className="px-5 py-4 text-xs text-slate-400">{l('Монтажей не запланировано', 'Монтаж жоспарланбаған', 'No installations scheduled')}</div>
                 ) : (
-                  <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+                  <div className="divide-y divide-white/50 max-h-64 overflow-y-auto">
                     {montages.map(d => (
                       <div key={d.id} className="px-5 py-2 text-xs">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-gray-800 truncate">{d.customerName}</span>
-                          <span className={`flex-shrink-0 tabular-nums ${d.installationDate === todayStr ? 'text-amber-600' : 'text-gray-500'}`}>{d.installationDate === todayStr ? l('сегодня', 'бүгін', 'today') : d.installationDate}</span>
+                          <span className="text-slate-800 truncate">{d.customerName}</span>
+                          <span className={`flex-shrink-0 tabular-nums ${d.installationDate === todayStr ? 'text-amber-600' : 'text-slate-500'}`}>{d.installationDate === todayStr ? l('сегодня', 'бүгін', 'today') : d.installationDate}</span>
                         </div>
                         {(d.siteAddress || d.address || d.measurer) && (() => {
                           const addr = d.siteAddress || d.address;
                           return (
-                            <div className="text-[10px] text-gray-400 truncate flex items-center gap-1.5">
+                            <div className="text-[10px] text-slate-400 truncate flex items-center gap-1.5">
                               {addr ? (
                                 <a href={`https://2gis.kz/search/${encodeURIComponent(addr)}`} target="_blank" rel="noreferrer"
                                   onClick={e => e.stopPropagation()} className="text-sky-600 hover:underline inline-flex items-center gap-0.5">
@@ -933,7 +933,7 @@ export function Warehouse({ language }: WarehouseProps) {
                   onClick={() => setProdStatusFilter(s.id as any)}
                   className={`px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${
                     prodStatusFilter === s.id
-                      ? 'bg-gray-900 text-white'
+                      ? 'bg-emerald-600 text-white'
                       : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-500 hover:bg-white/80'
                   }`}
                 >
@@ -954,7 +954,7 @@ export function Warehouse({ language }: WarehouseProps) {
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-900">{l('Заказы в производстве', 'Өндірістегі тапсырыстар', 'Production Orders')}</div>
+            <div className="text-sm text-slate-900">{l('Заказы в производстве', 'Өндірістегі тапсырыстар', 'Production Orders')}</div>
             <span className="text-[10px] text-slate-400">
               {sortedOrders.length}
               {sortedOrders.length !== prodOrders.length && <span className="text-slate-300"> / {prodOrders.length}</span>}
@@ -972,7 +972,7 @@ export function Warehouse({ language }: WarehouseProps) {
                   {/* Header */}
                   <div className="flex items-center justify-between mb-3 gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                      <span className="text-sm text-gray-900 truncate">{o.name}</span>
+                      <span className="text-sm text-slate-900 truncate">{o.name}</span>
                       <span className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg ${conf.color}`}><Icon className="w-3 h-3" />{conf.label}</span>
                       {/* Niche chip — only for multi-niche teams so the
                           shop floor knows which pipeline to follow when
@@ -991,18 +991,18 @@ export function Warehouse({ language }: WarehouseProps) {
                     <div className="flex items-center gap-1.5 text-[11px]"><Users className="w-3 h-3 text-slate-300" /><span className="text-slate-500">{o.client}</span></div>
                     <div className="flex items-center gap-1.5 text-[11px]"><Wrench className="w-3 h-3 text-slate-300" /><span className="text-slate-500">{o.master}</span></div>
                     <div className="flex items-center gap-1.5 text-[11px]"><Calendar className="w-3 h-3 text-slate-300" /><span className="text-slate-500">{o.start} → {o.end}</span></div>
-                    <div className="flex items-center gap-1.5 text-[11px]"><Clock className="w-3 h-3 text-slate-300" /><span className={o.daysLeft === 0 ? 'text-green-500' : o.daysLeft <= 3 ? 'text-red-500' : 'text-gray-500'}>{o.daysLeft === 0 ? l('Готово', 'Дайын', 'Ready') : `${o.daysLeft} ${l('дней', 'күн', 'days')}`}</span></div>
+                    <div className="flex items-center gap-1.5 text-[11px]"><Clock className="w-3 h-3 text-slate-300" /><span className={o.daysLeft === 0 ? 'text-green-500' : o.daysLeft <= 3 ? 'text-red-500' : 'text-slate-500'}>{o.daysLeft === 0 ? l('Готово', 'Дайын', 'Ready') : `${o.daysLeft} ${l('дней', 'күн', 'days')}`}</span></div>
                   </div>
 
                   {/* Materials */}
                   <div className="flex flex-wrap gap-1 mb-3">
-                    {o.materials.map((m, i) => <span key={i} className="text-[10px] px-1.5 py-0.5 bg-gray-50 text-slate-400 rounded">{m}</span>)}
+                    {o.materials.map((m, i) => <span key={i} className="text-[10px] px-1.5 py-0.5 bg-white/50 text-slate-400 rounded">{m}</span>)}
                   </div>
 
                   {/* Progress */}
                   <div>
-                    <div className="flex justify-between text-[10px] mb-1"><span className="text-slate-400">{l('Прогресс', 'Прогресс', 'Progress')}</span><span className="text-gray-900">{o.progress}%</span></div>
-                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${conf.bar} rounded-full transition-all`} style={{ width: `${o.progress}%` }} /></div>
+                    <div className="flex justify-between text-[10px] mb-1"><span className="text-slate-400">{l('Прогресс', 'Прогресс', 'Progress')}</span><span className="text-slate-900">{o.progress}%</span></div>
+                    <div className="w-full h-1.5 bg-white/60 rounded-full overflow-hidden"><div className={`h-full ${conf.bar} rounded-full transition-all`} style={{ width: `${o.progress}%` }} /></div>
                   </div>
 
                   {/* Stage chain — N clickable dots representing the
@@ -1201,7 +1201,7 @@ export function Warehouse({ language }: WarehouseProps) {
             })}
             {sortedOrders.length === 0 && (
               <div className="md:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
-                <Wrench className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                <Wrench className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                 <div className="text-sm text-slate-900 mb-1">
                   {prodOrders.length === 0
                     ? l('Нет заказов в производстве', 'Өндірісте тапсырыс жоқ', 'No production orders')
@@ -1226,8 +1226,8 @@ export function Warehouse({ language }: WarehouseProps) {
           <div className="px-5 py-3.5 flex items-center justify-between border-b border-white/60 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-              <span className="text-sm text-gray-900">{l('Потребность под заказы', 'Тапсырыстар қажеттілігі', 'Demand for active orders')}</span>
-              <span className="text-[11px] text-gray-400">· {l('зарезервировано позиций', 'брондалған', 'reserved items')}: {reservation.size}</span>
+              <span className="text-sm text-slate-900">{l('Потребность под заказы', 'Тапсырыстар қажеттілігі', 'Demand for active orders')}</span>
+              <span className="text-[11px] text-slate-400">· {l('зарезервировано позиций', 'брондалған', 'reserved items')}: {reservation.size}</span>
             </div>
             {shortages.length > 0 && canWrite && (
               <button onClick={triggerPurchaseForShortages}
@@ -1239,11 +1239,11 @@ export function Warehouse({ language }: WarehouseProps) {
           {shortages.length === 0 ? (
             <div className="px-5 py-4 text-xs text-emerald-600">{l('Материалов хватает на все активные заказы', 'Барлық тапсырысқа материал жеткілікті', 'Enough materials for all active orders')}</div>
           ) : (
-            <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+            <div className="divide-y divide-white/50 max-h-72 overflow-y-auto">
               {shortages.map(s => (
                 <div key={s.name} className="px-5 py-2.5 flex items-center justify-between text-xs gap-3">
                   <div className="min-w-0">
-                    <div className="text-gray-800 truncate">{s.name}</div>
+                    <div className="text-slate-800 truncate">{s.name}</div>
                     {s.late && (
                       <div className="text-[10px] text-rose-500 truncate">
                         {l('не успеет: приход ~', 'үлгермейді: ~', 'won\'t make it: ETA ~')}{s.eta} {l('· дедлайн', '· мерзім', '· deadline')} {s.deadline}
@@ -1251,8 +1251,8 @@ export function Warehouse({ language }: WarehouseProps) {
                     )}
                   </div>
                   <div className="flex items-center gap-3 sm:gap-4 tabular-nums flex-shrink-0">
-                    <span className="text-gray-500 hidden sm:inline">{l('нужно', 'қажет', 'need')} {Math.ceil(s.reserved)}</span>
-                    <span className="text-gray-500">{l('склад', 'қойма', 'stock')} {s.stock}</span>
+                    <span className="text-slate-500 hidden sm:inline">{l('нужно', 'қажет', 'need')} {Math.ceil(s.reserved)}</span>
+                    <span className="text-slate-500">{l('склад', 'қойма', 'stock')} {s.stock}</span>
                     <span className="text-rose-600 w-24 text-right">−{Math.ceil(s.shortage)} {s.unit}</span>
                   </div>
                 </div>
@@ -1385,7 +1385,7 @@ export function Warehouse({ language }: WarehouseProps) {
             </div>
             <div className="flex gap-1 overflow-x-auto pb-0.5">
               {categories.map(cat => (
-                <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-gray-900 text-white' : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-400 hover:border-gray-200'}`}>{cat}</button>
+                <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-emerald-600 text-white' : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-400 hover:bg-white/80'}`}>{cat}</button>
               ))}
             </div>
             {/* CSV export — produces an Excel-readable file with BOM */}
@@ -1449,22 +1449,22 @@ export function Warehouse({ language }: WarehouseProps) {
               <div className="col-span-2 text-right">{l('Статус', 'Күйі', 'Status')}</div>
             </div>
             {/* Items */}
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-white/50">
               {filtered.map(p => {
                 const st = statusConf(p.status);
                 return (
                   <div key={p.id} onClick={() => { setSelectedProduct(p); setShowEditModal(true); }} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center px-4 py-3 hover:bg-white/30 transition-colors cursor-pointer group">
                     <div className="col-span-4 flex items-center gap-2.5">
-                      <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0"><Package className="w-3.5 h-3.5 text-slate-400" /></div>
-                      <div><div className="text-sm text-gray-900">{p.name}</div><div className="text-[10px] text-slate-400">{p.category}</div></div>
+                      <div className="w-8 h-8 bg-white/50 rounded-lg flex items-center justify-center flex-shrink-0"><Package className="w-3.5 h-3.5 text-slate-400" /></div>
+                      <div><div className="text-sm text-slate-900">{p.name}</div><div className="text-[10px] text-slate-400">{p.category}</div></div>
                     </div>
                     <div className="col-span-2 text-xs text-slate-500 hidden sm:block">{p.supplier}</div>
                     <div className="col-span-2 text-center">
-                      <span className="text-sm text-gray-900">{p.quantity}</span>
+                      <span className="text-sm text-slate-900">{p.quantity}</span>
                       <span className="text-[10px] text-slate-400 ml-1">{p.unit}</span>
                       {p.quantity < p.minQty && p.quantity > 0 && <div className="text-[10px] text-yellow-500">min: {p.minQty}</div>}
                     </div>
-                    <div className="col-span-2 text-right text-xs text-gray-900 hidden sm:block">{p.cost.toLocaleString()} ₸</div>
+                    <div className="col-span-2 text-right text-xs text-slate-900 hidden sm:block">{p.cost.toLocaleString()} ₸</div>
                     <div className="col-span-2 flex items-center justify-end gap-1.5">
                       <span className={`text-[10px] px-2 py-0.5 rounded-lg ${st.bg}`}>{st.label}</span>
                       {(p.status === 'low' || p.status === 'outofstock') && (
@@ -1482,7 +1482,7 @@ export function Warehouse({ language }: WarehouseProps) {
                 );
               })}
               {filtered.length === 0 && (
-                <div className="py-12 text-center"><Package className="w-8 h-8 text-gray-200 mx-auto mb-2" /><p className="text-xs text-slate-400">{l('Не найдено', 'Табылмады', 'Not found')}</p></div>
+                <div className="py-12 text-center"><Package className="w-8 h-8 text-slate-200 mx-auto mb-2" /><p className="text-xs text-slate-400">{l('Не найдено', 'Табылмады', 'Not found')}</p></div>
               )}
             </div>
           </div>
@@ -1675,8 +1675,8 @@ export function Warehouse({ language }: WarehouseProps) {
         <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
-              <span className="text-sm text-gray-900">{l('Добавить материал', 'Материал қосу', 'Add Material')}</span>
-              <button onClick={() => setShowAddModal(false)} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-400" /></button>
+              <span className="text-sm text-slate-900">{l('Добавить материал', 'Материал қосу', 'Add Material')}</span>
+              <button onClick={() => setShowAddModal(false)} className="w-7 h-7 bg-white/50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-400" /></button>
             </div>
             <div className="p-5 space-y-3">
               <ModalInput
@@ -1687,7 +1687,7 @@ export function Warehouse({ language }: WarehouseProps) {
               />
               <div>
                 <label className="block text-[11px] text-slate-400 mb-1">{l('Категория', 'Санат', 'Category')}</label>
-                <select value={newProduct.category} onChange={e => setNewProduct({ ...newProduct, category: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none">
+                <select value={newProduct.category} onChange={e => setNewProduct({ ...newProduct, category: e.target.value })} className="w-full px-3 py-2.5 bg-white/50 border-0 rounded-xl text-sm focus:outline-none">
                   {/* Union of niche default categories + any custom ones
                       the user already entered (so old data still appears). */}
                   {Array.from(new Set([...niche.materialCategories, ...categories.filter(c => c !== 'Все')])).map(c => <option key={c}>{c}</option>)}
@@ -1695,7 +1695,7 @@ export function Warehouse({ language }: WarehouseProps) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <ModalInput label={l('Кол-во', 'Саны', 'Qty')} type="number" value={String(newProduct.quantity)} onChange={e => setNewProduct({ ...newProduct, quantity: Number((e.target as HTMLInputElement).value) })} />
-                <div><label className="block text-[11px] text-slate-400 mb-1">{l('Ед.', 'Бірл.', 'Unit')}</label><select value={newProduct.unit} onChange={e => setNewProduct({ ...newProduct, unit: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none"><option value="лист">{l('лист', 'парақ', 'sheet')}</option><option value="шт">{l('шт', 'дана', 'pcs')}</option><option value="м">м</option><option value="пара">{l('пара', 'жұп', 'pair')}</option></select></div>
+                <div><label className="block text-[11px] text-slate-400 mb-1">{l('Ед.', 'Бірл.', 'Unit')}</label><select value={newProduct.unit} onChange={e => setNewProduct({ ...newProduct, unit: e.target.value })} className="w-full px-3 py-2.5 bg-white/50 border-0 rounded-xl text-sm focus:outline-none"><option value="лист">{l('лист', 'парақ', 'sheet')}</option><option value="шт">{l('шт', 'дана', 'pcs')}</option><option value="м">м</option><option value="пара">{l('пара', 'жұп', 'pair')}</option></select></div>
               </div>
               <ModalInput label={l('Поставщик', 'Жеткізуші', 'Supplier')} value={newProduct.supplier} onChange={e => setNewProduct({ ...newProduct, supplier: (e.target as HTMLInputElement).value })} />
               <ModalInput label={l('Цена (₸)', 'Бағасы (₸)', 'Price (₸)')} type="number" value={String(newProduct.cost)} onChange={e => setNewProduct({ ...newProduct, cost: Number((e.target as HTMLInputElement).value) })} />
@@ -1709,7 +1709,7 @@ export function Warehouse({ language }: WarehouseProps) {
                   <select
                     value={newProduct.niche || ''}
                     onChange={e => setNewProduct({ ...newProduct, niche: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none"
+                    className="w-full px-3 py-2.5 bg-white/50 border-0 rounded-xl text-sm focus:outline-none"
                   >
                     <option value="">{l('Любое (общее)', 'Кез келген', 'Any (shared)')}</option>
                     {store.allNiches.map(nid => {
@@ -1732,8 +1732,8 @@ export function Warehouse({ language }: WarehouseProps) {
         <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => { setShowEditModal(false); setSelectedProduct(null); }}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
-              <div><div className="text-[10px] text-slate-400">{selectedProduct.category} · {selectedProduct.supplier}</div><div className="text-sm text-gray-900">{selectedProduct.name}</div></div>
-              <button onClick={() => { setShowEditModal(false); setSelectedProduct(null); }} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-400" /></button>
+              <div><div className="text-[10px] text-slate-400">{selectedProduct.category} · {selectedProduct.supplier}</div><div className="text-sm text-slate-900">{selectedProduct.name}</div></div>
+              <button onClick={() => { setShowEditModal(false); setSelectedProduct(null); }} className="w-7 h-7 bg-white/50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-400" /></button>
             </div>
             <div className="p-5 space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -1748,7 +1748,7 @@ export function Warehouse({ language }: WarehouseProps) {
                   <select
                     value={selectedProduct.niche || ''}
                     onChange={e => setSelectedProduct({ ...selectedProduct, niche: e.target.value || undefined })}
-                    className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none"
+                    className="w-full px-3 py-2.5 bg-white/50 border-0 rounded-xl text-sm focus:outline-none"
                   >
                     <option value="">{l('Любое (общее)', 'Кез келген', 'Any (shared)')}</option>
                     {store.allNiches.map(nid => {
@@ -1758,9 +1758,9 @@ export function Warehouse({ language }: WarehouseProps) {
                   </select>
                 </div>
               )}
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+              <div className="flex items-center justify-between p-3 bg-white/50 rounded-xl">
                 <span className="text-[10px] text-slate-400">{l('Итого на складе', 'Қоймадағы жиыны', 'Total stock value')}</span>
-                <span className="text-sm text-gray-900">{(selectedProduct.quantity * selectedProduct.cost).toLocaleString()} ₸</span>
+                <span className="text-sm text-slate-900">{(selectedProduct.quantity * selectedProduct.cost).toLocaleString()} ₸</span>
               </div>
             </div>
             <div className="p-5 pt-0 flex gap-2">
@@ -1775,24 +1775,24 @@ export function Warehouse({ language }: WarehouseProps) {
         <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setSelectedOrder(null)}>
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-white/60 flex items-center justify-between">
-              <div><div className="text-sm text-gray-900">{selectedOrder.name}</div><div className="text-[10px] text-slate-400">#{selectedOrder.id} · {selectedOrder.client}</div></div>
-              <button onClick={() => setSelectedOrder(null)} className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-400" /></button>
+              <div><div className="text-sm text-slate-900">{selectedOrder.name}</div><div className="text-[10px] text-slate-400">#{selectedOrder.id} · {selectedOrder.client}</div></div>
+              <button onClick={() => setSelectedOrder(null)} className="w-7 h-7 bg-white/50 rounded-lg flex items-center justify-center"><X className="w-3.5 h-3.5 text-slate-400" /></button>
             </div>
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 {[{ icon: Users, label: l('Клиент', 'Клиент', 'Client'), value: selectedOrder.client }, { icon: Wrench, label: l('Мастер', 'Шебер', 'Master'), value: selectedOrder.master }, { icon: Calendar, label: l('Сроки', 'Мерзім', 'Timeline'), value: `${selectedOrder.start} → ${selectedOrder.end}` }, { icon: Clock, label: l('Осталось', 'Қалды', 'Remaining'), value: selectedOrder.daysLeft === 0 ? l('Готово', 'Дайын', 'Ready') : `${selectedOrder.daysLeft} ${l('дней', 'күн', 'days')}` }].map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl">
-                    <item.icon className="w-3.5 h-3.5 text-slate-400" /><div><div className="text-[10px] text-slate-400">{item.label}</div><div className="text-xs text-gray-900">{item.value}</div></div>
+                  <div key={i} className="flex items-center gap-2 p-2.5 bg-white/50 rounded-xl">
+                    <item.icon className="w-3.5 h-3.5 text-slate-400" /><div><div className="text-[10px] text-slate-400">{item.label}</div><div className="text-xs text-slate-900">{item.value}</div></div>
                   </div>
                 ))}
               </div>
               <div>
                 <div className="text-[11px] text-slate-400 mb-2">{l('Материалы', 'Материалдар', 'Materials')}</div>
-                <div className="flex flex-wrap gap-1">{selectedOrder.materials.map((m, i) => <span key={i} className="text-[10px] px-2 py-1 bg-gray-50 text-gray-600 rounded-lg">{m}</span>)}</div>
+                <div className="flex flex-wrap gap-1">{selectedOrder.materials.map((m, i) => <span key={i} className="text-[10px] px-2 py-1 bg-white/50 text-slate-600 rounded-lg">{m}</span>)}</div>
               </div>
               <div>
-                <div className="flex justify-between text-[10px] mb-1"><span className="text-slate-400">{l('Прогресс', 'Прогресс', 'Progress')}</span><span className="text-gray-900">{selectedOrder.progress}%</span></div>
-                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${orderConf(selectedOrder.status).bar} rounded-full`} style={{ width: `${selectedOrder.progress}%` }} /></div>
+                <div className="flex justify-between text-[10px] mb-1"><span className="text-slate-400">{l('Прогресс', 'Прогресс', 'Progress')}</span><span className="text-slate-900">{selectedOrder.progress}%</span></div>
+                <div className="w-full h-2 bg-white/60 rounded-full overflow-hidden"><div className={`h-full ${orderConf(selectedOrder.status).bar} rounded-full`} style={{ width: `${selectedOrder.progress}%` }} /></div>
               </div>
             </div>
             <div className="p-5 pt-0"><button onClick={() => setSelectedOrder(null)} className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors">{l('Закрыть', 'Жабу', 'Close')}</button></div>
@@ -1932,7 +1932,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
 
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <div className="text-sm text-gray-900">{l('Шаблоны изделий', 'Бұйым шаблондары', 'Product templates')}</div>
+          <div className="text-sm text-slate-900">{l('Шаблоны изделий', 'Бұйым шаблондары', 'Product templates')}</div>
           <div className="text-[11px] text-slate-400">{templates.length} {l('шаблонов', 'шаблон', 'templates')}</div>
         </div>
         <button
@@ -1945,7 +1945,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
 
       {templates.length === 0 ? (
         <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
-          <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+          <Package className="w-10 h-10 text-slate-200 mx-auto mb-3" />
           <div className="text-sm text-slate-900 mb-1">{l('Пока нет шаблонов', 'Әзірге шаблондар жоқ', 'No templates yet')}</div>
           <div className="text-xs text-slate-400 mb-4">{l('Создайте первый шаблон чтобы быстро повторять типовые изделия', 'Типтік бұйымдарды тез қайталау үшін алғашқы шаблон жасаңыз', 'Create a template to reuse common items')}</div>
           <button onClick={() => setEditing(blankTemplate(typeOptions[0]?.id))} className="px-4 py-2 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all inline-flex items-center gap-1.5">
@@ -1960,7 +1960,7 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
               <div key={t.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-4 hover:shadow-sm transition-all">
                 <div className="w-full h-24 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center mb-3 relative">
                   <Package className="w-8 h-8 text-slate-300" />
-                  <span className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 bg-white/80 rounded text-gray-600">{labelFor(t.type)}</span>
+                  <span className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 bg-white/80 rounded text-slate-600">{labelFor(t.type)}</span>
                 </div>
                 <div className="text-sm text-slate-900 mb-1 truncate" title={t.name}>{t.name}</div>
                 <div className="flex items-center justify-between text-[11px] text-slate-400 mb-2">
@@ -1974,9 +1974,9 @@ function BomTemplates({ language }: { language: 'kz' | 'ru' | 'eng' }) {
                   <button onClick={() => useInOrder(t)} className="flex-1 text-[11px] px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
                     {l('В заказ', 'Тапсырысқа', 'Use')}
                   </button>
-                  <button onClick={() => setEditing(t)} title={l('Редактировать', 'Өңдеу', 'Edit')} className="w-7 h-7 hover:bg-white/50 border border-gray-100 rounded-lg flex items-center justify-center"><Edit2 className="w-3 h-3 text-slate-500" /></button>
-                  <button onClick={() => duplicate(t)} title={l('Дублировать', 'Көшіру', 'Duplicate')} className="w-7 h-7 hover:bg-white/50 border border-gray-100 rounded-lg flex items-center justify-center"><Copy className="w-3 h-3 text-slate-500" /></button>
-                  <button onClick={() => t.id && remove(t.id)} title={l('Удалить', 'Жою', 'Delete')} className="w-7 h-7 hover:bg-rose-50 border border-gray-100 rounded-lg flex items-center justify-center"><Trash2 className="w-3 h-3 text-rose-500" /></button>
+                  <button onClick={() => setEditing(t)} title={l('Редактировать', 'Өңдеу', 'Edit')} className="w-7 h-7 hover:bg-white/50 border border-white/60 rounded-lg flex items-center justify-center"><Edit2 className="w-3 h-3 text-slate-500" /></button>
+                  <button onClick={() => duplicate(t)} title={l('Дублировать', 'Көшіру', 'Duplicate')} className="w-7 h-7 hover:bg-white/50 border border-white/60 rounded-lg flex items-center justify-center"><Copy className="w-3 h-3 text-slate-500" /></button>
+                  <button onClick={() => t.id && remove(t.id)} title={l('Удалить', 'Жою', 'Delete')} className="w-7 h-7 hover:bg-rose-50 border border-white/60 rounded-lg flex items-center justify-center"><Trash2 className="w-3 h-3 text-rose-500" /></button>
                 </div>
               </div>
             );
@@ -2034,7 +2034,7 @@ function BomEditorModal({ initial, onClose, onSave, busy, language, typeOptions 
       <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-white/60 flex items-center justify-between">
           <div>
-            <div className="text-sm text-gray-900">{t.id ? l('Редактировать шаблон', 'Шаблонды өңдеу', 'Edit template') : l('Новый шаблон', 'Жаңа шаблон', 'New template')}</div>
+            <div className="text-sm text-slate-900">{t.id ? l('Редактировать шаблон', 'Шаблонды өңдеу', 'Edit template') : l('Новый шаблон', 'Жаңа шаблон', 'New template')}</div>
             <div className="text-[11px] text-slate-400">{l('Сохраняется на сервере для всей команды', 'Бүкіл команда үшін серверде сақталады', 'Saved on the server for the whole team')}</div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
@@ -2045,11 +2045,11 @@ function BomEditorModal({ initial, onClose, onSave, busy, language, typeOptions 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <div className="text-[10px] text-slate-400 mb-1">{l('Название', 'Атауы', 'Name')}</div>
-              <input value={t.name} onChange={e => up({ name: e.target.value })} placeholder='Кухня прямая 3м' className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+              <input value={t.name} onChange={e => up({ name: e.target.value })} placeholder='Кухня прямая 3м' className="w-full px-3 py-2 bg-white/50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
             </div>
             <div>
               <div className="text-[10px] text-slate-400 mb-1">{l('Тип изделия', 'Бұйым түрі', 'Type')}</div>
-              <select value={t.type} onChange={e => up({ type: e.target.value })} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200">
+              <select value={t.type} onChange={e => up({ type: e.target.value })} className="w-full px-3 py-2 bg-white/50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/40">
                 {typeOptions.map(o => <option key={o.id} value={o.id}>{o.ru}</option>)}
               </select>
             </div>
@@ -2059,20 +2059,20 @@ function BomEditorModal({ initial, onClose, onSave, busy, language, typeOptions 
           <div>
             <div className="text-[10px] text-slate-400 mb-1">{l('Размеры (мм)', 'Өлшемдер (мм)', 'Dimensions (mm)')}</div>
             <div className="grid grid-cols-3 gap-2">
-              <input type="number" value={t.width || 0}  onChange={e => up({ width:  Number(e.target.value) })} placeholder={l('Длина', 'Ұзындық', 'Length')}  className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
-              <input type="number" value={t.depth || 0}  onChange={e => up({ depth:  Number(e.target.value) })} placeholder={l('Глубина', 'Тереңдік', 'Depth')} className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
-              <input type="number" value={t.height || 0} onChange={e => up({ height: Number(e.target.value) })} placeholder={l('Высота', 'Биіктік', 'Height')}  className="px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+              <input type="number" value={t.width || 0}  onChange={e => up({ width:  Number(e.target.value) })} placeholder={l('Длина', 'Ұзындық', 'Length')}  className="px-3 py-2 bg-white/50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
+              <input type="number" value={t.depth || 0}  onChange={e => up({ depth:  Number(e.target.value) })} placeholder={l('Глубина', 'Тереңдік', 'Depth')} className="px-3 py-2 bg-white/50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
+              <input type="number" value={t.height || 0} onChange={e => up({ height: Number(e.target.value) })} placeholder={l('Высота', 'Биіктік', 'Height')}  className="px-3 py-2 bg-white/50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
             </div>
           </div>
 
           {/* Materials editor */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs text-gray-900">{l('Материалы', 'Материалдар', 'Materials')}</div>
+              <div className="text-xs text-slate-900">{l('Материалы', 'Материалдар', 'Materials')}</div>
               <button onClick={addMat} className="text-[11px] text-emerald-600 hover:text-violet-800 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> {l('Добавить', 'Қосу', 'Add')}</button>
             </div>
-            <div className="border border-gray-100 rounded-xl overflow-hidden">
-              <div className="grid grid-cols-12 gap-1 px-2 py-1.5 bg-gray-50 text-[10px] text-slate-400 uppercase tracking-wide">
+            <div className="border border-white/60 rounded-xl overflow-hidden">
+              <div className="grid grid-cols-12 gap-1 px-2 py-1.5 bg-white/50 text-[10px] text-slate-400 uppercase tracking-wide">
                 <div className="col-span-4">Материал</div>
                 <div className="col-span-3">Поставщик</div>
                 <div className="col-span-1 text-right">Кол-во</div>
@@ -2082,11 +2082,11 @@ function BomEditorModal({ initial, onClose, onSave, busy, language, typeOptions 
               </div>
               {t.materials.map((m, i) => (
                 <div key={i} className="grid grid-cols-12 gap-1 px-2 py-1.5 border-t border-white/60 items-center">
-                  <input value={m.mat}  onChange={e => upMat(i, { mat: e.target.value })}  placeholder="ЛДСП Egger…"   className="col-span-4 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
-                  <input value={m.sup}  onChange={e => upMat(i, { sup: e.target.value })}  placeholder={l('Поставщик', 'Жеткізуші', 'Supplier')}     className="col-span-3 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
-                  <input type="number"  value={m.qty}   onChange={e => upMat(i, { qty: Number(e.target.value) })}      className="col-span-1 px-2 py-1 bg-white rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-gray-200" />
-                  <input value={m.unit} onChange={e => upMat(i, { unit: e.target.value })} placeholder="шт"             className="col-span-1 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
-                  <input type="number"  value={m.price} onChange={e => upMat(i, { price: Number(e.target.value) })}    className="col-span-2 px-2 py-1 bg-white rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                  <input value={m.mat}  onChange={e => upMat(i, { mat: e.target.value })}  placeholder="ЛДСП Egger…"   className="col-span-4 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
+                  <input value={m.sup}  onChange={e => upMat(i, { sup: e.target.value })}  placeholder={l('Поставщик', 'Жеткізуші', 'Supplier')}     className="col-span-3 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
+                  <input type="number"  value={m.qty}   onChange={e => upMat(i, { qty: Number(e.target.value) })}      className="col-span-1 px-2 py-1 bg-white rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
+                  <input value={m.unit} onChange={e => upMat(i, { unit: e.target.value })} placeholder="шт"             className="col-span-1 px-2 py-1 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
+                  <input type="number"  value={m.price} onChange={e => upMat(i, { price: Number(e.target.value) })}    className="col-span-2 px-2 py-1 bg-white rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
                   <div className="col-span-1 flex items-center justify-end gap-1 text-xs text-slate-700 tabular-nums">
                     {Math.round(m.qty * m.price).toLocaleString('ru-RU')}
                     <button onClick={() => removeMat(i)} className="text-slate-300 hover:text-rose-500 ml-1"><X className="w-3 h-3" /></button>
@@ -2100,30 +2100,30 @@ function BomEditorModal({ initial, onClose, onSave, busy, language, typeOptions 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <div className="text-[10px] text-slate-400 mb-1">{l('Работа (₸)', 'Жұмыс (₸)', 'Labour (₸)')}</div>
-              <input type="number" value={t.labourCost} onChange={e => up({ labourCost: Number(e.target.value) })} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+              <input type="number" value={t.labourCost} onChange={e => up({ labourCost: Number(e.target.value) })} className="w-full px-3 py-2 bg-white/50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
             </div>
             <div>
               <div className="text-[10px] text-slate-400 mb-1">{l('Наценка %', 'Үстеме %', 'Markup %')}</div>
-              <input type="number" value={t.markupPct} onChange={e => up({ markupPct: Number(e.target.value) })} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+              <input type="number" value={t.markupPct} onChange={e => up({ markupPct: Number(e.target.value) })} className="w-full px-3 py-2 bg-white/50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
             </div>
             <div>
               <div className="text-[10px] text-slate-400 mb-1">{l('Срок (дн)', 'Мерзім (күн)', 'Lead time (days)')}</div>
-              <input type="number" value={t.leadDays} onChange={e => up({ leadDays: Number(e.target.value) })} className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+              <input type="number" value={t.leadDays} onChange={e => up({ leadDays: Number(e.target.value) })} className="w-full px-3 py-2 bg-white/50 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/40" />
             </div>
           </div>
 
           {/* Computed totals */}
           <div className="bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-            <div><div className="text-[10px] text-slate-400 mb-1">Материалы</div><div className="text-gray-900 tabular-nums">{Math.round(totals.materials).toLocaleString('ru-RU')} ₸</div></div>
-            <div><div className="text-[10px] text-slate-400 mb-1">Работа</div><div className="text-gray-900 tabular-nums">{Math.round(totals.labour).toLocaleString('ru-RU')} ₸</div></div>
-            <div><div className="text-[10px] text-slate-400 mb-1">Наценка {t.markupPct}%</div><div className="text-gray-900 tabular-nums">{Math.round(totals.markup).toLocaleString('ru-RU')} ₸</div></div>
-            <div><div className="text-[10px] text-slate-400 mb-1">Итого клиенту</div><div className="text-gray-900 tabular-nums">{Math.round(totals.clientTotal).toLocaleString('ru-RU')} ₸</div></div>
+            <div><div className="text-[10px] text-slate-400 mb-1">Материалы</div><div className="text-slate-900 tabular-nums">{Math.round(totals.materials).toLocaleString('ru-RU')} ₸</div></div>
+            <div><div className="text-[10px] text-slate-400 mb-1">Работа</div><div className="text-slate-900 tabular-nums">{Math.round(totals.labour).toLocaleString('ru-RU')} ₸</div></div>
+            <div><div className="text-[10px] text-slate-400 mb-1">Наценка {t.markupPct}%</div><div className="text-slate-900 tabular-nums">{Math.round(totals.markup).toLocaleString('ru-RU')} ₸</div></div>
+            <div><div className="text-[10px] text-slate-400 mb-1">Итого клиенту</div><div className="text-slate-900 tabular-nums">{Math.round(totals.clientTotal).toLocaleString('ru-RU')} ₸</div></div>
           </div>
         </div>
 
-        <div className="px-5 py-3 bg-gray-50 border-t border-white/60 flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
-          <button onClick={commit} disabled={busy || !t.name.trim()} className="px-4 py-1.5 bg-gray-900 text-white rounded-lg text-xs disabled:opacity-50 inline-flex items-center gap-1.5">
+        <div className="px-5 py-3 bg-white/50 border-t border-white/60 flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900">{l('Отмена', 'Болдырмау', 'Cancel')}</button>
+          <button onClick={commit} disabled={busy || !t.name.trim()} className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs disabled:opacity-50 inline-flex items-center gap-1.5">
             {busy && <Loader2 className="w-3 h-3 animate-spin" />}
             {l('Сохранить', 'Сақтау', 'Save')}
           </button>
@@ -2199,7 +2199,7 @@ function NestingView({ language, prodOrders, deals }: {
   if (prodOrders.length === 0) {
     return (
       <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-10 text-center">
-        <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+        <Package className="w-10 h-10 text-slate-200 mx-auto mb-3" />
         <div className="text-sm text-slate-900 mb-1">{l('Нет активных заказов', 'Белсенді тапсырыстар жоқ', 'No active orders')}</div>
         <div className="text-xs text-slate-400">{l('Раскрой работает на основе сделок в производстве — переведите сделку в нужный статус', 'Тілу өндірістегі мәмілелер негізінде жұмыс істейді — мәмілені тиісті күйге ауыстырыңыз', 'Nesting works from in-production deals')}</div>
       </div>
@@ -2214,7 +2214,7 @@ function NestingView({ language, prodOrders, deals }: {
         <select
           value={selectedDealId}
           onChange={e => setSelectedDealId(e.target.value)}
-          className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200 mb-4"
+          className="w-full px-3 py-2 bg-white/50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500/40 mb-4"
         >
           {prodOrders.map(o => (
             <option key={o.dealId} value={o.dealId}>{o.name} — {o.client}</option>
@@ -2229,10 +2229,10 @@ function NestingView({ language, prodOrders, deals }: {
         ) : (
           <div className="space-y-2">
             {parts.map(p => (
-              <div key={p.id} className="flex items-center gap-2 text-xs p-2 bg-gray-50 rounded-lg">
+              <div key={p.id} className="flex items-center gap-2 text-xs p-2 bg-white/50 rounded-lg">
                 <Package className="w-3 h-3 text-slate-400 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-gray-900 truncate">{p.name}</div>
+                  <div className="text-slate-900 truncate">{p.name}</div>
                   <div className="text-[10px] text-slate-400">{p.sizeMm} мм</div>
                 </div>
                 <span className="text-slate-500">×{p.qty}</span>
@@ -2246,12 +2246,12 @@ function NestingView({ language, prodOrders, deals }: {
       <div className="lg:col-span-2 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="text-sm text-gray-900">{l('Лист ЛДСП 2750×1830 мм', 'ЛДСП парағы 2750×1830 мм', 'MFC sheet 2750×1830 mm')}</div>
+            <div className="text-sm text-slate-900">{l('Лист ЛДСП 2750×1830 мм', 'ЛДСП парағы 2750×1830 мм', 'MFC sheet 2750×1830 mm')}</div>
             <div className="text-[10px] text-slate-400 mt-0.5">{l('Иллюстративная раскладка — для точного нестинга нужен CNC-софт', 'Иллюстрациялық сызба — нақты тілу үшін CNC бағдарламасы керек', 'Illustrative — real nesting requires CNC software')}</div>
           </div>
           <span className="text-[10px] text-slate-400">{l('Лист 1', '1-парақ', 'Sheet 1')} / {sheetsNeeded || 1}</span>
         </div>
-        <div className="aspect-[2750/1830] bg-gray-50 rounded-xl border border-gray-100 relative overflow-hidden">
+        <div className="aspect-[2750/1830] bg-white/50 rounded-xl border border-white/60 relative overflow-hidden">
           {/* Render a simple grid of part rectangles — purely visual */}
           {parts.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center text-slate-300 text-xs">
@@ -2273,10 +2273,10 @@ function NestingView({ language, prodOrders, deals }: {
         <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
           <div className="text-sm text-slate-900 mb-3">{l('Статистика', 'Статистика', 'Stats')}</div>
           <div className="space-y-2.5 text-xs">
-            <div className="flex justify-between"><span className="text-slate-500">Использовано</span><span className="text-gray-900">{utilizationPct}%</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Использовано</span><span className="text-slate-900">{utilizationPct}%</span></div>
             <div className="flex justify-between"><span className="text-slate-500">Отходы</span><span className="text-amber-600">{wastePct}%</span></div>
-            <div className="flex justify-between"><span className="text-slate-500">Листов нужно</span><span className="text-gray-900">{sheetsNeeded}</span></div>
-            <div className="flex justify-between"><span className="text-slate-500">Площадь деталей</span><span className="text-gray-900">{totalPartArea.toFixed(2)} м²</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Листов нужно</span><span className="text-slate-900">{sheetsNeeded}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Площадь деталей</span><span className="text-slate-900">{totalPartArea.toFixed(2)} м²</span></div>
           </div>
           <div className="mt-3 pt-3 border-t border-white/60 text-[10px] text-slate-400 leading-relaxed">
             {l('Оценка по средней детали 600×400 мм + 12% на отходы. Реальная раскладка зависит от размеров деталей и софта станка.',
