@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, startDailySummaryScheduler, buildDailySummary } from './telegram.js';
+import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
@@ -2949,8 +2949,13 @@ app.use('/api/team/bot-settings', botSettingsRouter);
 // Реальное превью ежедневного отчёта директору (тот же текст, что бот шлёт
 // в 09:00) — для панели «Настроить бота». Только менеджер+.
 app.get('/api/telegram/daily-preview', authMiddleware, requireRole('manager'), (req: AuthedRequest, res) => {
-  try { res.json({ text: buildDailySummary(db, req.teamId!) }); }
-  catch { res.json({ text: '' }); }
+  const period = String(req.query.period || 'day');
+  try {
+    const text = period === 'week' ? buildPeriodSummary(db, req.teamId!, 'week')
+      : period === 'month' ? buildPeriodSummary(db, req.teamId!, 'month')
+      : buildDailySummary(db, req.teamId!);
+    res.json({ text });
+  } catch { res.json({ text: '' }); }
 });
 
 // ─── Team catalogs (Product templates / Materials / Hardware / Addons /

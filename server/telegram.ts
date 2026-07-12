@@ -516,6 +516,14 @@ function almatyToday(): string {
 function almatyHour(): number {
   return Number(new Date().toLocaleTimeString('en-GB', { timeZone: SUMMARY_TZ, hour12: false }).slice(0, 2));
 }
+// 1=Mon … 7=Sun (Almaty).
+function almatyDayOfWeek(): number {
+  const wd = new Date().toLocaleDateString('en-US', { timeZone: SUMMARY_TZ, weekday: 'short' });
+  return ({ Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 } as Record<string, number>)[wd] || 1;
+}
+function almatyDayOfMonth(): number {
+  return Number(almatyToday().slice(8, 10));
+}
 
 // Build the digest text for a team. Pure read — safe to call on demand
 // (the /сводка command) or from the scheduler.
@@ -587,6 +595,51 @@ export function buildDailySummary(db: Database.Database, teamId: string): string
   return lines.join('\n');
 }
 
+// Недельный / месячный отчёт директору. Недельный — выручка, лиды/продажи,
+// конверсия, рейтинг менеджеров по закрытым деньгам. Месячный — финансовая
+// сводка (выручка/расходы/прибыль/маржа).
+export function buildPeriodSummary(db: Database.Database, teamId: string, period: 'week' | 'month'): string {
+  const deals = loadDeals(db, teamId).map(d => d.data);
+  const txRows = (db.prepare('SELECT data FROM transactions WHERE team_id = ?').all(teamId) as any[])
+    .map(r => { try { return JSON.parse(r.data); } catch { return null; } }).filter(Boolean);
+  const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
+  const days = period === 'week' ? 7 : 30;
+  const since = Date.now() - days * 86400000;
+  const inRange = (iso?: string) => !!iso && new Date(iso).getTime() >= since;
+
+  const revenue = txRows.filter(t => t.type === 'income' && t.status === 'completed' && inRange(t.date)).reduce((s, t) => s + (t.amount || 0), 0);
+  const expenses = txRows.filter(t => t.type === 'expense' && t.status === 'completed' && inRange(t.date)).reduce((s, t) => s + (t.amount || 0), 0);
+  const newDeals = deals.filter(d => inRange(d.createdAt)).length;
+  const won = deals.filter(d => d.status === 'completed' && inRange(d.completedAt || d.date || d.createdAt));
+  const conv = newDeals ? Math.round(won.length / newDeals * 100) : 0;
+
+  const title = period === 'week' ? 'Недельный отчёт' : 'Месячный отчёт';
+  const lines: string[] = [`📈 <b>${title}</b> · за ${days} дн.`, ''];
+  lines.push(`• Выручка: <b>${fmt(revenue)}</b>`);
+  lines.push(`• Новых заявок: <b>${newDeals}</b> · закрыто: <b>${won.length}</b> · конверсия: <b>${conv}%</b>`);
+
+  if (period === 'week') {
+    // Рейтинг менеджеров по закрытым деньгам.
+    const empRows = db.prepare('SELECT id, data FROM employees WHERE team_id = ?').all(teamId) as any[];
+    const nameById = new Map<string, string>();
+    for (const r of empRows) { try { nameById.set(r.id, JSON.parse(r.data).name || r.id); } catch { /* skip */ } }
+    const byOwner = new Map<string, number>();
+    for (const d of won) { if (d.ownerId) byOwner.set(d.ownerId, (byOwner.get(d.ownerId) || 0) + (d.amount || 0)); }
+    const top = [...byOwner.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+    if (top.length) {
+      lines.push('', `🏅 <b>Рейтинг менеджеров</b>`);
+      top.forEach(([id, sum], i) => lines.push(`${i + 1}. ${nameById.get(id) || '—'} — <b>${fmt(sum)}</b>`));
+    }
+  } else {
+    const profit = revenue - expenses;
+    const margin = revenue > 0 ? Math.round(profit / revenue * 100) : 0;
+    lines.push(`• Расходы: <b>${fmt(expenses)}</b>`);
+    lines.push(`• Прибыль: <b>${fmt(profit)}</b> · маржа: <b>${margin}%</b>`);
+  }
+  lines.push('', `<i>Открыть платформу для деталей.</i>`);
+  return lines.join('\n');
+}
+
 // Recipients = paired admins / managers of the team.
 function summaryRecipients(db: Database.Database, teamId: string): number[] {
   const rows = db.prepare(`
@@ -602,15 +655,32 @@ function getSummaryState(db: Database.Database, teamId: string): { enabled: bool
   try { const s = JSON.parse(row.daily_summary); return { enabled: s.enabled !== false, lastSent: s.lastSent }; }
   catch { return { enabled: true }; }
 }
-// Тумблер «Ежедневный отчёт» из панели бота (bot_settings.reports.daily).
-// Если панель не сохранялась — считаем включённым.
-function reportsDailyEnabled(db: Database.Database, teamId: string): boolean {
+// Тумблеры отчётов из панели бота (bot_settings.reports.{daily,weekly,monthly}).
+// Если панель не сохранялась — daily включён по умолчанию, weekly/monthly — по
+// значению из панели (дефолт панели: weekly=on, monthly=off).
+function reportsEnabled(db: Database.Database, teamId: string, kind: 'daily' | 'weekly' | 'monthly'): boolean {
   try {
     const row = db.prepare('SELECT bot_settings FROM team_settings WHERE team_id = ?').get(teamId) as any;
-    if (!row?.bot_settings) return true;
+    if (!row?.bot_settings) return kind !== 'monthly'; // дефолт: daily+weekly on, monthly off
     const s = JSON.parse(row.bot_settings);
-    return s?.reports?.daily !== false;
-  } catch { return true; }
+    return !!s?.reports?.[kind];
+  } catch { return kind === 'daily'; }
+}
+
+// Отдельные отметки об отправке недельного/месячного отчёта, чтобы не слать
+// повторно. Храним в том же daily_summary-блобе.
+function getPeriodLastSent(db: Database.Database, teamId: string, key: 'weeklyLastSent' | 'monthlyLastSent'): string | undefined {
+  try { const row = db.prepare('SELECT daily_summary FROM team_settings WHERE team_id = ?').get(teamId) as any; return row?.daily_summary ? JSON.parse(row.daily_summary)[key] : undefined; }
+  catch { return undefined; }
+}
+function setPeriodLastSent(db: Database.Database, teamId: string, key: 'weeklyLastSent' | 'monthlyLastSent', val: string) {
+  let blob: any = {};
+  try { const row = db.prepare('SELECT daily_summary FROM team_settings WHERE team_id = ?').get(teamId) as any; blob = row?.daily_summary ? JSON.parse(row.daily_summary) : {}; } catch { /* {} */ }
+  blob[key] = val;
+  db.prepare(`
+    INSERT INTO team_settings (team_id, daily_summary, updated_at) VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET daily_summary = excluded.daily_summary, updated_at = excluded.updated_at
+  `).run(teamId, JSON.stringify(blob));
 }
 function setSummaryLastSent(db: Database.Database, teamId: string, date: string) {
   const cur = getSummaryState(db, teamId);
@@ -634,16 +704,37 @@ async function dailySummaryTick(db: Database.Database) {
   for (const t of teams) {
     const teamId = t.team_id;
     if (!teamId) continue;
+    const recipients = summaryRecipients(db, teamId);
+    if (recipients.length === 0) continue;
+
+    // Ежедневный отчёт (09:00, раз в день).
     const state = getSummaryState(db, teamId);
-    if (!state.enabled || state.lastSent === today) continue;
-    if (!reportsDailyEnabled(db, teamId)) continue;  // выключено в панели бота
-    try {
-      const text = buildDailySummary(db, teamId);
-      for (const chatId of summaryRecipients(db, teamId)) {
-        await sendMessage(chatId, text);
-      }
-      setSummaryLastSent(db, teamId, today);
-    } catch (e) { console.warn('[daily summary]', teamId, e); }
+    if (state.enabled && state.lastSent !== today && reportsEnabled(db, teamId, 'daily')) {
+      try {
+        const text = buildDailySummary(db, teamId);
+        for (const chatId of recipients) await sendMessage(chatId, text);
+        setSummaryLastSent(db, teamId, today);
+      } catch (e) { console.warn('[daily summary]', teamId, e); }
+    }
+
+    // Недельный отчёт — понедельник 09:00, раз в неделю.
+    if (almatyDayOfWeek() === 1 && getPeriodLastSent(db, teamId, 'weeklyLastSent') !== today && reportsEnabled(db, teamId, 'weekly')) {
+      try {
+        const text = buildPeriodSummary(db, teamId, 'week');
+        for (const chatId of recipients) await sendMessage(chatId, text);
+        setPeriodLastSent(db, teamId, 'weeklyLastSent', today);
+      } catch (e) { console.warn('[weekly summary]', teamId, e); }
+    }
+
+    // Месячный отчёт — 1-е число 09:00, раз в месяц.
+    const monthKey = today.slice(0, 7);
+    if (almatyDayOfMonth() === 1 && getPeriodLastSent(db, teamId, 'monthlyLastSent') !== monthKey && reportsEnabled(db, teamId, 'monthly')) {
+      try {
+        const text = buildPeriodSummary(db, teamId, 'month');
+        for (const chatId of recipients) await sendMessage(chatId, text);
+        setPeriodLastSent(db, teamId, 'monthlyLastSent', monthKey);
+      } catch (e) { console.warn('[monthly summary]', teamId, e); }
+    }
   }
 }
 
