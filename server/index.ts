@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
+import { fetchCreativeInsights } from './metaAds.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
 import { generate as aiImageGenerate, providerStatuses as aiImageProviders, type ProviderId } from './aiImage.js';
@@ -3108,6 +3109,31 @@ metaCapiRouter.get('/stats', requireRole('manager'), (req: AuthedRequest, res) =
 metaCapiRouter.get('/events', requireRole('manager'), (req: AuthedRequest, res) => {
   const rows = db.prepare('SELECT data, created_at FROM meta_events WHERE team_id = ? ORDER BY rowid DESC LIMIT 100').all(req.teamId!) as any[];
   res.json(rows.map(r => { try { return { ...JSON.parse(r.data), created_at: r.created_at }; } catch { return null; } }).filter(Boolean));
+});
+// ROI по креативам из Meta Marketing API (использует конфиг «Meta Ads»:
+// adAccountId + System User токен). Кэш 5 мин, чтобы не бить API на каждый вход.
+function readMetaAdsConfig(teamId: string): { adAccountId?: string; accessToken?: string } {
+  try {
+    const row = db.prepare('SELECT integrations FROM team_settings WHERE team_id = ?').get(teamId) as any;
+    if (!row?.integrations) return {};
+    const all = JSON.parse(row.integrations);
+    return all?.['meta-ads'] || {};
+  } catch { return {}; }
+}
+const creativesCache = new Map<string, { at: number; data: any }>();
+metaCapiRouter.get('/creatives', requireRole('manager'), async (req: AuthedRequest, res) => {
+  const range = String(req.query.range || 'last_30d');
+  const cfg = readMetaAdsConfig(req.teamId!);
+  if (!cfg.adAccountId || !cfg.accessToken) {
+    return res.json({ configured: false, creatives: [] });
+  }
+  const key = `${req.teamId}:${range}`;
+  const cached = creativesCache.get(key);
+  if (cached && Date.now() - cached.at < 5 * 60 * 1000) return res.json(cached.data);
+  const r = await fetchCreativeInsights({ adAccountId: cfg.adAccountId, accessToken: cfg.accessToken }, range);
+  const payload = { configured: true, ok: r.ok, error: r.error || null, creatives: r.creatives };
+  if (r.ok) creativesCache.set(key, { at: Date.now(), data: payload });
+  res.json(payload);
 });
 app.use('/api/meta-capi', metaCapiRouter);
 

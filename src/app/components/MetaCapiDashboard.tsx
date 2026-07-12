@@ -25,6 +25,8 @@ export function MetaCapiDashboard({ language }: Props) {
   const [cfg, setCfg] = useState<{ pixelId: string; testEventCode: string; connected: boolean } | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [events, setEvents] = useState<Ev[]>([]);
+  const [creatives, setCreatives] = useState<any[]>([]);
+  const [crMeta, setCrMeta] = useState<{ configured: boolean; ok?: boolean; error?: string | null }>({ configured: false });
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
 
@@ -51,12 +53,14 @@ export function MetaCapiDashboard({ language }: Props) {
       setPixelId(c.pixelId || '');
       setTestCode(c.testEventCode || '');
       if (c.connected) {
-        const [s, e] = await Promise.all([
+        const [s, e, cr] = await Promise.all([
           api.get<Stats>('/api/meta-capi/stats').catch(() => null),
           api.get<Ev[]>('/api/meta-capi/events').catch(() => []),
+          api.get<{ configured: boolean; ok?: boolean; error?: string | null; creatives: any[] }>('/api/meta-capi/creatives').catch(() => null),
         ]);
         if (s) setStats(s);
         setEvents(e || []);
+        if (cr) { setCreatives(cr.creatives || []); setCrMeta({ configured: cr.configured, ok: cr.ok, error: cr.error }); }
       }
     } catch { /* ignore */ }
     finally { setLoading(false); }
@@ -191,6 +195,55 @@ export function MetaCapiDashboard({ language }: Props) {
           <div className="text-2xl text-slate-900 tabular-nums">{stats?.paramCoverage ?? 0}<span className="text-sm text-slate-400"> / 10</span></div>
           <div className="text-[11px] text-slate-400 mt-1.5">{l('Телефон, имя, город, external_id передаются. Добавьте email/fbc для роста EMQ.', 'Телефон, аты, қала, external_id. Email/fbc қосыңыз.', 'Phone, name, city, external_id sent. Add email/fbc.')}</div>
         </div>
+      </div>
+
+      {/* ROI по креативам (Meta Marketing API) */}
+      <div className={`${GLASS} overflow-hidden`}>
+        <div className="px-5 py-3 border-b border-white/60 flex items-center justify-between">
+          <span className="text-sm text-slate-900">{l('Аналитика по креативам', 'Креативтер аналитикасы', 'Creative analytics')}</span>
+          <span className="text-[11px] text-slate-400">{l('за 30 дней', '30 күн', '30 days')}</span>
+        </div>
+        {!crMeta.configured ? (
+          <div className="px-5 py-6 text-center">
+            <div className="text-xs text-slate-500 mb-2">{l('Подключите рекламный аккаунт, чтобы видеть расход и ROI по каждому объявлению.', 'Әр жарнама бойынша шығын мен ROI көру үшін рекламалық аккаунтты қосыңыз.', 'Connect the ad account to see spend and ROI per ad.')}</div>
+            <button onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'settings', tab: 'integrations' } }))}
+              className="text-xs text-emerald-600 hover:text-emerald-700">{l('Настройки → Интеграции → Meta Ads →', 'Баптаулар → Интеграциялар → Meta Ads →', 'Settings → Integrations → Meta Ads →')}</button>
+          </div>
+        ) : crMeta.ok === false ? (
+          <div className="px-5 py-6 text-center text-xs text-rose-500">{l('Ошибка Meta', 'Meta қатесі', 'Meta error')}: {String(crMeta.error || '').slice(0, 100)}</div>
+        ) : creatives.length === 0 ? (
+          <div className="px-5 py-6 text-center text-xs text-slate-400">{l('Нет активных объявлений за период.', 'Кезеңде белсенді жарнама жоқ.', 'No active ads for the period.')}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[560px]">
+              <thead>
+                <tr className="text-[10px] text-slate-400 uppercase tracking-wide border-b border-white/60">
+                  <th className="text-left font-normal px-5 py-2.5">{l('Креатив', 'Креатив', 'Creative')}</th>
+                  <th className="text-right font-normal px-3 py-2.5">{l('Расход', 'Шығын', 'Spend')}</th>
+                  <th className="text-right font-normal px-3 py-2.5">{l('Заявки', 'Өтінім', 'Leads')}</th>
+                  <th className="text-right font-normal px-3 py-2.5">{l('Продажи', 'Сатылым', 'Sales')}</th>
+                  <th className="text-right font-normal px-3 py-2.5">ROI</th>
+                  <th className="text-right font-normal px-5 py-2.5"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/50">
+                {creatives.map((c, i) => {
+                  const vd = ({ profit: { l: l('Окупается', 'Өтеледі', 'Profit'), c: 'bg-emerald-50 text-emerald-700' }, even: { l: l('В ноль', 'Нөлде', 'Even'), c: 'bg-amber-50 text-amber-700' }, loss: { l: l('Убыточно', 'Шығынды', 'Loss'), c: 'bg-rose-50 text-rose-600' }, nodata: { l: '—', c: 'bg-slate-50 text-slate-400' } } as any)[c.verdict];
+                  return (
+                    <tr key={i} className="hover:bg-white/40">
+                      <td className="px-5 py-3 text-slate-800 max-w-[220px] truncate" title={c.adName}>{c.adName}</td>
+                      <td className="px-3 py-3 text-right text-slate-600 tabular-nums">{fmt(c.spend)} ₸</td>
+                      <td className="px-3 py-3 text-right text-slate-600 tabular-nums">{c.leads}</td>
+                      <td className="px-3 py-3 text-right text-slate-900 tabular-nums">{c.purchases}{c.revenue ? <span className="text-slate-400"> · {fmt(c.revenue)} ₸</span> : ''}</td>
+                      <td className="px-3 py-3 text-right tabular-nums font-medium text-slate-900">{c.roas != null ? `${c.roas.toFixed(1)}×` : '—'}</td>
+                      <td className="px-5 py-3 text-right"><span className={`text-[10px] px-2 py-0.5 rounded-lg ${vd.c}`}>{vd.l}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Последние события */}
