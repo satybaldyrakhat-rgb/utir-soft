@@ -214,11 +214,19 @@ export async function runAgent(ctx: AgentTurnContext): Promise<AgentResult> {
     messages.push({ role: 'user', content: ctx.userText });
   }
 
+  // Промпт-кэш: system + tools стабильны в течение дня, поэтому помечаем их
+  // cache_control. Anthropic переиспользует префикс между запросами — ответ
+  // приходит заметно быстрее и дешевле (кэш живёт ~5 мин, продлевается при
+  // каждом обращении). Дата в system меняется раз в сутки — тогда кэш просто
+  // перестраивается.
+  const toolList = tools.toolsForClaude() as any[];
+  const cachedTools = toolList.map((t, i) =>
+    i === toolList.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t);
   const resp = await c.messages.create({
     model: MODEL,
     max_tokens: 1024,
-    system: buildSystemPrompt(),
-    tools: tools.toolsForClaude() as any,
+    system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }] as any,
+    tools: cachedTools as any,
     messages: messages as any,
   });
 

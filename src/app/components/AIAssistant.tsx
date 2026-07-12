@@ -261,7 +261,9 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
       const history = [...messages, userMsg]
         .filter(m => !m.pendingTool && m.id !== 'greet')
         .map(m => ({ role: m.role, content: m.content }));
-      const resp = await api.post<any>('/api/ai-chat/message', { provider: providerId, messages: history });
+      // retries: 2 → если связь оборвалась (частая проблема на мобильном/через
+      // прокси), сами тихо переотправляем, не показывая ошибку пользователю.
+      const resp = await api.post<any>('/api/ai-chat/message', { provider: providerId, messages: history }, { retries: 2, timeoutMs: 90_000 });
       if (resp?.kind === 'tool') {
         const proposalMsg: AIMessage = {
           id: newId(),
@@ -279,7 +281,14 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
         setError(l('Не удалось получить ответ', 'Жауап алу мүмкін болмады', 'No response received'));
       }
     } catch (e: any) {
-      setError(String(e?.message || e));
+      // NetworkError = связь не дошла даже после повторов. Понятное сообщение
+      // вместо технического «Load failed».
+      const isNet = e?.name === 'NetworkError' || e instanceof TypeError || /load failed|network|failed to fetch/i.test(String(e?.message || ''));
+      setError(isNet
+        ? l('Связь прервалась — проверьте интернет и отправьте ещё раз.',
+             'Байланыс үзілді — интернетті тексеріп, қайта жіберіңіз.',
+             'Connection dropped — check your internet and send again.')
+        : String(e?.message || e));
     } finally {
       setIsTyping(false);
     }
@@ -289,18 +298,24 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
     if (!msg.pendingTool) return;
     setExecutingToolId(msg.id);
     try {
+      // Без retry: повторная отправка write-действия могла бы создать дубль.
       const resp = await api.post<{ ok: boolean; text: string }>('/api/ai-chat/execute', {
         provider: providerId,
         toolName: msg.pendingTool.toolName,
         toolInput: msg.pendingTool.toolInput,
-      });
+      }, { timeoutMs: 90_000 });
       // Replace the proposal with the executed result (drops the buttons).
       setMessages(prev => prev.map(m => m.id === msg.id
         ? { ...m, content: (resp.ok ? '✅ ' : '⚠️ ') + (resp.text || ''), pendingTool: undefined, timestamp: now() }
         : m,
       ));
     } catch (e: any) {
-      setError(String(e?.message || e));
+      const isNet = e?.name === 'NetworkError' || e instanceof TypeError || /load failed|network|failed to fetch/i.test(String(e?.message || ''));
+      setError(isNet
+        ? l('Связь прервалась. Проверьте, не создалось ли действие, прежде чем повторить.',
+             'Байланыс үзілді. Қайталамас бұрын әрекет орындалмағанын тексеріңіз.',
+             'Connection dropped. Check whether the action went through before retrying.')
+        : String(e?.message || e));
     } finally {
       setExecutingToolId(null);
     }
