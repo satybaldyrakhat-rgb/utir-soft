@@ -252,10 +252,15 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   }, [deal.id]);
   const [paymentMethods, setPaymentMethods] = useState<Record<string, boolean>>(initialPM);
 
-  // ─── Re-sync state when the underlying deal changes ───────────────
-  // Previously the initialState only ran once per mount, so a server-side
-  // update (TG status change, autoRefresh poll, another user's edit) wouldn't
-  // reflect here. Now every prop change rebuilds the form to match.
+  // ─── Re-init the form ONLY when a different deal opens ────────────
+  // Bug fix: previously this effect depended on the whole `deal` object
+  // (and every field), so ANY background update to the same deal — a
+  // server poll, a Telegram status change, a parent re-render that hands
+  // us a fresh `deal` object reference — re-ran it and OVERWROTE whatever
+  // the user was typing (dates "flew away" mid-entry, edits weren't kept).
+  // Now it keys only on the deal identity + open state: opening another
+  // deal (or re-opening the modal) rebuilds the form, but background
+  // refreshes of the SAME open deal never clobber in-progress edits.
   useEffect(() => {
     setPhone(deal.phone || '');
     setAddress(deal.address || '');
@@ -284,10 +289,8 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     setCustomerBIN(deal.customerBIN || '');
     setDocuments((deal as any).documents || []);
     setDirty(false);
-  }, [deal.id, deal.phone, deal.address, deal.siteAddress, deal.source, deal.measurer,
-      deal.designer, deal.foreman, deal.architect, deal.ownerId, deal.furnitureType,
-      deal.materials, deal.measurementDate, deal.completionDate, deal.installationDate,
-      deal.notes, deal.paidAmount, deal.status, deal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deal.id, isOpen]);
 
   if (!isOpen) return null;
 
@@ -595,7 +598,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
   const tabs = [
     { id: 'main'     as const, label: l('Информация', 'Ақпарат',  'Info') },
-    { id: 'progress' as const, label: l('Прогресс',   'Прогресс', 'Progress') },
+    { id: 'progress' as const, label: l('Сроки · Оплата', 'Мерзім · Төлем', 'Dates · Pay') },
     { id: 'related'  as const, label: l('Связи',      'Байланыс', 'Related') },
     { id: 'chat'     as const, label: l('Чат',        'Чат',      'Chat') },
     { id: 'history'  as const, label: l('История',    'Тарих',    'History') },
@@ -672,7 +675,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
         </div>
 
         {/* Tabs — glass capsules */}
-        <div className="px-6 pt-4 pb-3 flex gap-1.5 flex-shrink-0 overflow-x-auto">
+        <div className="px-6 pt-4 pb-3 flex gap-1.5 flex-shrink-0 overflow-x-auto no-scrollbar fade-x">
           {tabs.map(tab => (
             <button
               key={tab.id}

@@ -205,7 +205,7 @@ export function NewDealModal({ language, onClose, seed, defaultStatus }: Props) 
         </div>
 
         {/* Tab bar — glass capsules instead of underline tabs */}
-        <div className="px-6 pt-4 pb-3 flex gap-1.5 overflow-x-auto flex-shrink-0">
+        <div className="px-6 pt-4 pb-3 flex gap-1.5 overflow-x-auto no-scrollbar fade-x flex-shrink-0">
           {TABS.map((t, i) => {
             const Icon = t.icon;
             const active = tab === i;
