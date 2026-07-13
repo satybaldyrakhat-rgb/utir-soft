@@ -257,7 +257,8 @@ export function Analytics({ language }: AnalyticsProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [store.transactions, periodRange]);
   const avgCheck = useMemo(() => {
-    const withAmount = scopedDeals.filter(d => d.amount > 0);
+    // Только реальные сделки — отказы исключаем (не продажа).
+    const withAmount = scopedDeals.filter(d => d.amount > 0 && d.status !== 'rejected');
     return withAmount.length ? Math.round(withAmount.reduce((s, d) => s + d.amount, 0) / withAmount.length) : 0;
   }, [scopedDeals]);
   const conversion = scopedDeals.length
@@ -284,7 +285,7 @@ export function Analytics({ language }: AnalyticsProps) {
       .reduce((acc, tx) => acc + tx.amount, 0);
     const dealsIn = (s: number, e: number) => store.deals.filter(d => inRange(d.date || d.createdAt, s, e));
     const avgOf = (ds: typeof store.deals) => {
-      const w = ds.filter(d => (d.amount || 0) > 0);
+      const w = ds.filter(d => (d.amount || 0) > 0 && d.status !== 'rejected');
       return w.length ? w.reduce((a, d) => a + d.amount, 0) / w.length : 0;
     };
     const convOf = (ds: typeof store.deals) => ds.length

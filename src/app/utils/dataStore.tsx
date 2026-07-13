@@ -1177,7 +1177,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         api.get<CustomRecord[]>('/api/custom-records').catch(() => null),
       ]);
       setDeals(d); setEmployees(e); setTasks(t); setProducts(p);
-      setTransactions(tx); setIntegrations(ig); setActivityLogs(al);
+      // Нормализуем статус транзакций: запись без status (импорт CSV / внешний
+      // API) считаем завершённой, иначе она была бы невидима в выручке/кассе.
+      setTransactions(tx.map(t => (t.status ? t : { ...t, status: 'completed' as const })));
+      setIntegrations(ig); setActivityLogs(al);
       // Apply team profile (niche + onboarding) — default to furniture
       // when missing so legacy teams keep working unchanged.
       if (prof) {
@@ -1470,7 +1473,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const getTotalRevenue = useCallback(() => transactions.filter(t => t.type === 'income' && t.status === 'completed').reduce((s, t) => s + t.amount, 0), [transactions]);
   const getTotalExpenses = useCallback(() => transactions.filter(t => t.type === 'expense' && t.status === 'completed').reduce((s, t) => s + t.amount, 0), [transactions]);
   const getAverageCheck = useCallback(() => {
-    const paid = deals.filter(d => d.amount > 0);
+    // Средний чек считаем только по реальным (не отменённым) заказам —
+    // отказная сделка не является продажей и не должна занижать чек.
+    const paid = deals.filter(d => d.amount > 0 && d.status !== 'rejected');
     return paid.length ? Math.round(paid.reduce((s, d) => s + d.amount, 0) / paid.length) : 0;
   }, [deals]);
   // Distinct clients, not deals — a repeat customer with 3 deals is 1 client.
