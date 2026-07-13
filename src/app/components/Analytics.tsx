@@ -344,7 +344,7 @@ export function Analytics({ language }: AnalyticsProps) {
     <div
       className="min-h-full relative"
     >
-    <div className="px-4 py-5 sm:p-6 lg:p-8 max-w-[1400px] mx-auto relative">
+    <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-[1400px] mx-auto relative">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
         <div>

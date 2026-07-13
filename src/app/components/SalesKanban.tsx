@@ -464,7 +464,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
     <>
       <div className="flex flex-col h-screen relative overflow-hidden">
         {/* ─── Header ─────────────────────────────────────────── */}
-        <div className="px-4 sm:px-6 lg:px-8 py-5 flex-shrink-0 relative">
+        <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-6 flex-shrink-0 relative w-full max-w-[1400px] mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5">
             <div>
               <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">
@@ -880,7 +880,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
           </div>
         ) : (
           // ─── Desktop: 6-column kanban ─────────────────────────
-          <div className="flex-1 overflow-hidden px-4 md:px-6 relative">
+          <div className="flex-1 overflow-hidden px-4 sm:px-6 lg:px-8 relative w-full max-w-[1400px] mx-auto">
             <div className="flex gap-3 overflow-x-auto h-full py-3 pb-6">
               {STAGES.map(stage => {
                 const stageDeals = dealsByStage[stage.id] || [];

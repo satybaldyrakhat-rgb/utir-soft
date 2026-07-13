@@ -27,9 +27,12 @@ function buildCategories(niche: NicheConfig): string[] {
   // De-dupe while preserving order: niche stages first, then generic.
   return Array.from(new Set([...fromNiche, ...GENERIC_CATEGORIES]));
 }
-function categoryColor(cat: string, allCats: string[]): string {
-  const idx = allCats.indexOf(cat);
-  return CATEGORY_PALETTE[(idx >= 0 ? idx : cat.length) % CATEGORY_PALETTE.length];
+function categoryColor(cat: string | undefined | null, allCats: string[]): string {
+  // Null-safe: tasks created via API / import may have no category. Falling
+  // through to cat.length on undefined used to crash the whole board.
+  const c = cat || '';
+  const idx = allCats.indexOf(c);
+  return CATEGORY_PALETTE[(idx >= 0 ? idx : c.length) % CATEGORY_PALETTE.length];
 }
 
 // ─── TYPES ───────────────────────────────────────────────────
@@ -221,7 +224,7 @@ export function Tasks({ language }: TasksProps) {
     <div
       className="min-h-full relative"
     >
-    <div className="px-4 py-5 sm:p-6 lg:p-8 relative max-w-[1400px] mx-auto">
+    <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-6 relative max-w-[1400px] mx-auto">
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
         <div>
@@ -523,7 +526,7 @@ export function Tasks({ language }: TasksProps) {
                       <div className="text-xs text-slate-400 truncate max-w-[250px]">{task.description}</div>
                     </td>
                     <td className="px-3 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColor(task.category, taskCategories)}`}>{task.category}</span>
+                      {task.category && <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColor(task.category, taskCategories)}`}>{task.category}</span>}
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
@@ -618,7 +621,7 @@ export function Tasks({ language }: TasksProps) {
                             <div>
                               <div className="text-sm text-slate-900">{task.title}</div>
                               <div className="flex items-center gap-2 mt-0.5">
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColor(task.category, taskCategories)}`}>{task.category}</span>
+                                {task.category && <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColor(task.category, taskCategories)}`}>{task.category}</span>}
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded ${priorityConfig[task.priority].bg} ${priorityConfig[task.priority].color}`}>{pickLang(priorityConfig[task.priority].label, language)}</span>
                               </div>
                             </div>
@@ -749,7 +752,7 @@ function TaskCard({ task, categories, language, onClick, onMove }: { task: Task;
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColor(task.category, categories)}`}>{task.category}</span>
+          {task.category && <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColor(task.category, categories)}`}>{task.category}</span>}
           {task.priority === 'urgent' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600">{l('Срочно', 'Шұғыл', 'Urgent')}</span>}
           {task.priority === 'high' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">{l('Высокий', 'Жоғары', 'High')}</span>}
         </div>

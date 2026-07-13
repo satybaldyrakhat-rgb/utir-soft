@@ -380,7 +380,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
   if (!store.loaded) {
     return (
       <div className="min-h-full relative">
-        <div className="relative px-4 py-5 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
+        <div className="relative px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-[1400px] mx-auto">
           <div className="mb-8 space-y-3">
             <div className="h-3 w-32 bg-white/60 rounded-full animate-pulse" />
             <div className="h-9 w-64 bg-white/60 rounded-2xl animate-pulse" />
@@ -461,11 +461,11 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
 
     return (
       <div className="min-h-full relative">
-        <div className="relative px-4 py-5 sm:p-6 lg:p-8 max-w-[1100px] mx-auto">
+        <div className="relative px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-[1100px] mx-auto">
           {/* Greeting */}
           <div className="mb-8">
             <p className="text-[11px] text-slate-400 mb-2 capitalize tracking-widest uppercase">{today}</p>
-            <h1 className="text-slate-900 mb-1 text-[26px] sm:text-3xl md:text-4xl font-medium tracking-tight">
+            <h1 className="text-slate-900 mb-1 text-2xl md:text-3xl font-medium tracking-tight">
               {getGreeting()}{firstName ? `, ${firstName}` : ''} 👋
             </h1>
             <p className="text-sm text-slate-500 max-w-2xl">
@@ -608,7 +608,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
 
   return (
     <div className="min-h-full relative">
-      <div className="relative px-4 py-5 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
+      <div className="relative px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-[1400px] mx-auto">
 
         {/* ─── Greeting ────────────────────────────────────────── */}
         <div className="mb-8">
@@ -619,7 +619,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
                 {' · '}
                 <span className="inline-flex items-center gap-1 normal-case tracking-normal text-slate-500"><NicheIcon niche={niche} className="w-3 h-3" /> {nicheName}</span>
               </p>
-              <h1 className="text-slate-900 mb-1 text-[26px] sm:text-3xl md:text-4xl font-medium tracking-tight">
+              <h1 className="text-slate-900 mb-1 text-2xl md:text-3xl font-medium tracking-tight">
                 {getGreeting()}{firstName ? `, ${firstName}` : ''}
               </h1>
               <p className="text-sm text-slate-500">

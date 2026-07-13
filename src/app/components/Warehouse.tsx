@@ -731,7 +731,7 @@ export function Warehouse({ language }: WarehouseProps) {
     <div
       className="min-h-full relative"
     >
-    <div className="px-4 py-5 sm:p-6 lg:p-8 max-w-[1400px] mx-auto relative">
+    <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-[1400px] mx-auto relative">
       {/* Header */}
       <div className="mb-6">
         {/* Row 1 — title + primary CTA */}

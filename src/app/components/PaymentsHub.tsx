@@ -30,7 +30,7 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
     <div
       className="flex-1 overflow-y-auto relative"
     >
-      <div className="px-4 sm:px-6 lg:px-8 pt-6 max-w-[1400px] mx-auto relative">
+      <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-[1400px] mx-auto relative">
         <div className="flex items-end justify-between flex-wrap gap-3 mb-5">
           <div>
             <p className="text-[11px] text-slate-400 mb-1 tracking-widest uppercase">{l('Оплаты', 'Төлемдер', 'Payments')}</p>
@@ -60,7 +60,7 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
       </div>
 
       {section === 'deals' && (
-        <div className="px-4 sm:px-6 lg:px-8 pb-8 max-w-[1400px] space-y-5">
+        <div className="px-4 sm:px-6 lg:px-8 pb-8 max-w-[1400px] mx-auto space-y-5">
           <AIFinancePanel language={language} variant="deals" deals={store.deals} transactions={store.transactions} />
           <DealPayments deals={store.deals} language={language} />
         </div>
@@ -68,7 +68,7 @@ export function PaymentsHub({ language }: PaymentsHubProps) {
 
       {section === 'finance' && (
         <>
-          <div className="px-4 sm:px-6 lg:px-8 max-w-[1400px]">
+          <div className="px-4 sm:px-6 lg:px-8 max-w-[1400px] mx-auto">
             <AIFinancePanel language={language} variant="finance" deals={store.deals} transactions={store.transactions} />
           </div>
           <div className="-mt-2">
