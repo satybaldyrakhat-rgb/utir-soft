@@ -207,7 +207,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
     'settings-integrations': l('Интеграции',          'Интеграциялар',     'Integrations'),
     'settings-ai':           l('AI-настройки',        'AI баптаулары',     'AI settings'),
   })[m];
-  const statusDot = (s: string) => s === 'active' ? 'bg-green-500' : s === 'vacation' ? 'bg-blue-500' : 'bg-gray-300';
+  const statusDot = (s: string) => s === 'active' ? 'bg-emerald-500' : s === 'vacation' ? 'bg-sky-500' : 'bg-gray-300';
 
   const filteredEmployees = employees.filter(e => {
     const s = e.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -323,7 +323,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
   };
 
   const Toggle = ({ value, onChange }: { value: boolean; onChange: () => void }) => (
-    <button onClick={onChange} className={`relative w-10 h-5 rounded-full transition-colors ${value ? 'bg-gray-900' : 'bg-gray-200'}`}>
+    <button onClick={onChange} className={`relative w-10 h-5 rounded-full transition-colors ${value ? 'bg-emerald-600' : 'bg-gray-200'}`}>
       <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-5' : ''}`} />
     </button>
   );
@@ -420,7 +420,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
       </div>
 
       {/* Tabs — glass capsules */}
-      <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1">
+      <div className="flex gap-1.5 mb-6 overflow-x-auto no-scrollbar fade-x pb-1">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -485,9 +485,9 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
                 <div className="flex-1 flex gap-2">
                   <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
-                    <input type="text" placeholder={l('Поиск...', 'Іздеу...', 'Search...')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                    <input type="text" placeholder={l('Поиск...', 'Іздеу...', 'Search...')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
                   </div>
-                  <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="px-3 py-2 bg-gray-50 border-0 rounded-xl text-xs focus:outline-none text-gray-600">
+                  <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="px-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40 text-gray-600">
                     <option value="all">{tt('all')}</option>
                     <option value="admin">{tt('roleAdmin')}</option>
                     <option value="manager">{tt('roleManager')}</option>
@@ -707,12 +707,12 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
                               disabled={isAdminFull}
                               title={isAdminFull ? tt('roleAdmin') : ''}
                               className={`inline-flex items-center justify-center w-7 h-7 rounded-full transition ${
-                                current === 'full' ? 'bg-green-50 hover:bg-green-100' :
+                                current === 'full' ? 'bg-emerald-50 hover:bg-emerald-100' :
                                 current === 'view' ? 'bg-gray-50 hover:bg-gray-100' :
                                                      'bg-red-50 hover:bg-red-100'
                               } ${isAdminFull ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                             >
-                              {current === 'full' && <Check className="w-3.5 h-3.5 text-green-600" />}
+                              {current === 'full' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
                               {current === 'view' && <Eye className="w-3.5 h-3.5 text-gray-400" />}
                               {current === 'none' && <X className="w-3.5 h-3.5 text-red-400" />}
                             </button>
@@ -726,7 +726,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
               </table>
             </div>
             <div className="mt-4 flex items-center gap-4 text-[11px] text-gray-400 flex-wrap">
-              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-50"><Check className="w-3 h-3 text-green-600" /></span>{tt('permLevelFull')}</span>
+              <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-50"><Check className="w-3 h-3 text-emerald-600" /></span>{tt('permLevelFull')}</span>
               <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-50"><Eye className="w-3 h-3 text-gray-400" /></span>{tt('permLevelView')}</span>
               <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-50"><X className="w-3 h-3 text-red-400" /></span>{tt('permLevelNone')}</span>
             </div>
@@ -974,7 +974,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                     {ALL_MODULES.map(m => {
                       const lvl = empRole === 'admin' ? 'full' : (store.rolePermissions[empRole]?.[m] || 'none');
-                      const icon = lvl === 'full' ? <Check className="w-3 h-3 text-green-600" />
+                      const icon = lvl === 'full' ? <Check className="w-3 h-3 text-emerald-600" />
                                  : lvl === 'view' ? <Eye   className="w-3 h-3 text-gray-400" />
                                  :                  <X     className="w-3 h-3 text-red-400" />;
                       return (
@@ -1712,7 +1712,7 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
       {/* ─── BODY: nav + editor ─────────────────────────────────── */}
       <div className="grid md:grid-cols-[200px_1fr]">
         {/* Section nav */}
-        <nav className="bg-gray-50 md:border-r border-gray-100 p-2 md:py-3 md:px-2 flex md:flex-col gap-1 overflow-x-auto md:overflow-visible">
+        <nav className="bg-gray-50 md:border-r border-gray-100 p-2 md:py-3 md:px-2 flex md:flex-col gap-1 overflow-x-auto no-scrollbar fade-x md:overflow-visible md:[-webkit-mask-image:none] md:[mask-image:none]">
           {SECTIONS.map(s => {
             const Icon = s.icon;
             const active = section === s.id;
@@ -2077,7 +2077,7 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
               </div>
 
               {/* WhatsApp */}
-              <div className={`flex items-center gap-3 p-4 rounded-2xl border transition ${cfg.channels.whatsapp ? 'border-green-400 bg-green-50/40' : 'border-gray-100'}`}>
+              <div className={`flex items-center gap-3 p-4 rounded-2xl border transition ${cfg.channels.whatsapp ? 'border-emerald-400 bg-emerald-50/40' : 'border-gray-100'}`}>
                 <WhatsAppLogo className="w-10 h-10 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -2088,7 +2088,7 @@ export function ClientAIBackendCard({ language }: { language: 'kz' | 'ru' | 'eng
                 </div>
                 <button
                   onClick={() => upd({ channels: { ...cfg.channels, whatsapp: !cfg.channels.whatsapp } })}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${cfg.channels.whatsapp ? 'bg-green-500' : 'bg-gray-200'}`}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${cfg.channels.whatsapp ? 'bg-emerald-600' : 'bg-gray-200'}`}
                 >
                   <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.channels.whatsapp ? 'translate-x-5' : ''}`} />
                 </button>

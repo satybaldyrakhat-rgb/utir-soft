@@ -559,7 +559,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
                     msg.role === 'user'
                       ? 'bg-emerald-600 text-white rounded-2xl rounded-tr-md shadow-[0_4px_12px_-2px_var(--accent-shadow-sm)] ring-1 ring-white/10'
                       : msg.pendingTool
-                      ? 'bg-violet-100/60 text-slate-800 rounded-2xl rounded-tl-md ring-1 ring-emerald-200/60 backdrop-blur-xl'
+                      ? 'bg-violet-100/60 text-slate-800 rounded-2xl rounded-tl-md ring-1 ring-violet-200/70 backdrop-blur-xl'
                       : 'bg-white/60 text-slate-800 rounded-2xl rounded-tl-md ring-1 ring-white/60 backdrop-blur-xl'
                   }`}>
                     {/* Server summarize() returns simple HTML (<b>); render as-is for tool proposals. */}

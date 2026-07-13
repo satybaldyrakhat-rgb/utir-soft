@@ -816,7 +816,7 @@ export function SalesKanban({ language }: SalesKanbanProps) {
           // ─── Mobile: single column + stage tabs ──────────────────
           <div className="flex-1 overflow-hidden flex flex-col px-4 pb-4">
             {/* Stage pill tabs */}
-            <div className="flex gap-1.5 overflow-x-auto pb-3 flex-shrink-0">
+            <div className="flex gap-1.5 overflow-x-auto no-scrollbar fade-x pb-3 flex-shrink-0">
               {STAGES.map(s => {
                 const count = dealsByStage[s.id]?.length || 0;
                 const active = mobileStage === s.id;

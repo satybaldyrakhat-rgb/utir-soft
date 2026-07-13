@@ -39,7 +39,7 @@ const statusConfig: Record<string, { ru: string; kz: string; eng: string; color:
   'project-agreed':  { ru: 'Проект',    kz: 'Жоба',      eng: 'Project',     color: 'text-violet-700  bg-violet-100/70',  icon: Palette },
   contract:          { ru: 'Договор',   kz: 'Шарт',      eng: 'Contract',    color: 'text-sky-700     bg-sky-100/70',     icon: DollarSign },
   production:        { ru: 'Произв.',   kz: 'Өндіріс',   eng: 'Production',  color: 'text-amber-700   bg-amber-100/70',   icon: Package },
-  assembly:          { ru: 'Сборка',    kz: 'Жинау',     eng: 'Assembly',    color: 'text-yellow-700  bg-yellow-100/70',  icon: Package },
+  assembly:          { ru: 'Сборка',    kz: 'Жинау',     eng: 'Assembly',    color: 'text-orange-700  bg-orange-100/70',  icon: Package },
   installation:      { ru: 'Установка', kz: 'Орнату',    eng: 'Installation',color: 'text-amber-700   bg-amber-100/70',   icon: Package },
   completed:         { ru: 'Готов',     kz: 'Дайын',     eng: 'Done',        color: 'text-emerald-700 bg-emerald-100/70', icon: CheckCircle2 },
   rejected:          { ru: 'Отказ',     kz: 'Бас тарту', eng: 'Rejected',    color: 'text-rose-700    bg-rose-100/70',    icon: X },

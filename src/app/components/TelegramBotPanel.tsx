@@ -85,8 +85,8 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-white/60">
+      <div onClick={e => e.stopPropagation()} className="bg-white/90 backdrop-blur-2xl backdrop-saturate-150 rounded-t-3xl sm:rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col ring-1 ring-white/70">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200/70">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 bg-sky-50 rounded-xl flex items-center justify-center"><Bot className="w-4 h-4 text-sky-600" /></div>
             <div>
@@ -107,12 +107,12 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
           </div>
         </div>
 
-        <div className="flex gap-1 px-4 pt-3 border-b border-white/60 overflow-x-auto">
+        <div className="flex gap-1 px-4 pt-3 border-b border-slate-200/70 overflow-x-auto no-scrollbar fade-x">
           {tabs.map(t => {
             const I = t.icon;
             return (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-xs whitespace-nowrap ${tab === t.id ? 'bg-gray-900 text-white' : 'text-slate-500 hover:text-gray-900'}`}>
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-xs whitespace-nowrap ${tab === t.id ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-gray-900'}`}>
                 <I className="w-3 h-3" /> {t.label}
               </button>
             );
@@ -146,9 +146,9 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
                 <div key={t.id} className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-3.5">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <textarea value={t.text} onChange={e => setTemplates(ts => ts.map(x => x.id === t.id ? { ...x, text: e.target.value } : x))}
-                      rows={2} className="flex-1 text-xs bg-gray-50 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-gray-200 resize-none" />
+                      rows={2} className="flex-1 text-xs bg-white/60 ring-1 ring-white/60 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 resize-none" />
                     <button onClick={() => setTemplates(ts => ts.map(x => x.id === t.id ? { ...x, enabled: !x.enabled } : x))}
-                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${t.enabled ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${t.enabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-gray-200 hover:bg-gray-300'}`}>
                       <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${t.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
                     </button>
                   </div>
@@ -168,7 +168,7 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
               <div>
                 <label className="text-[11px] text-slate-400">{l('Группа в Telegram', 'Telegram тобы', 'Telegram group')}</label>
                 <input value={bossGroup} onChange={e => setBossGroup(e.target.value)}
-                  className="w-full mt-1 px-3 py-2 bg-gray-50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-gray-200" />
+                  className="w-full mt-1 px-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
               </div>
               <div className="space-y-2">
                 {[
@@ -195,7 +195,7 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
                     };
                     return (
                       <button key={a} onClick={() => setActiveAlerts(s => on ? s.filter(x => x !== a) : [...s, a])}
-                        className={`px-3 py-2 rounded-xl text-xs text-left ${on ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600'}`}>{alertLabel[a] ?? a}</button>
+                        className={`px-3 py-2 rounded-xl text-xs text-left ${on ? 'bg-emerald-600 text-white' : 'bg-white/60 ring-1 ring-white/60 text-gray-600'}`}>{alertLabel[a] ?? a}</button>
                     );
                   })}
                 </div>

@@ -75,10 +75,10 @@ const pickLang = (t: { ru: string; kz: string; eng: string }, language: Lang) =>
   language === 'kz' ? t.kz : language === 'eng' ? t.eng : t.ru;
 
 const columns = [
-  { id: 'new' as const, title: { ru: 'Новые', kz: 'Жаңа', eng: 'New' }, icon: Circle, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-200' },
-  { id: 'in_progress' as const, title: { ru: 'В работе', kz: 'Жұмыста', eng: 'In progress' }, icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200' },
-  { id: 'review' as const, title: { ru: 'На проверке', kz: 'Тексеруде', eng: 'In review' }, icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', border: 'border-purple-200' },
-  { id: 'done' as const, title: { ru: 'Выполнено', kz: 'Орындалды', eng: 'Done' }, icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50', border: 'border-green-200' },
+  { id: 'new' as const, title: { ru: 'Новые', kz: 'Жаңа', eng: 'New' }, icon: Circle, color: 'text-sky-500', bg: 'bg-sky-50', border: 'border-sky-200' },
+  { id: 'in_progress' as const, title: { ru: 'В работе', kz: 'Жұмыста', eng: 'In progress' }, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-200' },
+  { id: 'review' as const, title: { ru: 'На проверке', kz: 'Тексеруде', eng: 'In review' }, icon: Eye, color: 'text-violet-500', bg: 'bg-violet-50', border: 'border-violet-200' },
+  { id: 'done' as const, title: { ru: 'Выполнено', kz: 'Орындалды', eng: 'Done' }, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-200' },
 ];
 
 const priorityConfig: Record<string, { label: { ru: string; kz: string; eng: string }; color: string; bg: string }> = {
@@ -316,8 +316,8 @@ export function Tasks({ language }: TasksProps) {
             <section>
               <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-3">{l('Подключённые сотрудники', 'Қосылған қызметкерлер', 'Connected employees')}</div>
               <div className="bg-white/40 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl p-6 text-center">
-                <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-white border border-white/60 flex items-center justify-center">
-                  <Send className="w-4 h-4 text-slate-300" />
+                <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-white/70 ring-1 ring-slate-200/60 flex items-center justify-center">
+                  <Send className="w-4 h-4 text-slate-400" />
                 </div>
                 <div className="text-xs text-slate-700 mb-1">{l('Пока никто не подключён', 'Әзірге ешкім қосылмаған', 'No one is connected yet')}</div>
                 <div className="text-[11px] text-slate-400 leading-relaxed max-w-[260px] mx-auto">
@@ -536,9 +536,9 @@ export function Tasks({ language }: TasksProps) {
                     </td>
                     <td className="px-3 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        task.status === 'done' ? 'bg-green-50 text-green-700' :
+                        task.status === 'done' ? 'bg-emerald-50 text-emerald-700' :
                         task.status === 'review' ? 'bg-purple-50 text-purple-700' :
-                        task.status === 'in_progress' ? 'bg-yellow-50 text-yellow-700' :
+                        task.status === 'in_progress' ? 'bg-amber-50 text-amber-700' :
                         'bg-blue-50 text-blue-700'
                       }`}>
                         {(() => { const c = columns.find(c => c.id === task.status); return c ? pickLang(c.title, language) : ''; })()}
@@ -596,7 +596,7 @@ export function Tasks({ language }: TasksProps) {
                       <div className="text-xs text-slate-400">{l('задач', 'тапсырма', 'tasks')}</div>
                     </div>
                     <div className="w-20 h-2 bg-white/60 rounded-full overflow-hidden">
-                      <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: empTasks.length > 0 ? `${(empDone / empTasks.length) * 100}%` : '0%' }} />
+                      <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: empTasks.length > 0 ? `${(empDone / empTasks.length) * 100}%` : '0%' }} />
                     </div>
                     {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                   </div>
@@ -774,7 +774,7 @@ function TaskCard({ task, categories, language, onClick, onMove }: { task: Task;
             <span className="text-[10px] text-slate-400">{subtasksDone}/{subtasksTotal}</span>
           </div>
           <div className="w-full h-1 bg-white/60 rounded-full overflow-hidden">
-            <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${(subtasksDone / subtasksTotal) * 100}%` }} />
+            <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${(subtasksDone / subtasksTotal) * 100}%` }} />
           </div>
         </div>
       )}
@@ -1119,7 +1119,7 @@ function TaskDetailModal({
                       onClick={() => onMoveStatus(col.id)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors ${
                         isActive ? `${col.bg} ${col.color} border ${col.border}` :
-                        isPast ? 'bg-green-50 text-green-600' :
+                        isPast ? 'bg-emerald-50 text-emerald-600' :
                         'bg-white/50 text-slate-400 hover:bg-white/70'
                       }`}
                     >
@@ -1140,7 +1140,7 @@ function TaskDetailModal({
               <div className="space-y-1.5">
                 {task.subtasks.map(sub => (
                   <div key={sub.id} className="flex items-center gap-2 py-1">
-                    {sub.done ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4 text-slate-300" />}
+                    {sub.done ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Circle className="w-4 h-4 text-slate-300" />}
                     <span className={`text-sm ${sub.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{sub.title}</span>
                   </div>
                 ))}
@@ -1150,12 +1150,12 @@ function TaskDetailModal({
 
           {/* Completion note (read-only, from Telegram) */}
           {task.completionNote && (
-            <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+            <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
               <div className="flex items-center gap-2 mb-1">
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
-                <span className="text-xs text-green-700">{l('Отчёт о выполнении (через Telegram)', 'Орындалу туралы есеп (Telegram арқылы)', 'Completion report (via Telegram)')}</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs text-emerald-700">{l('Отчёт о выполнении (через Telegram)', 'Орындалу туралы есеп (Telegram арқылы)', 'Completion report (via Telegram)')}</span>
               </div>
-              <p className="text-sm text-green-800">{task.completionNote}</p>
+              <p className="text-sm text-emerald-800">{task.completionNote}</p>
             </div>
           )}
 
@@ -1167,7 +1167,7 @@ function TaskDetailModal({
             </div>
             {task.completedAt && (
               <div className="flex items-center gap-1">
-                <Check className="w-3.5 h-3.5 text-green-500" />
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
                 {l('Выполнено', 'Орындалды', 'Completed')}: {new Date(task.completedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
               </div>
             )}

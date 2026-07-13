@@ -413,7 +413,7 @@ export function Finance({ language }: FinanceProps) {
               <button
                 key={p.id}
                 onClick={() => setPreset(p.id)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition ${period.preset === p.id ? 'bg-gray-900 text-white' : 'text-slate-500 hover:text-gray-900'}`}
+                className={`px-2.5 py-1 rounded-lg text-[11px] transition ${period.preset === p.id ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-gray-900'}`}
               >{p.ru}</button>
             ))}
             {/* Custom range — two compact date inputs */}
@@ -608,7 +608,7 @@ export function Finance({ language }: FinanceProps) {
         </div>
       </div>
 
-      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-3 overflow-x-auto">
+      <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-3 overflow-x-auto no-scrollbar fade-x">
         <div className="flex items-start gap-6 min-w-max">
           {TAB_GROUPS.map((group, gi) => (
             <div key={gi} className="flex flex-col gap-1.5">
@@ -625,13 +625,13 @@ export function Finance({ language }: FinanceProps) {
                       onClick={() => setActiveTab(tab.id)}
                       className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs whitespace-nowrap transition-colors ${
                         isActive
-                          ? 'bg-gray-900 text-white shadow-sm'
+                          ? 'bg-emerald-600 text-white shadow-sm'
                           : 'text-slate-500 hover:bg-white/50 hover:text-gray-900'
                       }`}
                     >
                       <Icon className={`${isActive ? 'w-4 h-4' : 'w-3.5 h-3.5'} transition-all`} />
                       {tab[language]}
-                      {isActive && <span className="absolute left-2 right-2 -bottom-1.5 h-[2px] bg-gray-900 rounded-full" />}
+                      {isActive && <span className="absolute left-2 right-2 -bottom-1.5 h-[2px] bg-emerald-600 rounded-full" />}
                     </button>
                   );
                 })}

@@ -9,7 +9,7 @@ interface Props {
 }
 
 const TYPE_META: Record<ActivityType, { ru: string; kz: string; eng: string; icon: any; bg: string; fg: string }> = {
-  create:     { ru: 'Создание',     kz: 'Жасау',         eng: 'Create',      icon: Plus,         bg: 'bg-green-50',  fg: 'text-green-600' },
+  create:     { ru: 'Создание',     kz: 'Жасау',         eng: 'Create',      icon: Plus,         bg: 'bg-emerald-50',fg: 'text-emerald-600' },
   update:     { ru: 'Изменение',    kz: 'Өзгерту',       eng: 'Update',      icon: Edit2,        bg: 'bg-blue-50',   fg: 'text-blue-600' },
   delete:     { ru: 'Удаление',     kz: 'Жою',           eng: 'Delete',      icon: Trash2,       bg: 'bg-red-50',    fg: 'text-red-500' },
   login:      { ru: 'Вход',         kz: 'Кіру',          eng: 'Login',       icon: LogIn,        bg: 'bg-emerald-50',fg: 'text-emerald-600' },
@@ -17,7 +17,7 @@ const TYPE_META: Record<ActivityType, { ru: string; kz: string; eng: string; ico
   invite:     { ru: 'Приглашение',  kz: 'Шақыру',        eng: 'Invite',      icon: Sparkles,     bg: 'bg-amber-50',  fg: 'text-amber-700' },
   permission: { ru: 'Права',        kz: 'Құқықтар',      eng: 'Permissions', icon: Shield,       bg: 'bg-purple-50', fg: 'text-purple-600' },
   settings:   { ru: 'Настройки',    kz: 'Баптаулар',     eng: 'Settings',    icon: SettingsIcon, bg: 'bg-gray-100',  fg: 'text-gray-600' },
-  ai:         { ru: 'AI-ассистент', kz: 'AI-көмекші',    eng: 'AI assistant',icon: Sparkles,     bg: 'bg-violet-50', fg: 'text-emerald-600' },
+  ai:         { ru: 'AI-ассистент', kz: 'AI-көмекші',    eng: 'AI assistant',icon: Sparkles,     bg: 'bg-violet-50', fg: 'text-violet-600' },
 };
 
 const MODULE_OPTIONS: { value: string; ru: string; kz: string; eng: string }[] = [
@@ -158,7 +158,7 @@ export function ActivityLog({ language }: Props) {
           <select
             value={filterType}
             onChange={e => setFilterType(e.target.value as any)}
-            className="px-3 py-2 bg-gray-50 border-0 rounded-xl text-xs focus:outline-none text-gray-600"
+            className="px-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40 text-gray-600"
           >
             <option value="all">{l('Все типы', 'Барлық түрлер', 'All types')}</option>
             {(Object.keys(TYPE_META) as ActivityType[]).map(k => (
@@ -169,7 +169,7 @@ export function ActivityLog({ language }: Props) {
           <select
             value={filterModule}
             onChange={e => setFilterModule(e.target.value)}
-            className="px-3 py-2 bg-gray-50 border-0 rounded-xl text-xs focus:outline-none text-gray-600"
+            className="px-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40 text-gray-600"
           >
             {MODULE_OPTIONS.map(m => (
               <option key={m.value} value={m.value}>{l(m.ru, m.kz, m.eng)}</option>
@@ -179,7 +179,7 @@ export function ActivityLog({ language }: Props) {
           <select
             value={filterUser}
             onChange={e => setFilterUser(e.target.value)}
-            className="px-3 py-2 bg-gray-50 border-0 rounded-xl text-xs focus:outline-none text-gray-600"
+            className="px-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40 text-gray-600"
           >
             <option value="all">{l('Все пользователи', 'Барлық пайдаланушылар', 'All users')}</option>
             {users.map(u => <option key={u} value={u}>{u}</option>)}
@@ -193,14 +193,14 @@ export function ActivityLog({ language }: Props) {
               type="date"
               value={filterFrom}
               onChange={e => setFilterFrom(e.target.value)}
-              className="flex-1 px-3 py-2 bg-gray-50 border-0 rounded-xl text-xs focus:outline-none text-gray-600"
+              className="flex-1 px-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40 text-gray-600"
             />
             <label className="text-[11px] text-slate-400">{l('по', 'дейін', 'to')}</label>
             <input
               type="date"
               value={filterTo}
               onChange={e => setFilterTo(e.target.value)}
-              className="flex-1 px-3 py-2 bg-gray-50 border-0 rounded-xl text-xs focus:outline-none text-gray-600"
+              className="flex-1 px-3 py-2 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40 text-gray-600"
             />
           </div>
           {filtersActive && (
@@ -223,7 +223,7 @@ export function ActivityLog({ language }: Props) {
           <div className="col-span-2">{l('Модуль', 'Модуль', 'Module')}</div>
           <div className="col-span-5">{l('Действие', 'Әрекет', 'Action')}</div>
         </div>
-        <div className="divide-y divide-gray-50">
+        <div className="divide-y divide-slate-200/60">
           {filtered.length === 0 && (
             <div className="px-4 py-16 text-center">
               <div className="text-xs text-slate-400">

@@ -278,3 +278,17 @@ html {
 .no-scrollbar::-webkit-scrollbar {
   display: none;                 /* Chrome / Safari */
 }
+
+/* Edge-fade mask for horizontally-scrolling tab / chip strips. Cut-off
+   tabs fade out softly at both ends instead of hard-clipping or bleeding
+   over the header. Pair with `no-scrollbar`:
+     className="no-scrollbar fade-x flex gap-1.5 overflow-x-auto ..." */
+.fade-x {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+}
+/* Vertical variant for tall scroll areas (dropdown lists, side columns). */
+.fade-y {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
+}

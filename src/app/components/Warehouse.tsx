@@ -937,7 +937,7 @@ export function Warehouse({ language }: WarehouseProps) {
                 className="w-full pl-9 pr-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs focus:outline-none focus:bg-white"
               />
             </div>
-            <div className="flex gap-1 overflow-x-auto pb-0.5">
+            <div className="flex gap-1 overflow-x-auto no-scrollbar fade-x pb-0.5">
               {([
                 { id: 'all',     label: l('Все', 'Барлығы', 'All') },
                 { id: 'started', label: l('Начали', 'Бастадық', 'Started') },
@@ -1400,9 +1400,9 @@ export function Warehouse({ language }: WarehouseProps) {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
               <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder={l('Поиск материалов...', 'Материал іздеу...', 'Search materials...')} className="w-full pl-9 pr-3 py-2 bg-white/50 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-sm focus:outline-none focus:bg-white focus:ring-slate-300 placeholder:text-slate-400 transition-all" />
             </div>
-            <div className="flex gap-1 overflow-x-auto pb-0.5">
+            <div className="flex gap-1 overflow-x-auto no-scrollbar fade-x pb-0.5">
               {categories.map(cat => (
-                <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-emerald-600 text-white' : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-400 hover:bg-white/80'}`}>{cat}</button>
+                <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-emerald-600 text-white' : 'bg-white/60 ring-1 ring-white/60 backdrop-blur-xl text-slate-500 hover:bg-white/80'}`}>{cat}</button>
               ))}
             </div>
             {/* CSV export — produces an Excel-readable file with BOM */}

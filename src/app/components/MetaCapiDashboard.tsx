@@ -125,11 +125,11 @@ export function MetaCapiDashboard({ language }: Props) {
         {canWrite ? (
           <div className="space-y-2.5 max-w-md">
             <input value={pixelId} onChange={e => setPixelId(e.target.value)} placeholder={l('Pixel ID (он же Dataset ID)', 'Pixel ID (Dataset ID)', 'Pixel ID (Dataset ID)')}
-              className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
             <input value={capiToken} onChange={e => setCapiToken(e.target.value)} type="password" placeholder={l('Access Token (Events Manager → Settings)', 'Access Token', 'Access Token')}
-              className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
             <input value={testCode} onChange={e => setTestCode(e.target.value)} placeholder={l('Test Event Code (необязательно, TESTxxxxx)', 'Test Event Code (міндетті емес)', 'Test Event Code (optional)')}
-              className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
             <button onClick={connect} disabled={saving} className="px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40">
               {saving ? l('Подключение…', 'Қосылуда…', 'Connecting…') : l('Подключить Meta', 'Meta қосу', 'Connect Meta')}
             </button>
