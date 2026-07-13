@@ -527,7 +527,7 @@ export function AIDesign({ language }: AIDesignProps) {
     <div
       className="min-h-full relative"
     >
-      <div className="relative p-4 md:p-8 max-w-[1400px] mx-auto">
+      <div className="relative px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-[1400px] mx-auto">
 
         {/* ─── Header ────────────────────────────────────────── */}
         <div className="mb-7 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
@@ -537,7 +537,7 @@ export function AIDesign({ language }: AIDesignProps) {
               {' · '}
               <span className="inline-flex items-center gap-1 normal-case tracking-normal text-slate-500"><NicheIcon niche={niche} className="w-3 h-3" /> {niche.name[language]}</span>
             </p>
-            <h1 className="text-slate-900 text-3xl md:text-4xl font-medium tracking-tight mb-1">
+            <h1 className="text-slate-900 text-2xl md:text-3xl font-medium tracking-tight mb-1">
               {l('Генерация интерьеров', 'Интерьер генерациясы', 'Interior generator')}
             </h1>
             <p className="text-sm text-slate-500 max-w-xl">
