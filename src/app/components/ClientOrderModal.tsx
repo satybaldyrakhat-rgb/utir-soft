@@ -394,6 +394,17 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   const remaining = Math.max(0, (deal.amount || 0) - (paidAmount || 0));
   const paidPercent = deal.amount > 0 ? Math.min(100, Math.round((paidAmount / deal.amount) * 100)) : 0;
 
+  // Nearest meaningful date for the summary strip: the follow-up if set,
+  // otherwise the soonest of the timeline dates. Shown dd.mm so the user
+  // sees "what's next" without opening the Dates tab.
+  const nearestDate = (() => {
+    const cands = [nextActionAt, measurementDate, completionDate, installationDate].filter(Boolean).sort();
+    if (!cands.length) return '';
+    const d = cands[0];
+    const [y, m, dd] = d.split('-');
+    return dd && m ? `${dd}.${m}` : d;
+  })();
+
   const addPaymentMethod = () => {
     const name = window.prompt(tt('newPaymentMethodPrompt'));
     if (!name) return;
@@ -663,6 +674,23 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
           </div>
         </div>
 
+        {/* ── Summary strip — key facts at a glance (no tab switching) ── */}
+        <div className="px-6 py-3 border-b border-white/60 flex-shrink-0 flex gap-2 overflow-x-auto no-scrollbar fade-x">
+          {[
+            { label: l('Статус', 'Күй', 'Status'), value: STATUS_LABELS[status] || status, accent: true },
+            { label: l('Прогресс', 'Прогресс', 'Progress'), value: `${currentProgress}%` },
+            { label: l('Сумма', 'Сома', 'Amount'), value: formatKZT(deal.amount || 0) },
+            { label: l('Оплачено', 'Төленген', 'Paid'), value: `${formatKZT(paidAmount)} · ${paidPercent}%` },
+            { label: l('Остаток', 'Қалдық', 'Remaining'), value: formatKZT(remaining) },
+            ...(nearestDate ? [{ label: l('Ближайшая дата', 'Жақын күн', 'Next date'), value: nearestDate }] : []),
+          ].map((s, i) => (
+            <div key={i} className="flex-shrink-0 min-w-[88px] px-3 py-2 bg-white/55 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl">
+              <div className="text-[9px] uppercase tracking-wider text-slate-400">{s.label}</div>
+              <div className={`text-xs tabular-nums truncate ${s.accent ? 'text-emerald-700' : 'text-slate-900'}`}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+
         {/* Sync status (real 1C/ERP sync — coming later) */}
         <div className="px-6 py-2 bg-white/30 backdrop-blur-xl border-b border-white/60 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2 text-[10px]">
@@ -753,6 +781,15 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                 </div>
               </section>
 
+              {/* ── Section: Object addresses (grouped with client contacts) ── */}
+              <section>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Объект', 'Объект', 'Object')}</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <FieldInput label={tt('clientAddress')} value={address} onChange={setAddress} placeholder={tt('addressMask')} />
+                  <FieldInput label={tt('siteAddress')} value={siteAddress} onChange={setSiteAddress} placeholder={tt('siteAddressMask')} />
+                </div>
+              </section>
+
               {/* ── Section: Next step (РОП — дисциплина касаний) ── */}
               <section>
                 <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Следующий шаг', 'Келесі қадам', 'Next step')}</div>
@@ -811,15 +848,6 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                   </section>
                 );
               })()}
-
-              {/* ── Section: Object addresses ── */}
-              <section>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">{l('Объект', 'Объект', 'Object')}</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <FieldInput label={tt('clientAddress')} value={address} onChange={setAddress} placeholder={tt('addressMask')} />
-                  <FieldInput label={tt('siteAddress')} value={siteAddress} onChange={setSiteAddress} placeholder={tt('siteAddressMask')} />
-                </div>
-              </section>
 
               {/* ── Section: Project type (multi-niche teams only) ── */}
               {/* Lets admin/manager re-assign a deal to a different niche
