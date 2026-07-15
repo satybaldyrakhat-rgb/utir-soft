@@ -226,6 +226,12 @@ export function teamInviteLink(code: string): string {
 // Frontend base URL where the SPA serves the #/track/<code> route.
 const APP_URL = (process.env.PUBLIC_APP_URL || 'https://utir-soft.com').replace(/\/+$/, '');
 export function trackLink(code: string): string { return `${APP_URL}/#/track/${code}`; }
+// Диплинк в приложение: открывает КОНКРЕТНЫЙ заказ в платформе (для
+// директорских алёртов «открыть заказ»). Ведёт на #/order/<id> — фронт
+// ловит хэш, переходит в Заказы и открывает карточку этой сделки.
+export function orderLink(dealId: string): string { return `${APP_URL}/#/order/${dealId}`; }
+// Ссылка на приложение вообще (для сводок «открыть платформу»).
+export function appLink(): string { return `${APP_URL}/`; }
 // Get the deal's existing public track code or mint a new one. Used by
 // the web "Ссылка для клиента" button and the bot completion messages.
 export function ensureTrackCode(db: Database.Database, teamId: string, dealId: string): string {
@@ -591,7 +597,7 @@ export function buildDailySummary(db: Database.Database, teamId: string): string
     if (lowStock.length > 6) lines.push(`• …и ещё ${lowStock.length - 6}`);
   }
 
-  lines.push('', `<i>Открыть платформу для деталей.</i>`);
+  lines.push('', `<a href="${APP_URL}/">Открыть платформу</a>`);
   return lines.join('\n');
 }
 
@@ -636,7 +642,7 @@ export function buildPeriodSummary(db: Database.Database, teamId: string, period
     lines.push(`• Расходы: <b>${fmt(expenses)}</b>`);
     lines.push(`• Прибыль: <b>${fmt(profit)}</b> · маржа: <b>${margin}%</b>`);
   }
-  lines.push('', `<i>Открыть платформу для деталей.</i>`);
+  lines.push('', `<a href="${APP_URL}/">Открыть платформу</a>`);
   return lines.join('\n');
 }
 

@@ -17,11 +17,13 @@ import {
   Phone, X, Users, Mail, Calendar, TrendingUp, XCircle, Plus, Search,
   Archive, Download, Upload, RotateCcw, Trash2, Filter, ArrowUpDown,
   ChevronDown, MoveRight, Eye, Sparkles, MessageCircle, AlertTriangle, Clock,
-  MoreHorizontal,
+  MoreHorizontal, FileText, Loader2,
 } from 'lucide-react';
 import { ClientOrderModal } from './ClientOrderModal';
 import { NewDealModal } from './NewDealModal';
 import { useDataStore, type Deal } from '../utils/dataStore';
+import { printDealDoc, DEAL_DOC_LABELS, type DealDocKind } from '../utils/dealDocs';
+import { toast } from '../utils/toast';
 import { confirmDialog } from '../utils/confirm';
 import { NicheIcon } from './NicheIcon';
 import { LOST_REASONS } from '../utils/marketing';
@@ -34,6 +36,9 @@ import { getNiche, getDealNiche } from '../utils/niches';
 
 interface SalesKanbanProps {
   language: 'kz' | 'ru' | 'eng';
+  // Диплинк из Telegram (#/order/<id>): id сделки, которую надо сразу открыть.
+  openDealId?: string | null;
+  onDealOpened?: () => void;
 }
 
 // Shared glass-card class — same vocabulary as Dashboard / AI Design:
@@ -107,7 +112,7 @@ function useIsMobile(): boolean {
 }
 
 // ─── Component ───────────────────────────────────────────────────
-export function SalesKanban({ language }: SalesKanbanProps) {
+export function SalesKanban({ language, openDealId, onDealOpened }: SalesKanbanProps) {
   const store = useDataStore();
   const niche = getNiche(store.niche);
   const isMobile = useIsMobile();
@@ -176,6 +181,14 @@ export function SalesKanban({ language }: SalesKanbanProps) {
   // ─── Derived data (memoized) ──────────────────────────────────
   const activeDeals = useMemo(() => store.deals.filter(d => d.status !== 'rejected'), [store.deals]);
   const rejectedDeals = useMemo(() => store.deals.filter(d => d.status === 'rejected'), [store.deals]);
+
+  // Диплинк из Telegram: как только сделки загрузились и пришёл openDealId —
+  // открываем её карточку и сообщаем родителю, что диплинк отработан.
+  useEffect(() => {
+    if (!openDealId) return;
+    const d = store.deals.find(x => x.id === openDealId);
+    if (d) { setSelectedDeal(d); onDealOpened?.(); }
+  }, [openDealId, store.deals, onDealOpened]);
 
   // Source values seen in current data → fuel the source filter dropdown.
   const knownSources = useMemo(() => {
@@ -1233,6 +1246,16 @@ function DealCard(props: {
           onDragStart, onDragEnd, iconMap, priorityConf, canWrite, isMobile, language, l,
           teamNiche, showNicheChip, owners = [], onAssign } = props;
   const [moveOpen, setMoveOpen] = useState(false);
+  // Быстрая печать документов прямо из карточки списка — без открытия заказа.
+  const [docOpen, setDocOpen] = useState(false);
+  const [docBusy, setDocBusy] = useState<string | null>(null);
+  const dealNicheLabel = showNicheChip ? getDealNiche(deal, teamNiche).name[language] : undefined;
+  const runDoc = async (kind: DealDocKind) => {
+    setDocBusy(kind);
+    try { await printDealDoc(kind, deal, dealNicheLabel); }
+    catch (e: any) { toast(String(e?.message || e), 'error'); }
+    finally { setDocBusy(null); setDocOpen(false); }
+  };
   const currentStage = statusToStage(deal.status);
   const priority = priorityConf(deal.priority);
   // Resolved niche for this deal — falls back to team's primary so
@@ -1304,6 +1327,34 @@ function DealCard(props: {
                 )}
               </div>
             )}
+            {/* Быстрая печать документов (КП / Счёт / Договор / Акт). */}
+            <div className="relative">
+              <button
+                onClick={e => { e.stopPropagation(); setDocOpen(o => !o); }}
+                className="p-1 hover:bg-white rounded-lg transition-colors"
+                title={l('Документы', 'Құжаттар', 'Documents')}
+              >
+                {docBusy ? <Loader2 className="w-3.5 h-3.5 text-slate-400 animate-spin" /> : <FileText className="w-3.5 h-3.5 text-slate-400 hover:text-slate-700" />}
+              </button>
+              {docOpen && (
+                <div
+                  onClick={e => e.stopPropagation()}
+                  className="absolute right-0 top-full mt-1 z-30 bg-white/95 backdrop-blur-xl ring-1 ring-white/60 rounded-xl shadow-lg p-1 min-w-[130px]"
+                >
+                  {DEAL_DOC_LABELS.map(d => (
+                    <button
+                      key={d.k}
+                      onClick={e => { e.stopPropagation(); runDoc(d.k); }}
+                      disabled={docBusy !== null}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100 rounded-lg text-left disabled:opacity-50"
+                    >
+                      {docBusy === d.k ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3 text-slate-400" />}
+                      {l(d.ru, d.kz, d.eng)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               onClick={e => { e.stopPropagation(); onReject(); }}
               className="p-1 hover:bg-rose-100/70 rounded-lg transition-colors"

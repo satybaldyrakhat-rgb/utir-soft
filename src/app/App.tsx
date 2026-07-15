@@ -62,11 +62,17 @@ function AppContent() {
   const [currentPageRaw, setCurrentPageRaw] = useState<string>(() => {
     try {
       const hash = window.location.hash.replace(/^#\/?/, '').trim();
+      // Диплинк из Telegram: #/order/<id> открывает Заказы + карточку сделки.
+      if (/^order\//.test(hash)) return 'sales';
       if (hash) return hash;
       const saved = localStorage.getItem(LAST_PAGE_KEY);
       if (saved) return saved;
     } catch { /* localStorage blocked — use default */ }
     return 'dashboard';
+  });
+  // Сделка, которую надо открыть по диплинку #/order/<id> (из Telegram-алёрта).
+  const [openDealId, setOpenDealId] = useState<string | null>(() => {
+    try { const m = window.location.hash.match(/^#\/order\/(.+)$/); return m ? decodeURIComponent(m[1]) : null; } catch { return null; }
   });
   const currentPage = currentPageRaw;
   // Wrapped setter: persists synchronously on every navigation so there's
@@ -196,6 +202,8 @@ function AppContent() {
   // immediate replaceState ping-pong (the hash is already the new value).
   useEffect(() => {
     const onHash = () => {
+      const om = window.location.hash.match(/^#\/order\/(.+)$/);
+      if (om) { setOpenDealId(decodeURIComponent(om[1])); setCurrentPageRaw('sales'); return; }
       const hash = window.location.hash.replace(/^#\/?/, '').trim();
       if (hash) setCurrentPageRaw(hash);
     };
@@ -297,7 +305,7 @@ function AppContent() {
       case 'ai-design':
         return <AIDesign language={language} />;
       case 'sales':
-        return <SalesKanban language={language} />;
+        return <SalesKanban language={language} openDealId={openDealId} onDealOpened={() => setOpenDealId(null)} />;
       case 'warehouse':
         return <Warehouse language={language} />;
       case 'finance':

@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
+import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
@@ -1414,7 +1414,7 @@ app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (
                 `<b>Статус сделки изменён</b>\n` +
                 `${updated.customerName || 'Сделка'}${amount ? ` · ${amount}` : ''}\n\n` +
                 `<i>${fromL}</i>  →  <b>${toL}</b>\n\n` +
-                `Открыть на платформе → Заказы`;
+                `<a href="${orderLink(req.params.id)}">Открыть заказ →</a>`;
               await tgSendMessage(link.chat_id, msg);
             }
           }
@@ -1429,15 +1429,16 @@ app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (
     try {
       const amt = Number(updated.amount) || 0;
       const amtStr = `${Math.round(amt).toLocaleString('ru-RU').replace(/,/g, ' ')} ₸`;
+      const openLink = `\n\n<a href="${orderLink(req.params.id)}">Открыть заказ →</a>`;
       if (updated.status === 'rejected') {
         const reason = updated.rejectReason || updated.lostReason || updated.rejectionReason;
         await sendBotAlert(req.teamId!, 'Отказ клиента',
           `<b>❌ Отказ клиента</b>\n${updated.customerName || 'Сделка'}${amt ? ` · ${amtStr}` : ''}` +
-          `${reason ? `\nПричина: ${reason}` : ''}`);
+          `${reason ? `\nПричина: ${reason}` : ''}` + openLink);
       }
       if (updated.status === 'completed' && amt >= 1_000_000) {
         await sendBotAlert(req.teamId!, 'Крупная сделка > 1 млн ₸',
-          `<b>💰 Крупная сделка закрыта</b>\n${updated.customerName || 'Сделка'} · ${amtStr}`);
+          `<b>💰 Крупная сделка закрыта</b>\n${updated.customerName || 'Сделка'} · ${amtStr}` + openLink);
       }
     } catch (e) { console.warn('[deals] bot alert failed', e); }
   }
