@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
+import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
@@ -2009,6 +2009,14 @@ function ingestInboundMessage(teamId: string, m: { platform: string; externalId:
   db.prepare('INSERT INTO messages (id, conversation_id, team_id, user_id, data) VALUES (?, ?, ?, ?, ?)').run(msgId, convId, teamId, m.platform, JSON.stringify(msg));
   const upd = { ...convData, id: convId, name: convData.name || m.name || m.externalId, lastMessage: m.text.slice(0, 140), lastMessageAt: now, unreadCount: (convData.unreadCount || 0) + 1 };
   db.prepare('UPDATE conversations SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(upd), convId, teamId);
+
+  // Директорский алёрт: новое входящее сообщение от клиента. Название канала
+  // человекочитаемо; текст обрезаем. Ссылка ведёт в Чаты.
+  const chLabel: Record<string, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', telegram: 'Telegram' };
+  const preview = m.text.length > 120 ? m.text.slice(0, 120) + '…' : m.text;
+  void sendBotAlert(teamId, 'Новое сообщение', // no-op если бот не готов / алёрт выключен
+    `<b>💬 Новое сообщение · ${chLabel[m.platform] || m.platform}</b>\n${upd.name}\n«${preview}»` +
+    `\n\n<a href="${chatsLink()}">Открыть Чаты →</a>`);
 }
 
 // Верификация вебхука Meta (при подключении в App Dashboard).
@@ -4042,6 +4050,26 @@ function runAlertScan() {
         }
 
         if (dirty) db.prepare('UPDATE deals SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(d), dr.id, teamId);
+      }
+
+      // Низкий остаток склада: материал в статусе low/outofstock, ещё не
+      // алёртили за этот статус. Дедуп: lowStockAlerted = текущий статус;
+      // при пополнении флаг сбрасываем, чтобы при следующем падении алёртнуть снова.
+      const prodRows = db.prepare('SELECT id, data FROM products WHERE team_id = ?').all(teamId) as any[];
+      for (const pr of prodRows) {
+        let p: any; try { p = JSON.parse(pr.data); } catch { continue; }
+        const low = p.status === 'low' || p.status === 'outofstock';
+        if (low && p.lowStockAlerted !== p.status) {
+          const label = p.status === 'outofstock' ? '🛒 Закончился' : '⚠️ Мало на складе';
+          void sendBotAlert(teamId, 'Мало на складе',
+            `<b>${label}</b>\n${p.name || 'Материал'} — осталось ${p.quantity ?? 0} ${p.unit || 'шт'}${p.minQty ? ` (мин. ${p.minQty})` : ''}` +
+            `\n\n<a href="${warehouseLink()}">Открыть склад →</a>`);
+          p.lowStockAlerted = p.status;
+          db.prepare('UPDATE products SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(p), pr.id, teamId);
+        } else if (!low && p.lowStockAlerted) {
+          delete p.lowStockAlerted;
+          db.prepare('UPDATE products SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(p), pr.id, teamId);
+        }
       }
     }
   } catch (e) { console.warn('[alert-scan] failed', e); }

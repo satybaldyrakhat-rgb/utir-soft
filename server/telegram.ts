@@ -232,6 +232,10 @@ export function trackLink(code: string): string { return `${APP_URL}/#/track/${c
 export function orderLink(dealId: string): string { return `${APP_URL}/#/order/${dealId}`; }
 // Ссылка на приложение вообще (для сводок «открыть платформу»).
 export function appLink(): string { return `${APP_URL}/`; }
+// Ссылка на раздел Чаты (для алёрта о новом входящем сообщении).
+export function chatsLink(): string { return `${APP_URL}/#/chats`; }
+// Ссылка на раздел Производство/Склад (для алёрта о низком остатке).
+export function warehouseLink(): string { return `${APP_URL}/#/warehouse`; }
 // Get the deal's existing public track code or mint a new one. Used by
 // the web "Ссылка для клиента" button and the bot completion messages.
 export function ensureTrackCode(db: Database.Database, teamId: string, dealId: string): string {
