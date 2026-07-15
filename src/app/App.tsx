@@ -1,18 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense, type ComponentType } from 'react';
 import { Dashboard } from './components/Dashboard';
-import { ClientTrack } from './components/ClientTrack';
-import { LeadForm } from './components/LeadForm';
-import { ClientCabinet } from './components/ClientCabinet';
-import { Booking } from './components/Booking';
-import { AIDesign } from './components/AIDesign';
-import { SalesKanban } from './components/SalesKanban';
-import { Warehouse } from './components/Warehouse';
-import { PaymentsHub } from './components/PaymentsHub';
-import { Chats } from './components/Chats';
-import { Analytics } from './components/Analytics';
-import { Tasks } from './components/Tasks';
-import { Settings } from './components/Settings';
-import { CustomModulePage } from './components/CustomModulePage';
+// ─── Code-splitting: тяжёлые страницы грузятся лениво, только при открытии.
+// Главный бандл был ~1.97МБ — на слабом интернете/телефоне открывался долго.
+// Dashboard (лендинг после входа) оставляем статичным для мгновенного показа.
+// Named-export → { default } для React.lazy.
+const lazyNamed = (imp: () => Promise<Record<string, any>>, name: string) =>
+  lazy(() => imp().then(m => ({ default: m[name] as ComponentType<any> })));
+const ClientTrack   = lazyNamed(() => import('./components/ClientTrack'), 'ClientTrack');
+const LeadForm      = lazyNamed(() => import('./components/LeadForm'), 'LeadForm');
+const Booking       = lazyNamed(() => import('./components/Booking'), 'Booking');
+const AIDesign      = lazyNamed(() => import('./components/AIDesign'), 'AIDesign');
+const SalesKanban   = lazyNamed(() => import('./components/SalesKanban'), 'SalesKanban');
+const Warehouse     = lazyNamed(() => import('./components/Warehouse'), 'Warehouse');
+const PaymentsHub   = lazyNamed(() => import('./components/PaymentsHub'), 'PaymentsHub');
+const Chats         = lazyNamed(() => import('./components/Chats'), 'Chats');
+const Analytics     = lazyNamed(() => import('./components/Analytics'), 'Analytics');
+const Tasks         = lazyNamed(() => import('./components/Tasks'), 'Tasks');
+const Settings      = lazyNamed(() => import('./components/Settings'), 'Settings');
+const CustomModulePage = lazyNamed(() => import('./components/CustomModulePage'), 'CustomModulePage');
+
+// Лёгкий плейсхолдер, пока подгружается ленивый чанк страницы.
+const PageFallback = () => (
+  <div className="min-h-[60vh] flex items-center justify-center">
+    <div className="w-6 h-6 rounded-full border-2 border-emerald-500/30 border-t-emerald-600 animate-spin" />
+  </div>
+);
 import { CustomIcon } from './components/CustomIcons';
 import { AIAssistant } from './components/AIAssistant';
 import { Toaster } from './utils/toast';
@@ -705,7 +717,7 @@ function AppContent() {
       {/* Main Content. Platform AI assistant lives in two places per user's request:
           Telegram-bot is the primary channel (Block F), but a floating in-platform popup is also kept here for quick UI prompts. */}
       <main className="content-scroll flex-1 overflow-y-auto pt-[57px] lg:pt-0 relative">
-        {renderPage()}
+        <Suspense fallback={<PageFallback />}>{renderPage()}</Suspense>
         <AIAssistant
           context={currentPage as 'dashboard' | 'ai-design' | 'sales' | 'warehouse' | 'finance' | 'chats' | 'analytics' | 'tasks' | 'settings'}
           language={language}
@@ -733,14 +745,14 @@ function PublicRouter({ children }: { children: React.ReactNode }) {
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
-  if (hash.startsWith('#/track/')) return <ClientTrack orderId={hash.replace('#/track/', '')} />;
-  if (hash.startsWith('#/lead/')) return <LeadForm route={hash.replace('#/lead/', '')} />;
+  if (hash.startsWith('#/track/')) return <Suspense fallback={<PageFallback />}><ClientTrack orderId={hash.replace('#/track/', '')} /></Suspense>;
+  if (hash.startsWith('#/lead/')) return <Suspense fallback={<PageFallback />}><LeadForm route={hash.replace('#/lead/', '')} /></Suspense>;
   if (hash === '#/cabinet' || hash.startsWith('#/cabinet/')) return <ClientCabinetRoute />;
   // #/booking/CODE — public booking for a specific team (uses lead-form code).
   // Bare #/booking works only for a logged-in user (their own team).
   if (hash === '#/booking' || hash.startsWith('#/booking/')) {
     const code = hash.startsWith('#/booking/') ? hash.replace('#/booking/', '') : undefined;
-    return <Booking teamCode={code} />;
+    return <Suspense fallback={<PageFallback />}><Booking teamCode={code} /></Suspense>;
   }
   if (hash === '#/terms') return <Terms language={legalLang} onLanguageChange={setLegalLang} />;
   if (hash === '#/privacy') return <Privacy language={legalLang} onLanguageChange={setLegalLang} />;
