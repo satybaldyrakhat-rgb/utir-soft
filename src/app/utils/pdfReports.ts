@@ -12,7 +12,14 @@ let cachedRobotoBase64: string | null = null;
 let cachedRobotoBoldBase64: string | null = null;
 
 async function fetchTtfAsBase64(url: string): Promise<string> {
-  const res = await fetch(url);
+  // Таймаут на загрузку шрифта: без него при недоступном CDN клик по
+  // «скачать документ» висел бы бесконечно. 8с → быстро переходим к
+  // следующему зеркалу, а если все мертвы — показываем понятную ошибку.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  let res: Response;
+  try { res = await fetch(url, { signal: ctrl.signal }); }
+  finally { clearTimeout(timer); }
   if (!res.ok) throw new Error('font fetch failed: HTTP ' + res.status);
   const buf = await res.arrayBuffer();
   let binary = '';
@@ -655,6 +662,174 @@ function numberToRussianWords(n: number): string {
   return parts.join(' ').trim();
 }
 function capitalize(s: string): string { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+
+// ─── Коммерческое предложение (КП) ─────────────────────────────────
+// Продающий бланк из сделки: изделие, характеристики, цена, условия,
+// срок действия. Главный инструмент менеджера на этапе «до договора».
+export interface QuoteDeal {
+  id: string;
+  customerName: string;
+  product?: string;
+  furnitureType?: string;
+  dimensions?: string;   // «3.2 × 0.6 × 0.9 м»
+  materials?: string;
+  color?: string;
+  hardware?: string;
+  amount: number;
+  prepayPercent?: number;  // по умолчанию 50
+  nicheLabel?: string;
+  validDays?: number;      // по умолчанию 7
+}
+
+export async function generateQuotePDF(deal: QuoteDeal, requisites: CompanyRequisites = {}, opts?: { number?: string }) {
+  const doc = await newDoc();
+  const pageW = doc.internal.pageSize.getWidth();
+  const num = opts?.number || invoiceNumberFor(deal.id);
+  drawHeader(doc, `Коммерческое предложение № ${num}`, `от ${fmtDate()}`, requisites.legalName);
+  let y = 38;
+  if (deal.nicheLabel) { doc.setFontSize(9); doc.setTextColor(100, 116, 139); doc.text(`Направление: ${deal.nicheLabel}`, 14, y); y += 6; doc.setTextColor(15, 23, 42); }
+
+  doc.setFontSize(10); doc.setTextColor(120, 120, 120); doc.text('Кому', 14, y); y += 5;
+  doc.setFontSize(11); doc.setTextColor(15, 23, 42); doc.text(deal.customerName, 14, y); y += 8;
+
+  doc.setFontSize(9.5); doc.setTextColor(60, 60, 60);
+  const intro = `Благодарим за интерес к нашей продукции. Ниже — предложение по изготовлению${deal.furnitureType ? ' «' + deal.furnitureType + '»' : ''} по индивидуальным размерам.`;
+  const introLines = doc.splitTextToSize(intro, pageW - 28);
+  doc.text(introLines, 14, y); y += introLines.length * 5 + 4;
+  doc.setTextColor(15, 23, 42);
+
+  const specRows: string[][] = [];
+  if (deal.product) specRows.push(['Изделие', deal.product]);
+  if (deal.furnitureType && !deal.product) specRows.push(['Тип', deal.furnitureType]);
+  if (deal.dimensions) specRows.push(['Габариты', deal.dimensions]);
+  if (deal.materials) specRows.push(['Материалы', deal.materials]);
+  if (deal.color) specRows.push(['Цвет / декор', deal.color]);
+  if (deal.hardware) specRows.push(['Фурнитура', deal.hardware]);
+  if (specRows.length) {
+    autoTable(doc, { startY: y, head: [['Характеристика', 'Значение']], body: specRows,
+      styles: { font: 'Roboto', fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
+      columnStyles: { 0: { cellWidth: 45, textColor: [100, 116, 139] } } });
+    y = (doc as any).lastAutoTable.finalY + 8;
+  }
+
+  const prepay = deal.prepayPercent ?? 50;
+  const prepayAmount = Math.round(deal.amount * prepay / 100);
+  autoTable(doc, { startY: y, head: [['Наименование', 'Кол-во', 'Стоимость']],
+    body: [[deal.product || deal.furnitureType || 'Изделие на заказ', '1', KZT(deal.amount)]],
+    foot: [['Итого', '', KZT(deal.amount)]],
+    styles: { font: 'Roboto', fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
+    footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], font: 'Roboto', fontStyle: 'bold' },
+    columnStyles: { 1: { halign: 'center', cellWidth: 24 }, 2: { halign: 'right', cellWidth: 40 } } });
+  y = (doc as any).lastAutoTable.finalY + 6;
+  doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+  doc.text(`Сумма прописью: ${kztInWords(deal.amount)}`, 14, y, { maxWidth: pageW - 28 }); y += 9;
+
+  doc.setFontSize(10); doc.setTextColor(120, 120, 120); doc.text('Условия', 14, y); y += 6;
+  doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+  const terms = [
+    `Предоплата: ${prepay}% — ${KZT(prepayAmount)}, остаток при готовности.`,
+    'Гарантия: 12 месяцев на изделие и фурнитуру.',
+    'Срок изготовления уточняется после замера.',
+    `Предложение действительно ${deal.validDays ?? 7} дней с даты формирования.`,
+  ];
+  terms.forEach(t => { const ls = doc.splitTextToSize('• ' + t, pageW - 28); doc.text(ls, 14, y); y += ls.length * 5; });
+  y += 10;
+
+  doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+  doc.text(requisites.director || '_______________________', 14, y);
+  doc.setDrawColor(200, 200, 200); doc.line(14, y + 2, 80, y + 2);
+  doc.setFontSize(8); doc.setTextColor(120, 120, 120); doc.text('Подпись / М.П.', 14, y + 6);
+
+  drawFooter(doc);
+  doc.save(`КП_${deal.customerName}_${num}.pdf`);
+}
+
+// ─── Договор подряда на изготовление мебели ────────────────────────
+// Простой рабочий договор из сделки: предмет, стоимость + порядок
+// оплаты (предоплата/остаток), сроки, гарантия, реквизиты и подписи.
+export interface ContractDeal {
+  id: string;
+  customerName: string;
+  customerPhone?: string;
+  customerBIN?: string;
+  customerAddress?: string;
+  product?: string;
+  amount: number;
+  prepayPercent?: number;
+  completionDate?: string;
+  installationDate?: string;
+  nicheLabel?: string;
+}
+
+export async function generateContractPDF(deal: ContractDeal, requisites: CompanyRequisites = {}, opts?: { number?: string }) {
+  const doc = await newDoc();
+  const pageW = doc.internal.pageSize.getWidth();
+  const num = opts?.number || invoiceNumberFor(deal.id);
+  drawHeader(doc, `Договор № ${num}`, `на изготовление мебели · ${fmtDate()}`, requisites.legalName);
+  let y = 38;
+  const prepay = deal.prepayPercent ?? 50;
+  const prepayAmount = Math.round(deal.amount * prepay / 100);
+  const rest = deal.amount - prepayAmount;
+
+  doc.setFontSize(9.5); doc.setTextColor(30, 41, 59);
+  const preamble = `${requisites.legalName || '«Исполнитель»'}${requisites.director ? ', в лице ' + requisites.director + ',' : ''} именуемое в дальнейшем «Исполнитель», с одной стороны, и ${deal.customerName}, именуемый(-ая) в дальнейшем «Заказчик», с другой стороны, заключили настоящий Договор о нижеследующем:`;
+  const pl = doc.splitTextToSize(preamble, pageW - 28); doc.text(pl, 14, y); y += pl.length * 5 + 5;
+
+  const section = (title: string, body: string[]) => {
+    if (y > 255) { doc.addPage(); y = 20; }
+    doc.setFontSize(10.5); doc.setFont('Roboto', 'bold'); doc.setTextColor(15, 23, 42);
+    doc.text(title, 14, y); y += 6; doc.setFont('Roboto', 'normal'); doc.setFontSize(9); doc.setTextColor(30, 41, 59);
+    body.forEach(b => { const ls = doc.splitTextToSize(b, pageW - 28); if (y + ls.length * 5 > 282) { doc.addPage(); y = 20; } doc.text(ls, 14, y); y += ls.length * 5 + 1.5; });
+    y += 4;
+  };
+
+  section('1. Предмет договора', [
+    `1.1. Исполнитель обязуется изготовить и передать Заказчику: ${deal.product || 'мебельное изделие по индивидуальному заказу'}.`,
+    '1.2. Точные размеры и характеристики согласуются сторонами после замера.',
+  ]);
+  section('2. Стоимость и порядок оплаты', [
+    `2.1. Общая стоимость работ составляет ${KZT(deal.amount)} (${kztInWords(deal.amount)}).`,
+    `2.2. Предоплата ${prepay}% — ${KZT(prepayAmount)} — вносится при подписании Договора.`,
+    `2.3. Остаток ${KZT(rest)} оплачивается при готовности / передаче изделия.`,
+  ]);
+  const dates = ['3.1. Срок изготовления исчисляется с момента внесения предоплаты и проведения замера.'];
+  if (deal.completionDate) dates.push(`3.2. Плановая дата готовности: ${deal.completionDate}.`);
+  if (deal.installationDate) dates.push(`3.3. Плановая дата установки: ${deal.installationDate}.`);
+  section('3. Сроки', dates);
+  section('4. Гарантия', [
+    '4.1. Гарантийный срок на изделие и фурнитуру — 12 месяцев с даты передачи.',
+    '4.2. Гарантия не распространяется на повреждения вследствие нарушения правил эксплуатации.',
+  ]);
+  section('5. Прочие условия', [
+    '5.1. Договор составлен в двух экземплярах, имеющих равную силу, по одному для каждой стороны.',
+    '5.2. Во всём остальном, не урегулированном Договором, стороны руководствуются законодательством РК.',
+  ]);
+
+  if (y > 235) { doc.addPage(); y = 20; }
+  y += 2;
+  doc.setFontSize(10.5); doc.setFont('Roboto', 'bold'); doc.setTextColor(15, 23, 42); doc.text('6. Реквизиты и подписи сторон', 14, y); y += 8;
+  doc.setFont('Roboto', 'normal'); doc.setFontSize(8.5); doc.setTextColor(30, 41, 59);
+  const colX = pageW / 2 + 4;
+  const seller = ['ИСПОЛНИТЕЛЬ', requisites.legalName || '—',
+    requisites.bin ? `БИН/ИИН: ${requisites.bin}` : '', requisites.address || '',
+    requisites.iban ? `IBAN: ${requisites.iban}` : '', requisites.phone || ''].filter(Boolean);
+  const buyer = ['ЗАКАЗЧИК', deal.customerName,
+    deal.customerBIN ? `БИН/ИИН: ${deal.customerBIN}` : 'БИН/ИИН: ______________',
+    deal.customerAddress || 'Адрес: __________________', deal.customerPhone ? `Тел: ${deal.customerPhone}` : 'Тел: ______________'].filter(Boolean);
+  let ys = y, yb = y;
+  seller.forEach((l, i) => { doc.setFont('Roboto', i === 0 ? 'bold' : 'normal'); doc.text(l, 14, ys, { maxWidth: pageW / 2 - 20 }); ys += 5; });
+  buyer.forEach((l, i) => { doc.setFont('Roboto', i === 0 ? 'bold' : 'normal'); doc.text(l, colX, yb, { maxWidth: pageW / 2 - 20 }); yb += 5; });
+  const sy = Math.max(ys, yb) + 10;
+  doc.setFont('Roboto', 'normal'); doc.setDrawColor(180, 180, 180);
+  doc.line(14, sy, 80, sy); doc.line(colX, sy, colX + 66, sy);
+  doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+  doc.text('Подпись / М.П.', 14, sy + 4); doc.text('Подпись', colX, sy + 4);
+
+  drawFooter(doc);
+  doc.save(`Договор_${deal.customerName}_${num}.pdf`);
+}
 
 // ─── Receivables aging report ──────────────────────────────────────
 // Buckets outstanding deal amounts by how long they've been unpaid

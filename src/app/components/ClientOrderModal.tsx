@@ -214,6 +214,31 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
     finally { setSverkaBusy(false); }
   };
 
+  // Печать документов из заказа: КП / Счёт / Договор / Акт. Данные берём
+  // из живых полей формы + реквизиты компании (team/requisites). PDF-модуль
+  // тяжёлый (jspdf) — грузим лениво только при клике.
+  const [docBusy, setDocBusy] = useState<string | null>(null);
+  const printDoc = async (kind: 'quote' | 'invoice' | 'contract' | 'act') => {
+    setDocBusy(kind);
+    try {
+      const pdf = await import('../utils/pdfReports');
+      let req: any = {};
+      try { req = await api.get('/api/team/requisites'); } catch { /* best-effort */ }
+      const nicheLabel = showNicheChip ? dealNiche.name[language] : undefined;
+      const base = { id: deal.id, customerName: deal.customerName || '—', amount: deal.amount || 0, product: deal.product, nicheLabel };
+      if (kind === 'quote') {
+        await pdf.generateQuotePDF({ ...base, furnitureType, materials }, req);
+      } else if (kind === 'invoice') {
+        await pdf.generateInvoicePDF({ ...base, customerPhone: phone, customerBIN, customerAddress: address, paidAmount }, req);
+      } else if (kind === 'contract') {
+        await pdf.generateContractPDF({ ...base, customerPhone: phone, customerBIN, customerAddress: address, completionDate, installationDate }, req);
+      } else if (kind === 'act') {
+        await pdf.generateActPDF({ ...base, customerBIN, customerAddress: address }, req);
+      }
+    } catch (e: any) { toast(String(e?.message || e), 'error'); }
+    finally { setDocBusy(null); }
+  };
+
   const [trackCopied, setTrackCopied] = useState(false);
   const copyTrackLink = async () => {
     try {
@@ -1011,6 +1036,41 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
 
               {/* ── Section: AI Дизайн концепты ── */}
               <DesignConcepts deal={deal} language={language} />
+
+              {/* ── Section: Печать документов ── */}
+              {/* КП / Счёт / Договор / Акт — генерируются в PDF из данных
+                  заказа + реквизитов компании (Настройки → Реквизиты). */}
+              <section>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+                  <FileText className="w-3 h-3" />
+                  {l('Печать документов', 'Құжаттарды басып шығару', 'Print documents')}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {([
+                    { k: 'quote',    ru: 'КП',       kz: 'КҰ',      eng: 'Quote' },
+                    { k: 'invoice',  ru: 'Счёт',     kz: 'Шот',     eng: 'Invoice' },
+                    { k: 'contract', ru: 'Договор',  kz: 'Шарт',    eng: 'Contract' },
+                    { k: 'act',      ru: 'Акт',      kz: 'Акт',     eng: 'Act' },
+                  ] as const).map(d => (
+                    <button
+                      key={d.k}
+                      onClick={() => printDoc(d.k)}
+                      disabled={docBusy !== null}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white/60 backdrop-blur-xl ring-1 ring-white/60 rounded-2xl text-xs text-slate-700 hover:bg-white/85 transition-colors disabled:opacity-50"
+                    >
+                      {docBusy === d.k
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <Download className="w-3.5 h-3.5 text-slate-500" />}
+                      {l(d.ru, d.kz, d.eng)}
+                    </button>
+                  ))}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-2">
+                  {l('Реквизиты компании подтягиваются из Настройки → Реквизиты.',
+                     'Деректемелер Баптаулар → Деректемелерден алынады.',
+                     'Company details are pulled from Settings → Requisites.')}
+                </div>
+              </section>
 
               {/* ── Section: Notes ── */}
               <section>
