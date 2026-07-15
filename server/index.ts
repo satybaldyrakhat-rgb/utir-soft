@@ -1430,6 +1430,19 @@ app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (
       const amt = Number(updated.amount) || 0;
       const amtStr = `${Math.round(amt).toLocaleString('ru-RU').replace(/,/g, ' ')} ₸`;
       const openLink = `\n\n<a href="${orderLink(req.params.id)}">Открыть заказ →</a>`;
+      // Оплата поступила — когда paidAmount вырос (частичная или полная).
+      const paidBefore = Number(before.paidAmount) || 0;
+      const paidNow = Number(updated.paidAmount) || 0;
+      if (paidNow > paidBefore) {
+        const delta = paidNow - paidBefore;
+        const deltaStr = `${Math.round(delta).toLocaleString('ru-RU').replace(/,/g, ' ')} ₸`;
+        const rest = Math.max(0, amt - paidNow);
+        const restStr = `${Math.round(rest).toLocaleString('ru-RU').replace(/,/g, ' ')} ₸`;
+        const full = rest === 0 && amt > 0;
+        await sendBotAlert(req.teamId!, 'Оплата поступила',
+          `<b>💵 ${full ? 'Оплачено полностью' : 'Поступила оплата'}</b>\n${updated.customerName || 'Сделка'} · +${deltaStr}` +
+          `${full ? '' : `\nОстаток: ${restStr}`}` + openLink);
+      }
       if (updated.status === 'rejected') {
         const reason = updated.rejectReason || updated.lostReason || updated.rejectionReason;
         await sendBotAlert(req.teamId!, 'Отказ клиента',
@@ -3990,9 +4003,61 @@ function startLeadFollowupScheduler() {
   console.log('[server] lead follow-up scheduler started (every 12h)');
 }
 
+// ─── Directorские алёрты по времени: горячий лид без ответа + просрочка ──
+// Оживляет тумблеры «Потеря горячего лида» и «Просрочка заказа» из панели
+// бота (раньше они были в UI, но ничего не делали). Дедуп — флагами прямо
+// на blob сделки, чтобы не слать одно и то же каждые 30 минут.
+const HOT_LEAD_SLA_HOURS = 2;
+function runAlertScan() {
+  if (!isTelegramReady()) return;
+  try {
+    const now = Date.now();
+    const today = new Date().toISOString().slice(0, 10);
+    const teams = db.prepare('SELECT DISTINCT team_id FROM deals WHERE team_id IS NOT NULL').all() as any[];
+    for (const t of teams) {
+      const teamId = t.team_id; if (!teamId) continue;
+      const dealRows = db.prepare('SELECT id, data FROM deals WHERE team_id = ?').all(teamId) as any[];
+      for (const dr of dealRows) {
+        let d: any; try { d = JSON.parse(dr.data); } catch { continue; }
+        if (d.status === 'rejected' || d.status === 'completed') continue;
+        const amtStr = d.amount ? ` · ${Math.round(d.amount).toLocaleString('ru-RU').replace(/,/g, ' ')} ₸` : '';
+        const link = `\n\n<a href="${orderLink(dr.id)}">Открыть заказ →</a>`;
+        let dirty = false;
+
+        // Горячий лид: новая заявка без первого контакта, старше SLA (но не старьё).
+        if (d.status === 'new' && !d.firstContactAt && !d.hotLeadAlertedAt && d.createdAt) {
+          const ageH = (now - Date.parse(d.createdAt)) / 3_600_000;
+          if (ageH >= HOT_LEAD_SLA_HOURS && ageH < 72) {
+            void sendBotAlert(teamId, 'Потеря горячего лида',
+              `<b>🔥 Горячий лид без ответа</b>\n${d.customerName || 'Лид'}${amtStr}\nБез контакта ${Math.floor(ageH)} ч. Источник: ${d.source || '—'}${d.phone ? ` · ${d.phone}` : ''}` + link);
+            d.hotLeadAlertedAt = new Date().toISOString(); dirty = true;
+          }
+        }
+
+        // Просрочка: дата касания (nextActionAt) в прошлом, ещё не алёртили за эту дату.
+        if (d.nextActionAt && d.nextActionAt < today && d.overdueAlertedFor !== d.nextActionAt) {
+          void sendBotAlert(teamId, 'Просрочка заказа',
+            `<b>⏰ Просрочено касание</b>\n${d.customerName || 'Сделка'}${amtStr}\nДата контакта была ${d.nextActionAt}${d.nextActionNote ? `: ${d.nextActionNote}` : ''}` + link);
+          d.overdueAlertedFor = d.nextActionAt; dirty = true;
+        }
+
+        if (dirty) db.prepare('UPDATE deals SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(d), dr.id, teamId);
+      }
+    }
+  } catch (e) { console.warn('[alert-scan] failed', e); }
+}
+let alertTimer: ReturnType<typeof setInterval> | null = null;
+function startAlertScanScheduler() {
+  if (alertTimer) return;
+  setTimeout(runAlertScan, 90 * 1000);
+  alertTimer = setInterval(runAlertScan, 30 * 60 * 1000); // каждые 30 минут
+  console.log('[server] alert scan scheduler started (every 30min)');
+}
+
 app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
   startLeadFollowupScheduler();
+  startAlertScanScheduler();
   // Push the /-command menu to Telegram (idempotent — safe on every boot).
   // Adds /design to the blue menu button so users discover the wizard.
   if (isTelegramReady()) {

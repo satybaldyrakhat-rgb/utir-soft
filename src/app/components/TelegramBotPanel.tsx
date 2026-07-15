@@ -12,7 +12,7 @@ const CLIENT_TEMPLATES = [
   { id: 't4', text: 'Завтра приедем устанавливать с {время}', trigger: 'За 1 день до установки', enabled: false },
 ];
 
-const ALERTS = ['Крупная сделка > 1 млн ₸', 'Отказ клиента', 'Просрочка заказа', 'Потеря горячего лида'];
+const ALERTS = ['Оплата поступила', 'Крупная сделка > 1 млн ₸', 'Отказ клиента', 'Просрочка заказа', 'Потеря горячего лида'];
 
 export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
@@ -188,6 +188,7 @@ export function TelegramBotPanel({ onClose, language = 'ru' }: Props) {
                   {ALERTS.map(a => {
                     const on = activeAlerts.includes(a);
                     const alertLabel: Record<string, string> = {
+                      'Оплата поступила': l('Оплата поступила', 'Төлем түсті', 'Payment received'),
                       'Крупная сделка > 1 млн ₸': l('Крупная сделка > 1 млн ₸', 'Ірі мәміле > 1 млн ₸', 'Large deal > 1M ₸'),
                       'Отказ клиента': l('Отказ клиента', 'Клиенттің бас тартуы', 'Client refusal'),
                       'Просрочка заказа': l('Просрочка заказа', 'Тапсырыстың мерзімі өтуі', 'Order overdue'),
