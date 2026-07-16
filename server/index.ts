@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
+import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
@@ -3929,6 +3929,29 @@ app.get('/api/telegram/link/status', authMiddleware, (req: AuthedRequest, res) =
 app.delete('/api/telegram/link', authMiddleware, (req: AuthedRequest, res) => {
   unlink(db, req.userId!);
   res.json({ ok: true });
+});
+
+// Тест-алёрт: шлёт пробное сообщение в ЛИЧНЫЙ Telegram текущего пользователя.
+// Позволяет за 1 клик убедиться, что связка бот → уведомления работает, и
+// понять, чего не хватает (нет токена / Telegram не привязан).
+app.post('/api/telegram/test-alert', authMiddleware, async (req: AuthedRequest, res) => {
+  if (!isTelegramReady()) {
+    return res.json({ ok: false, reason: 'no_token', message: 'Бот не подключён на сервере (нет TELEGRAM_BOT_TOKEN). Добавьте токен в Railway → Variables.' });
+  }
+  const status = getLinkStatus(db, req.userId!);
+  if (!status.paired || !status.chatId) {
+    return res.json({ ok: false, reason: 'not_linked', message: 'Ваш Telegram не привязан. Нажмите «Привязать Telegram» и отправьте боту команду /link.' });
+  }
+  const who = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
+  try {
+    await tgSendMessage(status.chatId,
+      `<b>✅ Проверка алёртов</b>\nПривет, ${who?.name || 'директор'}! Бот подключён и уведомления настроены.\n\n` +
+      `Сюда будут приходить: новые сообщения клиентов, оплаты, крупные сделки, отказы, просрочки, горячие лиды и низкий остаток склада.\n\n` +
+      `<a href="${appLink()}">Открыть платформу</a>`);
+    return res.json({ ok: true, message: 'Тестовое сообщение отправлено вам в Telegram.' });
+  } catch (e: any) {
+    return res.json({ ok: false, reason: 'send_failed', message: `Не удалось отправить: ${String(e?.message || e)}` });
+  }
 });
 
 // ─── Team Telegram invite (Этап 1 — onboard field workers) ────────

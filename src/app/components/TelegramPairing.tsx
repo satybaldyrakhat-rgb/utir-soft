@@ -25,6 +25,17 @@ export function TelegramPairing({ language }: Props) {
   const [generating, setGenerating] = useState(false);
   const [code, setCode] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const testAlert = async () => {
+    setTesting(true); setTestMsg(null);
+    try {
+      const r = await api.post<{ ok: boolean; message?: string }>('/api/telegram/test-alert', {});
+      setTestMsg({ ok: !!r.ok, text: r.message || (r.ok ? 'Отправлено' : 'Не удалось') });
+    } catch (e: any) {
+      setTestMsg({ ok: false, text: String(e?.message || e) });
+    } finally { setTesting(false); }
+  };
 
   const refresh = async () => {
     try {
@@ -90,28 +101,47 @@ export function TelegramPairing({ language }: Props) {
 
       {/* Paired state */}
       {status?.paired ? (
-        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full" />
-            <div>
-              <div className="text-xs text-emerald-900">
-                {l('Бот подключён', 'Бот қосылды', 'Bot connected')}
-                {status.username && <span className="text-emerald-700 ml-1">· @{status.username}</span>}
-              </div>
-              {status.linkedAt && (
-                <div className="text-[10px] text-emerald-600/70">
-                  {new Date(status.linkedAt).toLocaleString(language === 'eng' ? 'en-GB' : 'ru-RU')}
+        <div>
+          <div className="flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full flex-shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs text-emerald-900">
+                  {l('Бот подключён', 'Бот қосылды', 'Bot connected')}
+                  {status.username && <span className="text-emerald-700 ml-1">· @{status.username}</span>}
                 </div>
-              )}
+                {status.linkedAt && (
+                  <div className="text-[10px] text-emerald-600/70">
+                    {new Date(status.linkedAt).toLocaleString(language === 'eng' ? 'en-GB' : 'ru-RU')}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                onClick={testAlert}
+                disabled={testing}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] text-emerald-700 hover:bg-emerald-100 rounded-lg disabled:opacity-50"
+                title={l('Отправить тестовое уведомление себе в Telegram', 'Өзіңізге тест хабарлама жіберу', 'Send a test alert to yourself')}
+              >
+                {testing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                {l('Проверить', 'Тексеру', 'Test')}
+              </button>
+              <button
+                onClick={unlinkBot}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
+              >
+                <X className="w-3 h-3" />
+                {l('Отвязать', 'Ажырату', 'Unlink')}
+              </button>
             </div>
           </div>
-          <button
-            onClick={unlinkBot}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-          >
-            <X className="w-3 h-3" />
-            {l('Отвязать', 'Ажырату', 'Unlink')}
-          </button>
+          {testMsg && (
+            <div className={`mt-2 flex items-start gap-1.5 text-[11px] px-3 py-2 rounded-lg ${testMsg.ok ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-100'}`}>
+              {testMsg.ok ? <Check className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> : <span className="flex-shrink-0">⚠</span>}
+              <span>{testMsg.text}</span>
+            </div>
+          )}
         </div>
       ) : code ? (
         /* Code generated — show pairing instruction */
