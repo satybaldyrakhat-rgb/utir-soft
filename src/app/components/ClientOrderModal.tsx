@@ -1425,7 +1425,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
                       </div>
                     </div>
                     <div className="space-y-1">
-                      {Object.entries(entry.changes).map(([key, diff]) => (
+                      {Object.entries(entry.changes || {}).map(([key, diff]) => (
                         <div key={key} className="text-[11px] flex flex-wrap items-baseline gap-1.5">
                           <span className="text-slate-500">{FIELD_LABEL[key] || key}:</span>
                           <span className="text-slate-400 line-through truncate max-w-[40%]">{formatHistoryValue(key, diff.before)}</span>

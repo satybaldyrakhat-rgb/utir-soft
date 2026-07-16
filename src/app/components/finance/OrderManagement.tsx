@@ -49,7 +49,7 @@ export function OrderManagement({ language }: { language: 'kz' | 'ru' | 'eng' })
     };
   });
   const orders = storeOrders;
-  const visible = orders.filter(o => (filter === 'all' || o.status === filter) && (!query || o.name.toLowerCase().includes(query.toLowerCase()) || (o.client || '').toLowerCase().includes(query.toLowerCase())));
+  const visible = orders.filter(o => (filter === 'all' || o.status === filter) && (!query || (o.name || '').toLowerCase().includes(query.toLowerCase()) || (o.client || '').toLowerCase().includes(query.toLowerCase())));
 
   const totalRevenue = orders.reduce((s, o) => s + o.revenue, 0);
   const totalProfit = orders.reduce((s, o) => s + o.profit, 0);

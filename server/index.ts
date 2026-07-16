@@ -1898,7 +1898,6 @@ app.post('/api/conversations/:id/messages', authMiddleware, requirePermission('c
   const msg = {
     text: String(body.text || ''),
     type: body.type || 'text',
-    direction,
     senderName: body.senderName || undefined,
     fileUrl: body.fileUrl || undefined,
     fileName: body.fileName || undefined,

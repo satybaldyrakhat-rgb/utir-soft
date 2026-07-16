@@ -103,10 +103,10 @@ export function Finance({ language }: FinanceProps) {
   // Live finance figures
   const todayMonth = new Date().toISOString().slice(0, 7);
   const monthRevenue = store.transactions
-    .filter(t => t.type === 'income' && t.status === 'completed' && t.date.startsWith(todayMonth))
+    .filter(t => t.type === 'income' && t.status === 'completed' && t.date && t.date.startsWith(todayMonth))
     .reduce((s, t) => s + t.amount, 0);
   const monthExpenses = store.transactions
-    .filter(t => t.type === 'expense' && t.status === 'completed' && t.date.startsWith(todayMonth))
+    .filter(t => t.type === 'expense' && t.status === 'completed' && t.date && t.date.startsWith(todayMonth))
     .reduce((s, t) => s + t.amount, 0);
   const monthProfit = monthRevenue - monthExpenses;
   const margin = monthRevenue ? Math.round((monthProfit / monthRevenue) * 100) : 0;
@@ -684,7 +684,7 @@ function InvoiceModal({ onClose, language }: { onClose: () => void; language: 'k
 
   const candidates = store.deals
     .filter(d => d.status !== 'rejected' && d.amount > 0)
-    .filter(d => !query || d.customerName.toLowerCase().includes(query.toLowerCase()) || (d.product || '').toLowerCase().includes(query.toLowerCase()))
+    .filter(d => !query || (d.customerName || '').toLowerCase().includes(query.toLowerCase()) || (d.product || '').toLowerCase().includes(query.toLowerCase()))
     .slice(0, 20);
 
   const selected = store.deals.find(d => d.id === dealId);

@@ -269,7 +269,8 @@ export function MetaCapiDashboard({ language }: Props) {
               </thead>
               <tbody className="divide-y divide-white/50">
                 {creatives.map((c, i) => {
-                  const vd = ({ profit: { l: l('Окупается', 'Өтеледі', 'Profit'), c: 'bg-emerald-50 text-emerald-700' }, even: { l: l('В ноль', 'Нөлде', 'Even'), c: 'bg-amber-50 text-amber-700' }, loss: { l: l('Убыточно', 'Шығынды', 'Loss'), c: 'bg-rose-50 text-rose-600' }, nodata: { l: '—', c: 'bg-slate-50 text-slate-400' } } as any)[c.verdict];
+                  const VERDICT_MAP: any = { profit: { l: l('Окупается', 'Өтеледі', 'Profit'), c: 'bg-emerald-50 text-emerald-700' }, even: { l: l('В ноль', 'Нөлде', 'Even'), c: 'bg-amber-50 text-amber-700' }, loss: { l: l('Убыточно', 'Шығынды', 'Loss'), c: 'bg-rose-50 text-rose-600' }, nodata: { l: '—', c: 'bg-slate-50 text-slate-400' } };
+                  const vd = VERDICT_MAP[c.verdict] || VERDICT_MAP.nodata;
                   return (
                     <tr key={i} className="hover:bg-white/40">
                       <td className="px-5 py-3 text-slate-800 max-w-[220px] truncate" title={c.adName}>{c.adName}</td>

@@ -1176,7 +1176,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
         api.get<PlatformModule[]>('/api/custom-modules').catch(() => null),
         api.get<CustomRecord[]>('/api/custom-records').catch(() => null),
       ]);
-      setDeals(d); setEmployees(e); setTasks(t); setProducts(p);
+      // Нормализуем сделки: записи из CSV-импорта / частичных API-ответов
+      // могут прийти без обязательных строковых полей (status, customerName,
+      // product, phone). Раньше это роняло рендер (`d.status.toLowerCase()`,
+      // `d.customerName.charAt(0)` и т.п. → белый экран). Проставляем безопасные
+      // дефолты один раз при загрузке — защита в глубину поверх точечных гардов.
+      setDeals(d.map(dl => ({
+        ...dl,
+        status: dl.status || 'new',
+        customerName: dl.customerName ?? '',
+        product: dl.product ?? '',
+        phone: dl.phone ?? '',
+      })));
+      // Сотрудник без name (приглашение без имени / частичный ответ) ронял
+      // вкладки «Задачи» и «Команда» (`e.name.split`, `emp.name.charAt`).
+      setEmployees(e.map(emp => ({ ...emp, name: emp.name ?? '' })));
+      setTasks(t); setProducts(p);
       // Нормализуем статус транзакций: запись без status (импорт CSV / внешний
       // API) считаем завершённой, иначе она была бы невидима в выручке/кассе.
       setTransactions(tx.map(t => (t.status ? t : { ...t, status: 'completed' as const })));

@@ -703,7 +703,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
       const q = query.toLowerCase();
       const phoneDigits = (d.phone || '').replace(/[^0-9]/g, '');
       const qDigits = q.replace(/[^0-9]/g, '');
-      return d.customerName.toLowerCase().includes(q)
+      return (d.customerName || '').toLowerCase().includes(q)
           || (d.product || '').toLowerCase().includes(q)
           || (d.phone || '').toLowerCase().includes(q)
           || (qDigits.length >= 3 && phoneDigits.includes(qDigits))
@@ -712,7 +712,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
     .sort((a, b) => {
       const dir = sortDir === 'asc' ? 1 : -1;
       if (sortKey === 'amount') return (a._amount - b._amount) * dir;
-      if (sortKey === 'name')   return a.customerName.localeCompare(b.customerName) * dir;
+      if (sortKey === 'name')   return (a.customerName || '').localeCompare(b.customerName || '') * dir;
       if (sortKey === 'date') {
         const ta = a.date ? new Date(a.date).getTime() : 0;
         const tb = b.date ? new Date(b.date).getTime() : 0;
@@ -883,7 +883,7 @@ function DealPayments({ deals, language }: { deals: Deal[]; language: 'kz' | 'ru
               <div key={d.id} className="px-4 py-3 hover:bg-white/30 transition-colors grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
                 <div className="md:col-span-3 flex items-center gap-2.5 min-w-0">
                   <div className="w-8 h-8 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center text-[10px] text-gray-500 flex-shrink-0">
-                    {d.customerName.slice(0, 2).toUpperCase()}
+                    {(d.customerName || '—').slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs text-gray-900 truncate">{d.customerName}</div>

@@ -90,6 +90,9 @@ const priorityConfig: Record<string, { label: { ru: string; kz: string; eng: str
   high: { label: { ru: 'Высокий', kz: 'Жоғары', eng: 'High' }, color: 'text-orange-600', bg: 'bg-orange-50' },
   urgent: { label: { ru: 'Срочно', kz: 'Шұғыл', eng: 'Urgent' }, color: 'text-red-600', bg: 'bg-red-50' },
 };
+// Priority из CSV-импорта бывает нестандартной строкой («Высокий», мусор) —
+// прямой lookup давал undefined и ронял вид «Список»/детали. Фолбэк на medium.
+const prCfg = (p: string | undefined) => priorityConfig[p as string] || priorityConfig.medium;
 
 interface TasksProps {
   language: 'kz' | 'ru' | 'eng';
@@ -158,7 +161,7 @@ export function Tasks({ language }: TasksProps) {
   const today = new Date().toISOString().slice(0, 10);
 
   const filteredTasks = tasks.filter(t => {
-    if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase()) && !t.description.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (searchQuery && !(t.title || '').toLowerCase().includes(searchQuery.toLowerCase()) && !(t.description || '').toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (filterEmployee !== 'all' && t.assignee.id !== filterEmployee) return false;
     if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
     if (filterCategory !== 'all' && t.category !== filterCategory) return false;
@@ -518,7 +521,7 @@ export function Tasks({ language }: TasksProps) {
             </thead>
             <tbody className="divide-y divide-white/50">
               {filteredTasks.map(task => {
-                const pr = priorityConfig[task.priority];
+                const pr = prCfg(task.priority);
                 return (
                   <tr key={task.id} className="hover:bg-white/30 transition-colors cursor-pointer" onClick={() => setSelectedTask(task)}>
                     <td className="px-4 py-3">
@@ -622,7 +625,7 @@ export function Tasks({ language }: TasksProps) {
                               <div className="text-sm text-slate-900">{task.title}</div>
                               <div className="flex items-center gap-2 mt-0.5">
                                 {task.category && <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${categoryColor(task.category, taskCategories)}`}>{task.category}</span>}
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${priorityConfig[task.priority].bg} ${priorityConfig[task.priority].color}`}>{pickLang(priorityConfig[task.priority].label, language)}</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${prCfg(task.priority).bg} ${prCfg(task.priority).color}`}>{pickLang(prCfg(task.priority).label, language)}</span>
                               </div>
                             </div>
                           </div>
@@ -1016,8 +1019,8 @@ function TaskDetailModal({
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColor(category, categoryOptions)}`}>{category}</span>
-                <span className={`text-xs px-2 py-0.5 rounded ${priorityConfig[priority].bg} ${priorityConfig[priority].color}`}>
-                  {pickLang(priorityConfig[priority].label, language)}
+                <span className={`text-xs px-2 py-0.5 rounded ${prCfg(priority).bg} ${prCfg(priority).color}`}>
+                  {pickLang(prCfg(priority).label, language)}
                 </span>
                 {task.source === 'telegram' && (
                   <span className="inline-flex items-center gap-1 text-[10px] text-[#2AABEE] bg-blue-50 px-2 py-0.5 rounded-full">

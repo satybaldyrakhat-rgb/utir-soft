@@ -265,7 +265,7 @@ export function AIDesign({ language }: AIDesignProps) {
     const q = attachQuery.toLowerCase().trim();
     return store.deals
       .filter(d => d.status !== 'rejected')
-      .filter(d => !q || d.customerName.toLowerCase().includes(q) || (d.phone || '').includes(q))
+      .filter(d => !q || (d.customerName || '').toLowerCase().includes(q) || (d.phone || '').includes(q))
       .slice(0, 30);
   }, [store.deals, attachQuery]);
 

@@ -971,7 +971,7 @@ export function Dashboard({ language, onNavigate }: DashboardProps) {
                     onClick={() => setSelectedOrder(deal)}
                   >
                     <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 ring-1 ring-white/70 flex items-center justify-center text-sm text-slate-600 flex-shrink-0">
-                      {deal.customerName.charAt(0)}
+                      {deal.customerName?.charAt(0) || '?'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">

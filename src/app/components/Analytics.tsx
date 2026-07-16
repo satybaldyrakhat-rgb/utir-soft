@@ -80,7 +80,7 @@ export function Analytics({ language }: AnalyticsProps) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const revenue = store.transactions
-        .filter(t => t.type === 'income' && t.status === 'completed' && t.date.startsWith(monthKey))
+        .filter(t => t.type === 'income' && t.status === 'completed' && (t.date || '').startsWith(monthKey))
         .reduce((s, t) => s + t.amount, 0);
       const orders = store.deals.filter(dl => (dl.createdAt || '').slice(0, 7) === monthKey).length;
       out.push({ month: monthNames[d.getMonth()], revenue, orders });

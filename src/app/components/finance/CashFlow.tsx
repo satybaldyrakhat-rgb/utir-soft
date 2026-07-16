@@ -24,10 +24,10 @@ export function CashFlow() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const inflow = store.transactions
-        .filter(t => t.type === 'income' && t.status === 'completed' && t.date.startsWith(key))
+        .filter(t => t.type === 'income' && t.status === 'completed' && t.date && t.date.startsWith(key))
         .reduce((s, t) => s + t.amount, 0);
       const outflow = store.transactions
-        .filter(t => t.type === 'expense' && t.status === 'completed' && t.date.startsWith(key))
+        .filter(t => t.type === 'expense' && t.status === 'completed' && t.date && t.date.startsWith(key))
         .reduce((s, t) => s + t.amount, 0);
       out.push({ m: MONTHS[d.getMonth()], in: inflow, out: outflow });
     }

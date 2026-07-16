@@ -100,7 +100,7 @@ export function ClientCabinet({ session, onLogout }: { session: ClientSession; o
 
   const activeDeals = clientDeals.filter(d => d.status.toLowerCase() !== 'done');
   const totalActive = activeDeals.reduce((s, d) => s + (d.amount || 0), 0);
-  const initials = session.name.split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase();
+  const initials = (session.name || '').split(' ').map(s => s[0] || '').join('').slice(0, 2).toUpperCase();
 
   const curNav = NAV.find(n => n.id === page);
 
@@ -247,7 +247,7 @@ function HomePage({
   deals: Deal[]; activeDeals: Deal[]; totalActive: number;
 }) {
   const courier = useCourierLocation();
-  const firstName = session.name.split(' ')[0];
+  const firstName = (session.name || '').split(' ')[0];
 
   const markers: MapMarker[] = [
     { id: 'home', lat: CLIENT_HOME[0], lng: CLIENT_HOME[1], label: tl(lang, 'Вы здесь', 'Сіз осындасыз', 'You'), sub: 'ул. Абая 45', color: 'sky' },

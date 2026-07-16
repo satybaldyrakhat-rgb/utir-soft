@@ -409,7 +409,7 @@ export function MarketingDashboard({ language }: { language: 'kz' | 'ru' | 'eng'
                 <div key={d.id} className="px-5 py-3">
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="text-xs text-gray-800 truncate">{d.customerName}</span>
-                    <span className="text-[11px] text-amber-500 tabular-nums flex-shrink-0">{'★'.repeat(d.review!.rating)}<span className="text-gray-200">{'★'.repeat(5 - d.review!.rating)}</span></span>
+                    <span className="text-[11px] text-amber-500 tabular-nums flex-shrink-0">{(() => { const r = Math.max(0, Math.min(5, Math.round(d.review!.rating || 0))); return <>{'★'.repeat(r)}<span className="text-gray-200">{'★'.repeat(5 - r)}</span></>; })()}</span>
                   </div>
                   {d.review!.text && <div className="text-[11px] text-gray-500 leading-snug">{d.review!.text}</div>}
                 </div>

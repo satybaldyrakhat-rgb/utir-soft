@@ -13,6 +13,9 @@ import { toast } from '../utils/toast';
 
 interface Product {
   id: string; name: string; category: string; quantity: number; unit: string; supplier: string; cost: number; status: 'instock' | 'low' | 'outofstock'; minQty: number;
+  // Ниша-тег (опционально) — для мульти-нишевых команд, чтобы фильтровать
+  // склад по направлению. Пусто/undefined = материал общий для всех ниш.
+  niche?: string;
 }
 
 interface ProdOrder {
@@ -438,7 +441,7 @@ export function Warehouse({ language }: WarehouseProps) {
       const dealNicheConfig = getNiche(d.niche || store.niche);
       return {
         id: i + 1, dealId: d.id,
-        name: d.product, client: d.customerName.split(' ')[0] + ' ' + (d.customerName.split(' ')[1]?.[0] || '') + '.',
+        name: d.product, client: (d.customerName || '').split(' ')[0] + ' ' + ((d.customerName || '').split(' ')[1]?.[0] || '') + '.',
         master: d.measurer || 'Не назначен',
         daysLeft: d.completionDate ? Math.max(0, Math.ceil((new Date(d.completionDate).getTime() - Date.now()) / 86400000)) : 0,
         progress: d.progress,
@@ -470,7 +473,7 @@ export function Warehouse({ language }: WarehouseProps) {
       if (!bom) continue;
       const consumedByName = new Map<string, number>();
       (((d as any).consumed as ConsumedMaterial[] | undefined) || []).forEach(c =>
-        consumedByName.set((c.name || '').toLowerCase(), (consumedByName.get((c.name || '').toLowerCase()) || 0) + (c.qty || 0)));
+        consumedByName.set((c.productName || '').toLowerCase(), (consumedByName.get((c.productName || '').toLowerCase()) || 0) + (c.qty || 0)));
       const dl = d.completionDate || '';
       for (const m of bom.materials) {
         const key = (m.mat || '').trim().toLowerCase();

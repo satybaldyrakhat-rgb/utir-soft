@@ -291,14 +291,14 @@ export function PaymentCalendar() {
             </div>
           ) : (
             <div className="divide-y divide-gray-50 max-h-[420px] overflow-y-auto">
-              {visible.sort((a, b) => a.date.localeCompare(b.date)).map(p => (
-                <button key={p.id} onClick={() => setSelectedDay(parseInt(p.date.slice(8), 10))} className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-gray-50/50">
+              {visible.sort((a, b) => (a.date || '').localeCompare(b.date || '')).map(p => (
+                <button key={p.id} onClick={() => setSelectedDay(parseInt((p.date || '').slice(8), 10))} className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-gray-50/50">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${p.type === 'in' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
                     {p.type === 'in' ? <ArrowDownRight className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs text-gray-900 truncate">{p.client}</div>
-                    <div className="text-[10px] text-gray-400 truncate">{p.date.slice(8)} · {p.method}</div>
+                    <div className="text-[10px] text-gray-400 truncate">{(p.date || '').slice(8)} · {p.method}</div>
                   </div>
                   <div className="text-right flex-shrink-0">
                     <div className={`text-xs tabular-nums ${p.type === 'in' ? 'text-emerald-600' : 'text-rose-500'}`}>{p.type === 'in' ? '+' : '−'}{fmt(p.amount)}</div>
