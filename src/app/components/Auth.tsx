@@ -102,7 +102,10 @@ export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
   useEffect(() => {
     try {
       const p = new URLSearchParams(window.location.search);
-      const oauthToken = p.get('token');
+      // Токен теперь приходит во фрагменте (#oauth_token=) — не утекает в
+      // Referer/логи. Старый ?token= читаем как fallback (совместимость).
+      const hashMatch = /(?:^#|&)oauth_token=([^&]+)/.exec(window.location.hash || '');
+      const oauthToken = (hashMatch ? decodeURIComponent(hashMatch[1]) : null) || p.get('token');
       const oauthErr = p.get('oauth');
       if (oauthToken) {
         setToken(oauthToken);

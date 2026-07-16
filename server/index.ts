@@ -1220,17 +1220,45 @@ function upsertOAuthUser(opts: { email: string; name: string; provider: string }
   return jwt.sign({ sub: id }, JWT_SECRET, { expiresIn: '30d' });
 }
 
+// ─── OAuth CSRF-защита (state) + безопасная передача токена ──────────
+// state: случайная строка, кладётся в httpOnly-cookie на старте и
+// сравнивается с параметром при возврате — привязка к браузеру,
+// закрывает login-CSRF. Оба OAuth-эндпоинта на одном (API) origin, так
+// что cookie доезжает. SameSite=Lax → cookie доходит при top-level
+// редиректе назад от Google/Facebook.
+function setOAuthStateCookie(res: Response, state: string) {
+  res.cookie('oauth_state', state, { httpOnly: true, sameSite: 'lax', secure: !DEV, maxAge: 10 * 60 * 1000, path: '/' });
+}
+function readRawCookie(req: Request, name: string): string {
+  const raw = req.headers.cookie || '';
+  for (const part of raw.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() === name) return decodeURIComponent(part.slice(eq + 1).trim());
+  }
+  return '';
+}
+function oauthStateOk(req: Request, res: Response): boolean {
+  const fromUrl = String(req.query.state || '');
+  const fromCookie = readRawCookie(req, 'oauth_state');
+  res.clearCookie('oauth_state', { path: '/' });
+  return fromUrl.length > 0 && fromCookie.length > 0 && fromUrl === fromCookie;
+}
+
 app.get('/api/auth/google', (req, res) => {
   const cid = (process.env.GOOGLE_CLIENT_ID || '').trim();
   if (!cid) return res.redirect(`${APP_URL}/?oauth=notconfigured`);
+  const state = randomBytes(16).toString('hex');
+  setOAuthStateCookie(res, state);
   const params = new URLSearchParams({
     client_id: cid, redirect_uri: oauthRedirectUri(req, 'google'),
-    response_type: 'code', scope: 'openid email profile', prompt: 'select_account',
+    response_type: 'code', scope: 'openid email profile', prompt: 'select_account', state,
   });
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
 });
 app.get('/api/auth/google/callback', async (req, res) => {
   try {
+    if (!oauthStateOk(req, res)) return res.redirect(`${APP_URL}/?oauth=failed`);
     const code = String(req.query.code || '');
     const cid = (process.env.GOOGLE_CLIENT_ID || '').trim(), secret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
     if (!code || !cid || !secret) return res.redirect(`${APP_URL}/?oauth=failed`);
@@ -1243,21 +1271,26 @@ app.get('/api/auth/google/callback', async (req, res) => {
     const profResp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: `Bearer ${tk.access_token}` } });
     const profile: any = await profResp.json();
     const token = upsertOAuthUser({ email: profile.email, name: profile.name || profile.email, provider: 'google' });
-    res.redirect(`${APP_URL}/?token=${token}`);
+    // Токен во фрагменте (#), а не в query (?): фрагмент не уходит в
+    // Referer и не пишется в логи прокси/сервера.
+    res.redirect(`${APP_URL}/#oauth_token=${token}`);
   } catch { res.redirect(`${APP_URL}/?oauth=failed`); }
 });
 
 app.get('/api/auth/facebook', (req, res) => {
   const aid = (process.env.FACEBOOK_APP_ID || '').trim();
   if (!aid) return res.redirect(`${APP_URL}/?oauth=notconfigured`);
+  const state = randomBytes(16).toString('hex');
+  setOAuthStateCookie(res, state);
   const params = new URLSearchParams({
     client_id: aid, redirect_uri: oauthRedirectUri(req, 'facebook'),
-    response_type: 'code', scope: 'email public_profile',
+    response_type: 'code', scope: 'email public_profile', state,
   });
   res.redirect(`https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`);
 });
 app.get('/api/auth/facebook/callback', async (req, res) => {
   try {
+    if (!oauthStateOk(req, res)) return res.redirect(`${APP_URL}/?oauth=failed`);
     const code = String(req.query.code || '');
     const aid = (process.env.FACEBOOK_APP_ID || '').trim(), secret = (process.env.FACEBOOK_APP_SECRET || '').trim();
     if (!code || !aid || !secret) return res.redirect(`${APP_URL}/?oauth=failed`);
@@ -1270,7 +1303,7 @@ app.get('/api/auth/facebook/callback', async (req, res) => {
     const profile: any = await profResp.json();
     if (!profile.email) return res.redirect(`${APP_URL}/?oauth=noemail`);
     const token = upsertOAuthUser({ email: profile.email, name: profile.name || profile.email, provider: 'facebook' });
-    res.redirect(`${APP_URL}/?token=${token}`);
+    res.redirect(`${APP_URL}/#oauth_token=${token}`);
   } catch { res.redirect(`${APP_URL}/?oauth=failed`); }
 });
 
@@ -2319,7 +2352,10 @@ app.use('/api/tasks', makeCrud('tasks', 't'));
 // Кастомные модули: определения (создать/изменить/удалить модуль) — только
 // админ; читать модули и вести записи внутри них может вся команда.
 app.use('/api/custom-modules', authMiddleware, requireRoleForWrites('admin'), makeCrud('custom_modules', 'cm_'));
-app.use('/api/custom-records', makeCrud('custom_records', 'r_'));
+// Записи кастомных модулей: чтение — любому члену команды, запись —
+// менеджер+ (структуру модулей меняет только админ выше). Раньше писать
+// мог кто угодно; теперь рядовой сотрудник только читает.
+app.use('/api/custom-records', authMiddleware, requireRoleForWrites('manager'), makeCrud('custom_records', 'r_'));
 app.use('/api/products', authMiddleware, requirePermission('production'), makeCrud('products', 'p'));
 // Finance gated by the matrix (was requireRole('manager') — now matrix-driven
 // so admin can hand finance to specific roles without touching code).
@@ -3554,7 +3590,7 @@ taxesRouter.get('/payments', (req: AuthedRequest, res) => {
   })));
 });
 
-taxesRouter.post('/payments', requireRole('manager'), (req: AuthedRequest, res) => {
+taxesRouter.post('/payments', requirePermission('finance'), (req: AuthedRequest, res) => {
   const periodKey = String(req.body?.periodKey || '').trim();
   const amount = Number(req.body?.amount) || 0;
   const note = String(req.body?.note || '').slice(0, 240);
@@ -3582,7 +3618,7 @@ taxesRouter.post('/payments', requireRole('manager'), (req: AuthedRequest, res) 
 });
 
 // Undo a payment mark — DELETE by period_key (not row id, simpler from UI).
-taxesRouter.delete('/payments/:periodKey', requireRole('manager'), (req: AuthedRequest, res) => {
+taxesRouter.delete('/payments/:periodKey', requirePermission('finance'), (req: AuthedRequest, res) => {
   const periodKey = String(req.params.periodKey);
   db.prepare('DELETE FROM tax_payments WHERE team_id = ? AND period_key = ?').run(req.teamId!, periodKey);
   const actor = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
