@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary, verifyWebhookSecret, configureWebhookSecret, isWebhookSecretSet } from './telegram.js';
+import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
@@ -3995,6 +3996,21 @@ activityRouter.post('/', (req: AuthedRequest, res) => {
 });
 
 app.use('/api/activity', activityRouter);
+
+// ─── Демо-данные одной кнопкой (только админ) ───────────────────────
+// Заполняет команду реалистичными данными мебельного бизнеса для показа
+// клиентам. Все записи с id `demo-…` — очистка удаляет только их.
+app.get('/api/team/demo/status', authMiddleware, (req: AuthedRequest, res) => {
+  res.json(demoStatus(db, req.teamId!));
+});
+app.post('/api/team/demo/seed', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
+  const counts = seedDemoData(db, req.teamId!, req.userId!);
+  res.json({ ok: true, counts });
+});
+app.post('/api/team/demo/clear', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
+  const removed = clearDemoData(db, req.teamId!);
+  res.json({ ok: true, removed });
+});
 
 // ─── CLIENT CABINET PASSWORDLESS (phone) ───────────────
 // Stores a session by phone — non-secure demo; not tied to JWT users.

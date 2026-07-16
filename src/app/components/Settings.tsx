@@ -37,6 +37,90 @@ interface Employee {
 
 interface ActivityLog { id: string; user: string; action: string; target: string; timestamp: string; type: 'create' | 'update' | 'delete' | 'login' | 'logout'; }
 
+// ─── Демо-данные (только админ) ───────────────────────────────────────
+// Заполняет платформу реалистичными данными мебельного бизнеса, чтобы
+// показывать клиентам живые экраны. Все записи с id `demo-…` — очистка
+// удаляет только их, реальные данные не трогает.
+function DemoDataPanel({ language }: { language: 'kz' | 'ru' | 'eng' }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const store = useDataStore();
+  const [total, setTotal] = useState<number | null>(null);
+  const [busy, setBusy] = useState<'seed' | 'clear' | null>(null);
+
+  const refresh = async () => {
+    try { const s = await api.get<{ total: number }>('/api/team/demo/status'); setTotal(s.total); }
+    catch { setTotal(null); }
+  };
+  useEffect(() => { refresh(); }, []);
+
+  const seed = async () => {
+    setBusy('seed');
+    try {
+      const r = await api.post<{ counts: { total: number } }>('/api/team/demo/seed', {});
+      await store.reloadAll();
+      setTotal(r.counts.total);
+      toast(l(`Демо-данные добавлены: ${r.counts.total} записей`, `Демо-деректер қосылды: ${r.counts.total}`, `Demo data added: ${r.counts.total} records`), 'success');
+    } catch {
+      toast(l('Не удалось добавить демо-данные', 'Демо-деректерді қосу мүмкін болмады', 'Failed to add demo data'), 'error');
+    } finally { setBusy(null); }
+  };
+
+  const clear = async () => {
+    if (!(await confirmDialog({ message: l('Удалить все демо-данные? Реальные данные не затрагиваются.', 'Барлық демо-деректерді жою керек пе? Нақты деректер өзгермейді.', 'Delete all demo data? Real data is untouched.'), danger: true }))) return;
+    setBusy('clear');
+    try {
+      await api.post('/api/team/demo/clear', {});
+      await store.reloadAll();
+      setTotal(0);
+      toast(l('Демо-данные удалены', 'Демо-деректер жойылды', 'Demo data removed'), 'success');
+    } catch {
+      toast(l('Не удалось удалить', 'Жою мүмкін болмады', 'Failed to remove'), 'error');
+    } finally { setBusy(null); }
+  };
+
+  const has = (total || 0) > 0;
+  return (
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
+      <div className="flex items-center gap-2 mb-1">
+        <LayoutGrid className="w-4 h-4 text-emerald-600" />
+        <div className="text-sm text-gray-900">{l('Демо-данные для показа', 'Көрсетуге арналған демо-деректер', 'Demo data for presentations')}</div>
+      </div>
+      <div className="text-[11px] text-slate-400 mb-4 leading-relaxed">
+        {l(
+          'Заполнит платформу реалистичными данными мебельного бизнеса (сделки, финансы, склад, задачи) — чтобы показывать клиентам живые экраны. Ваши реальные данные не затрагиваются: удаляются только демо-записи.',
+          'Платформаны нақты жиһаз бизнесінің деректерімен толтырады (мәмілелер, қаржы, қойма, тапсырмалар). Нақты деректеріңіз өзгермейді — тек демо-жазбалар жойылады.',
+          'Fills the platform with realistic furniture-business data (deals, finance, warehouse, tasks) so you can show clients live screens. Your real data is untouched — only demo records are removed.',
+        )}
+      </div>
+      {has && (
+        <div className="mb-3 px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl text-[11px] text-emerald-800">
+          {l(`Сейчас загружено демо-записей: ${total}`, `Қазір жүктелген демо-жазбалар: ${total}`, `Demo records loaded: ${total}`)}
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={seed}
+          disabled={busy !== null}
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {busy === 'seed' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+          {has ? l('Пересоздать демо-данные', 'Демо-деректерді қайта құру', 'Regenerate demo data') : l('Заполнить демо-данными', 'Демо-деректермен толтыру', 'Fill with demo data')}
+        </button>
+        {has && (
+          <button
+            onClick={clear}
+            disabled={busy !== null}
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl text-xs disabled:opacity-50"
+          >
+            {busy === 'clear' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            {l('Очистить демо-данные', 'Демо-деректерді тазалау', 'Clear demo data')}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface SettingsProps {
   language: 'kz' | 'ru' | 'eng';
   onLanguageChange?: (language: 'kz' | 'ru' | 'eng') => void;
@@ -441,12 +525,15 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
           RequisitesCard is passed through as a slot so this file remains
           the source of truth for banking-requisites wiring. */}
       {activeTab === 'general' && (
-        <GeneralSettings
-          language={language}
-          onLanguageChange={onLanguageChange}
-          onLogout={onLogout}
-          requisitesSlot={<RequisitesCard language={language} />}
-        />
+        <div className="space-y-5">
+          <GeneralSettings
+            language={language}
+            onLanguageChange={onLanguageChange}
+            onLogout={onLogout}
+            requisitesSlot={<RequisitesCard language={language} />}
+          />
+          {isAdmin && <DemoDataPanel language={language} />}
+        </div>
       )}
 
       {/* ===== CATALOGS (Справочники) ===== */}
