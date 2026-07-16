@@ -546,6 +546,49 @@ function seedIntegrations(userId: string) {
 }
 
 const app = express();
+
+// ─── Устойчивость процесса ───────────────────────────────────────────
+// Express 4 НЕ ловит реджекты из async-обработчиков — в Node 22 такой
+// unhandledRejection роняет весь процесс (платформа ложится у всех).
+// `ah()` оборачивает async-хендлер: любой throw/reject уходит в
+// error-middleware (ниже), клиент получает чистый 500, процесс живёт.
+type AnyHandler = (req: any, res: any, next: any) => any;
+const ah = (fn: AnyHandler): AnyHandler => (req, res, next) => {
+  try {
+    const out = fn(req, res, next);
+    if (out && typeof (out as any).then === 'function') (out as Promise<any>).catch(next);
+  } catch (e) { next(e); }
+};
+
+// Автообёртка всех обработчиков маршрутов: любой хендлер, зарегистрированный
+// через get/post/put/patch/delete/all (и на app, и на любом express.Router),
+// оборачивается в ah(). Так реджект async-хендлера уходит в error-middleware,
+// а не в unhandledRejection. Error-middleware (arity 4) и суб-роутеры не
+// трогаем. Патч стоит ДО создания любого роутера/маршрута — проверено на
+// express 4.22 (см. scratch-тест: param-роуты, цепочки middleware, роутеры —
+// всё работает, процесс не падает).
+function patchRouteVerbs(target: any) {
+  for (const m of ['get', 'post', 'put', 'patch', 'delete', 'all']) {
+    const orig = target[m];
+    if (typeof orig !== 'function') continue;
+    target[m] = function (path: any, ...handlers: any[]) {
+      return orig.call(this, path, ...handlers.map((h: any) =>
+        (typeof h === 'function' && h.length < 4) ? ah(h) : h));
+    };
+  }
+}
+patchRouteVerbs(app);                 // app.get/post/…
+patchRouteVerbs(express.Router);      // router.get/post/… (все инстансы наследуют)
+
+// Последний рубеж: даже если что-то прорвётся мимо ah()/Express, процесс
+// не должен падать. Логируем и продолжаем работать.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+});
+
 // CORS: в проде ограничиваем список origin через env CORS_ORIGINS
 // (запятые). Без токена запросы (curl/мобильные/same-origin) всегда
 // разрешены. В dev — всё разрешено (localhost:5173 и т.п.). Если
@@ -4103,6 +4146,16 @@ function startAlertScanScheduler() {
   alertTimer = setInterval(runAlertScan, 30 * 60 * 1000); // каждые 30 минут
   console.log('[server] alert scan scheduler started (every 30min)');
 }
+
+// ─── Error middleware (последний, после всех маршрутов) ──────────────
+// Единая точка обработки ошибок: и синхронные throw (Express их ловит),
+// и реджекты async-хендлеров, обёрнутых в ah(), приходят сюда. Отдаём
+// чистый JSON-500 без утечки стектрейса клиенту; детали — только в лог.
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  console.error(`[api-error] ${req.method} ${req.originalUrl}`, err);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'internal server error' });
+});
 
 app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
