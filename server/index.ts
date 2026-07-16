@@ -756,6 +756,7 @@ const RATE_LIMITS: Record<string, { max: number; windowMs: number }> = {
   'forgot':      { max: 3,  windowMs: 15 * 60 * 1000 },  // 3 / 15min — strict, prevents email-spam-via-form
   'lead':        { max: 20, windowMs: 60 * 60 * 1000 },  // 20 / hour per IP — public lead form
   'phone':       { max: 8,  windowMs: 15 * 60 * 1000 },  // 8 / 15min — SMS code requests
+  'track':       { max: 60, windowMs: 60 * 1000 },       // 60 / min per IP — публичный трек-линк: клиенту хватает с запасом, а перебор 7-символьных кодов делает бессмысленным
 };
 function rateLimit(bucket: keyof typeof RATE_LIMITS) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -1572,7 +1573,7 @@ const TRACK_STAGE_LABEL: Record<string, string> = {
   manufacturing: 'Изготовление', installation: 'Монтаж', completed: 'Готово', rejected: 'Отменён',
 };
 const TRACK_STAGE_ORDER = ['new', 'measured', 'project-agreed', 'contract', 'production', 'installation', 'completed'];
-app.get('/api/track/:code', (req, res) => {
+app.get('/api/track/:code', rateLimit('track'), (req, res) => {
   const link = db.prepare('SELECT deal_id, team_id FROM track_links WHERE code = ?').get(String(req.params.code || '').toUpperCase()) as any;
   if (!link) return res.status(404).json({ error: 'not found' });
   const row = db.prepare('SELECT data FROM deals WHERE id = ? AND team_id = ?').get(link.deal_id, link.team_id) as any;
@@ -1644,7 +1645,7 @@ app.get('/api/track/:code', (req, res) => {
 // text on a completed order. No auth (public Trackpage). Stored on the deal
 // JSON as `review`; idempotent-ish — overwrites a previous review. Feeds the
 // team's «Отзывы» (соц-доказательство) without exposing any team data.
-app.post('/api/track/:code/review', (req, res) => {
+app.post('/api/track/:code/review', rateLimit('track'), (req, res) => {
   const link = db.prepare('SELECT deal_id, team_id FROM track_links WHERE code = ?').get(String(req.params.code || '').toUpperCase()) as any;
   if (!link) return res.status(404).json({ error: 'not found' });
   const row = db.prepare('SELECT data FROM deals WHERE id = ? AND team_id = ?').get(link.deal_id, link.team_id) as any;
