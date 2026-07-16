@@ -1379,7 +1379,8 @@ async function sendBotAlert(teamId: string, alertKey: string, text: string) {
 app.patch('/api/deals/:id', authMiddleware, requirePermission('orders'), async (req: AuthedRequest, res) => {
   const row = db.prepare('SELECT data FROM deals WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
   if (!row) return res.status(404).json({ error: 'not found' });
-  const before = JSON.parse(row.data);
+  let before: any;
+  try { before = JSON.parse(row.data); } catch { return res.status(422).json({ error: 'corrupt deal record' }); }
   const updated = { ...before, ...req.body, id: req.params.id };
   db.prepare('UPDATE deals SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(updated), req.params.id, req.teamId!);
 
@@ -1845,7 +1846,8 @@ app.post('/api/deals/:id/history/:entryId/rollback', authMiddleware, requirePerm
   const fieldKeys = Object.keys(entryChanges);
   if (fieldKeys.length === 0) return res.status(400).json({ error: 'nothing to roll back' });
 
-  const before = JSON.parse(dealRow.data);
+  let before: any;
+  try { before = JSON.parse(dealRow.data); } catch { return res.status(422).json({ error: 'corrupt deal record' }); }
   const updated = { ...before };
   // For each field touched in the entry, restore its 'before' value.
   const rollbackDiff: Record<string, { before: any; after: any }> = {};
@@ -2250,7 +2252,8 @@ app.post('/api/tasks', authMiddleware, async (req: AuthedRequest, res) => {
 app.patch('/api/tasks/:id', authMiddleware, async (req: AuthedRequest, res) => {
   const row = db.prepare('SELECT data FROM tasks WHERE id = ? AND team_id = ?').get(req.params.id, req.teamId!) as any;
   if (!row) return res.status(404).json({ error: 'not found' });
-  const before = JSON.parse(row.data);
+  let before: any;
+  try { before = JSON.parse(row.data); } catch { return res.status(422).json({ error: 'corrupt task record' }); }
   const updated = { ...before, ...req.body, id: req.params.id };
   db.prepare('UPDATE tasks SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(updated), req.params.id, req.teamId!);
 
@@ -2616,17 +2619,22 @@ aiDesignRouter.post('/generate', requirePermission('ai-design'), async (req: Aut
   const saved = results.map(r => {
     if (!r.ok) return { ...r };
     const id = newId('aig_');
-    db.prepare(
-      'INSERT INTO ai_generations (id, team_id, user_id, user_name, provider, prompt, image_url, image_data, enhanced_prompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    ).run(
-      id, req.teamId!, req.userId!, actor?.name || '',
-      // Save the user's ORIGINAL prompt for clean history. The brand-kit
-      // additions are deterministic + readable in the team settings.
-      r.provider, userPrompt,
-      r.imageUrl || null,
-      r.imageDataUrl || null,
-      r.enhancedPrompt || null,
-    );
+    // Изображение уже сгенерировано (стоит реальных денег на API). Если
+    // запись в историю сорвётся (диск/размер/busy) — НЕ теряем результат:
+    // логируем и всё равно возвращаем картинку пользователю.
+    try {
+      db.prepare(
+        'INSERT INTO ai_generations (id, team_id, user_id, user_name, provider, prompt, image_url, image_data, enhanced_prompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ).run(
+        id, req.teamId!, req.userId!, actor?.name || '',
+        // Save the user's ORIGINAL prompt for clean history. The brand-kit
+        // additions are deterministic + readable in the team settings.
+        r.provider, userPrompt,
+        r.imageUrl || null,
+        r.imageDataUrl || null,
+        r.enhancedPrompt || null,
+      );
+    } catch (e) { console.warn('[ai-design] history insert failed', e); }
     return { ...r, id };
   });
 
