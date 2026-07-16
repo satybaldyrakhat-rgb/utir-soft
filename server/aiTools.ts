@@ -52,11 +52,13 @@ function findDealByCustomer(db: Database.Database, teamId: string, customerQuery
   return { multiple: matches };
 }
 
-function patchDeal(db: Database.Database, dealId: string, updates: Record<string, any>) {
-  const row = db.prepare('SELECT data FROM deals WHERE id = ?').get(dealId) as any;
+function patchDeal(db: Database.Database, teamId: string, dealId: string, updates: Record<string, any>) {
+  // Скоуп по team_id обязателен: не полагаемся на то, что вызывающий уже
+  // проверил принадлежность сделки команде (defense-in-depth против IDOR).
+  const row = db.prepare('SELECT data FROM deals WHERE id = ? AND team_id = ?').get(dealId, teamId) as any;
   if (!row) throw new Error('deal not found');
   const data = { ...JSON.parse(row.data), ...updates };
-  db.prepare('UPDATE deals SET data = ? WHERE id = ?').run(JSON.stringify(data), dealId);
+  db.prepare('UPDATE deals SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(data), dealId, teamId);
   return data;
 }
 
@@ -194,7 +196,7 @@ const logPayment: ToolDef = {
     const addAmount = Number(i.amount) || 0;
     const nextPaid = prevPaid + addAmount;
     const totalAmount = Number(d.data.amount) || 0;
-    patchDeal(ctx.db, d.id, { paidAmount: nextPaid });
+    patchDeal(ctx.db, ctx.teamId, d.id, { paidAmount: nextPaid });
     ctx.logActivity(ctx.userId, {
       user: 'AI-ассистент', actor: 'ai',
       action: `Записал оплату (по запросу ${ctx.userName})`,
@@ -258,7 +260,7 @@ const updateDealStatus: ToolDef = {
     const d = r.single!;
     const prev = d.data.status;
     const meta = STATUS_MAP[i.status] || { code: i.status, label: i.status };
-    patchDeal(ctx.db, d.id, { status: meta.code });
+    patchDeal(ctx.db, ctx.teamId, d.id, { status: meta.code });
     ctx.logActivity(ctx.userId, {
       user: 'AI-ассистент', actor: 'ai',
       action: `Сменил статус сделки (по запросу ${ctx.userName})`,
@@ -342,7 +344,7 @@ const updateDeal: ToolDef = {
     if (Object.keys(patch).length === 0) {
       throw new Error('не указано ни одного поля для обновления');
     }
-    patchDeal(ctx.db, d.id, patch);
+    patchDeal(ctx.db, ctx.teamId, d.id, patch);
     const changed = Object.keys(patch).join(', ');
     ctx.logActivity(ctx.userId, {
       user: 'AI-ассистент', actor: 'ai',

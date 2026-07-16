@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary } from './telegram.js';
+import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary, verifyWebhookSecret, configureWebhookSecret, isWebhookSecretSet } from './telegram.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
@@ -19,7 +19,7 @@ import { getPermissionLevel as getPermLevel, canRunTool } from './permissions.js
 import { transcribeAudio, parseAudioDataUrl, isWhisperReady } from './whisper.js';
 import { readClientAI, writeClientAI, runClientAITest, DEFAULT_CLIENT_AI, ALL_CLIENT_AI_MODELS, type ClientAIConfig, type DayKey } from './clientAi.js';
 import { INTEGRATION_CATALOG, getAllStatuses as getIntegrationStatuses, saveConfig as saveIntegrationConfig, disconnect as disconnectIntegration } from './integrations2.js';
-import { createHmac, randomBytes } from 'crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Dev flag: enables the local secret fallback and surfacing OTP/reset codes in
@@ -610,7 +610,14 @@ app.use(cors({
 }));
 // Bumped to 25MB because AI-design img2img sends base64 images for the room
 // photo + up to 3 reference shots in one body.
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({
+  limit: '25mb',
+  // Сохраняем сырое тело только для вебхука Meta — нужно для проверки
+  // подписи X-Hub-Signature-256 (HMAC по точным байтам запроса).
+  verify: (req: any, _res, buf) => {
+    if (req.originalUrl === '/api/webhooks/meta') req.rawBody = buf;
+  },
+}));
 
 interface AuthedRequest extends Request {
   userId?: string;
@@ -757,6 +764,7 @@ const RATE_LIMITS: Record<string, { max: number; windowMs: number }> = {
   'lead':        { max: 20, windowMs: 60 * 60 * 1000 },  // 20 / hour per IP — public lead form
   'phone':       { max: 8,  windowMs: 15 * 60 * 1000 },  // 8 / 15min — SMS code requests
   'track':       { max: 60, windowMs: 60 * 1000 },       // 60 / min per IP — публичный трек-линк: клиенту хватает с запасом, а перебор 7-символьных кодов делает бессмысленным
+  'token-check': { max: 30, windowMs: 15 * 60 * 1000 },  // 30 / 15min — оракул валидности reset-токена (токены и так 64-hex, это defense-in-depth)
 };
 function rateLimit(bucket: keyof typeof RATE_LIMITS) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -1083,7 +1091,7 @@ app.post('/api/auth/change-password', authMiddleware, async (req: AuthedRequest,
 // GET /api/auth/check-reset-token?token=XXX → tells the frontend if the
 // link is still valid before rendering the new-password form. Avoids
 // the user typing a new password only to be told the link expired.
-app.get('/api/auth/check-reset-token', (req, res) => {
+app.get('/api/auth/check-reset-token', rateLimit('token-check'), (req, res) => {
   const token = String(req.query?.token || '').trim();
   if (!token) return res.json({ valid: false, reason: 'missing' });
   const row = db.prepare(
@@ -2074,6 +2082,21 @@ app.get('/api/webhooks/meta', (req, res) => {
 });
 // Приём входящих сообщений WhatsApp (и Instagram — Фаза 2).
 app.post('/api/webhooks/meta', (req, res) => {
+  // Верификация подписи Meta (X-Hub-Signature-256 = HMAC-SHA256 по сырому
+  // телу с app secret). Опт-ин: если META_APP_SECRET задан — проверяем и
+  // отклоняем подделки; если нет — пропускаем (совместимость, но входящие
+  // можно подделать — задайте секрет перед запуском WhatsApp/Instagram).
+  const appSecret = process.env.META_APP_SECRET || '';
+  if (appSecret) {
+    const sig = String(req.get('X-Hub-Signature-256') || '');
+    const raw: Buffer | undefined = (req as any).rawBody;
+    let ok = false;
+    if (sig.startsWith('sha256=') && raw) {
+      const expected = 'sha256=' + createHmac('sha256', appSecret).update(raw).digest('hex');
+      try { ok = timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); } catch { ok = false; }
+    }
+    if (!ok) return res.sendStatus(401);
+  }
   // Отвечаем 200 сразу, чтобы Meta не ретраила; обработка — синхронно, но быстро.
   try {
     // WhatsApp (object: whatsapp_business_account)
@@ -3829,10 +3852,11 @@ app.get('/api/invitations/preview/:code', (req, res) => {
      WHERE i.code = ?`
   ).get(code) as any;
   if (!row) {
-    // Diagnostic: log the mismatch so we can see in Railway logs whether the issue
-    // is a typo, a casing problem, or the row genuinely doesn't exist.
-    const allCodes = db.prepare('SELECT code FROM invitations ORDER BY rowid DESC LIMIT 5').all() as any[];
-    console.warn(`[invitations/preview] not found: "${code}". Recent codes: ${allCodes.map(r => r.code).join(', ')}`);
+    // Diagnostic without leaking valid invite codes (они дают доступ к
+    // команде — нельзя писать реальные коды в логи). Логируем только факт
+    // и количество активных приглашений.
+    const cnt = db.prepare('SELECT COUNT(*) AS n FROM invitations WHERE used_at IS NULL').get() as any;
+    console.warn(`[invitations/preview] not found (len=${String(code).length}); active invites: ${cnt?.n ?? 0}`);
     return res.status(404).json({ error: 'invalid code' });
   }
   if (row.used_at) return res.status(410).json({ error: 'already used' });
@@ -3949,13 +3973,22 @@ app.post('/api/client/session', (req, res) => {
 // Webhook is intentionally PUBLIC — Telegram calls it directly. We don't trust
 // the request body's user info; we map by chat_id → user_id via telegram_links.
 app.post('/api/telegram/webhook', async (req, res) => {
+  // Верификация источника ДО обработки: если TELEGRAM_WEBHOOK_SECRET задан
+  // и заголовок не совпал — это поддельный апдейт, отклоняем. Если секрет
+  // не настроен — verifyWebhookSecret вернёт true (совместимость).
+  if (!verifyWebhookSecret(req.get('X-Telegram-Bot-Api-Secret-Token') || undefined)) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
   // Acknowledge quickly so Telegram doesn't retry; do the work async.
   res.json({ ok: true });
   try {
     await handleUpdate(db, req.body, (userId, entry) => {
       const id = newId('a_');
       const data = { id, timestamp: new Date().toISOString(), actor: 'human', ...entry };
-      db.prepare('INSERT INTO activity_logs (id, user_id, data) VALUES (?, ?, ?)').run(id, userId, JSON.stringify(data));
+      // team_id обязателен: читатель activity_logs фильтрует по team_id,
+      // иначе действия ассистента из бота теряются для командного журнала.
+      const u = db.prepare('SELECT team_id FROM users WHERE id = ?').get(userId) as any;
+      db.prepare('INSERT INTO activity_logs (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, userId, u?.team_id || null, JSON.stringify(data));
     });
   } catch (e) {
     console.error('[telegram webhook]', e);
@@ -4175,6 +4208,15 @@ app.listen(PORT, () => {
   if (isTelegramReady()) {
     registerBotCommands().then(() => console.log('[server] telegram /design menu registered'))
       .catch(e => console.warn('[server] registerBotCommands failed', e));
+    // Верификация источника вебхука: если TELEGRAM_WEBHOOK_SECRET задан —
+    // регистрируем вебхук с этим секретом (Telegram будет слать заголовок,
+    // а мы его проверяем). Если не задан — предупреждаем, что публичный
+    // вебхук без верификации можно подделать.
+    if (isWebhookSecretSet()) {
+      void configureWebhookSecret();
+    } else {
+      console.warn('[security] TELEGRAM_WEBHOOK_SECRET не задан — вебхук бота без верификации источника. Задайте секрет, чтобы исключить подделку апдейтов.');
+    }
     // 09:00 Almaty morning digest to admins/managers.
     startDailySummaryScheduler(db);
   }

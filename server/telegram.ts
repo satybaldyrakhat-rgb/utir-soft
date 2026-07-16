@@ -236,6 +236,44 @@ export function appLink(): string { return `${APP_URL}/`; }
 export function chatsLink(): string { return `${APP_URL}/#/chats`; }
 // Ссылка на раздел Производство/Склад (для алёрта о низком остатке).
 export function warehouseLink(): string { return `${APP_URL}/#/warehouse`; }
+
+// ─── Верификация источника вебхука ────────────────────────────────
+// Вебхук /api/telegram/webhook публичный (Telegram зовёт напрямую). Без
+// проверки источника любой, зная числовой chat_id привязанного
+// сотрудника, мог бы подделать апдейт и читать/писать данные его команды
+// в обход прав. Закрываем через secret_token (Telegram шлёт его в
+// заголовке X-Telegram-Bot-Api-Secret-Token).
+//
+// ОПТ-ИН И БЕЗОПАСНО ПО УМОЛЧАНИЮ: если TELEGRAM_WEBHOOK_SECRET не задан —
+// проверки нет, бот работает как раньше (обратная совместимость). Если
+// задан — сервер на старте сам регистрирует вебхук с этим секретом
+// (configureWebhookSecret) и проверяет заголовок на каждом апдейте, так
+// что включение одной переменной окружения и закрывает дыру, и остаётся
+// консистентным (не ловит 401 из-за рассинхрона регистрации).
+const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || '';
+const WEBHOOK_URL = process.env.TELEGRAM_WEBHOOK_URL || `${APP_URL}/api/telegram/webhook`;
+
+export function isWebhookSecretSet(): boolean { return !!WEBHOOK_SECRET; }
+
+// true = апдейт можно обрабатывать. Если секрет не настроен — пропускаем
+// (совместимость). Если настроен — только при совпадении заголовка.
+export function verifyWebhookSecret(headerValue: string | undefined): boolean {
+  if (!WEBHOOK_SECRET) return true;
+  return headerValue === WEBHOOK_SECRET;
+}
+
+// Регистрирует вебхук с secret_token, чтобы Telegram присылал заголовок.
+// Вызывается на старте только когда секрет задан.
+export async function configureWebhookSecret(): Promise<void> {
+  if (!TOKEN || !WEBHOOK_SECRET) return;
+  try {
+    await tg('setWebhook', { url: WEBHOOK_URL, secret_token: WEBHOOK_SECRET });
+    console.log('[telegram] webhook зарегистрирован с secret_token:', WEBHOOK_URL);
+  } catch (e) {
+    console.warn('[telegram] setWebhook с secret_token не удался — проверьте TELEGRAM_WEBHOOK_URL', e);
+  }
+}
+
 // Get the deal's existing public track code or mint a new one. Used by
 // the web "Ссылка для клиента" button and the bot completion messages.
 export function ensureTrackCode(db: Database.Database, teamId: string, dealId: string): string {
@@ -441,8 +479,10 @@ function findDeal(db: Database.Database, teamId: string, dealId: string): DealRo
   if (!r) return null;
   try { return { rowId: r.rowid, id: r.id, data: JSON.parse(r.data) }; } catch { return null; }
 }
-function saveDeal(db: Database.Database, dealId: string, data: any) {
-  db.prepare('UPDATE deals SET data = ? WHERE id = ?').run(JSON.stringify(data), dealId);
+function saveDeal(db: Database.Database, teamId: string, dealId: string, data: any) {
+  // Скоуп по team_id: не полагаемся на то, что вызывающий уже проверил
+  // findDeal с team_id (defense-in-depth — dealId приходит из callback_data).
+  db.prepare('UPDATE deals SET data = ? WHERE id = ? AND team_id = ?').run(JSON.stringify(data), dealId, teamId);
 }
 // ─── Production stages per niche (Этап 3) ──────────────────────────
 // Mirror of src/app/utils/niches.ts productionStages (RU labels + ids).
@@ -1299,7 +1339,7 @@ async function handleCallback(
     const d = findDeal(db, user.teamId, dealId);
     if (!d) { await answerCallback(cq.id, 'Заказ не найден'); return; }
     d.data.notes = appendNote(d.data.notes, `🚗 ${nowHM()} — ${emp?.name || 'мастер'} выехал на объект`);
-    saveDeal(db, dealId, d.data);
+    saveDeal(db, user.teamId, dealId, d.data);
     await answerCallback(cq.id, 'Отметил: выехал 🚗');
     if (messageId) await editReplyMarkupClear(chatId, messageId);
     await sendMessage(chatId,
@@ -1321,7 +1361,7 @@ async function handleCallback(
     d.data.progress = Math.max(25, Number(d.data.progress) || 0);
     d.data.measurementDate = new Date().toISOString().slice(0, 10);
     d.data.notes = appendNote(d.data.notes, `📐 ${nowHM()} — замер выполнен (${emp?.name || 'мастер'})`);
-    saveDeal(db, dealId, d.data);
+    saveDeal(db, user.teamId, dealId, d.data);
     await answerCallback(cq.id, 'Замер отмечен ✅');
     if (messageId) await editReplyMarkupClear(chatId, messageId);
     await sendMessage(chatId,
@@ -1354,7 +1394,7 @@ async function handleCallback(
       source: 'telegram',
     });
     d.data.documents = docs;
-    saveDeal(db, dealId, d.data);
+    saveDeal(db, user.teamId, dealId, d.data);
     clearPendingPhoto(db, chatId);
     await answerCallback(cq.id, 'Фото прикреплено ✅');
     if (messageId) await editReplyMarkupClear(chatId, messageId);
@@ -1381,7 +1421,7 @@ async function handleCallback(
     d.data.status = 'installation';
     d.data.progress = Math.max(88, Number(d.data.progress) || 0);
     d.data.notes = appendNote(d.data.notes, `🔧 ${nowHM()} — начал монтаж (${emp?.name || 'монтажник'})`);
-    saveDeal(db, dealId, d.data);
+    saveDeal(db, user.teamId, dealId, d.data);
     await answerCallback(cq.id, 'Монтаж начат 🔧');
     if (messageId) await editReplyMarkupClear(chatId, messageId);
     await sendMessage(chatId, `🔧 Монтаж у <b>${d.data.customerName || 'клиента'}</b> начат. Как закончите — нажмите «✅ Завершил монтаж» в списке /монтажи.`);
@@ -1406,7 +1446,7 @@ async function handleCallback(
     const end = new Date(start); end.setFullYear(end.getFullYear() + 1);
     d.data.warranty = { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10), months: 12 };
     d.data.notes = appendNote(d.data.notes, `✅ ${nowHM()} — монтаж завершён (${emp?.name || 'монтажник'}). Гарантия 12 мес. до ${d.data.warranty.endDate}`);
-    saveDeal(db, dealId, d.data);
+    saveDeal(db, user.teamId, dealId, d.data);
     await answerCallback(cq.id, 'Монтаж завершён ✅');
     if (messageId) await editReplyMarkupClear(chatId, messageId);
     const tlink = trackLink(ensureTrackCode(db, user.teamId, dealId));
@@ -1432,7 +1472,7 @@ async function handleCallback(
     const tpl = stagesForNiche(d.data.niche || getTeamNiche(db, user.teamId));
     const changed = cycleDealStage(d.data, stageId, tpl);
     d.data.notes = appendNote(d.data.notes, `🪚 ${nowHM()} — ${changed.label}: ${changed.status === 'done' ? 'готово' : changed.status === 'in-progress' ? 'в работе' : 'сброшен'} (${emp?.name || 'мастер'})`);
-    saveDeal(db, dealId, d.data);
+    saveDeal(db, user.teamId, dealId, d.data);
     await answerCallback(cq.id, `${changed.label}: ${changed.status === 'done' ? 'готово ✅' : changed.status === 'in-progress' ? 'в работе 🔄' : 'сброшен ⚪'}`);
     // Re-render the card in place so the chain reflects the new state.
     const card = renderOrderCard(d.data, tpl);
