@@ -38,6 +38,10 @@ export function seedDemoData(db: Database.Database, teamId: string, userId: stri
   const insert = (table: DemoTable, id: string, data: Record<string, any>) =>
     db.prepare(`INSERT INTO ${table} (id, user_id, team_id, data) VALUES (?, ?, ?, ?)`)
       .run(id, userId, teamId, JSON.stringify({ ...data, id, _demo: true }));
+  // id ДОЛЖЕН включать team_id: в этих таблицах `id` — единственный
+  // первичный ключ, поэтому фиксированные `demo-d1` конфликтовали бы между
+  // командами (вторая команда → UNIQUE constraint, весь сев откатывался).
+  const rid = (key: string) => `demo-${teamId}-${key}`;
 
   const tx = db.transaction(() => {
     // Идемпотентность: пере-сев начинается с чистого листа демо-данных.
@@ -50,7 +54,7 @@ export function seedDemoData(db: Database.Database, teamId: string, userId: stri
       { key: 'emp-3', name: 'Ерлан Серіков (демо)', email: 'demo.erlan@example.kz', phone: '+7 705 555 0103', role: 'employee', department: 'Монтаж', salary: 300000, commissionPct: 2.5, monthlyTarget: 0, perf: { ordersCompleted: 15, rating: 4.9, efficiency: 95 } },
     ];
     for (const e of employees) {
-      insert('employees', `demo-${e.key}`, {
+      insert('employees', rid(e.key), {
         name: e.name, email: e.email, phone: e.phone, role: e.role, department: e.department,
         status: 'active', salary: e.salary, joinDate: ymd(daysAgo(220)), lastActive: ymd(daysAgo(1)),
         avatar: e.name.slice(0, 2), commissionPct: e.commissionPct, monthlyTarget: e.monthlyTarget,
@@ -58,7 +62,7 @@ export function seedDemoData(db: Database.Database, teamId: string, userId: stri
         performance: e.perf,
       });
     }
-    const OWNER = { design: 'demo-emp-1', measure: 'demo-emp-2', install: 'demo-emp-3' };
+    const OWNER = { design: rid('emp-1'), measure: rid('emp-2'), install: rid('emp-3') };
 
     // ─── Сделки (14) — вся воронка, реальные суммы в ₸ ──────────────────
     // [key, клиент, телефон, продукт, сумма, оплачено, статус, источник, дней_назад_создан, owner, extra]
@@ -82,7 +86,7 @@ export function seedDemoData(db: Database.Database, teamId: string, userId: stri
     for (const [key, name, phone, product, amount, paid, status, source, createdDaysAgo, ownerId, extra] of deals) {
       const created = daysAgo(createdDaysAgo);
       const progress = status === 'completed' ? 100 : status === 'installation' ? 90 : status === 'assembly' ? 75 : status === 'manufacturing' ? 60 : status === 'production' ? 45 : status === 'contract' ? 30 : status === 'project-agreed' ? 20 : status === 'measured' ? 12 : status === 'rejected' ? 0 : 5;
-      insert('deals', `demo-${key}`, {
+      insert('deals', rid(key), {
         customerName: name, phone, address: 'г. Алматы', siteAddress: 'г. Алматы',
         product, furnitureType: product.includes('Кухня') ? 'Кухня' : product.includes('Шкаф') || product.includes('Гардероб') ? 'Шкаф' : 'Мебель',
         amount, paidAmount: paid, status, icon: source === 'Instagram' ? 'instagram' : source === 'WhatsApp' ? 'whatsapp' : 'phone',
@@ -98,10 +102,10 @@ export function seedDemoData(db: Database.Database, teamId: string, userId: stri
       // Приход по сделкам (предоплата/оплата) — привязан к сделке.
       if (paid > 0) {
         const payDate = ACTIVE_MEASURED.has(status) ? daysAgo(createdDaysAgo - 2) : created;
-        insert('transactions', `demo-tx-in-${key}`, {
+        insert('transactions', rid(`tx-in-${key}`), {
           type: 'income', category: 'Оплата заказа', amount: paid, date: ymd(payDate),
           description: `${status === 'completed' ? 'Оплата' : 'Предоплата'} · ${name}`,
-          dealId: `demo-${key}`, status: 'completed', account: 'kaspi',
+          dealId: rid(key), status: 'completed', account: 'kaspi',
         });
       }
     }
@@ -120,7 +124,7 @@ export function seedDemoData(db: Database.Database, teamId: string, userId: stri
       ['ex-mkt-2', 'Маркетинг', 90000, 12, 'Реклама WhatsApp / рассылки', { account: 'kaspi', adChannel: 'WhatsApp' }],
     ];
     for (const [key, category, amount, dAgo, description, extra] of expenses) {
-      insert('transactions', `demo-${key}`, {
+      insert('transactions', rid(key), {
         type: 'expense', category, amount, date: ymd(daysAgo(dAgo)), description, status: 'completed', ...extra,
       });
     }
@@ -141,28 +145,29 @@ export function seedDemoData(db: Database.Database, teamId: string, userId: stri
       ['p12', 'Конфирмат + заглушки', 'Крепёж', 0, 'упак', 3500, 10, 'outofstock'],
     ];
     for (const [key, name, category, quantity, unit, cost, minQty, status] of products) {
-      insert('products', `demo-${key}`, {
+      insert('products', rid(key), {
         name, category, quantity, unit, supplier: 'ТОО «Мебель-Снаб»', cost, status, minQty, niche: 'furniture',
       });
     }
 
     // ─── Задачи (6) — по разным статусам, привязаны к сделкам ───────────
+    // Последнее поле — key связанной сделки ('d1') или '' если нет.
     const tasks: Array<[string, string, string, string, string, string, number, string]> = [
-      ['t1', 'Позвонить и назначить замер', 'Асель Нурланова — кухня «Модерн»', 'new', 'high', 'Продажи', 0, 'demo-d1'],
-      ['t2', 'Согласовать проект с клиентом', 'Ержан Қасымов — прихожая', 'in_progress', 'medium', 'Дизайн', -1, 'demo-d4'],
+      ['t1', 'Позвонить и назначить замер', 'Асель Нурланова — кухня «Модерн»', 'new', 'high', 'Продажи', 0, 'd1'],
+      ['t2', 'Согласовать проект с клиентом', 'Ержан Қасымов — прихожая', 'in_progress', 'medium', 'Дизайн', -1, 'd4'],
       ['t3', 'Закупить направляющие Blum', 'Закончились на складе', 'new', 'urgent', 'Снабжение', 0, ''],
-      ['t4', 'Распил ЛДСП по заказу', 'Сауле Жаксылык — кухня 3.2м', 'in_progress', 'high', 'Производство', 1, 'demo-d7'],
-      ['t5', 'Выехать на монтаж', 'Айдана Мұратқызы — кухня «Лофт»', 'review', 'high', 'Монтаж', -1, 'demo-d9'],
-      ['t6', 'Взять отзыв у клиента', 'Нұрлан Байжанов — заказ завершён', 'done', 'low', 'Продажи', 8, 'demo-d10'],
+      ['t4', 'Распил ЛДСП по заказу', 'Сауле Жаксылык — кухня 3.2м', 'in_progress', 'high', 'Производство', 1, 'd7'],
+      ['t5', 'Выехать на монтаж', 'Айдана Мұратқызы — кухня «Лофт»', 'review', 'high', 'Монтаж', -1, 'd9'],
+      ['t6', 'Взять отзыв у клиента', 'Нұрлан Байжанов — заказ завершён', 'done', 'low', 'Продажи', 8, 'd10'],
     ];
-    for (const [key, title, description, status, priority, category, dueOffset, linkedDealId] of tasks) {
+    for (const [key, title, description, status, priority, category, dueOffset, dealKey] of tasks) {
       const due = daysAgo(-dueOffset); // dueOffset>0 → в прошлом (просрочено/сделано)
-      insert('tasks', `demo-${key}`, {
+      insert('tasks', rid(key), {
         title, description, status, priority,
         assigneeId: category === 'Монтаж' ? OWNER.install : category === 'Дизайн' || category === 'Продажи' ? OWNER.design : OWNER.measure,
         createdAt: daysAgo(3).toISOString(), dueDate: ymd(due),
         completedAt: status === 'done' ? daysAgo(dueOffset).toISOString() : undefined,
-        category, subtasks: [], linkedDealId: linkedDealId || undefined,
+        category, subtasks: [], linkedDealId: dealKey ? rid(dealKey) : undefined,
       });
     }
   });

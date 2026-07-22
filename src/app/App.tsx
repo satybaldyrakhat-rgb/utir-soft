@@ -18,6 +18,7 @@ const Analytics     = lazyNamed(() => import('./components/Analytics'), 'Analyti
 const Tasks         = lazyNamed(() => import('./components/Tasks'), 'Tasks');
 const Settings      = lazyNamed(() => import('./components/Settings'), 'Settings');
 const CustomModulePage = lazyNamed(() => import('./components/CustomModulePage'), 'CustomModulePage');
+const OwnerDashboard = lazyNamed(() => import('./components/OwnerDashboard'), 'OwnerDashboard');
 
 // Лёгкий плейсхолдер, пока подгружается ленивый чанк страницы.
 const PageFallback = () => (
@@ -92,7 +93,15 @@ function AppContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; teamRole: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; teamRole: string; isSuperAdmin?: boolean } | null>(null);
+  // Отдельный полноэкранный маршрут владельца (#/owner). Реактивно следим за
+  // хешем, чтобы перехватить до рендера обычной оболочки.
+  const [ownerRoute, setOwnerRoute] = useState(() => typeof window !== 'undefined' && window.location.hash.startsWith('#/owner'));
+  useEffect(() => {
+    const on = () => setOwnerRoute(window.location.hash.startsWith('#/owner'));
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
   const dataStore = useDataStore();
 
   // If a logged-in user opens an invite link, the invite is meant for someone
@@ -202,6 +211,9 @@ function AppContent() {
   // immediate replaceState ping-pong (the hash is already the new value).
   useEffect(() => {
     const onHash = () => {
+      // #/owner — отдельный полноэкранный маршрут владельца, обрабатывается
+      // через ownerRoute, а не через currentPage (иначе isModuleVisible его сбросит).
+      if (window.location.hash.startsWith('#/owner')) return;
       const om = window.location.hash.match(/^#\/order\/(.+)$/);
       if (om) { setOpenDealId(decodeURIComponent(om[1])); setCurrentPageRaw('sales'); return; }
       const hash = window.location.hash.replace(/^#\/?/, '').trim();
@@ -215,9 +227,9 @@ function AppContent() {
   useEffect(() => {
     const token = getToken();
     if (!token) { setAuthChecked(true); return; }
-    api.get<{ user: { id: string; name: string; email: string; teamRole?: string } }>('/api/auth/me')
+    api.get<{ user: { id: string; name: string; email: string; teamRole?: string; isSuperAdmin?: boolean } }>('/api/auth/me')
       .then(({ user }) => {
-        setCurrentUser({ name: user.name, email: user.email, teamRole: user.teamRole || 'admin' });
+        setCurrentUser({ name: user.name, email: user.email, teamRole: user.teamRole || 'admin', isSuperAdmin: !!user.isSuperAdmin });
         setIsAuthenticated(true);
       })
       .catch(() => {
@@ -239,8 +251,8 @@ function AppContent() {
     return () => window.removeEventListener('utir:auth-changed', onAuth);
   }, []);
 
-  const handleLogin = (user: { name: string; email: string; teamRole?: string }) => {
-    setCurrentUser({ name: user.name, email: user.email, teamRole: user.teamRole || 'admin' });
+  const handleLogin = (user: { name: string; email: string; teamRole?: string; isSuperAdmin?: boolean }) => {
+    setCurrentUser({ name: user.name, email: user.email, teamRole: user.teamRole || 'admin', isSuperAdmin: !!user.isSuperAdmin });
     setIsAuthenticated(true);
   };
 
@@ -270,6 +282,16 @@ function AppContent() {
   // Show Auth screen if not authenticated
   if (!isAuthenticated) {
     return <Auth onLogin={handleLogin} language={language} onLanguageChange={setLanguage} />;
+  }
+
+  // Дашборд владельца платформы — отдельный полноэкранный маршрут (#/owner),
+  // до обычной оболочки и онбординга. Доступ только у super-admin; иначе
+  // тихо возвращаем на дашборд (бэкенд /api/owner/* всё равно закрыт).
+  if (ownerRoute) {
+    if (currentUser?.isSuperAdmin) {
+      return <Suspense fallback={<PageFallback />}><OwnerDashboard onExit={() => { window.location.hash = '#/dashboard'; }} /></Suspense>;
+    }
+    if (typeof window !== 'undefined') window.location.hash = '#/dashboard';
   }
 
   // First-run wizard — shown to brand new teams whose onboarding flag
@@ -666,6 +688,17 @@ function AppContent() {
 
           {!isSidebarCollapsed && (
             <>
+              {/* Владелец платформы — вход в командный центр (только super-admin) */}
+              {currentUser?.isSuperAdmin && (
+                <button
+                  onClick={() => { window.location.hash = '#/owner'; }}
+                  className="w-full flex items-center gap-2.5 p-2.5 mb-2 bg-gradient-to-r from-indigo-500/90 to-violet-500/90 text-white rounded-2xl text-xs shadow-[0_8px_20px_-8px_rgba(79,70,229,0.6)] hover:from-indigo-500 hover:to-violet-500 transition-all ring-1 ring-white/20"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7l7-4z"/></svg>
+                  <span className="flex-1 text-left">Центр управления</span>
+                  <svg className="w-3.5 h-3.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </button>
+              )}
               {/* Profile — clickable for admin (opens Settings), informational for others */}
               <button
                 onClick={() => { if (moduleAllowedByRole('settings')) handleMenuClick('settings'); }}

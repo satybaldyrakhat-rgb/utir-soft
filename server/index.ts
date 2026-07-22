@@ -946,7 +946,7 @@ app.post('/api/auth/login', rateLimit('login'), async (req, res) => {
   logActivity(user.id, { user: user.name, action: 'Вошёл в систему', target: user.email, type: 'login', page: 'auth' });
   res.json({
     token,
-    user: { id: user.id, email: user.email, name: user.name, company: user.company || '', emailVerified: verified, teamRole: user.team_role || 'admin' },
+    user: { id: user.id, email: user.email, name: user.name, company: user.company || '', emailVerified: verified, teamRole: user.team_role || 'admin', isSuperAdmin: isSuperAdminEmail(user.email) },
     // SECURITY: never return the OTP code in login response. Even for
     // unverified users — they should use /resend-code (rate-limited) to
     // get the code emailed. The previous behavior leaked OTP to anyone
