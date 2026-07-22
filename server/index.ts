@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary, verifyWebhookSecret, configureWebhookSecret, isWebhookSecretSet } from './telegram.js';
 import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
+import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError } from './ownerAdmin.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
@@ -450,6 +451,9 @@ if (teamIdJustAdded) {
   console.log('[migration] back-filled team_id=id and team_role=admin for existing users');
 }
 
+// Схема дашборда владельца: подписки, блокировки, лог ошибок.
+initOwnerSchema(db);
+
 // Each shared data table gets a team_id column. Pre-existing rows belong to the
 // creator's personal team (team_id = user_id), so single-user installs see no
 // change.
@@ -645,6 +649,8 @@ function authMiddleware(req: AuthedRequest, res: Response, next: NextFunction) {
     if (row?.disabled_at) return res.status(403).json({ error: 'account disabled' });
     req.teamId = row?.team_id || payload.sub;
     req.teamRole = (row?.team_role as string) || 'admin';
+    // Команда заблокирована владельцем платформы (неоплата) → доступ закрыт.
+    if (isTeamSuspended(db, req.teamId)) return res.status(403).json({ error: 'team suspended' });
     next();
   } catch {
     res.status(401).json({ error: 'invalid token' });
@@ -766,6 +772,7 @@ const RATE_LIMITS: Record<string, { max: number; windowMs: number }> = {
   'phone':       { max: 8,  windowMs: 15 * 60 * 1000 },  // 8 / 15min — SMS code requests
   'track':       { max: 60, windowMs: 60 * 1000 },       // 60 / min per IP — публичный трек-линк: клиенту хватает с запасом, а перебор 7-символьных кодов делает бессмысленным
   'token-check': { max: 30, windowMs: 15 * 60 * 1000 },  // 30 / 15min — оракул валидности reset-токена (токены и так 64-hex, это defense-in-depth)
+  'client-error': { max: 30, windowMs: 60 * 1000 },      // 30 / min — приём клиентских ошибок, чтобы не спамили лог
 };
 function rateLimit(bucket: keyof typeof RATE_LIMITS) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -978,7 +985,7 @@ app.post('/api/auth/resend-code', rateLimit('resend-code'), authMiddleware, asyn
 app.get('/api/auth/me', authMiddleware, (req: AuthedRequest, res) => {
   const user = db.prepare('SELECT id, email, name, company, email_verified, team_role FROM users WHERE id = ?').get(req.userId!) as any;
   if (!user) return res.status(404).json({ error: 'not found' });
-  res.json({ user: { id: user.id, email: user.email, name: user.name, company: user.company || '', emailVerified: !!user.email_verified, teamRole: user.team_role || 'admin' } });
+  res.json({ user: { id: user.id, email: user.email, name: user.name, company: user.company || '', emailVerified: !!user.email_verified, teamRole: user.team_role || 'admin', isSuperAdmin: isSuperAdminEmail(user.email) } });
 });
 
 app.post('/api/auth/logout', authMiddleware, (req: AuthedRequest, res) => {
@@ -4012,6 +4019,31 @@ app.post('/api/team/demo/clear', authMiddleware, requireRole('admin'), (req: Aut
   res.json({ ok: true, removed });
 });
 
+// ─── Дашборд владельца платформы (super-admin) ──────────────────────
+// Кросс-командный обзор ВСЕЙ платформы. Доступ строго по email из
+// SUPER_ADMIN_EMAILS (authMiddleware → requireSuperAdmin).
+app.use('/api/owner', authMiddleware, makeRequireSuperAdmin(db), createOwnerRouter(db, (teamId, suspended) => {
+  console.log(`[owner] team ${teamId} ${suspended ? 'suspended' : 'unsuspended'}`);
+}));
+
+// Приём клиентских ошибок (краши фронтенда) в лог владельца. Требует
+// авторизации, чтобы привязать к команде; rate-limited от спама.
+app.post('/api/client-error', rateLimit('client-error'), (req, res) => {
+  let userId: string | undefined, teamId: string | undefined;
+  try {
+    const h = req.headers.authorization;
+    if (h?.startsWith('Bearer ')) {
+      const p = jwt.verify(h.slice(7), JWT_SECRET) as { sub: string };
+      userId = p.sub;
+      const u = db.prepare('SELECT team_id FROM users WHERE id = ?').get(p.sub) as any;
+      teamId = u?.team_id || p.sub;
+    }
+  } catch { /* аноним — тоже логируем */ }
+  const b = req.body || {};
+  logOwnerError(db, { source: 'client', teamId, userId, method: 'CLIENT', url: String(b.url || '').slice(0, 300), message: String(b.message || 'client error'), stack: String(b.stack || '') });
+  res.json({ ok: true });
+});
+
 // ─── CLIENT CABINET PASSWORDLESS (phone) ───────────────
 // Stores a session by phone — non-secure demo; not tied to JWT users.
 // For a real deployment, replace with SMS-OTP via a provider.
@@ -4247,6 +4279,11 @@ function startAlertScanScheduler() {
 // чистый JSON-500 без утечки стектрейса клиенту; детали — только в лог.
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   console.error(`[api-error] ${req.method} ${req.originalUrl}`, err);
+  // Пишем ошибку в error_logs для дашборда владельца (best-effort).
+  logOwnerError(db, {
+    source: 'server', teamId: (req as AuthedRequest).teamId, userId: (req as AuthedRequest).userId,
+    method: req.method, url: req.originalUrl, message: err?.message || String(err), stack: err?.stack,
+  });
   if (res.headersSent) return;
   res.status(500).json({ error: 'internal server error' });
 });
