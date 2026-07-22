@@ -38,6 +38,18 @@ export function initOwnerSchema(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_error_logs_created ON error_logs(created_at);
+    -- Роадмап владельца: личные задачи по платформе (не привязаны к команде).
+    CREATE TABLE IF NOT EXISTS owner_tasks (
+      id TEXT PRIMARY KEY,
+      data TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    -- Финансы платформы: доходы/расходы владельца (ИИ, хостинг, зарплаты…).
+    CREATE TABLE IF NOT EXISTS platform_finance (
+      id TEXT PRIMARY KEY,
+      data TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 }
 
@@ -262,6 +274,123 @@ export function listErrors(db: Database.Database, limit = 200) {
     ORDER BY e.rowid DESC LIMIT ?`).all(limit) as any[];
 }
 
+// ─── Роадмап владельца ────────────────────────────────────────────────
+export type OwnerTaskStatus = 'todo' | 'in_progress' | 'on_hold' | 'done';
+const oid = () => 'ot_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+// Стартовый роадмап — реальные незакрытые пункты по платформе. Заполняется
+// один раз, если задач ещё нет (владелец потом правит/двигает/удаляет).
+const DEFAULT_OWNER_TASKS: { title: string; description: string; status: OwnerTaskStatus; priority: string }[] = [
+  { title: 'Задать TELEGRAM_WEBHOOK_SECRET в проде', description: 'Включить верификацию источника Telegram-вебхука (защита от подделки апдейтов).', status: 'todo', priority: 'high' },
+  { title: 'Задать JWT_SECRET и постоянный DATABASE_PATH', description: 'Обязательно в проде: без JWT_SECRET сервер не стартует; БД — на постоянном диске.', status: 'todo', priority: 'high' },
+  { title: 'Автобиллинг подписок', description: 'Автосписание/напоминания об оплате, интеграция с Kaspi/банком вместо ручного ведения.', status: 'todo', priority: 'medium' },
+  { title: 'Напоминания о продлении подписки', description: 'За N дней до истечения — уведомление владельцу и клиенту (email/Telegram).', status: 'todo', priority: 'medium' },
+  { title: 'История платежей по каждой команде', description: 'Лог оплат внутри карточки команды в Центре управления.', status: 'todo', priority: 'low' },
+  { title: 'Экспорт данных дашборда в CSV', description: 'Команды, пользователи, финансы — выгрузка для отчётности.', status: 'todo', priority: 'low' },
+  { title: 'Meta: верификация бизнеса (WhatsApp/Instagram)', description: 'На проверке у Meta. После подтверждения — включить каналы (META_APP_SECRET + токены).', status: 'on_hold', priority: 'high' },
+  { title: 'Kaspi: онлайн-оплата', description: 'Ждём мерчант-данные Kaspi для приёма онлайн-платежей от клиентов.', status: 'on_hold', priority: 'medium' },
+];
+
+export function listOwnerTasks(db: Database.Database) {
+  let rows = db.prepare('SELECT id, data FROM owner_tasks ORDER BY rowid ASC').all() as any[];
+  if (rows.length === 0) {
+    const now = new Date().toISOString();
+    const tx = db.transaction(() => {
+      for (const t of DEFAULT_OWNER_TASKS) {
+        const id = oid();
+        db.prepare('INSERT INTO owner_tasks (id, data) VALUES (?, ?)').run(id, JSON.stringify({ ...t, id, createdAt: now, seed: true }));
+      }
+    });
+    tx();
+    rows = db.prepare('SELECT id, data FROM owner_tasks ORDER BY rowid ASC').all() as any[];
+  }
+  return rows.map(r => { try { return { ...JSON.parse(r.data), id: r.id }; } catch { return { id: r.id }; } });
+}
+export function createOwnerTask(db: Database.Database, body: any) {
+  const id = oid();
+  const data = { title: String(body.title || 'Без названия').slice(0, 300), description: String(body.description || '').slice(0, 2000), status: (body.status || 'todo') as OwnerTaskStatus, priority: body.priority || 'medium', dueDate: body.dueDate || '', createdAt: new Date().toISOString(), id };
+  db.prepare('INSERT INTO owner_tasks (id, data) VALUES (?, ?)').run(id, JSON.stringify(data));
+  return data;
+}
+export function updateOwnerTask(db: Database.Database, id: string, patch: any) {
+  const row = db.prepare('SELECT data FROM owner_tasks WHERE id = ?').get(id) as any;
+  if (!row) return null;
+  let cur: any = {}; try { cur = JSON.parse(row.data); } catch { /* skip */ }
+  const allowed: any = {};
+  for (const k of ['title', 'description', 'status', 'priority', 'dueDate']) if (patch[k] !== undefined) allowed[k] = patch[k];
+  const next = { ...cur, ...allowed, id };
+  db.prepare('UPDATE owner_tasks SET data = ? WHERE id = ?').run(JSON.stringify(next), id);
+  return next;
+}
+export function deleteOwnerTask(db: Database.Database, id: string) {
+  db.prepare('DELETE FROM owner_tasks WHERE id = ?').run(id);
+}
+
+// ─── Использование ИИ по всей платформе ───────────────────────────────
+// Точных токенов не логируем, поэтому считаем натуральные единицы
+// (генерации изображений, действия ассистента) и даём грубую ₸-оценку.
+// Для точного P&L владелец вносит фактический расход в раздел финансов.
+const EST_IMG_KZT = 25;   // ~ стоимость одной AI-генерации изображения
+const EST_MSG_KZT = 4;    // ~ стоимость одного действия/ответа ассистента
+function monthStartStr(): string { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01 00:00:00`; }
+
+export function aiUsage(db: Database.Database) {
+  const ms = monthStartStr();
+  const n = (sql: string, ...p: any[]) => (db.prepare(sql).get(...p) as any)?.n || 0;
+  const imagesTotal = n('SELECT COUNT(*) n FROM ai_generations');
+  const imagesMonth = n('SELECT COUNT(*) n FROM ai_generations WHERE created_at >= ?', ms);
+  const actionsMonth = n(`SELECT COUNT(*) n FROM activity_logs WHERE created_at >= ? AND data LIKE '%"actor":"ai"%'`, ms);
+  const byTeam = (db.prepare(`
+    SELECT g.team_id, COUNT(*) n, owner.company AS teamName, owner.name AS teamOwner
+    FROM ai_generations g LEFT JOIN users owner ON owner.id = g.team_id
+    WHERE g.created_at >= ? GROUP BY g.team_id ORDER BY n DESC LIMIT 8`).all(ms) as any[])
+    .map(r => ({ team: r.teamName || r.teamOwner || '—', images: r.n }));
+  const estMonthlyCost = imagesMonth * EST_IMG_KZT + actionsMonth * EST_MSG_KZT;
+  return { imagesTotal, imagesMonth, actionsMonth, estMonthlyCost, byTeam };
+}
+
+// ─── Финансы платформы ────────────────────────────────────────────────
+export function listFinanceEntries(db: Database.Database) {
+  return (db.prepare('SELECT id, data FROM platform_finance ORDER BY rowid DESC').all() as any[])
+    .map(r => { try { return { ...JSON.parse(r.data), id: r.id }; } catch { return { id: r.id }; } });
+}
+export function createFinanceEntry(db: Database.Database, body: any) {
+  const id = 'pf_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  const data = { type: body.type === 'income' ? 'income' : 'expense', category: String(body.category || 'Прочее').slice(0, 100), amount: Number(body.amount) || 0, recurring: !!body.recurring, date: body.date || new Date().toISOString().slice(0, 10), note: String(body.note || '').slice(0, 300), id };
+  db.prepare('INSERT INTO platform_finance (id, data) VALUES (?, ?)').run(id, JSON.stringify(data));
+  return data;
+}
+export function deleteFinanceEntry(db: Database.Database, id: string) {
+  db.prepare('DELETE FROM platform_finance WHERE id = ?').run(id);
+}
+
+export function financeOverview(db: Database.Database) {
+  const teams = listTeams(db);
+  const mrr = teams.reduce((s, t) => s + monthlyEquivalent(t.subscription), 0);
+  const contracted = teams.reduce((s, t) => s + (t.subscription.status !== 'churned' && t.subscription.status !== 'trial' ? (Number(t.subscription.amount) || 0) : 0), 0);
+  const entries = listFinanceEntries(db);
+  const curMonth = new Date().toISOString().slice(0, 7);
+  const expenseEntries = entries.filter(e => e.type === 'expense');
+  const incomeEntries = entries.filter(e => e.type === 'income');
+  // Месячные расходы = все recurring + разовые с датой в текущем месяце.
+  const monthlyExpense = (list: any[]) => list.reduce((s, e) => s + (e.recurring || String(e.date || '').startsWith(curMonth) ? (Number(e.amount) || 0) : 0), 0);
+  const expMonthly = monthlyExpense(expenseEntries);
+  const incExtra = monthlyExpense(incomeEntries); // прочие доходы (не подписки)
+  const byCategory = Object.entries(expenseEntries.reduce((m: Record<string, number>, e) => {
+    if (e.recurring || String(e.date || '').startsWith(curMonth)) m[e.category] = (m[e.category] || 0) + (Number(e.amount) || 0);
+    return m;
+  }, {})).map(([category, amount]) => ({ category, amount: Number(amount) })).sort((a, b) => b.amount - a.amount);
+  const ai = aiUsage(db);
+  const totalMonthlyIncome = mrr + incExtra;
+  return {
+    income: { mrr, contracted, extra: incExtra, totalMonthly: totalMonthlyIncome },
+    expenses: { monthly: expMonthly, byCategory },
+    ai,
+    net: totalMonthlyIncome - expMonthly,
+    entries,
+  };
+}
+
 // ─── Router ───────────────────────────────────────────────────────────
 // Требует, чтобы ВЫШЕ уже отработали authMiddleware + requireSuperAdmin
 // (см. монтирование в index.ts). requireSuperAdmin здесь же экспортируем.
@@ -283,6 +412,17 @@ export function createOwnerRouter(db: Database.Database, onSuspendChange?: (team
   r.get('/users', (_req, res) => res.json(listAllUsers(db)));
   r.get('/activity', (req, res) => res.json(globalActivity(db, Math.min(500, Number(req.query.limit) || 100))));
   r.get('/errors', (req, res) => res.json(listErrors(db, Math.min(500, Number(req.query.limit) || 200))));
+
+  // Роадмап владельца.
+  r.get('/tasks', (_req, res) => res.json(listOwnerTasks(db)));
+  r.post('/tasks', (req, res) => res.json(createOwnerTask(db, req.body || {})));
+  r.patch('/tasks/:id', (req, res) => { const t = updateOwnerTask(db, req.params.id, req.body || {}); if (!t) return res.status(404).json({ error: 'not found' }); res.json(t); });
+  r.delete('/tasks/:id', (req, res) => { deleteOwnerTask(db, req.params.id); res.json({ ok: true }); });
+
+  // Финансы платформы.
+  r.get('/finance', (_req, res) => res.json(financeOverview(db)));
+  r.post('/finance/entries', (req, res) => res.json(createFinanceEntry(db, req.body || {})));
+  r.delete('/finance/entries/:id', (req, res) => { deleteFinanceEntry(db, req.params.id); res.json({ ok: true }); });
 
   // Редактирование подписки (полный контроль).
   r.patch('/teams/:id/subscription', (req: any, res) => {

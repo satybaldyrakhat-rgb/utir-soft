@@ -10,6 +10,7 @@ import {
   LayoutDashboard, KanbanSquare, Users2, Activity, Bug, X, Search, LogOut,
   TrendingUp, Wallet, Building2, CircleDollarSign, ArrowUpRight, AlertTriangle,
   Clock, Ban, ShieldCheck, ChevronRight, Loader2, Check, Zap, UserCog, Radio,
+  ListTodo, Plus, Trash2, Sparkles, Receipt, TrendingDown, Image as ImageIcon, MessageSquare,
 } from 'lucide-react';
 import { api } from '../utils/api';
 import { toast } from '../utils/toast';
@@ -66,7 +67,7 @@ function Glass({ children, className = '' }: { children: React.ReactNode; classN
 }
 
 // ─── Корень ───────────────────────────────────────────────────────────
-type Tab = 'overview' | 'kanban' | 'teams' | 'users' | 'activity' | 'errors';
+type Tab = 'overview' | 'kanban' | 'teams' | 'finance' | 'roadmap' | 'users' | 'activity' | 'errors';
 
 export function OwnerDashboard({ onExit }: { onExit: () => void }) {
   const [tab, setTab] = useState<Tab>('overview');
@@ -81,8 +82,10 @@ export function OwnerDashboard({ onExit }: { onExit: () => void }) {
 
   const NAV: { id: Tab; icon: any; label: string }[] = [
     { id: 'overview', icon: LayoutDashboard, label: 'Обзор' },
-    { id: 'kanban',   icon: KanbanSquare,    label: 'Канбан' },
+    { id: 'kanban',   icon: KanbanSquare,    label: 'Подписки' },
     { id: 'teams',    icon: Building2,       label: 'Команды' },
+    { id: 'finance',  icon: Wallet,          label: 'Финансы' },
+    { id: 'roadmap',  icon: ListTodo,        label: 'Задачи' },
     { id: 'users',    icon: Users2,          label: 'Пользователи' },
     { id: 'activity', icon: Activity,        label: 'Активность' },
     { id: 'errors',   icon: Bug,             label: 'Ошибки' },
@@ -131,6 +134,8 @@ export function OwnerDashboard({ onExit }: { onExit: () => void }) {
         {tab === 'overview' && <OverviewTab />}
         {tab === 'kanban'   && <KanbanTab teams={teams} reload={loadTeams} onOpen={setOpenTeam} />}
         {tab === 'teams'    && <TeamsTab teams={teams} onOpen={setOpenTeam} />}
+        {tab === 'finance'  && <FinanceTab />}
+        {tab === 'roadmap'  && <RoadmapTab />}
         {tab === 'users'    && <UsersTab />}
         {tab === 'activity' && <ActivityTab />}
         {tab === 'errors'   && <ErrorsTab />}
@@ -460,6 +465,222 @@ function ErrorsTab() {
         {errs.length === 0 && <div className="text-center text-emerald-400 text-xs py-10 flex flex-col items-center gap-2"><Check className="w-6 h-6" />Ошибок нет — чисто</div>}
       </div>
     </Glass>
+  );
+}
+
+// ─── Финансы платформы ────────────────────────────────────────────────
+interface FinanceData {
+  income: { mrr: number; contracted: number; extra: number; totalMonthly: number };
+  expenses: { monthly: number; byCategory: { category: string; amount: number }[] };
+  ai: { imagesTotal: number; imagesMonth: number; actionsMonth: number; estMonthlyCost: number; byTeam: { team: string; images: number }[] };
+  net: number;
+  entries: any[];
+}
+function FinanceTab() {
+  const [d, setD] = useState<FinanceData | null>(null);
+  const [form, setForm] = useState({ type: 'expense', category: '', amount: '', recurring: true, note: '' });
+  const [adding, setAdding] = useState(false);
+  const load = () => api.get<FinanceData>('/api/owner/finance').then(setD).catch(() => {});
+  useEffect(() => { load(); }, []);
+  if (!d) return <Skeleton />;
+
+  const add = async () => {
+    if (!form.category.trim() || !Number(form.amount)) { toast('Укажите категорию и сумму', 'error'); return; }
+    setAdding(true);
+    try { await api.post('/api/owner/finance/entries', { ...form, amount: Number(form.amount) }); setForm({ type: 'expense', category: '', amount: '', recurring: true, note: '' }); await load(); toast('Добавлено', 'success'); }
+    catch { toast('Ошибка', 'error'); } finally { setAdding(false); }
+  };
+  const del = async (id: string) => { try { await api.delete(`/api/owner/finance/entries/${id}`); await load(); } catch { /* */ } };
+
+  const maxCat = Math.max(1, ...d.expenses.byCategory.map(c => c.amount));
+  const tiles = [
+    { label: 'Доход / мес', value: KZTm(d.income.totalMonthly), sub: `${KZT(d.income.contracted)} законтрактовано`, icon: TrendingUp, tint: 'from-emerald-500 to-teal-500' },
+    { label: 'Расход / мес', value: KZTm(d.expenses.monthly), sub: `${d.expenses.byCategory.length} категорий`, icon: TrendingDown, tint: 'from-rose-500 to-orange-500' },
+    { label: 'Прибыль / мес', value: KZTm(d.net), sub: d.net >= 0 ? 'в плюсе' : 'в минусе', icon: Wallet, tint: d.net >= 0 ? 'from-indigo-500 to-violet-500' : 'from-rose-500 to-rose-600' },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {tiles.map((t, i) => (
+          <Glass key={i} className="p-5">
+            <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${t.tint} flex items-center justify-center shadow-lg mb-3`}><t.icon className="w-5 h-5 text-white" /></div>
+            <div className="text-[11px] text-slate-400">{t.label}</div>
+            <div className={`text-2xl font-semibold tracking-tight tabular-nums ${t.label.includes('Прибыль') && d.net < 0 ? 'text-rose-500' : 'text-slate-900'}`}>{t.value}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">{t.sub}</div>
+          </Glass>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* AI usage */}
+        <Glass className="p-5 lg:col-span-1">
+          <div className="flex items-center gap-2 mb-1"><Sparkles className="w-4 h-4 text-violet-500" /><div className="text-sm text-slate-900">Расходы на ИИ</div></div>
+          <div className="text-[11px] text-slate-400 mb-4">За текущий месяц · оценка</div>
+          <div className="text-3xl font-semibold tracking-tight text-slate-900 mb-1">≈ {KZTm(d.ai.estMonthlyCost)}</div>
+          <div className="flex gap-4 mb-4 mt-3">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500"><ImageIcon className="w-3.5 h-3.5 text-slate-400" /> {d.ai.imagesMonth} <span className="text-slate-300">картинок</span></div>
+            <div className="flex items-center gap-1.5 text-xs text-slate-500"><MessageSquare className="w-3.5 h-3.5 text-slate-400" /> {d.ai.actionsMonth} <span className="text-slate-300">ответов</span></div>
+          </div>
+          {d.ai.byTeam.length > 0 && (
+            <div className="space-y-1.5 pt-3 border-t border-white/60">
+              <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-1">Кто больше генерит</div>
+              {d.ai.byTeam.map((t, i) => (
+                <div key={i} className="flex items-center justify-between text-xs"><span className="text-slate-600 truncate">{t.team}</span><span className="text-slate-400 tabular-nums">{t.images}</span></div>
+              ))}
+            </div>
+          )}
+          <div className="text-[10px] text-slate-300 mt-3 leading-relaxed">Оценка по количеству генераций/ответов. Точную сумму вносите расходом ниже.</div>
+        </Glass>
+
+        {/* Expense breakdown */}
+        <Glass className="p-5 lg:col-span-2">
+          <div className="text-sm text-slate-900 mb-4">Расходы по категориям (месяц)</div>
+          {d.expenses.byCategory.length === 0 ? (
+            <div className="text-center text-slate-300 text-xs py-10">Добавьте расходы ниже — они появятся здесь</div>
+          ) : (
+            <div className="space-y-3">
+              {d.expenses.byCategory.map((c, i) => (
+                <div key={i}>
+                  <div className="flex items-center justify-between text-xs mb-1"><span className="text-slate-600">{c.category}</span><span className="text-slate-800 tabular-nums">{KZT(c.amount)}</span></div>
+                  <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-gradient-to-r from-rose-400 to-orange-400" style={{ width: `${(c.amount / maxCat) * 100}%` }} /></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Glass>
+      </div>
+
+      {/* Ledger */}
+      <Glass className="p-5">
+        <div className="text-sm text-slate-900 mb-3 flex items-center gap-2"><Receipt className="w-4 h-4 text-slate-400" /> Учёт доходов и расходов</div>
+        {/* Add form */}
+        <div className="flex flex-wrap items-end gap-2 mb-4 pb-4 border-b border-white/60">
+          <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className={inputCls + ' w-28'}><option value="expense">Расход</option><option value="income">Доход</option></select>
+          <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} placeholder="Категория (ИИ, Хостинг…)" className={inputCls + ' flex-1 min-w-[140px]'} />
+          <input type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="Сумма ₸" className={inputCls + ' w-32'} />
+          <label className="flex items-center gap-1.5 text-[11px] text-slate-500 px-1"><input type="checkbox" checked={form.recurring} onChange={e => setForm({ ...form, recurring: e.target.checked })} className="rounded" /> ежемесячно</label>
+          <input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="Заметка" className={inputCls + ' flex-1 min-w-[120px]'} />
+          <button onClick={add} disabled={adding} className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs hover:bg-indigo-700 disabled:opacity-50">{adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Добавить</button>
+        </div>
+        <div className="space-y-1.5 max-h-[40vh] overflow-y-auto">
+          {d.entries.length === 0 && <div className="text-center text-slate-300 text-xs py-6">Пока нет записей</div>}
+          {d.entries.map(e => (
+            <div key={e.id} className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/40 group">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${e.type === 'income' ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>{e.type === 'income' ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}</div>
+              <div className="min-w-0 flex-1"><div className="text-xs text-slate-800 truncate">{e.category}{e.recurring && <span className="text-[9px] text-slate-400 ml-1.5">/мес</span>}</div>{e.note && <div className="text-[10px] text-slate-400 truncate">{e.note}</div>}</div>
+              <div className={`text-xs tabular-nums ${e.type === 'income' ? 'text-emerald-600' : 'text-rose-500'}`}>{e.type === 'income' ? '+' : '−'}{KZT(e.amount)}</div>
+              <button onClick={() => del(e.id)} className="p-1 opacity-0 group-hover:opacity-100 hover:bg-rose-50 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5 text-rose-400" /></button>
+            </div>
+          ))}
+        </div>
+      </Glass>
+    </div>
+  );
+}
+
+// ─── Роадмап владельца ────────────────────────────────────────────────
+interface OwnerTask { id: string; title: string; description: string; status: string; priority: string; dueDate?: string }
+const ROADMAP_COLS: { id: string; label: string; accent: string }[] = [
+  { id: 'todo', label: 'Надо сделать', accent: 'bg-slate-400' },
+  { id: 'in_progress', label: 'В работе', accent: 'bg-indigo-400' },
+  { id: 'on_hold', label: 'На стопе', accent: 'bg-amber-400' },
+  { id: 'done', label: 'Готово', accent: 'bg-emerald-400' },
+];
+const PRIO: Record<string, { c: string; l: string }> = { high: { c: 'bg-rose-400', l: 'Высокий' }, medium: { c: 'bg-amber-400', l: 'Средний' }, low: { c: 'bg-slate-300', l: 'Низкий' } };
+
+function RoadmapTab() {
+  const [tasks, setTasks] = useState<OwnerTask[] | null>(null);
+  const [drag, setDrag] = useState<string | null>(null);
+  const [over, setOver] = useState<string | null>(null);
+  const [edit, setEdit] = useState<OwnerTask | null>(null);
+  const [creating, setCreating] = useState(false);
+  const load = () => api.get<OwnerTask[]>('/api/owner/tasks').then(setTasks).catch(() => {});
+  useEffect(() => { load(); }, []);
+  if (!tasks) return <Skeleton />;
+
+  const drop = async (col: string) => {
+    const id = drag; setDrag(null); setOver(null);
+    if (!id) return;
+    const t = tasks.find(x => x.id === id);
+    if (!t || t.status === col) return;
+    setTasks(ts => ts!.map(x => x.id === id ? { ...x, status: col } : x)); // оптимистично
+    try { await api.patch(`/api/owner/tasks/${id}`, { status: col }); } catch { load(); }
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-[11px] text-slate-400">{tasks.length} задач · перетаскивайте карточки между колонками</div>
+        <button onClick={() => { setCreating(true); setEdit({ id: '', title: '', description: '', status: 'todo', priority: 'medium' }); }} className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs hover:bg-indigo-700"><Plus className="w-3.5 h-3.5" /> Новая задача</button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {ROADMAP_COLS.map(col => {
+          const items = tasks.filter(t => t.status === col.id);
+          return (
+            <div key={col.id}
+              onDragOver={e => { e.preventDefault(); setOver(col.id); }}
+              onDragLeave={() => setOver(o => o === col.id ? null : o)}
+              onDrop={() => drop(col.id)}>
+              <Glass className={`p-3 min-h-[300px] ${over === col.id ? 'ring-2 ring-indigo-300' : ''}`}>
+                <div className="flex items-center gap-2 px-1 mb-3"><span className={`w-2 h-2 rounded-full ${col.accent}`} /><div className="text-xs font-medium text-slate-700 flex-1">{col.label}</div><span className="text-[10px] text-slate-400 bg-white/60 px-1.5 py-0.5 rounded-lg">{items.length}</span></div>
+                <div className="space-y-2">
+                  {items.map(t => (
+                    <div key={t.id} draggable
+                      onDragStart={() => setDrag(t.id)} onDragEnd={() => { setDrag(null); setOver(null); }}
+                      onClick={() => { setCreating(false); setEdit(t); }}
+                      className={`bg-white/80 rounded-2xl p-3 ring-1 ring-white/70 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md hover:bg-white transition-all ${drag === t.id ? 'opacity-40' : ''}`}>
+                      <div className="flex items-start gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${PRIO[t.priority]?.c || 'bg-slate-300'}`} />
+                        <div className="min-w-0">
+                          <div className={`text-xs text-slate-800 ${t.status === 'done' ? 'line-through text-slate-400' : ''}`}>{t.title}</div>
+                          {t.description && <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-2">{t.description}</div>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {items.length === 0 && <div className="text-[11px] text-slate-300 text-center py-6">—</div>}
+                </div>
+              </Glass>
+            </div>
+          );
+        })}
+      </div>
+      {edit && <TaskEditor task={edit} creating={creating} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); load(); }} />}
+    </>
+  );
+}
+
+function TaskEditor({ task, creating, onClose, onSaved }: { task: OwnerTask; creating: boolean; onClose: () => void; onSaved: () => void }) {
+  const [t, setT] = useState<OwnerTask>(task);
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (!t.title.trim()) { toast('Введите название', 'error'); return; }
+    setSaving(true);
+    try {
+      if (creating) await api.post('/api/owner/tasks', t);
+      else await api.patch(`/api/owner/tasks/${t.id}`, t);
+      onSaved();
+    } catch { toast('Ошибка', 'error'); } finally { setSaving(false); }
+  };
+  const del = async () => { if (!(await confirmDialog({ message: 'Удалить задачу?', danger: true }))) return; try { await api.delete(`/api/owner/tasks/${t.id}`); onSaved(); } catch { /* */ } };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" />
+      <div onClick={e => e.stopPropagation()} className="relative w-full max-w-md bg-white/85 backdrop-blur-2xl ring-1 ring-white/60 shadow-2xl rounded-[26px] p-5 space-y-3">
+        <div className="flex items-center justify-between"><div className="text-sm font-semibold text-slate-900">{creating ? 'Новая задача' : 'Задача'}</div><button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4 text-slate-400" /></button></div>
+        <Field label="Название"><input value={t.title} onChange={e => setT({ ...t, title: e.target.value })} className={inputCls} autoFocus /></Field>
+        <Field label="Описание"><textarea value={t.description} onChange={e => setT({ ...t, description: e.target.value })} rows={3} className={inputCls + ' resize-none'} /></Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Статус"><select value={t.status} onChange={e => setT({ ...t, status: e.target.value })} className={inputCls}>{ROADMAP_COLS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></Field>
+          <Field label="Приоритет"><select value={t.priority} onChange={e => setT({ ...t, priority: e.target.value })} className={inputCls}><option value="high">Высокий</option><option value="medium">Средний</option><option value="low">Низкий</option></select></Field>
+        </div>
+        <div className="flex gap-2 pt-1">
+          <button onClick={save} disabled={saving} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs hover:bg-indigo-700 disabled:opacity-50">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Сохранить</button>
+          {!creating && <button onClick={del} className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-600 rounded-xl text-xs hover:bg-rose-100"><Trash2 className="w-3.5 h-3.5" /></button>}
+        </div>
+      </div>
+    </div>
   );
 }
 
