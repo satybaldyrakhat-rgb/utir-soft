@@ -8,7 +8,9 @@
     "web": "vite",
     "server": "tsx watch server/index.ts",
     "build": "vite build",
-    "start": "tsx server/index.ts"
+    "start": "tsx server/index.ts",
+    "test": "node --test --test-concurrency=1 --test-timeout=60000 'test/**/*.test.mjs'",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",

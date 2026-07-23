@@ -775,8 +775,12 @@ const RATE_LIMITS: Record<string, { max: number; windowMs: number }> = {
   'token-check': { max: 30, windowMs: 15 * 60 * 1000 },  // 30 / 15min — оракул валидности reset-токена (токены и так 64-hex, это defense-in-depth)
   'client-error': { max: 30, windowMs: 60 * 1000 },      // 30 / min — приём клиентских ошибок, чтобы не спамили лог
 };
+// В тестах (и при явном отключении) rate-limit мешает — прогон делает
+// десятки signup с одного IP. Отключаем только в этих режимах.
+const RATE_LIMIT_OFF = process.env.NODE_ENV === 'test' || process.env.DISABLE_RATE_LIMIT === '1';
 function rateLimit(bucket: keyof typeof RATE_LIMITS) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (RATE_LIMIT_OFF) return next();
     const cfg = RATE_LIMITS[bucket];
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
             || req.socket.remoteAddress || 'unknown';
