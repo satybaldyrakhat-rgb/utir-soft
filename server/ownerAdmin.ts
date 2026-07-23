@@ -250,11 +250,14 @@ export function teamDetail(db: Database.Database, teamId: string) {
   };
 }
 
-export function globalActivity(db: Database.Database, limit = 100) {
-  const rows = db.prepare(`
-    SELECT a.data, a.created_at, a.team_id, u.company AS teamName, u.name AS teamOwner
-    FROM activity_logs a LEFT JOIN users u ON u.id = a.team_id
-    ORDER BY a.rowid DESC LIMIT ?`).all(limit) as any[];
+export function globalActivity(db: Database.Database, limit = 100, teamId?: string) {
+  const rows = (teamId
+    ? db.prepare(`SELECT a.data, a.created_at, a.team_id, u.company AS teamName, u.name AS teamOwner
+                  FROM activity_logs a LEFT JOIN users u ON u.id = a.team_id
+                  WHERE a.team_id = ? ORDER BY a.rowid DESC LIMIT ?`).all(teamId, limit)
+    : db.prepare(`SELECT a.data, a.created_at, a.team_id, u.company AS teamName, u.name AS teamOwner
+                  FROM activity_logs a LEFT JOIN users u ON u.id = a.team_id
+                  ORDER BY a.rowid DESC LIMIT ?`).all(limit)) as any[];
   return rows.map(r => { let d: any = {}; try { d = JSON.parse(r.data); } catch { /* skip */ } return { at: r.created_at, teamId: r.team_id, team: r.teamName || r.teamOwner || '—', user: d.user, action: d.action, target: d.target, actor: d.actor, source: d.source, type: d.type }; });
 }
 
@@ -410,7 +413,7 @@ export function createOwnerRouter(db: Database.Database, onSuspendChange?: (team
   r.get('/teams', (_req, res) => res.json(listTeams(db)));
   r.get('/teams/:id', (req, res) => { const d = teamDetail(db, req.params.id); if (!d) return res.status(404).json({ error: 'not found' }); res.json(d); });
   r.get('/users', (_req, res) => res.json(listAllUsers(db)));
-  r.get('/activity', (req, res) => res.json(globalActivity(db, Math.min(500, Number(req.query.limit) || 100))));
+  r.get('/activity', (req, res) => res.json(globalActivity(db, Math.min(500, Number(req.query.limit) || 150), req.query.teamId ? String(req.query.teamId) : undefined)));
   r.get('/errors', (req, res) => res.json(listErrors(db, Math.min(500, Number(req.query.limit) || 200))));
 
   // Роадмап владельца.

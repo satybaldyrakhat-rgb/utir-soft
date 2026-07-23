@@ -136,8 +136,8 @@ export function OwnerDashboard({ onExit }: { onExit: () => void }) {
         {tab === 'teams'    && <TeamsTab teams={teams} onOpen={setOpenTeam} />}
         {tab === 'finance'  && <FinanceTab />}
         {tab === 'roadmap'  && <RoadmapTab />}
-        {tab === 'users'    && <UsersTab />}
-        {tab === 'activity' && <ActivityTab />}
+        {tab === 'users'    && <UsersTab teams={teams} />}
+        {tab === 'activity' && <ActivityTab teams={teams} />}
         {tab === 'errors'   && <ErrorsTab />}
       </div>
 
@@ -374,70 +374,133 @@ function TeamsTab({ teams, onOpen }: { teams: TeamSummary[] | null; onOpen: (id:
 }
 
 // ─── Пользователи ─────────────────────────────────────────────────────
-interface OwnerUser { id: string; name: string; email: string; role: string; team: string; disabled: boolean; createdAt: string; provider: string }
-function UsersTab() {
+interface OwnerUser { id: string; name: string; email: string; role: string; teamId: string; team: string; disabled: boolean; createdAt: string; provider: string }
+const roleLabelFn = (r: string) => r === 'admin' ? 'Админ' : r === 'manager' ? 'Менеджер' : r === 'employee' ? 'Сотрудник' : r;
+const ROLE_CHIP: Record<string, string> = { admin: 'bg-indigo-50 text-indigo-600', manager: 'bg-violet-50 text-violet-600', employee: 'bg-slate-100 text-slate-500' };
+
+function UsersTab({ teams }: { teams: TeamSummary[] | null }) {
   const [users, setUsers] = useState<OwnerUser[] | null>(null);
   const [role, setRole] = useState('all');
+  const [team, setTeam] = useState('all');
   const [q, setQ] = useState('');
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   useEffect(() => { api.get<OwnerUser[]>('/api/owner/users').then(setUsers).catch(() => {}); }, []);
   if (!users) return <Skeleton />;
-  const roleLabel = (r: string) => r === 'admin' ? 'Админ' : r === 'manager' ? 'Менеджер' : r === 'employee' ? 'Сотрудник' : r;
-  const filtered = users.filter(u => (role === 'all' || u.role === role) && (!q || u.name.toLowerCase().includes(q.toLowerCase()) || u.email.toLowerCase().includes(q.toLowerCase()) || u.team.toLowerCase().includes(q.toLowerCase())));
-  const roleChip: Record<string, string> = { admin: 'bg-indigo-50 text-indigo-600', manager: 'bg-violet-50 text-violet-600', employee: 'bg-slate-100 text-slate-500' };
+
+  const filtered = users.filter(u =>
+    (role === 'all' || u.role === role) &&
+    (team === 'all' || u.teamId === team) &&
+    (!q || u.name.toLowerCase().includes(q.toLowerCase()) || u.email.toLowerCase().includes(q.toLowerCase()) || (u.team || '').toLowerCase().includes(q.toLowerCase())));
+
+  // Группируем по команде — так при большом числе пользователей их легко
+  // найти: каждая команда своим блоком, со счётчиком и сворачиванием.
+  const groups = new Map<string, { name: string; users: OwnerUser[] }>();
+  for (const u of filtered) {
+    const g = groups.get(u.teamId) || { name: u.team || '—', users: [] };
+    g.users.push(u); groups.set(u.teamId, g);
+  }
+  const groupList = [...groups.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name));
 
   return (
-    <Glass className="p-5">
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="w-4 h-4 text-slate-300 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск…" className="w-full pl-9 pr-3 py-2 bg-white/60 ring-1 ring-white/70 rounded-xl text-xs focus:outline-none placeholder:text-slate-300" />
-        </div>
-        <div className="flex gap-1">
-          {['all', 'admin', 'manager', 'employee'].map(r => (
-            <button key={r} onClick={() => setRole(r)} className={`px-3 py-1.5 rounded-xl text-[11px] transition-all ${role === r ? 'bg-white text-slate-900 shadow-sm ring-1 ring-white/80' : 'text-slate-500 hover:bg-white/40'}`}>{r === 'all' ? 'Все' : roleLabel(r)}</button>
-          ))}
-        </div>
-        <div className="text-[11px] text-slate-400 ml-auto">{filtered.length}</div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead><tr className="text-left text-[10px] text-slate-400 uppercase tracking-wide"><th className="px-3 py-2 font-medium">Имя</th><th className="px-3 py-2 font-medium">Команда</th><th className="px-3 py-2 font-medium">Роль</th><th className="px-3 py-2 font-medium">Вход</th><th className="px-3 py-2 font-medium">Регистрация</th></tr></thead>
-          <tbody className="divide-y divide-white/50">
-            {filtered.map(u => (
-              <tr key={u.id} className="hover:bg-white/40 transition-colors">
-                <td className="px-3 py-3"><div className="text-slate-800 flex items-center gap-1.5">{u.name}{u.disabled && <span className="text-[9px] px-1.5 py-0.5 bg-rose-50 text-rose-500 rounded">откл.</span>}</div><div className="text-[10px] text-slate-400">{u.email}</div></td>
-                <td className="px-3 py-3 text-slate-500">{u.team}</td>
-                <td className="px-3 py-3"><span className={`px-2 py-0.5 rounded-lg text-[10px] ${roleChip[u.role] || 'bg-slate-100 text-slate-500'}`}>{roleLabel(u.role)}</span></td>
-                <td className="px-3 py-3 text-slate-400 text-[11px]">{u.provider}</td>
-                <td className="px-3 py-3 text-slate-400 text-[11px]">{fmtDate(u.createdAt)}</td>
-              </tr>
+    <div className="space-y-4">
+      <Glass className="p-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <Search className="w-4 h-4 text-slate-300 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Имя, email, команда…" className="w-full pl-9 pr-3 py-2 bg-white/60 ring-1 ring-white/70 rounded-xl text-xs focus:outline-none placeholder:text-slate-300" />
+          </div>
+          <select value={team} onChange={e => setTeam(e.target.value)} className="px-3 py-2 bg-white/60 ring-1 ring-white/70 rounded-xl text-xs focus:outline-none max-w-[180px]">
+            <option value="all">Все команды</option>
+            {(teams || []).map(t => <option key={t.teamId} value={t.teamId}>{t.name}</option>)}
+          </select>
+          <div className="flex gap-1">
+            {['all', 'admin', 'manager', 'employee'].map(r => (
+              <button key={r} onClick={() => setRole(r)} className={`px-3 py-1.5 rounded-xl text-[11px] transition-all ${role === r ? 'bg-white text-slate-900 shadow-sm ring-1 ring-white/80' : 'text-slate-500 hover:bg-white/40'}`}>{r === 'all' ? 'Все' : roleLabelFn(r)}</button>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </Glass>
+          </div>
+          <div className="text-[11px] text-slate-400 ml-auto">{filtered.length} чел · {groupList.length} команд</div>
+        </div>
+      </Glass>
+
+      {groupList.map(([teamId, g]) => {
+        const isCollapsed = collapsed[teamId];
+        return (
+          <Glass key={teamId} className="p-3">
+            <button onClick={() => setCollapsed(c => ({ ...c, [teamId]: !c[teamId] }))} className="w-full flex items-center gap-2.5 px-2 py-1.5 hover:bg-white/40 rounded-xl transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center text-[10px] text-indigo-600 flex-shrink-0">{(g.name || '—').slice(0, 2).toUpperCase()}</div>
+              <div className="text-sm text-slate-800 flex-1 text-left">{g.name}</div>
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                {g.users.filter(u => u.role === 'admin').length > 0 && <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-500 rounded">{g.users.filter(u => u.role === 'admin').length} админ</span>}
+                <span className="bg-white/70 px-1.5 py-0.5 rounded-lg">{g.users.length}</span>
+              </div>
+              <ChevronRight className={`w-4 h-4 text-slate-300 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
+            </button>
+            {!isCollapsed && (
+              <div className="mt-2 divide-y divide-white/50">
+                {g.users.map(u => (
+                  <div key={u.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/40 transition-colors rounded-lg">
+                    <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-[10px] text-slate-500 flex-shrink-0">{(u.name || '—').slice(0, 2).toUpperCase()}</div>
+                    <div className="min-w-0 flex-1"><div className="text-xs text-slate-800 truncate flex items-center gap-1.5">{u.name}{u.disabled && <span className="text-[9px] px-1.5 py-0.5 bg-rose-50 text-rose-500 rounded">откл.</span>}</div><div className="text-[10px] text-slate-400 truncate">{u.email}</div></div>
+                    <span className="text-[10px] text-slate-400 hidden sm:block">{u.provider}</span>
+                    <span className="text-[10px] text-slate-400 hidden sm:block w-20 text-right">{fmtDate(u.createdAt)}</span>
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] ${ROLE_CHIP[u.role] || 'bg-slate-100 text-slate-500'}`}>{roleLabelFn(u.role)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Glass>
+        );
+      })}
+      {groupList.length === 0 && <Glass className="p-10"><div className="text-center text-slate-300 text-xs">Ничего не найдено</div></Glass>}
+    </div>
   );
 }
 
 // ─── Активность ───────────────────────────────────────────────────────
-function ActivityTab() {
+function ActivityTab({ teams }: { teams: TeamSummary[] | null }) {
   const [feed, setFeed] = useState<any[] | null>(null);
-  useEffect(() => { api.get<any[]>('/api/owner/activity?limit=150').then(setFeed).catch(() => {}); }, []);
-  if (!feed) return <Skeleton />;
+  const [team, setTeam] = useState('all');
+  const [kind, setKind] = useState('all'); // all | human | ai | telegram
+  useEffect(() => {
+    setFeed(null);
+    const url = team === 'all' ? '/api/owner/activity?limit=200' : `/api/owner/activity?limit=200&teamId=${encodeURIComponent(team)}`;
+    api.get<any[]>(url).then(setFeed).catch(() => setFeed([]));
+  }, [team]);
+
+  const shown = (feed || []).filter(a => kind === 'all' || (kind === 'ai' ? a.actor === 'ai' : kind === 'telegram' ? a.source === 'telegram' : a.actor !== 'ai' && a.source !== 'telegram'));
+
   return (
-    <Glass className="p-5">
-      <div className="text-sm text-slate-900 mb-4">Глобальная лента действий</div>
-      <div className="space-y-1 max-h-[70vh] overflow-y-auto">
-        {feed.map((a, i) => (
-          <div key={i} className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/40 transition-colors">
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${a.actor === 'ai' ? 'bg-violet-50 text-violet-500' : a.source === 'telegram' ? 'bg-sky-50 text-sky-500' : 'bg-slate-100 text-slate-400'}`}>{a.actor === 'ai' ? <Zap className="w-3.5 h-3.5" /> : a.source === 'telegram' ? <Radio className="w-3.5 h-3.5" /> : <UserCog className="w-3.5 h-3.5" />}</div>
-            <div className="min-w-0 flex-1"><div className="text-xs text-slate-700 truncate"><span className="text-slate-900">{a.user || 'Система'}</span> {a.action} {a.target && <span className="text-slate-400">· {a.target}</span>}</div><div className="text-[10px] text-slate-400">{a.team}</div></div>
-            <div className="text-[10px] text-slate-400 flex-shrink-0">{ago(a.at)}</div>
+    <div className="space-y-4">
+      <Glass className="p-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="text-sm text-slate-900 mr-2">Лента действий</div>
+          <select value={team} onChange={e => setTeam(e.target.value)} className="px-3 py-2 bg-white/60 ring-1 ring-white/70 rounded-xl text-xs focus:outline-none max-w-[180px]">
+            <option value="all">Все команды</option>
+            {(teams || []).map(t => <option key={t.teamId} value={t.teamId}>{t.name}</option>)}
+          </select>
+          <div className="flex gap-1">
+            {[['all', 'Все'], ['human', 'Люди'], ['ai', 'ИИ'], ['telegram', 'Telegram']].map(([k, l]) => (
+              <button key={k} onClick={() => setKind(k)} className={`px-3 py-1.5 rounded-xl text-[11px] transition-all ${kind === k ? 'bg-white text-slate-900 shadow-sm ring-1 ring-white/80' : 'text-slate-500 hover:bg-white/40'}`}>{l}</button>
+            ))}
           </div>
-        ))}
-        {feed.length === 0 && <div className="text-center text-slate-300 text-xs py-10">Пока нет действий</div>}
-      </div>
-    </Glass>
+          <div className="text-[11px] text-slate-400 ml-auto">{shown.length}</div>
+        </div>
+      </Glass>
+      <Glass className="p-4">
+        {!feed ? <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-slate-300" /></div> : (
+          <div className="space-y-1 max-h-[68vh] overflow-y-auto">
+            {shown.map((a, i) => (
+              <div key={i} className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/40 transition-colors">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${a.actor === 'ai' ? 'bg-violet-50 text-violet-500' : a.source === 'telegram' ? 'bg-sky-50 text-sky-500' : 'bg-slate-100 text-slate-400'}`}>{a.actor === 'ai' ? <Zap className="w-3.5 h-3.5" /> : a.source === 'telegram' ? <Radio className="w-3.5 h-3.5" /> : <UserCog className="w-3.5 h-3.5" />}</div>
+                <div className="min-w-0 flex-1"><div className="text-xs text-slate-700 truncate"><span className="text-slate-900">{a.user || 'Система'}</span> {a.action} {a.target && <span className="text-slate-400">· {a.target}</span>}</div>{team === 'all' && <div className="text-[10px] text-slate-400">{a.team}</div>}</div>
+                <div className="text-[10px] text-slate-400 flex-shrink-0">{ago(a.at)}</div>
+              </div>
+            ))}
+            {shown.length === 0 && <div className="text-center text-slate-300 text-xs py-10">Нет действий по фильтру</div>}
+          </div>
+        )}
+      </Glass>
+    </div>
   );
 }
 
