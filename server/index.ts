@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary, verifyWebhookSecret, configureWebhookSecret, isWebhookSecretSet } from './telegram.js';
 import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
-import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds } from './ownerAdmin.js';
+import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView } from './ownerAdmin.js';
 import { runBackup, listBackups, startBackupScheduler } from './backup.js';
 import { exportTeam } from './teamExport.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
@@ -4023,6 +4023,11 @@ app.post('/api/team/demo/seed', authMiddleware, requireRole('admin'), (req: Auth
 app.post('/api/team/demo/clear', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
   const removed = clearDemoData(db, req.teamId!);
   res.json({ ok: true, removed });
+});
+
+// Взгляд команды на свою подписку (для баннера). Только чтение.
+app.get('/api/team/subscription', authMiddleware, (req: AuthedRequest, res) => {
+  res.json(teamSubscriptionView(db, req.teamId!));
 });
 
 // Экспорт всех данных команды одним JSON (только админ команды).

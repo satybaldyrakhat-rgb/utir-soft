@@ -100,6 +100,18 @@ export function setSubscription(db: Database.Database, teamId: string, patch: Pa
   return next;
 }
 
+// Взгляд команды на СВОЮ подписку (read-only). managed:false, если
+// владелец ещё не завёл подписку для команды — тогда клиент не видит
+// никаких баннеров (нулевое влияние на существующих пользователей).
+export function teamSubscriptionView(db: Database.Database, teamId: string) {
+  const row = db.prepare('SELECT data FROM subscriptions WHERE team_id = ?').get(teamId) as any;
+  if (!row?.data) return { managed: false };
+  let s: Subscription; try { s = JSON.parse(row.data); } catch { return { managed: false }; }
+  const exp = new Date(s.expiresAt).getTime();
+  const daysLeft = isNaN(exp) ? null : Math.ceil((exp - Date.now()) / 86400000);
+  return { managed: true, status: s.status, plan: s.plan, expiresAt: s.expiresAt, daysLeft };
+}
+
 // Блокировка команды — читается из subscriptions.suspended. Используется в
 // authMiddleware, чтобы заблокированная команда теряла доступ немедленно.
 export function isTeamSuspended(db: Database.Database, teamId: string): boolean {

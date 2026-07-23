@@ -19,6 +19,7 @@ const Tasks         = lazyNamed(() => import('./components/Tasks'), 'Tasks');
 const Settings      = lazyNamed(() => import('./components/Settings'), 'Settings');
 const CustomModulePage = lazyNamed(() => import('./components/CustomModulePage'), 'CustomModulePage');
 const OwnerDashboard = lazyNamed(() => import('./components/OwnerDashboard'), 'OwnerDashboard');
+import { SubscriptionBanner } from './components/SubscriptionBanner';
 
 // Лёгкий плейсхолдер, пока подгружается ленивый чанк страницы.
 const PageFallback = () => (
@@ -758,6 +759,7 @@ function AppContent() {
       {/* Main Content. Platform AI assistant lives in two places per user's request:
           Telegram-bot is the primary channel (Block F), but a floating in-platform popup is also kept here for quick UI prompts. */}
       <main className="content-scroll flex-1 overflow-y-auto pt-[57px] lg:pt-0 relative">
+        <SubscriptionBanner language={language} />
         <Suspense fallback={<PageFallback />}>{renderPage()}</Suspense>
         <AIAssistant
           context={currentPage as 'dashboard' | 'ai-design' | 'sales' | 'warehouse' | 'finance' | 'chats' | 'analytics' | 'tasks' | 'settings'}
