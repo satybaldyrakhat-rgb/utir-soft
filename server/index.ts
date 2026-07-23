@@ -9,6 +9,7 @@ import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, se
 import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
 import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError } from './ownerAdmin.js';
 import { runBackup, listBackups, startBackupScheduler } from './backup.js';
+import { exportTeam } from './teamExport.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
@@ -4022,6 +4023,14 @@ app.post('/api/team/demo/seed', authMiddleware, requireRole('admin'), (req: Auth
 app.post('/api/team/demo/clear', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
   const removed = clearDemoData(db, req.teamId!);
   res.json({ ok: true, removed });
+});
+
+// Экспорт всех данных команды одним JSON (только админ команды).
+app.get('/api/team/export', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
+  const data = exportTeam(db, req.teamId!);
+  res.setHeader('Content-Disposition', `attachment; filename="utir-export-${new Date().toISOString().slice(0, 10)}.json"`);
+  res.setHeader('Content-Type', 'application/json');
+  res.send(JSON.stringify(data, null, 2));
 });
 
 // ─── Бэкапы (только владелец) ───────────────────────────────────────

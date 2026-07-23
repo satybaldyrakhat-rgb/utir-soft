@@ -15,7 +15,7 @@ import { getNiche } from '../utils/niches';
 import { toast } from '../utils/toast';
 import { confirmDialog } from '../utils/confirm';
 import { NicheIcon } from './NicheIcon';
-import { api } from '../utils/api';
+import { api, getToken } from '../utils/api';
 import { rowsToCsv, downloadCsv, todayStampedName, type CsvColumn } from '../utils/csv';
 import { t } from '../utils/translations';
 
@@ -117,6 +117,50 @@ function DemoDataPanel({ language }: { language: 'kz' | 'ru' | 'eng' }) {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Экспорт данных команды (только админ) ────────────────────────────
+function ExportDataPanel({ language }: { language: 'kz' | 'ru' | 'eng' }) {
+  const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
+  const [busy, setBusy] = useState(false);
+  const exportData = async () => {
+    setBusy(true);
+    try {
+      const base = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${base}/api/team/export`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `utir-export-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+      URL.revokeObjectURL(url);
+      toast(l('Данные выгружены', 'Деректер жүктелді', 'Data exported'), 'success');
+    } catch {
+      toast(l('Не удалось выгрузить данные', 'Деректерді жүктеу мүмкін болмады', 'Failed to export data'), 'error');
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
+      <div className="flex items-center gap-2 mb-1">
+        <Download className="w-4 h-4 text-emerald-600" />
+        <div className="text-sm text-gray-900">{l('Экспорт данных', 'Деректерді экспорттау', 'Export data')}</div>
+      </div>
+      <div className="text-[11px] text-slate-400 mb-4 leading-relaxed">
+        {l(
+          'Выгрузите все данные вашей команды одним файлом JSON: сделки, финансы, склад, задачи, чаты, сотрудники, настройки. Это ваши данные — можете сохранить копию в любой момент.',
+          'Командаңыздың барлық деректерін бір JSON файлымен жүктеп алыңыз: мәмілелер, қаржы, қойма, тапсырмалар, чаттар, қызметкерлер, баптаулар.',
+          'Download all your team data as a single JSON file: deals, finance, warehouse, tasks, chats, employees, settings. It is your data — keep a copy anytime.',
+        )}
+      </div>
+      <button
+        onClick={exportData}
+        disabled={busy}
+        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white/70 hover:bg-white ring-1 ring-white/60 text-gray-700 rounded-xl text-xs disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+        {l('Скачать все данные (JSON)', 'Барлық деректерді жүктеу (JSON)', 'Download all data (JSON)')}
+      </button>
     </div>
   );
 }
@@ -533,6 +577,7 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
             requisitesSlot={<RequisitesCard language={language} />}
           />
           {isAdmin && <DemoDataPanel language={language} />}
+          {isAdmin && <ExportDataPanel language={language} />}
         </div>
       )}
 
