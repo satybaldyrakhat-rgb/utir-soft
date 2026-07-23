@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary, verifyWebhookSecret, configureWebhookSecret, isWebhookSecretSet } from './telegram.js';
 import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
 import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError } from './ownerAdmin.js';
+import { runBackup, listBackups, startBackupScheduler } from './backup.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
@@ -4019,6 +4020,20 @@ app.post('/api/team/demo/clear', authMiddleware, requireRole('admin'), (req: Aut
   res.json({ ok: true, removed });
 });
 
+// ─── Бэкапы (только владелец) ───────────────────────────────────────
+// Регистрируем ДО общего /api/owner-роутера, чтобы точные пути имели
+// приоритет. Скачивание генерирует свежую консистентную копию БД.
+const ownerGate = [authMiddleware, makeRequireSuperAdmin(db)];
+app.get('/api/owner/backup/status', ...ownerGate, (_req, res) => res.json({ backups: listBackups(DB_PATH) }));
+app.post('/api/owner/backup/run', ...ownerGate, async (_req, res) => {
+  const r = await runBackup(db, DB_PATH);
+  res.json({ ok: true, file: path.basename(r.file), size: r.size });
+});
+app.get('/api/owner/backup/download', ...ownerGate, async (_req, res) => {
+  const r = await runBackup(db, DB_PATH);
+  res.download(r.file, path.basename(r.file));
+});
+
 // ─── Дашборд владельца платформы (super-admin) ──────────────────────
 // Кросс-командный обзор ВСЕЙ платформы. Доступ строго по email из
 // SUPER_ADMIN_EMAILS (authMiddleware → requireSuperAdmin).
@@ -4292,6 +4307,7 @@ app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
   startLeadFollowupScheduler();
   startAlertScanScheduler();
+  startBackupScheduler(db, DB_PATH);
   // Push the /-command menu to Telegram (idempotent — safe on every boot).
   // Adds /design to the blue menu button so users discover the wizard.
   if (isTelegramReady()) {

@@ -11,8 +11,9 @@ import {
   TrendingUp, Wallet, Building2, CircleDollarSign, ArrowUpRight, AlertTriangle,
   Clock, Ban, ShieldCheck, ChevronRight, Loader2, Check, Zap, UserCog, Radio,
   ListTodo, Plus, Trash2, Sparkles, Receipt, TrendingDown, Image as ImageIcon, MessageSquare,
+  Database, Download, ShieldAlert,
 } from 'lucide-react';
-import { api } from '../utils/api';
+import { api, getToken } from '../utils/api';
 import { toast } from '../utils/toast';
 import { confirmDialog } from '../utils/confirm';
 
@@ -215,22 +216,64 @@ function OverviewTab() {
         </Glass>
       </div>
 
-      {/* Subscription status bar */}
-      <Glass className="p-5">
-        <div className="text-sm text-slate-900 mb-4">Подписки по статусам</div>
-        <div className="flex gap-2">
-          {([['active', ov.subs.active], ['trial', ov.subs.trial], ['past_due', ov.subs.pastDue], ['churned', ov.subs.churned]] as [SubStatus, number][]).map(([st, n]) => {
-            const total = Math.max(1, ov.subs.active + ov.subs.trial + ov.subs.pastDue + ov.subs.churned);
-            return (
-              <div key={st} className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-1.5"><span className={`w-2 h-2 rounded-full ${STATUS_META[st].dot}`} /><span className="text-[11px] text-slate-500 truncate">{STATUS_META[st].label}</span><span className="text-[11px] text-slate-900 ml-auto tabular-nums">{n}</span></div>
-                <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full ${STATUS_META[st].dot}`} style={{ width: `${(n / total) * 100}%` }} /></div>
-              </div>
-            );
-          })}
-        </div>
-      </Glass>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Subscription status bar */}
+        <Glass className="p-5 lg:col-span-2">
+          <div className="text-sm text-slate-900 mb-4">Подписки по статусам</div>
+          <div className="flex gap-2">
+            {([['active', ov.subs.active], ['trial', ov.subs.trial], ['past_due', ov.subs.pastDue], ['churned', ov.subs.churned]] as [SubStatus, number][]).map(([st, n]) => {
+              const total = Math.max(1, ov.subs.active + ov.subs.trial + ov.subs.pastDue + ov.subs.churned);
+              return (
+                <div key={st} className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1.5"><span className={`w-2 h-2 rounded-full ${STATUS_META[st].dot}`} /><span className="text-[11px] text-slate-500 truncate">{STATUS_META[st].label}</span><span className="text-[11px] text-slate-900 ml-auto tabular-nums">{n}</span></div>
+                  <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full ${STATUS_META[st].dot}`} style={{ width: `${(n / total) * 100}%` }} /></div>
+                </div>
+              );
+            })}
+          </div>
+        </Glass>
+        <BackupCard />
+      </div>
     </div>
+  );
+}
+
+// ─── Резервные копии базы ─────────────────────────────────────────────
+function BackupCard() {
+  const [backups, setBackups] = useState<{ file: string; size: number; at: string }[] | null>(null);
+  const [dl, setDl] = useState(false);
+  const refresh = () => api.get<{ backups: any[] }>('/api/owner/backup/status').then(r => setBackups(r.backups)).catch(() => setBackups([]));
+  useEffect(() => { refresh(); }, []);
+  const last = backups?.[0];
+  const stale = last ? (Date.now() - new Date(last.at).getTime()) > 2 * 86400000 : true;
+
+  const download = async () => {
+    setDl(true);
+    try {
+      const base = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${base}/api/owner/backup/download`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `utir-backup-${new Date().toISOString().slice(0, 10)}.db`; a.click();
+      URL.revokeObjectURL(url);
+      toast('Свежий бэкап скачан', 'success'); refresh();
+    } catch { toast('Не удалось скачать бэкап', 'error'); } finally { setDl(false); }
+  };
+
+  return (
+    <Glass className="p-5">
+      <div className="flex items-center gap-2 mb-1"><Database className="w-4 h-4 text-indigo-500" /><div className="text-sm text-slate-900">Резервные копии</div></div>
+      <div className="text-[11px] text-slate-400 mb-3">Авто-бэкап раз в сутки</div>
+      <div className={`flex items-center gap-2 text-[11px] mb-3 px-2.5 py-2 rounded-xl ${stale ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+        {stale ? <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" /> : <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+        <span>{last ? `Последний: ${fmtDate(last.at)} · ${Math.round(last.size / 1024)} КБ` : 'Бэкапов пока нет'}</span>
+      </div>
+      <button onClick={download} disabled={dl} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs hover:bg-indigo-700 disabled:opacity-50">
+        {dl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Скачать свежий бэкап
+      </button>
+      <div className="text-[10px] text-slate-300 mt-2 leading-relaxed">Скачивайте офсайт-копию регулярно — это защита от потери диска сервера.</div>
+    </Glass>
   );
 }
 
