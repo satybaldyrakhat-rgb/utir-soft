@@ -67,6 +67,10 @@ export interface Subscription {
   suspended: boolean;      // доступ команде заблокирован
   note: string;
   updatedAt?: string;
+  // Дедуп напоминаний о продлении: значение expiresAt, о котором уже
+  // напомнили (чтобы не слать одно и то же каждый день).
+  remindedExpiringFor?: string;
+  remindedExpiredFor?: string;
 }
 
 function addDays(d: Date, n: number): Date { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
@@ -275,6 +279,54 @@ export function listErrors(db: Database.Database, limit = 200) {
     SELECT e.*, owner.company AS teamName, owner.name AS teamOwner
     FROM error_logs e LEFT JOIN users owner ON owner.id = e.team_id
     ORDER BY e.rowid DESC LIMIT ?`).all(limit) as any[];
+}
+
+// ─── Напоминания о продлении подписок ─────────────────────────────────
+// Telegram-чаты владельца (по email из SUPER_ADMIN_EMAILS + привязка).
+export function superAdminChatIds(db: Database.Database): number[] {
+  if (SUPER_ADMIN_EMAILS.length === 0) return [];
+  const ph = SUPER_ADMIN_EMAILS.map(() => '?').join(',');
+  const rows = db.prepare(
+    `SELECT tl.chat_id FROM telegram_links tl JOIN users u ON u.id = tl.user_id
+     WHERE LOWER(u.email) IN (${ph}) AND tl.chat_id IS NOT NULL`).all(...SUPER_ADMIN_EMAILS) as any[];
+  return rows.map(r => r.chat_id as number).filter(Boolean);
+}
+
+// Собирает дайджест по подпискам, которые скоро истекают (≤7 дней) или
+// уже истекли, и помечает их, чтобы не напоминать повторно. Возвращает
+// готовый HTML-текст или null, если напоминать не о чем.
+export function buildRenewalDigest(db: Database.Database): string | null {
+  const teams = listTeams(db);
+  const now = Date.now(); const day = 86400000;
+  const expiring: { name: string; daysLeft: number; amount: number }[] = [];
+  const expired: { name: string; daysAgo: number; amount: number }[] = [];
+  for (const t of teams) {
+    const s = t.subscription;
+    if (s.status === 'churned' || s.status === 'trial') continue;
+    const exp = new Date(s.expiresAt).getTime();
+    if (isNaN(exp)) continue;
+    const daysLeft = Math.ceil((exp - now) / day);
+    if (daysLeft > 0 && daysLeft <= 7 && s.remindedExpiringFor !== s.expiresAt) {
+      expiring.push({ name: t.name, daysLeft, amount: s.amount });
+      setSubscription(db, t.teamId, { remindedExpiringFor: s.expiresAt }, t.createdAt);
+    } else if (daysLeft <= 0 && s.remindedExpiredFor !== s.expiresAt) {
+      expired.push({ name: t.name, daysAgo: -daysLeft, amount: s.amount });
+      setSubscription(db, t.teamId, { remindedExpiredFor: s.expiresAt }, t.createdAt);
+    }
+  }
+  if (expiring.length === 0 && expired.length === 0) return null;
+  const kzt = (n: number) => (n || 0).toLocaleString('ru-RU') + ' ₸';
+  const lines: string[] = ['<b>💳 Продления подписок</b>', ''];
+  if (expired.length) {
+    lines.push('<b>⛔ Истекли — нужна оплата:</b>');
+    for (const e of expired) lines.push(`• ${e.name} — ${kzt(e.amount)}${e.daysAgo > 0 ? ` (${e.daysAgo} дн. назад)` : ' (сегодня)'}`);
+    lines.push('');
+  }
+  if (expiring.length) {
+    lines.push('<b>⏳ Скоро истекают:</b>');
+    for (const e of expiring) lines.push(`• ${e.name} — через ${e.daysLeft} дн. · ${kzt(e.amount)}`);
+  }
+  return lines.join('\n');
 }
 
 // ─── Роадмап владельца ────────────────────────────────────────────────

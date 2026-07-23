@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary, verifyWebhookSecret, configureWebhookSecret, isWebhookSecretSet } from './telegram.js';
 import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
-import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError } from './ownerAdmin.js';
+import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds } from './ownerAdmin.js';
 import { runBackup, listBackups, startBackupScheduler } from './backup.js';
 import { exportTeam } from './teamExport.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
@@ -4301,6 +4301,25 @@ function startAlertScanScheduler() {
   console.log('[server] alert scan scheduler started (every 30min)');
 }
 
+// Напоминания владельцу о продлении подписок (раз в сутки в Telegram).
+let renewalTimer: ReturnType<typeof setInterval> | null = null;
+function startRenewalReminderScheduler() {
+  if (renewalTimer) return;
+  const run = () => {
+    try {
+      if (!isTelegramReady()) return;
+      const chatIds = superAdminChatIds(db);
+      if (chatIds.length === 0) return;          // некому слать — не помечаем напоминания
+      const text = buildRenewalDigest(db);
+      if (!text) return;
+      for (const id of chatIds) tgSendMessage(id, text).catch(e => console.warn('[renewal] send failed', e));
+    } catch (e) { console.warn('[renewal] scan failed', e); }
+  };
+  setTimeout(run, 2 * 60 * 1000);                 // первый прогон через 2 мин после старта
+  renewalTimer = setInterval(run, 24 * 60 * 60 * 1000);
+  console.log('[server] renewal reminder scheduler started (daily)');
+}
+
 // ─── Error middleware (последний, после всех маршрутов) ──────────────
 // Единая точка обработки ошибок: и синхронные throw (Express их ловит),
 // и реджекты async-хендлеров, обёрнутых в ah(), приходят сюда. Отдаём
@@ -4321,6 +4340,7 @@ app.listen(PORT, () => {
   startLeadFollowupScheduler();
   startAlertScanScheduler();
   startBackupScheduler(db, DB_PATH);
+  startRenewalReminderScheduler();
   // Push the /-command menu to Telegram (idempotent — safe on every boot).
   // Adds /design to the blue menu button so users discover the wizard.
   if (isTelegramReady()) {
