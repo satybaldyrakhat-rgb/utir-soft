@@ -19,6 +19,8 @@ interface AuthProps {
   onLogin: (user: { name: string; email: string; avatar?: string; teamRole?: string; isSuperAdmin?: boolean }) => void;
   language: 'kz' | 'ru' | 'eng';
   onLanguageChange: (lang: 'kz' | 'ru' | 'eng') => void;
+  // С лендинга: «Попробовать бесплатно» открывает регистрацию, «Войти» — вход.
+  initialMode?: 'login' | 'signup';
 }
 
 // Console structure: a single glass panel with a Вход/Регистрация tab
@@ -26,9 +28,9 @@ interface AuthProps {
 // as full-panel screens with a back arrow.
 type AuthStep = 'console' | 'otp' | 'forgot' | 'forgot-sent';
 
-export function Auth({ onLogin, language, onLanguageChange }: AuthProps) {
+export function Auth({ onLogin, language, onLanguageChange, initialMode }: AuthProps) {
   const [step, setStep] = useState<AuthStep>('console');
-  const [tab, setTab] = useState<'login' | 'signup'>('login');
+  const [tab, setTab] = useState<'login' | 'signup'>(initialMode || 'login');
   // Auth method within a tab: email/password or phone/SMS-code.
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [phone, setPhone] = useState('');

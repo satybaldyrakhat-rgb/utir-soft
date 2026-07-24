@@ -19,6 +19,7 @@ const Tasks         = lazyNamed(() => import('./components/Tasks'), 'Tasks');
 const Settings      = lazyNamed(() => import('./components/Settings'), 'Settings');
 const CustomModulePage = lazyNamed(() => import('./components/CustomModulePage'), 'CustomModulePage');
 const OwnerDashboard = lazyNamed(() => import('./components/OwnerDashboard'), 'OwnerDashboard');
+const LandingPage = lazyNamed(() => import('./landing/pages/LandingPage'), 'LandingPage');
 import { SubscriptionBanner } from './components/SubscriptionBanner';
 
 // Лёгкий плейсхолдер, пока подгружается ленивый чанк страницы.
@@ -98,8 +99,9 @@ function AppContent() {
   // Отдельный полноэкранный маршрут владельца (#/owner). Реактивно следим за
   // хешем, чтобы перехватить до рендера обычной оболочки.
   const [ownerRoute, setOwnerRoute] = useState(() => typeof window !== 'undefined' && window.location.hash.startsWith('#/owner'));
+  const [publicHash, setPublicHash] = useState(() => typeof window !== 'undefined' ? window.location.hash : '');
   useEffect(() => {
-    const on = () => setOwnerRoute(window.location.hash.startsWith('#/owner'));
+    const on = () => { setOwnerRoute(window.location.hash.startsWith('#/owner')); setPublicHash(window.location.hash); };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);
@@ -280,9 +282,19 @@ function AppContent() {
     );
   }
 
-  // Show Auth screen if not authenticated
+  // Логаут: публичный лендинг по корню, экран входа/регистрации — по
+  // явным маршрутам (#/login, #/signup) и при возврате из OAuth (токен в
+  // хеше/квери). Всё остальное для гостя → лендинг.
   if (!isAuthenticated) {
-    return <Auth onLogin={handleLogin} language={language} onLanguageChange={setLanguage} />;
+    const h = publicHash || (typeof window !== 'undefined' ? window.location.hash : '');
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    const wantsAuth = h.startsWith('#/login') || h.startsWith('#/signup')
+      || h.startsWith('#oauth_token') || h.includes('token=')
+      || search.includes('token=') || search.includes('oauth=');
+    if (wantsAuth) {
+      return <Auth onLogin={handleLogin} language={language} onLanguageChange={setLanguage} initialMode={h.startsWith('#/signup') ? 'signup' : 'login'} />;
+    }
+    return <Suspense fallback={<PageFallback />}><LandingPage /></Suspense>;
   }
 
   // Дашборд владельца платформы — отдельный полноэкранный маршрут (#/owner),
