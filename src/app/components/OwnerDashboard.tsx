@@ -11,7 +11,7 @@ import {
   TrendingUp, Wallet, Building2, CircleDollarSign, ArrowUpRight, AlertTriangle,
   Clock, Ban, ShieldCheck, ChevronRight, Loader2, Check, Zap, UserCog, Radio,
   ListTodo, Plus, Trash2, Sparkles, Receipt, TrendingDown, Image as ImageIcon, MessageSquare,
-  Database, Download, ShieldAlert,
+  Database, Download, ShieldAlert, Inbox, Phone, Mail,
 } from 'lucide-react';
 import { api, getToken } from '../utils/api';
 import { toast } from '../utils/toast';
@@ -68,7 +68,7 @@ function Glass({ children, className = '' }: { children: React.ReactNode; classN
 }
 
 // ─── Корень ───────────────────────────────────────────────────────────
-type Tab = 'overview' | 'kanban' | 'teams' | 'finance' | 'roadmap' | 'users' | 'activity' | 'errors';
+type Tab = 'overview' | 'leads' | 'kanban' | 'teams' | 'finance' | 'roadmap' | 'users' | 'activity' | 'errors';
 
 export function OwnerDashboard({ onExit }: { onExit: () => void }) {
   const [tab, setTab] = useState<Tab>('overview');
@@ -83,6 +83,7 @@ export function OwnerDashboard({ onExit }: { onExit: () => void }) {
 
   const NAV: { id: Tab; icon: any; label: string }[] = [
     { id: 'overview', icon: LayoutDashboard, label: 'Обзор' },
+    { id: 'leads',    icon: Inbox,           label: 'Заявки' },
     { id: 'kanban',   icon: KanbanSquare,    label: 'Подписки' },
     { id: 'teams',    icon: Building2,       label: 'Команды' },
     { id: 'finance',  icon: Wallet,          label: 'Финансы' },
@@ -133,6 +134,7 @@ export function OwnerDashboard({ onExit }: { onExit: () => void }) {
         </Glass>
 
         {tab === 'overview' && <OverviewTab />}
+        {tab === 'leads'    && <LeadsTab />}
         {tab === 'kanban'   && <KanbanTab teams={teams} reload={loadTeams} onOpen={setOpenTeam} />}
         {tab === 'teams'    && <TeamsTab teams={teams} onOpen={setOpenTeam} />}
         {tab === 'finance'  && <FinanceTab />}
@@ -571,6 +573,74 @@ function ErrorsTab() {
         {errs.length === 0 && <div className="text-center text-emerald-400 text-xs py-10 flex flex-col items-center gap-2"><Check className="w-6 h-6" />Ошибок нет — чисто</div>}
       </div>
     </Glass>
+  );
+}
+
+// ─── Заявки на демо ───────────────────────────────────────────────────
+interface Lead { id: string; name: string; phone?: string; email?: string; company?: string; message?: string; status: string; at: string; source?: string }
+const LEAD_STATUS: Record<string, { label: string; chip: string }> = {
+  new:       { label: 'Новая',      chip: 'bg-indigo-50 text-indigo-600 ring-indigo-100' },
+  contacted: { label: 'Связались',  chip: 'bg-amber-50 text-amber-700 ring-amber-100' },
+  converted: { label: 'Клиент',     chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
+  rejected:  { label: 'Отказ',      chip: 'bg-slate-100 text-slate-500 ring-slate-200' },
+};
+function LeadsTab() {
+  const [leads, setLeads] = useState<Lead[] | null>(null);
+  const [filter, setFilter] = useState('all');
+  const load = () => api.get<Lead[]>('/api/owner/leads').then(setLeads).catch(() => setLeads([]));
+  useEffect(() => { load(); }, []);
+  if (!leads) return <Skeleton />;
+
+  const setStatus = async (id: string, status: string) => {
+    setLeads(ls => ls!.map(l => l.id === id ? { ...l, status } : l));
+    try { await api.patch(`/api/owner/leads/${id}`, { status }); } catch { load(); }
+  };
+  const del = async (id: string) => {
+    if (!(await confirmDialog({ message: 'Удалить заявку?', danger: true }))) return;
+    try { await api.delete(`/api/owner/leads/${id}`); load(); } catch { /* */ }
+  };
+  const shown = leads.filter(l => filter === 'all' || l.status === filter);
+  const newCount = leads.filter(l => l.status === 'new').length;
+
+  return (
+    <div className="space-y-4">
+      <Glass className="p-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="text-sm text-slate-900 mr-2 flex items-center gap-2"><Inbox className="w-4 h-4 text-indigo-500" /> Заявки на демо {newCount > 0 && <span className="text-[10px] px-1.5 py-0.5 bg-indigo-500 text-white rounded-full">{newCount} новых</span>}</div>
+          <div className="flex gap-1 ml-auto">
+            {[['all', 'Все'], ['new', 'Новые'], ['contacted', 'Связались'], ['converted', 'Клиенты'], ['rejected', 'Отказ']].map(([k, l]) => (
+              <button key={k} onClick={() => setFilter(k)} className={`px-3 py-1.5 rounded-xl text-[11px] transition-all ${filter === k ? 'bg-white text-slate-900 shadow-sm ring-1 ring-white/80' : 'text-slate-500 hover:bg-white/40'}`}>{l}</button>
+            ))}
+          </div>
+        </div>
+      </Glass>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {shown.map(lead => (
+          <Glass key={lead.id} className="p-4">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="min-w-0">
+                <div className="text-sm text-slate-900 font-medium truncate">{lead.name}</div>
+                {lead.company && <div className="text-[11px] text-slate-400 truncate">{lead.company}</div>}
+              </div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-lg ring-1 flex-shrink-0 ${LEAD_STATUS[lead.status]?.chip || LEAD_STATUS.new.chip}`}>{LEAD_STATUS[lead.status]?.label || lead.status}</span>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">
+              {lead.phone && <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-indigo-600"><Phone className="w-3 h-3" />{lead.phone}</a>}
+              {lead.email && <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-indigo-600"><Mail className="w-3 h-3" />{lead.email}</a>}
+            </div>
+            {lead.message && <div className="text-[11px] text-slate-500 bg-white/50 rounded-lg px-3 py-2 mb-2 leading-snug">«{lead.message}»</div>}
+            <div className="flex items-center gap-1.5">
+              <select value={lead.status} onChange={e => setStatus(lead.id, e.target.value)} className="text-[11px] px-2 py-1 bg-white/70 ring-1 ring-white/70 rounded-lg focus:outline-none">
+                {Object.entries(LEAD_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <span className="text-[10px] text-slate-400 ml-auto">{ago(lead.at)}</span>
+              <button onClick={() => del(lead.id)} className="p-1 hover:bg-rose-50 rounded-lg"><Trash2 className="w-3.5 h-3.5 text-rose-400" /></button>
+            </div>
+          </Glass>
+        ))}
+      </div>
+      {shown.length === 0 && <Glass className="p-10"><div className="text-center text-slate-300 text-xs">{filter === 'all' ? 'Заявок пока нет' : 'Нет заявок по фильтру'}</div></Glass>}
+    </div>
   );
 }
 

@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary, verifyWebhookSecret, configureWebhookSecret, isWebhookSecretSet } from './telegram.js';
 import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
-import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView } from './ownerAdmin.js';
+import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView, createPlatformLead } from './ownerAdmin.js';
 import { runBackup, listBackups, startBackupScheduler } from './backup.js';
 import { exportTeam } from './teamExport.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
@@ -4028,6 +4028,23 @@ app.post('/api/team/demo/clear', authMiddleware, requireRole('admin'), (req: Aut
 // Взгляд команды на свою подписку (для баннера). Только чтение.
 app.get('/api/team/subscription', authMiddleware, (req: AuthedRequest, res) => {
   res.json(teamSubscriptionView(db, req.teamId!));
+});
+
+// Заявка на демо с лендинга (публичная, rate-limited). Падает лидом в
+// Центр управления + мгновенное уведомление владельцу в Telegram.
+app.post('/api/demo-request', rateLimit('lead'), (req, res) => {
+  const body = req.body || {};
+  if (!String(body.name || '').trim() || !(String(body.phone || '').trim() || String(body.email || '').trim())) {
+    return res.status(400).json({ error: 'name and phone/email required' });
+  }
+  const lead = createPlatformLead(db, body);
+  // Уведомляем владельца (если есть привязанный Telegram).
+  if (isTelegramReady()) {
+    const chatIds = superAdminChatIds(db);
+    const text = `<b>🔔 Новая заявка на демо</b>\n\n<b>${lead.name}</b>${lead.company ? `\n🏢 ${lead.company}` : ''}${lead.phone ? `\n📞 ${lead.phone}` : ''}${lead.email ? `\n✉️ ${lead.email}` : ''}${lead.message ? `\n\n«${lead.message}»` : ''}`;
+    for (const id of chatIds) tgSendMessage(id, text).catch(() => {});
+  }
+  res.json({ ok: true });
 });
 
 // Экспорт всех данных команды одним JSON (только админ команды).

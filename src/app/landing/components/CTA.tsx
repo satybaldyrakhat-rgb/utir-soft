@@ -22,12 +22,12 @@ export function CTA() {
                 {t.cta.btn1}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </a>
-              <a
-                href="#/signup"
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent("utir:open-demo"))}
                 className="inline-flex items-center justify-center rounded-full border border-white/40 px-6 py-3.5 text-sm text-white hover:bg-white/10 transition-colors"
               >
                 {t.cta.btn2}
-              </a>
+              </button>
               <a
                 href="tel:+77779631717"
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-white/40 px-6 py-3.5 text-sm text-white hover:bg-white/10 transition-colors"

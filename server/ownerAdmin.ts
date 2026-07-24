@@ -50,6 +50,12 @@ export function initOwnerSchema(db: Database.Database) {
       data TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now'))
     );
+    -- Заявки на демо с лендинга (лиды самой платформы).
+    CREATE TABLE IF NOT EXISTS platform_leads (
+      id TEXT PRIMARY KEY,
+      data TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 }
 
@@ -458,6 +464,41 @@ export function financeOverview(db: Database.Database) {
   };
 }
 
+// ─── Заявки на демо (лиды платформы с лендинга) ───────────────────────
+export function createPlatformLead(db: Database.Database, body: any) {
+  const id = 'lead_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  const data = {
+    name: String(body.name || '').slice(0, 120).trim(),
+    phone: String(body.phone || '').slice(0, 40).trim(),
+    email: String(body.email || '').slice(0, 120).trim(),
+    company: String(body.company || '').slice(0, 160).trim(),
+    message: String(body.message || '').slice(0, 1000).trim(),
+    source: String(body.source || 'landing').slice(0, 60),
+    status: 'new', id,
+  };
+  db.prepare('INSERT INTO platform_leads (id, data) VALUES (?, ?)').run(id, JSON.stringify(data));
+  return data;
+}
+export function listPlatformLeads(db: Database.Database) {
+  return (db.prepare('SELECT id, data, created_at FROM platform_leads ORDER BY rowid DESC').all() as any[])
+    .map(r => { try { return { ...JSON.parse(r.data), id: r.id, at: r.created_at }; } catch { return { id: r.id, at: r.created_at }; } });
+}
+export function updatePlatformLead(db: Database.Database, id: string, patch: any) {
+  const row = db.prepare('SELECT data FROM platform_leads WHERE id = ?').get(id) as any;
+  if (!row) return null;
+  let cur: any = {}; try { cur = JSON.parse(row.data); } catch { /* skip */ }
+  if (patch.status) cur.status = String(patch.status);
+  if (patch.note !== undefined) cur.note = String(patch.note).slice(0, 1000);
+  db.prepare('UPDATE platform_leads SET data = ? WHERE id = ?').run(JSON.stringify({ ...cur, id }), id);
+  return { ...cur, id };
+}
+export function deletePlatformLead(db: Database.Database, id: string) {
+  db.prepare('DELETE FROM platform_leads WHERE id = ?').run(id);
+}
+export function newLeadCount(db: Database.Database): number {
+  return (db.prepare(`SELECT COUNT(*) n FROM platform_leads WHERE data LIKE '%"status":"new"%'`).get() as any)?.n || 0;
+}
+
 // ─── Router ───────────────────────────────────────────────────────────
 // Требует, чтобы ВЫШЕ уже отработали authMiddleware + requireSuperAdmin
 // (см. монтирование в index.ts). requireSuperAdmin здесь же экспортируем.
@@ -485,6 +526,11 @@ export function createOwnerRouter(db: Database.Database, onSuspendChange?: (team
   r.post('/tasks', (req, res) => res.json(createOwnerTask(db, req.body || {})));
   r.patch('/tasks/:id', (req, res) => { const t = updateOwnerTask(db, req.params.id, req.body || {}); if (!t) return res.status(404).json({ error: 'not found' }); res.json(t); });
   r.delete('/tasks/:id', (req, res) => { deleteOwnerTask(db, req.params.id); res.json({ ok: true }); });
+
+  // Заявки на демо.
+  r.get('/leads', (_req, res) => res.json(listPlatformLeads(db)));
+  r.patch('/leads/:id', (req, res) => { const u = updatePlatformLead(db, req.params.id, req.body || {}); if (!u) return res.status(404).json({ error: 'not found' }); res.json(u); });
+  r.delete('/leads/:id', (req, res) => { deletePlatformLead(db, req.params.id); res.json({ ok: true }); });
 
   // Финансы платформы.
   r.get('/finance', (_req, res) => res.json(financeOverview(db)));
