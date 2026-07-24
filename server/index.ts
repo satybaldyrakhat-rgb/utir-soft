@@ -10,6 +10,7 @@ import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
 import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView, createPlatformLead } from './ownerAdmin.js';
 import { runBackup, listBackups, startBackupScheduler } from './backup.js';
 import { exportTeam } from './teamExport.js';
+import { initAiLimitsSchema, aiLimitStatus, consumeAi, limitReason } from './aiLimits.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
@@ -455,6 +456,8 @@ if (teamIdJustAdded) {
 
 // Схема дашборда владельца: подписки, блокировки, лог ошибок.
 initOwnerSchema(db);
+// Схема лимитов AI на пробном периоде.
+initAiLimitsSchema(db);
 
 // Each shared data table gets a team_id column. Pre-existing rows belong to the
 // creator's personal team (team_id = user_id), so single-user installs see no
@@ -2669,6 +2672,12 @@ aiDesignRouter.post('/generate', requirePermission('ai-design'), async (req: Aut
     }
   }
 
+  // Лимит бесплатного (пробного) периода — дневной, поверх ролевой квоты.
+  const dLimit = aiLimitStatus(db, req.teamId!, 'design');
+  if (!dLimit.allowed) {
+    return res.status(402).json({ error: limitReason(dLimit), aiLimit: true, kind: 'design', plan: dLimit.plan, limit: dLimit.limit, used: dLimit.used });
+  }
+
   const provider = String(req.body?.provider || 'utir-mix') as ProviderId;
   const userPrompt = String(req.body?.prompt || '').trim();
   // Optional input images for img2img. Accept data-URLs only (the frontend
@@ -2711,6 +2720,9 @@ aiDesignRouter.post('/generate', requirePermission('ai-design'), async (req: Aut
     } catch (e) { console.warn('[ai-design] history insert failed', e); }
     return { ...r, id };
   });
+
+  // Списываем дневной лимит пробного периода при успешной генерации.
+  if (saved.some(s => s.ok)) consumeAi(db, req.teamId!, 'design');
 
   // Telegram notify: when a teammate generates a design, ping them so they
   // see the result even if they're chatting in the bot.
@@ -2796,6 +2808,14 @@ aiChatRouter.post('/message', async (req: AuthedRequest, res) => {
     .slice(-40);
   if (messages.length === 0) return res.status(400).json({ error: 'messages required' });
   if (messages[messages.length - 1].role !== 'user') return res.status(400).json({ error: 'last message must be user' });
+
+  // Лимит AI-ассистента на пробном периоде (дневной). Отдаём 200 с
+  // kind:'error', чтобы попап показал сообщение прямо в чате.
+  const aLimit = aiLimitStatus(db, req.teamId!, 'assistant');
+  if (!aLimit.allowed) {
+    return res.json({ kind: 'error', provider, ok: false, error: limitReason(aLimit), aiLimit: true });
+  }
+  consumeAi(db, req.teamId!, 'assistant');
 
   const userRow = db.prepare('SELECT name FROM users WHERE id = ?').get(req.userId!) as any;
   const userName = userRow?.name || 'Пользователь';
@@ -4028,6 +4048,14 @@ app.post('/api/team/demo/clear', authMiddleware, requireRole('admin'), (req: Aut
 // Взгляд команды на свою подписку (для баннера). Только чтение.
 app.get('/api/team/subscription', authMiddleware, (req: AuthedRequest, res) => {
   res.json(teamSubscriptionView(db, req.teamId!));
+});
+
+// Текущие лимиты AI (для показа «осталось N на сегодня»).
+app.get('/api/team/ai-limits', authMiddleware, (req: AuthedRequest, res) => {
+  res.json({
+    assistant: aiLimitStatus(db, req.teamId!, 'assistant'),
+    design: aiLimitStatus(db, req.teamId!, 'design'),
+  });
 });
 
 // Заявка на демо с лендинга (публичная, rate-limited). Падает лидом в

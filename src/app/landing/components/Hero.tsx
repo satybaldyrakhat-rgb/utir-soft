@@ -32,12 +32,12 @@ export function Hero() {
                 {t.hero.ctaTry}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </a>
-              <button
-                onClick={() => window.dispatchEvent(new CustomEvent("utir:open-demo"))}
+              <a
+                href="#/signup"
                 className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm text-slate-700 hover:border-slate-300 transition-colors"
               >
                 {t.hero.ctaDemo}
-              </button>
+              </a>
             </div>
 
             <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-slate-500">

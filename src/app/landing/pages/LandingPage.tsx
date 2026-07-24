@@ -14,7 +14,6 @@ import { Testimonials } from "../components/Testimonials";
 import { FAQ } from "../components/FAQ";
 import { CTA } from "../components/CTA";
 import { Footer } from "../components/Footer";
-import { DemoRequestModal } from "../components/DemoRequestModal";
 
 export function LandingPage() {
   return (
@@ -37,7 +36,6 @@ export function LandingPage() {
         <CTA />
       </main>
       <Footer />
-      <DemoRequestModal />
     </div>
     </LanguageProvider>
   );
