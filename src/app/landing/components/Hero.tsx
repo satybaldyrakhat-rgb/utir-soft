@@ -4,14 +4,14 @@ import { useLang } from "../i18n/LanguageContext";
 export function Hero() {
   const { t } = useLang();
   return (
-    <section className="relative overflow-hidden bg-white">
+    <section className="relative overflow-hidden">
       <div className="absolute -top-40 -left-40 h-[480px] w-[480px] rounded-full bg-emerald-100/50 blur-3xl" />
       <div className="absolute -top-20 right-0 h-[420px] w-[420px] rounded-full bg-emerald-50 blur-3xl" />
 
       <div className="relative mx-auto max-w-6xl px-6 lg:px-8 pt-20 sm:pt-24 pb-16 sm:pb-24">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs text-slate-600">
+            <div className="inline-flex items-center gap-2 rounded-full ring-1 ring-white/60 bg-white/60 backdrop-blur-xl px-3.5 py-1.5 text-xs text-slate-600">
               <span className="h-1.5 w-1.5 rounded-full bg-[#58c084]" />
               {t.hero.badge}
             </div>
@@ -33,8 +33,8 @@ export function Hero() {
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </a>
               <a
-                href="#/signup"
-                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm text-slate-700 hover:border-slate-300 transition-colors"
+                href="#features"
+                className="inline-flex items-center justify-center rounded-full ring-1 ring-white/60 bg-white/60 backdrop-blur-xl px-6 py-3.5 text-sm text-slate-700 hover:bg-white/80 transition-colors"
               >
                 {t.hero.ctaDemo}
               </a>
@@ -88,7 +88,7 @@ function HeroInfographic() {
       <div className="absolute inset-0 -m-4 sm:-m-6 bg-gradient-to-tr from-emerald-50 to-transparent rounded-[24px] sm:rounded-[32px]" />
 
       <div className="relative flex flex-col sm:grid sm:grid-cols-6 sm:grid-rows-6 gap-3 sm:gap-4 sm:h-[480px]">
-        <div className="sm:col-span-4 sm:row-span-4 rounded-2xl bg-white border border-slate-200/80 shadow-[0_20px_60px_-20px_rgba(15,23,42,0.12)] p-5 sm:p-6 flex flex-col h-64 sm:h-auto">
+        <div className="sm:col-span-4 sm:row-span-4 rounded-2xl bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_20px_60px_-20px_rgba(15,23,42,0.12)] p-5 sm:p-6 flex flex-col h-64 sm:h-auto">
           <div className="flex items-center justify-between">
             <div className="text-xs text-slate-500">{t.hero.info.sales}</div>
             <div className="inline-flex items-center gap-1 text-[#58c084] text-xs">
@@ -140,7 +140,7 @@ function HeroInfographic() {
             </div>
           </div>
 
-          <div className="sm:flex-1 rounded-2xl bg-white border border-slate-200/80 p-4 sm:p-5 flex flex-col justify-between h-32 sm:h-auto">
+          <div className="sm:flex-1 rounded-2xl bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] p-4 sm:p-5 flex flex-col justify-between h-32 sm:h-auto">
             <div className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-emerald-50">
               <Package className="h-4 w-4 text-[#58c084]" />
             </div>
@@ -174,7 +174,7 @@ function HeroInfographic() {
           </div>
         </div>
 
-        <div className="sm:col-span-3 sm:row-span-2 rounded-2xl bg-white border border-slate-200/80 p-4 sm:p-5 h-auto sm:h-auto">
+        <div className="sm:col-span-3 sm:row-span-2 rounded-2xl bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] p-4 sm:p-5 h-auto sm:h-auto">
           <div className="flex items-center justify-between">
             <div className="text-xs text-slate-500">{t.hero.info.tasks}</div>
             <div className="text-[10px] text-[#58c084]">8/12</div>

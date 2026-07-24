@@ -8,7 +8,7 @@ const icons: LucideIcon[] = [Flag, Hammer, Bot, MessagesSquare, Smartphone, Zap]
 export function WhyUtirSoft() {
   const { t } = useLang();
   return (
-    <section className="py-24 sm:py-32 bg-white">
+    <section className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <motion.div
           className="max-w-2xl mx-auto text-center"
@@ -32,7 +32,7 @@ export function WhyUtirSoft() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.5, delay: idx * 0.05 }}
-                className="group relative rounded-2xl border border-slate-200/70 bg-white p-6 sm:p-8 hover:border-[#58c084]/40 hover:shadow-[0_20px_50px_-30px_rgba(88,192,132,0.4)] transition-all"
+                className="group relative rounded-2xl bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] p-6 sm:p-8 hover:border-[#58c084]/40 hover:shadow-[0_20px_50px_-30px_rgba(88,192,132,0.4)] transition-all"
               >
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-[#58c084]">
                   <Icon className="h-5 w-5" />

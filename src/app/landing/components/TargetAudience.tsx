@@ -14,7 +14,7 @@ export function TargetAudience() {
   ];
 
   return (
-    <section id="solutions" className="py-24 sm:py-32 bg-slate-50 border-y border-slate-100">
+    <section id="solutions" className="py-24 sm:py-32 border-y border-white/40">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <motion.div
           className="max-w-2xl mx-auto text-center"
@@ -42,7 +42,7 @@ export function TargetAudience() {
                 className={`relative rounded-3xl p-7 sm:p-9 flex flex-col ${
                   a.featured
                     ? "bg-slate-900 text-white shadow-[0_30px_60px_-30px_rgba(15,23,42,0.5)]"
-                    : "bg-white border border-slate-200/70 text-slate-900"
+                    : "bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] text-slate-900"
                 }`}
               >
                 {a.featured && (

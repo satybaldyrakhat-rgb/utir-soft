@@ -15,7 +15,7 @@ import { useLang } from "../i18n/LanguageContext";
 export function Trusted() {
   const { t } = useLang();
   return (
-    <section className="py-20 sm:py-24 bg-white border-y border-slate-100">
+    <section className="py-20 sm:py-24 border-y border-white/40">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto">
           <p className="text-sm text-[#58c084]">{t.trusted.eyebrow}</p>
@@ -24,11 +24,11 @@ export function Trusted() {
           </h2>
         </div>
 
-        <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-px bg-slate-100 rounded-2xl overflow-hidden border border-slate-100">
+        <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 rounded-2xl overflow-hidden bg-white/45 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] divide-x divide-y sm:divide-y-0 divide-white/50">
           {logos.map((logo) => (
             <div
               key={logo.name}
-              className="bg-white py-10 px-6 sm:py-14 sm:px-8 flex items-center justify-center"
+              className="py-10 px-6 sm:py-14 sm:px-8 flex items-center justify-center"
             >
               <img
                 src={logo.src}

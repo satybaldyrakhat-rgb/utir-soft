@@ -4,7 +4,7 @@ import { useLang } from "../i18n/LanguageContext";
 export function CTA() {
   const { t } = useLang();
   return (
-    <section className="bg-white py-24 sm:py-32">
+    <section className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-3xl bg-[#58c084] px-6 py-14 sm:px-14 sm:py-20 text-white">
           <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-white/15 blur-3xl" />
@@ -23,7 +23,7 @@ export function CTA() {
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </a>
               <a
-                href="#/signup"
+                href="#pricing"
                 className="inline-flex items-center justify-center rounded-full border border-white/40 px-6 py-3.5 text-sm text-white hover:bg-white/10 transition-colors"
               >
                 {t.cta.btn2}

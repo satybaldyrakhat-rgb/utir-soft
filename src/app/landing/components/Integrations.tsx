@@ -55,7 +55,7 @@ const meta: { icon: IconType | ((p: { className?: string }) => JSX.Element); col
 export function Integrations() {
   const { t } = useLang();
   return (
-    <section className="py-24 sm:py-32 bg-slate-50 border-y border-slate-100">
+    <section className="py-24 sm:py-32 border-y border-white/40">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <motion.div
           className="max-w-2xl mx-auto text-center"
@@ -80,7 +80,7 @@ export function Integrations() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.4, delay: idx * 0.04 }}
-                className="rounded-2xl bg-white border border-slate-200/70 p-5 sm:p-6 hover:border-[#58c084]/40 transition-colors"
+                className="rounded-2xl bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] p-5 sm:p-6 hover:border-[#58c084]/40 transition-colors"
               >
                 <div className={`inline-flex h-12 w-12 items-center justify-center rounded-xl ${m.bg} ${m.color}`}>
                   <m.icon className="h-6 w-6" />

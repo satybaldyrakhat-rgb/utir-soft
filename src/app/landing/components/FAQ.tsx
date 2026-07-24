@@ -8,7 +8,7 @@ export function FAQ() {
   const [openKey, setOpenKey] = useState<string | null>("0-0");
 
   return (
-    <section id="faq" className="py-24 sm:py-32 bg-slate-50 border-t border-slate-100">
+    <section id="faq" className="py-24 sm:py-32 border-t border-white/40">
       <div className="mx-auto max-w-3xl px-6 lg:px-8">
         <motion.div
           className="text-center"

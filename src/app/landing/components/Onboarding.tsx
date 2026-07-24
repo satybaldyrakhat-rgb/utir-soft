@@ -8,7 +8,7 @@ const icons: LucideIcon[] = [UserPlus, Settings, Upload, GraduationCap];
 export function Onboarding() {
   const { t } = useLang();
   return (
-    <section className="py-24 sm:py-32 bg-white">
+    <section className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <motion.div
           className="max-w-2xl mx-auto text-center"
@@ -33,7 +33,7 @@ export function Onboarding() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.4, delay: idx * 0.1 }}
-                className="relative rounded-2xl bg-white border border-slate-200/70 p-6 sm:p-7"
+                className="relative rounded-2xl bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] p-6 sm:p-7"
               >
                 <div className="relative inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-[#58c084]">
                   <Icon className="h-5 w-5" />

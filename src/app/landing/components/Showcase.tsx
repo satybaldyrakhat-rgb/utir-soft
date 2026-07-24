@@ -125,7 +125,7 @@ export function Showcase() {
     <AnalyticsVisual />,
   ];
   return (
-    <section id="interface" className="py-24 sm:py-32 bg-slate-50">
+    <section id="interface" className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <div className="max-w-2xl mb-20">
           <p className="text-sm text-[#58c084]">{t.showcase.eyebrow}</p>
@@ -163,7 +163,7 @@ export function Showcase() {
                 </a>
               </div>
 
-              <div className="rounded-2xl bg-white border border-slate-200/60 p-5 sm:p-8 shadow-[0_20px_60px_-20px_rgba(15,23,42,0.12)]">
+              <div className="rounded-2xl bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] p-5 sm:p-8 shadow-[0_20px_60px_-20px_rgba(15,23,42,0.12)]">
                 {visualNodes[index]}
               </div>
             </div>
@@ -230,7 +230,7 @@ function KanbanVisual() {
             </div>
             <div className="mt-3 space-y-2">
               {col.cards.map((c) => (
-                <div key={c} className="rounded-lg bg-white border border-slate-100 px-3 py-2.5">
+                <div key={c} className="rounded-lg bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] px-3 py-2.5">
                   <div className="text-xs text-slate-700">{c}</div>
                   <div className="mt-1.5 flex items-center gap-1">
                     <span className="h-1 w-1 rounded-full bg-[#58c084]" />

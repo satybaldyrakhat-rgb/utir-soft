@@ -21,7 +21,7 @@ const layout: { eyebrow: string; titleKey: "g1" | "g2" | "g3"; cardKeys: (keyof 
 export function Features() {
   const { t } = useLang();
   return (
-    <section id="features" className="py-24 sm:py-32 bg-white">
+    <section id="features" className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <motion.div
           className="max-w-2xl"
@@ -58,7 +58,7 @@ export function Features() {
                   return (
                     <div
                       key={key}
-                      className="rounded-2xl border border-slate-200/70 bg-white p-6 hover:border-[#58c084]/40 hover:bg-emerald-50/30 transition-colors"
+                      className="rounded-2xl bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] p-6 hover:border-[#58c084]/40 hover:bg-emerald-50/30 transition-colors"
                     >
                       <div className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-emerald-50 text-[#58c084] mb-5">
                         <Icon className="h-5 w-5" />

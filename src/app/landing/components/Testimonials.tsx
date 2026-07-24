@@ -5,7 +5,7 @@ import { useLang } from "../i18n/LanguageContext";
 export function Testimonials() {
   const { t } = useLang();
   return (
-    <section id="cases" className="py-24 sm:py-32 bg-white">
+    <section id="cases" className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <motion.div
           className="max-w-2xl mx-auto text-center mb-14"

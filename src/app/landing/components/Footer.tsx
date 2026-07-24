@@ -19,7 +19,7 @@ export function Footer() {
   ];
 
   return (
-    <footer className="bg-white border-t border-slate-100 py-16">
+    <footer className="bg-white/40 backdrop-blur-xl border-t border-white/40 py-16">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-10">
           <div className="col-span-2 sm:col-span-3 lg:col-span-1">

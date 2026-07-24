@@ -20,7 +20,7 @@ export function Pricing() {
   const [yearly, setYearly] = useState(false);
 
   return (
-    <section id="pricing" className="py-24 sm:py-32 bg-white">
+    <section id="pricing" className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <motion.div
           className="max-w-2xl mx-auto text-center"
@@ -74,7 +74,7 @@ export function Pricing() {
                 className={`relative rounded-3xl p-7 flex flex-col transition-all ${
                   isHighlighted
                     ? "bg-white border-2 border-[#58c084] shadow-[0_30px_60px_-30px_rgba(88,192,132,0.4)]"
-                    : "bg-white border border-slate-200/70 hover:border-slate-300"
+                    : "bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] hover:border-slate-300"
                 }`}
               >
                 {isHighlighted && (

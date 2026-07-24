@@ -29,7 +29,7 @@ function LangSwitcher() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 hover:border-slate-300 transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-full ring-1 ring-white/60 bg-white/60 backdrop-blur-xl px-3 py-1.5 text-xs text-slate-700 hover:bg-white/80 transition-colors"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -91,7 +91,7 @@ export function Header() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/70 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 w-full border-b border-white/40 bg-white/55 backdrop-blur-2xl backdrop-saturate-150">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6 lg:px-8">
         <a href="#" className="flex items-center">
           <img src={logoImg} alt="UTIR soft" className="h-9 w-auto object-contain rounded-lg" />
