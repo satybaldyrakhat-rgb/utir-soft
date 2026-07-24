@@ -113,13 +113,13 @@ export function Header() {
           <LangSwitcher />
           <a
             href="#/login"
-            className="px-3 py-2 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+            className="inline-flex items-center rounded-full px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-900/5 transition-colors"
           >
             {t.nav.login}
           </a>
           <a
             href="#/signup"
-            className="rounded-full bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 transition-colors"
+            className="inline-flex items-center rounded-full bg-[#58c084] px-4 py-2 text-sm font-medium text-white shadow-[0_6px_18px_-8px_rgba(88,192,132,0.8)] hover:bg-[#47a66f] transition-colors"
           >
             {t.nav.tryFree}
           </a>
@@ -135,7 +135,7 @@ export function Header() {
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-slate-100 bg-white px-6 py-6 space-y-5">
+        <div className="md:hidden border-t border-white/40 bg-white/70 backdrop-blur-2xl px-6 py-6 space-y-5">
           <nav className="flex flex-col gap-4">
             {navLinks.map((link) => (
               <a
@@ -149,16 +149,16 @@ export function Header() {
             ))}
           </nav>
           <LangSwitcher />
-          <div className="flex flex-col gap-2 pt-4 border-t border-slate-100">
+          <div className="flex flex-col gap-2 pt-4 border-t border-white/50">
             <a
               href="#/login"
-              className="w-full text-center py-2.5 text-slate-700 border border-slate-200 rounded-full"
+              className="w-full inline-flex items-center justify-center py-2.5 text-sm font-medium text-slate-700 ring-1 ring-slate-200 rounded-full"
             >
               {t.nav.login}
             </a>
             <a
               href="#/signup"
-              className="w-full text-center py-2.5 text-white bg-slate-900 rounded-full"
+              className="w-full inline-flex items-center justify-center py-2.5 text-sm font-medium text-white bg-[#58c084] hover:bg-[#47a66f] rounded-full transition-colors"
             >
               {t.nav.tryFree}
             </a>

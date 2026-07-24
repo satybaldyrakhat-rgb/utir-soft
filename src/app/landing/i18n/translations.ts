@@ -222,8 +222,8 @@ export const translations: Record<Lang, any> = {
       perks: ["Без скрытых платежей", "Перенос данных бесплатно", "Поддержка на казахском и русском", "Гарантия возврата 30 дней"],
       plans: [
         ["Старт", "Чтобы попробовать руками", ["1 пользователь", "До 10 заказов/месяц", "Базовая CRM (Заказы и Клиенты)"], "Начать бесплатно"],
-        ["Цех", "Для маленьких цехов", ["До 3 пользователей", "Безлимит заказов", "CRM + Производство + Чаты WhatsApp", "BOM и калькулятор", "Кабинет клиента", "Поддержка в чате"], "Попробовать 14 дней бесплатно"],
-        ["Бизнес", "Для растущих фабрик", ["До 10 пользователей", "Всё из Цеха", "Аналитика + Финансы + P&L", "Telegram-бот для бригад", "Раскрой ЛДСП + ЧПУ интеграция", "AI-ассистент (50 запросов/день)", "Приоритетная поддержка"], "Попробовать Бизнес"],
+        ["Цех", "Для маленьких цехов", ["До 3 пользователей", "Безлимит заказов", "CRM + Производство + Чаты WhatsApp", "BOM и калькулятор", "Кабинет клиента", "Поддержка в чате"], "Выбрать Цех"],
+        ["Бизнес", "Для растущих фабрик", ["До 10 пользователей", "Всё из Цеха", "Аналитика + Финансы + P&L", "Telegram-бот для бригад", "Раскрой ЛДСП + ЧПУ интеграция", "AI-ассистент (50 запросов/день)", "Приоритетная поддержка"], "Выбрать Бизнес"],
         ["Корпорация", "Для крупных производств", ["До 30 пользователей", "Всё из Бизнеса", "Многосклад и филиалы", "Кабинет дилера", "AI без лимита", "White-label кабинет клиента", "API доступ", "Персональный менеджер"], "Связаться"],
         ["Энтерпрайз", "Для холдингов и сетей", ["30+ пользователей", "On-premise по желанию", "Индивидуальные доработки", "SLA 99.9%", "Внедрение под ключ"], "Получить КП"],
       ],
@@ -570,8 +570,8 @@ export const translations: Record<Lang, any> = {
       perks: ["Жасырын төлем жоқ", "Деректер көшірілуі тегін", "Қазақша және орысша қолдау", "30 күн қайтару кепілдігі"],
       plans: [
         ["Старт", "Қолмен сынап көру үшін", ["1 пайдаланушы", "Айына 10 тапсырыс", "Базалық CRM (Тапсырыс және Клиент)"], "Тегін бастау"],
-        ["Цех", "Кішкентай цехтарға", ["3 пайдаланушыға дейін", "Шектеусіз тапсырыс", "CRM + Өндіріс + WhatsApp", "BOM және калькулятор", "Клиент кабинеті", "Чатта қолдау"], "14 күн тегін көру"],
-        ["Бизнес", "Өсіп жатқан фабрикаларға", ["10 пайдаланушыға дейін", "Цех тарифінің барлығы", "Аналитика + Қаржы + P&L", "Telegram-бот", "ЛДСП кесу + ЧПУ", "AI-көмекші (50 сұраныс/күн)", "Басымды қолдау"], "Бизнес көру"],
+        ["Цех", "Кішкентай цехтарға", ["3 пайдаланушыға дейін", "Шектеусіз тапсырыс", "CRM + Өндіріс + WhatsApp", "BOM және калькулятор", "Клиент кабинеті", "Чатта қолдау"], "Цехты таңдау"],
+        ["Бизнес", "Өсіп жатқан фабрикаларға", ["10 пайдаланушыға дейін", "Цех тарифінің барлығы", "Аналитика + Қаржы + P&L", "Telegram-бот", "ЛДСП кесу + ЧПУ", "AI-көмекші (50 сұраныс/күн)", "Басымды қолдау"], "Бизнесті таңдау"],
         ["Корпорация", "Ірі өндірістерге", ["30 пайдаланушыға дейін", "Бизнес тарифінің барлығы", "Көпқойма және филиалдар", "Дилер кабинеті", "Шектеусіз AI", "White-label кабинет", "API қолжетімділік", "Жеке менеджер"], "Хабарласу"],
         ["Энтерпрайз", "Холдингтерге", ["30+ пайдаланушы", "On-premise мүмкіндігі", "Жеке өңдеулер", "SLA 99.9%", "Кілтке тапсыру"], "КП алу"],
       ],
@@ -918,8 +918,8 @@ export const translations: Record<Lang, any> = {
       perks: ["No hidden fees", "Free data migration", "Kazakh & Russian support", "30-day money back"],
       plans: [
         ["Start", "To try it hands-on", ["1 user", "Up to 10 orders/month", "Basic CRM (Orders and Clients)"], "Start free"],
-        ["Workshop", "For small workshops", ["Up to 3 users", "Unlimited orders", "CRM + Production + WhatsApp", "BOM and calculator", "Client portal", "Chat support"], "Try 14 days free"],
-        ["Business", "For growing factories", ["Up to 10 users", "Everything in Workshop", "Analytics + Finance + P&L", "Telegram bot for crews", "Board nesting + CNC", "AI assistant (50 req/day)", "Priority support"], "Try Business"],
+        ["Workshop", "For small workshops", ["Up to 3 users", "Unlimited orders", "CRM + Production + WhatsApp", "BOM and calculator", "Client portal", "Chat support"], "Choose Workshop"],
+        ["Business", "For growing factories", ["Up to 10 users", "Everything in Workshop", "Analytics + Finance + P&L", "Telegram bot for crews", "Board nesting + CNC", "AI assistant (50 req/day)", "Priority support"], "Choose Business"],
         ["Corporation", "For large producers", ["Up to 30 users", "Everything in Business", "Multi-warehouse and branches", "Dealer portal", "Unlimited AI", "White-label client portal", "API access", "Personal manager"], "Contact us"],
         ["Enterprise", "For holdings & networks", ["30+ users", "Optional on-premise", "Custom development", "SLA 99.9%", "Turnkey rollout"], "Get a quote"],
       ],

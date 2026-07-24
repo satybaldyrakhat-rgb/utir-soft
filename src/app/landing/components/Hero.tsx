@@ -27,14 +27,14 @@ export function Hero() {
             <div className="mt-9 flex flex-col sm:flex-row gap-3">
               <a
                 href="#/signup"
-                className="group inline-flex items-center justify-center gap-2 rounded-full bg-[#58c084] px-6 py-3.5 text-sm text-white hover:bg-[#47a66f] transition-colors"
+                className="group inline-flex items-center justify-center gap-2 rounded-full bg-[#58c084] px-6 py-3.5 text-sm font-medium text-white shadow-[0_10px_28px_-12px_rgba(88,192,132,0.8)] hover:bg-[#47a66f] transition-colors"
               >
                 {t.hero.ctaTry}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </a>
               <a
                 href="#features"
-                className="inline-flex items-center justify-center rounded-full ring-1 ring-white/60 bg-white/60 backdrop-blur-xl px-6 py-3.5 text-sm text-slate-700 hover:bg-white/80 transition-colors"
+                className="inline-flex items-center justify-center rounded-full ring-1 ring-white/60 bg-white/60 backdrop-blur-xl px-6 py-3.5 text-sm font-medium text-slate-700 hover:bg-white/80 transition-colors"
               >
                 {t.hero.ctaDemo}
               </a>

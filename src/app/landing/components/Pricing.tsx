@@ -106,17 +106,6 @@ export function Pricing() {
                   )}
                 </div>
 
-                <a
-                  href="#/signup"
-                  className={`mt-5 w-full block text-center rounded-full py-2.5 text-sm transition-colors ${
-                    isHighlighted
-                      ? "bg-[#58c084] text-white hover:bg-[#47a66f]"
-                      : "border border-slate-200 text-slate-700 hover:border-slate-900 hover:text-slate-900"
-                  }`}
-                >
-                  {buttonText}
-                </a>
-
                 <div className="my-6 h-px bg-slate-100" />
 
                 <ul className="space-y-2.5 flex-1">
@@ -127,6 +116,17 @@ export function Pricing() {
                     </li>
                   ))}
                 </ul>
+
+                <a
+                  href="#/signup"
+                  className={`mt-7 w-full inline-flex items-center justify-center whitespace-nowrap rounded-full py-2.5 text-sm font-medium transition-colors ${
+                    isHighlighted
+                      ? "bg-[#58c084] text-white hover:bg-[#47a66f] shadow-[0_10px_28px_-12px_rgba(88,192,132,0.7)]"
+                      : "ring-1 ring-slate-200 text-slate-700 hover:ring-slate-900 hover:text-slate-900"
+                  }`}
+                >
+                  {buttonText}
+                </a>
               </motion.div>
             );
           })}

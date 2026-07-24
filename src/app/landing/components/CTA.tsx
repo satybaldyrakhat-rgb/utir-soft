@@ -17,20 +17,20 @@ export function CTA() {
             <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
               <a
                 href="#/signup"
-                className="group inline-flex items-center justify-center gap-2 rounded-full bg-white text-slate-900 px-6 py-3.5 text-sm hover:bg-slate-50 transition-colors"
+                className="group inline-flex items-center justify-center gap-2 rounded-full bg-white text-slate-900 px-6 py-3.5 text-sm font-medium shadow-[0_10px_28px_-12px_rgba(15,23,42,0.5)] hover:bg-slate-50 transition-colors"
               >
                 {t.cta.btn1}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </a>
               <a
                 href="#pricing"
-                className="inline-flex items-center justify-center rounded-full border border-white/40 px-6 py-3.5 text-sm text-white hover:bg-white/10 transition-colors"
+                className="inline-flex items-center justify-center rounded-full border border-white/40 px-6 py-3.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
               >
                 {t.cta.btn2}
               </a>
               <a
                 href="tel:+77779631717"
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/40 px-6 py-3.5 text-sm text-white hover:bg-white/10 transition-colors"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/40 px-6 py-3.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
               >
                 <Phone className="h-4 w-4" />
                 +7 777 963 17 17
