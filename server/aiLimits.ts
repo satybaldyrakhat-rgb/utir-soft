@@ -9,7 +9,7 @@
 // сразу, даже если владелец ещё не заводил подписку вручную.
 
 import type Database from 'better-sqlite3';
-import { getSubscription } from './ownerAdmin.js';
+import { getSubscription, isSuperAdminTeam } from './ownerAdmin.js';
 
 export type AiKind = 'assistant' | 'design';
 export type Plan = 'active' | 'trial' | 'expired';
@@ -34,6 +34,7 @@ function teamCreatedAt(db: Database.Database, teamId: string): string | undefine
 }
 
 export function effectivePlan(db: Database.Database, teamId: string): Plan {
+  if (isSuperAdminTeam(db, teamId)) return 'active'; // владелец без лимитов
   const sub = getSubscription(db, teamId, teamCreatedAt(db, teamId));
   if (sub.status === 'active') return 'active';
   if (sub.status === 'trial') {

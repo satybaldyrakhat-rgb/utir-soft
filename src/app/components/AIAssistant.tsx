@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Sparkles, X, Send, ChevronRight, ChevronDown, Check, AlertCircle, Loader2, Trash2, Mic, Square } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
+import { AiTrialMeter } from './AiTrialMeter';
 import { NicheIcon } from './NicheIcon';
 import { api } from '../utils/api';
 
@@ -264,6 +265,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
       // retries: 2 → если связь оборвалась (частая проблема на мобильном/через
       // прокси), сами тихо переотправляем, не показывая ошибку пользователю.
       const resp = await api.post<any>('/api/ai-chat/message', { provider: providerId, messages: history }, { retries: 2, timeoutMs: 90_000 });
+      window.dispatchEvent(new Event('utir:ai-used'));
       if (resp?.kind === 'tool') {
         const proposalMsg: AIMessage = {
           id: newId(),
@@ -655,6 +657,7 @@ export function AIAssistant({ context, language }: AIAssistantProps) {
 
           {/* Input */}
           <div className="p-3 border-t border-white/60 bg-white/30 backdrop-blur-xl">
+            <div className="mb-2 flex justify-center"><AiTrialMeter kind="assistant" language={language} /></div>
             {recording ? (
               // Recording bar — pulses red so the user can see we're listening.
               // Click ⏹ to finish; the recorder also auto-cuts at 60s.

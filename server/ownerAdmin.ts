@@ -106,16 +106,28 @@ export function setSubscription(db: Database.Database, teamId: string, patch: Pa
   return next;
 }
 
-// Взгляд команды на СВОЮ подписку (read-only). managed:false, если
-// владелец ещё не завёл подписку для команды — тогда клиент не видит
-// никаких баннеров (нулевое влияние на существующих пользователей).
+// Команда владельца платформы (по email основателя) — без триала/лимитов.
+export function isSuperAdminTeam(db: Database.Database, teamId: string): boolean {
+  const u = db.prepare('SELECT email FROM users WHERE id = ?').get(teamId) as any;
+  return isSuperAdminEmail(u?.email);
+}
+
+// Взгляд команды на СВОЮ подписку (read-only) + эффективный план для
+// баннера триала: trial (идёт пробный период) / active (оплачено) /
+// expired (пробный кончился без оплаты). Команда владельца → всегда active.
 export function teamSubscriptionView(db: Database.Database, teamId: string) {
+  if (isSuperAdminTeam(db, teamId)) return { managed: false, plan: 'active' as const, status: 'active', daysLeft: null, expiresAt: '' };
   const row = db.prepare('SELECT data FROM subscriptions WHERE team_id = ?').get(teamId) as any;
-  if (!row?.data) return { managed: false };
-  let s: Subscription; try { s = JSON.parse(row.data); } catch { return { managed: false }; }
+  const managed = !!row?.data;
+  const owner = db.prepare('SELECT created_at FROM users WHERE id = ?').get(teamId) as any;
+  const s = getSubscription(db, teamId, owner?.created_at);
   const exp = new Date(s.expiresAt).getTime();
   const daysLeft = isNaN(exp) ? null : Math.ceil((exp - Date.now()) / 86400000);
-  return { managed: true, status: s.status, plan: s.plan, expiresAt: s.expiresAt, daysLeft };
+  const plan: 'trial' | 'active' | 'expired' =
+    s.status === 'active' ? 'active'
+    : s.status === 'trial' ? (daysLeft !== null && daysLeft >= 0 ? 'trial' : 'expired')
+    : 'expired';
+  return { managed, plan, status: s.status, expiresAt: s.expiresAt, daysLeft };
 }
 
 // Блокировка команды — читается из subscriptions.suspended. Используется в

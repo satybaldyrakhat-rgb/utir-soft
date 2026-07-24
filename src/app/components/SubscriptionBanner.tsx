@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, X, Clock } from 'lucide-react';
 import { api } from '../utils/api';
 
-interface SubView { managed: boolean; status?: string; plan?: string; expiresAt?: string; daysLeft?: number | null }
+interface SubView { managed: boolean; status?: string; plan?: 'trial' | 'active' | 'expired'; expiresAt?: string; daysLeft?: number | null }
 const DISMISS_KEY = 'utir_sub_banner_dismissed';
 
 export function SubscriptionBanner({ language }: { language: 'kz' | 'ru' | 'eng' }) {
@@ -18,29 +18,31 @@ export function SubscriptionBanner({ language }: { language: 'kz' | 'ru' | 'eng'
 
   useEffect(() => { api.get<SubView>('/api/team/subscription').then(setSub).catch(() => setSub(null)); }, []);
 
-  if (!sub?.managed) return null;
-  const { status, daysLeft, expiresAt } = sub;
+  if (!sub) return null;
+  const { plan, status, daysLeft, expiresAt } = sub;
   const d = daysLeft ?? 99;
 
   // Определяем, что показать (иначе — ничего).
   let msg: string | null = null;
   let tone: 'red' | 'amber' | 'sky' = 'sky';
+  let urgent = false;
   if (status === 'past_due') {
-    msg = l('Подписка просрочена. Продлите, чтобы сохранить доступ.', 'Жазылым мерзімі өтті. Қол жеткізуді сақтау үшін ұзартыңыз.', 'Subscription past due. Renew to keep access.'); tone = 'red';
-  } else if (status === 'trial' && d <= 0) {
-    msg = l('Пробный период завершён. Оформите подписку для продолжения.', 'Сынақ кезеңі аяқталды. Жалғастыру үшін жазылыңыз.', 'Trial ended. Subscribe to continue.'); tone = 'amber';
-  } else if (status === 'trial' && d <= 5) {
-    msg = l(`Пробный период: осталось ${d} дн.`, `Сынақ кезеңі: ${d} күн қалды.`, `Trial: ${d} days left.`); tone = 'amber';
-  } else if (status === 'active' && d <= 5 && d >= 0) {
-    msg = l(`Подписка истекает через ${d} дн.`, `Жазылым ${d} күнде аяқталады.`, `Subscription expires in ${d} days.`); tone = 'sky';
-  } else if (status === 'active' && d < 0) {
-    msg = l('Срок подписки истёк. Свяжитесь для продления.', 'Жазылым мерзімі бітті. Ұзарту үшін хабарласыңыз.', 'Subscription expired. Contact to renew.'); tone = 'amber';
+    msg = l('Подписка просрочена. Продлите, чтобы сохранить доступ.', 'Жазылым мерзімі өтті. Қол жеткізуді сақтау үшін ұзартыңыз.', 'Subscription past due. Renew to keep access.'); tone = 'red'; urgent = true;
+  } else if (plan === 'expired') {
+    msg = l('Пробный период завершён. Оформите подписку — AI-функции ограничены.', 'Сынақ кезеңі аяқталды. Жазылыңыз — AI шектеулі.', 'Trial ended. Subscribe — AI features are limited.'); tone = 'amber'; urgent = true;
+  } else if (plan === 'trial') {
+    msg = d <= 1
+      ? l('Пробный период заканчивается сегодня.', 'Сынақ кезеңі бүгін аяқталады.', 'Trial ends today.')
+      : l(`Бесплатный период: осталось ${d} дн. Все функции доступны.`, `Тегін кезең: ${d} күн қалды.`, `Free trial: ${d} days left.`);
+    tone = d <= 3 ? 'amber' : 'sky'; urgent = d <= 3;
+  } else if (plan === 'active' && d <= 5 && d >= 0) {
+    msg = l(`Подписка истекает через ${d} дн.`, `Жазылым ${d} күнде аяқталады.`, `Subscription expires in ${d} days.`); tone = 'sky'; urgent = d <= 2;
   }
   if (!msg) return null;
 
-  // Дедуп-скрытие: привязываем к статусу+дате, чтобы баннер вернулся при
-  // смене состояния.
-  const sig = `${status}:${expiresAt}`;
+  // Дедуп-скрытие: привязка к плану+срочности+дате — баннер вернётся при
+  // смене состояния или когда станет срочным (≤3 дней).
+  const sig = `${plan}:${urgent ? 'u' : 'n'}:${expiresAt}`;
   if (dismissed) return null;
   try { if (localStorage.getItem(DISMISS_KEY) === sig) return null; } catch { /* ignore */ }
 

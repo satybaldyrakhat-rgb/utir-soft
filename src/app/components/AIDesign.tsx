@@ -22,6 +22,7 @@ import { api } from '../utils/api';
 import { useDataStore } from '../utils/dataStore';
 import { getNiche } from '../utils/niches';
 import { NicheIcon } from './NicheIcon';
+import { AiTrialMeter } from './AiTrialMeter';
 import utirLogo from '../../imports/utirsoft.png';
 
 // ─── Brand-icon SVGs (real provider logos, inline so no extra requests) ──
@@ -394,7 +395,7 @@ export function AIDesign({ language }: AIDesignProps) {
         roomPhoto,
         referenceImages,
       });
-      setResults(res.results || []);
+      setResults(res.results || []); window.dispatchEvent(new Event("utir:ai-used"));
       void reloadAll();
     } catch (e: any) {
       const msg = String(e?.message || 'generation failed');
@@ -434,7 +435,7 @@ export function AIDesign({ language }: AIDesignProps) {
         provider: item.provider,
         prompt: text,
       });
-      setResults(res.results || []);
+      setResults(res.results || []); window.dispatchEvent(new Event("utir:ai-used"));
       void reloadAll();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e: any) {
@@ -884,6 +885,7 @@ export function AIDesign({ language }: AIDesignProps) {
                 </span>
               )}
             </div>
+            <AiTrialMeter kind="design" language={language} className="mr-2" />
             <button
               onClick={generate}
               disabled={!canGenerate}
