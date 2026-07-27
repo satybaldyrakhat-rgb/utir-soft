@@ -67,7 +67,7 @@ export function SavingsCalculator() {
 
             <a
               href="#/signup"
-              className="mt-auto pt-8 inline-flex items-center justify-center gap-2 rounded-full bg-white text-slate-900 px-5 py-3 text-sm hover:bg-slate-50 transition-colors"
+              className="mt-auto inline-flex items-center justify-center gap-2 rounded-full bg-white text-slate-900 px-5 py-3.5 text-sm font-medium shadow-[0_10px_28px_-14px_rgba(15,23,42,0.5)] hover:bg-slate-50 transition-colors"
             >
               {t.calc.cta}
               <ArrowRight className="h-4 w-4" />

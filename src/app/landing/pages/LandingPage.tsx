@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { LanguageProvider } from "../i18n/LanguageContext";
 import { Header } from "../components/Header";
 import { Hero } from "../components/Hero";
@@ -16,6 +17,42 @@ import { CTA } from "../components/CTA";
 import { Footer } from "../components/Footer";
 
 export function LandingPage() {
+  // Сохраняем позицию прокрутки и восстанавливаем её после монтирования.
+  // Лендинг грузится лениво, поэтому нативное восстановление скролла
+  // браузером срабатывает по пустому fallback и сбрасывает на верх —
+  // делаем восстановление вручную (и скроллим к секции, если в адресе
+  // есть якорь вида #pricing / #features).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const KEY = "utir_landing_scroll";
+    const prev = window.history.scrollRestoration;
+    try { window.history.scrollRestoration = "manual"; } catch { /* noop */ }
+
+    const restore = () => {
+      const hash = window.location.hash;
+      if (hash && !hash.startsWith("#/") && !hash.startsWith("#oauth")) {
+        try {
+          const el = document.querySelector(hash);
+          if (el) { el.scrollIntoView(); return; }
+        } catch { /* невалидный селектор — игнорируем */ }
+      }
+      const saved = Number(sessionStorage.getItem(KEY) || 0);
+      if (saved > 0) window.scrollTo(0, saved);
+    };
+    // Двойной rAF — ждём, пока секции отрисуются и высота станет реальной.
+    const raf = requestAnimationFrame(() => requestAnimationFrame(restore));
+
+    const onScroll = () => {
+      try { sessionStorage.setItem(KEY, String(Math.round(window.scrollY))); } catch { /* noop */ }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      try { window.history.scrollRestoration = prev; } catch { /* noop */ }
+    };
+  }, []);
+
   return (
     <LanguageProvider>
     <div className="relative min-h-screen font-sans text-slate-900 antialiased overflow-x-hidden">
