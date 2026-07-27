@@ -34,3 +34,7 @@ yarn-error.log*
 .railway
 
 .claude/
+
+# runtime SQLite backups
+server/backups/
+*.db
