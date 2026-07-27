@@ -5,9 +5,9 @@ import { useLang } from "../i18n/LanguageContext";
 
 const prices: { monthly: number | "free" | "custom"; yearly: number | "free" | "custom" }[] = [
   { monthly: "free", yearly: "free" },
-  { monthly: 9900, yearly: 7900 },
-  { monthly: 29900, yearly: 23900 },
-  { monthly: 79900, yearly: 63900 },
+  { monthly: 12900, yearly: 10320 },
+  { monthly: 34900, yearly: 27920 },
+  { monthly: 89900, yearly: 71920 },
   { monthly: "custom", yearly: "custom" },
 ];
 
