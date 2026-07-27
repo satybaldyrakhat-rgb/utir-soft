@@ -98,20 +98,20 @@ export const translations: Record<Lang, any> = {
         title: "Гаражный цех",
         size: "1–3 мастера, до 30 заказов в месяц",
         pains: "Путаюсь в Excel, забываю про заказы, теряю деньги на материалах",
-        plan: "Цех — от 12 900 ₸",
+        plan: "Цех — от 12 900 ₸",
       },
       a2: {
         title: "Мебельная фабрика",
         size: "4–15 человек, 30–200 заказов в месяц",
         pains:
           "Менеджеры не видят что в производстве, клиенты звонят и спрашивают где их заказ, бухгалтер не успевает",
-        plan: "Бизнес — от 34 900 ₸",
+        plan: "Бизнес — от 34 900 ₸",
       },
       a3: {
         title: "Сеть фабрик и дилеры",
         size: "15+ человек, филиалы, дилеры",
         pains: "Нет единой картины по всем филиалам, дилеры работают вслепую",
-        plan: "Корпорация — от 89 900 ₸",
+        plan: "Корпорация — от 89 900 ₸",
       },
     },
     showcase: {
@@ -446,20 +446,20 @@ export const translations: Record<Lang, any> = {
         title: "Гараж цехы",
         size: "1–3 шебер, айына 30-ға дейін тапсырыс",
         pains: "Excel-де шатасамын, тапсырысты ұмытамын, материалдан ақша жоғалтамын",
-        plan: "Цех — 12 900 ₸ бастап",
+        plan: "Цех — 12 900 ₸ бастап",
       },
       a2: {
         title: "Жиһаз фабрикасы",
         size: "4–15 адам, айына 30–200 тапсырыс",
         pains:
           "Менеджерлер өндірісте не жатқанын көрмейді, клиенттер тапсырыс қайда деп қоңырау шалады, бухгалтер үлгермейді",
-        plan: "Бизнес — 34 900 ₸ бастап",
+        plan: "Бизнес — 34 900 ₸ бастап",
       },
       a3: {
         title: "Фабрика желісі және дилерлер",
         size: "15+ адам, филиалдар, дилерлер",
         pains: "Барлық филиал бойынша біртұтас көрініс жоқ, дилерлер соқыр жұмыс істейді",
-        plan: "Корпорация — 89 900 ₸ бастап",
+        plan: "Корпорация — 89 900 ₸ бастап",
       },
     },
     showcase: {
@@ -794,20 +794,20 @@ export const translations: Record<Lang, any> = {
         title: "Garage workshop",
         size: "1–3 masters, up to 30 orders/month",
         pains: "I get lost in Excel, forget orders, lose money on materials",
-        plan: "Workshop — from 12,900 ₸",
+        plan: "Workshop — from 12,900 ₸",
       },
       a2: {
         title: "Furniture factory",
         size: "4–15 people, 30–200 orders/month",
         pains:
           "Managers can't see production, customers keep calling, accountant is overloaded",
-        plan: "Business — from 34,900 ₸",
+        plan: "Business — from 34,900 ₸",
       },
       a3: {
         title: "Factory network & dealers",
         size: "15+ people, branches, dealers",
         pains: "No single view across branches, dealers work blind",
-        plan: "Corporation — from 89,900 ₸",
+        plan: "Corporation — from 89,900 ₸",
       },
     },
     showcase: {

@@ -40,7 +40,7 @@ export function SavingsCalculator() {
         </motion.div>
 
         <div className="mt-14 grid lg:grid-cols-5 gap-6 lg:gap-8">
-          <div className="lg:col-span-3 rounded-3xl bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] p-6 sm:p-10 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.15)]">
+          <div className="lg:col-span-3 rounded-3xl bg-white/55 backdrop-blur-2xl ring-1 ring-white/55 shadow-[0_14px_44px_-18px_rgba(15,23,42,0.16)] p-6 sm:p-10">
             <Slider label={t.calc.orders} value={orders} min={5} max={100} step={1} onChange={setOrders} suffix="" />
             <div className="mt-8">
               <Slider label={t.calc.hours} value={hours} min={1} max={8} step={1} onChange={setHours} suffix=" ч" />

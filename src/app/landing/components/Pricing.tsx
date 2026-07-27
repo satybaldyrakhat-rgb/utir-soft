@@ -35,22 +35,16 @@ export function Pricing() {
           </h2>
           <p className="mt-5 text-slate-600">{t.pricing.subtitle}</p>
 
-          <div className="mt-8 relative inline-flex items-center rounded-full bg-slate-100 p-1 text-sm">
-            <motion.div
-              className="absolute top-1 bottom-1 rounded-full bg-white shadow-[0_1px_2px_rgba(15,23,42,0.08),0_4px_12px_-4px_rgba(15,23,42,0.12)]"
-              initial={false}
-              animate={{ left: yearly ? "calc(50% + 2px)" : "4px", right: yearly ? "4px" : "calc(50% + 2px)" }}
-              transition={{ type: "spring", stiffness: 380, damping: 32 }}
-            />
+          <div className="mt-8 inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 text-sm">
             <button
               onClick={() => setYearly(false)}
-              className={`relative z-10 px-5 py-2 rounded-full transition-colors ${!yearly ? "text-slate-900" : "text-slate-500"}`}
+              className={`px-5 py-2 rounded-full transition-colors ${!yearly ? "bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_4px_12px_-4px_rgba(15,23,42,0.12)]" : "text-slate-500 hover:text-slate-700"}`}
             >
               {t.pricing.monthly}
             </button>
             <button
               onClick={() => setYearly(true)}
-              className={`relative z-10 px-5 py-2 rounded-full inline-flex items-center gap-2 transition-colors ${yearly ? "text-slate-900" : "text-slate-500"}`}
+              className={`px-5 py-2 rounded-full inline-flex items-center gap-2 whitespace-nowrap transition-colors ${yearly ? "bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_4px_12px_-4px_rgba(15,23,42,0.12)]" : "text-slate-500 hover:text-slate-700"}`}
             >
               {t.pricing.yearly}
               <span className="text-[10px] tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-50 text-[#58c084]">−20%</span>
