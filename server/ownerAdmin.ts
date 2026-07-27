@@ -9,6 +9,7 @@
 
 import type Database from 'better-sqlite3';
 import express from 'express';
+import { getAllStatuses, INTEGRATION_CATALOG } from './integrations2.js';
 
 // ─── Кто владелец ─────────────────────────────────────────────────────
 const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS || 'satybaldy.rakhat@gmail.com')
@@ -222,6 +223,17 @@ export function listTeams(db: Database.Database): TeamSummary[] {
 // + персональные integrations пользователей команды, помеченные connected.
 function teamIntegrations(db: Database.Database, teamId: string): string[] {
   const set = new Set<string>();
+  // Актуальный источник — система интеграций v2 (getAllStatuses). Берём
+  // только командные (config/oauth), а не платформенные env-ключи (AI),
+  // иначе у каждой команды «подключились» бы все AI-провайдеры разом.
+  try {
+    const nameById = new Map(INTEGRATION_CATALOG.map(d => [d.id, d.name]));
+    const teamScoped = new Set(INTEGRATION_CATALOG.filter(d => d.kind !== 'env').map(d => d.id));
+    for (const st of getAllStatuses(db, teamId)) {
+      if (st.connected && teamScoped.has(st.id)) set.add(nameById.get(st.id) || st.id);
+    }
+  } catch { /* skip */ }
+  // Легаси-форма в team_settings.integrations (на случай старых данных).
   try {
     const ts = db.prepare('SELECT integrations FROM team_settings WHERE team_id = ?').get(teamId) as any;
     if (ts?.integrations) { const o = JSON.parse(ts.integrations); for (const k of Object.keys(o || {})) if (o[k]?.connected || o[k]?.phoneNumberId || o[k]?.igUserId || o[k]?.accessToken) set.add(k); }

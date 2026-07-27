@@ -93,7 +93,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/40 bg-white/55 backdrop-blur-2xl backdrop-saturate-150">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6 lg:px-8">
-        <a href="#" className="flex items-center">
+        <a href="#/" className="flex items-center">
           <img src={logoImg} alt="UTIR soft" className="h-9 w-auto object-contain rounded-lg" />
         </a>
 

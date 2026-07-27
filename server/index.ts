@@ -2721,8 +2721,13 @@ aiDesignRouter.post('/generate', requirePermission('ai-design'), async (req: Aut
     return { ...r, id };
   });
 
-  // Списываем дневной лимит пробного периода при успешной генерации.
-  if (saved.some(s => s.ok)) consumeAi(db, req.teamId!, 'design');
+  // Списываем лимит AI при успешной генерации + пишем в журнал активности,
+  // чтобы генерации AI-дизайна из веба были видны владельцу в Центре
+  // управления (раньше учитывались только в счётчике, но не в активности).
+  if (saved.some(s => s.ok)) {
+    consumeAi(db, req.teamId!, 'design');
+    try { logActivity(req.userId!, { actor: 'ai', kind: 'ai_design', action: 'generate', count: saved.filter(s => s.ok).length }); } catch { /* журнал не должен ронять ответ */ }
+  }
 
   // Telegram notify: when a teammate generates a design, ping them so they
   // see the result even if they're chatting in the bot.
@@ -4116,6 +4121,15 @@ app.post('/api/owner/backup/run', ...ownerGate, async (_req, res) => {
 app.get('/api/owner/backup/download', ...ownerGate, async (_req, res) => {
   const r = await runBackup(db, DB_PATH);
   res.download(r.file, path.basename(r.file));
+});
+
+// AI-расход команды (для владельца): чтобы начислять пакеты не вслепую —
+// видно использовано/лимит/докуплено по дизайну и ассистенту.
+app.get('/api/owner/teams/:id/ai-usage', ...ownerGate, (req, res) => {
+  res.json({
+    assistant: aiLimitStatus(db, req.params.id, 'assistant'),
+    design: aiLimitStatus(db, req.params.id, 'design'),
+  });
 });
 
 // Начисление AI-пакета команде (владелец, после оплаты). Регистрируем ДО

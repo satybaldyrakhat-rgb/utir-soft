@@ -55,7 +55,7 @@ const meta: { icon: IconType | ((p: { className?: string }) => JSX.Element); col
 export function Integrations() {
   const { t } = useLang();
   return (
-    <section className="py-24 sm:py-32 border-y border-white/40">
+    <section id="integrations" className="py-24 sm:py-32 border-y border-white/40">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <motion.div
           className="max-w-2xl mx-auto text-center"

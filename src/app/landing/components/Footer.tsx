@@ -4,10 +4,11 @@ import { useLang } from "../i18n/LanguageContext";
 
 export function Footer() {
   const { t } = useLang();
+  // href по индексу (не зависит от языка — порядок пунктов одинаков во всех).
   const columns = [
-    { title: t.footer.productTitle, links: t.footer.product },
-    { title: t.footer.companyTitle, links: t.footer.company },
-    { title: t.footer.helpTitle, links: t.footer.help },
+    { title: t.footer.productTitle, links: t.footer.product, hrefs: ["#features", "#pricing", "#integrations"] },
+    { title: t.footer.companyTitle, links: t.footer.company, hrefs: ["#why", "#cases"] },
+    { title: t.footer.helpTitle, links: t.footer.help, hrefs: ["#faq", "mailto:hello@utirsoft.kz"] },
   ];
 
   const contacts = [
@@ -50,9 +51,9 @@ export function Footer() {
             <div key={col.title}>
               <h4 className="text-sm text-slate-900 mb-4">{col.title}</h4>
               <ul className="space-y-3 text-sm">
-                {col.links.map((link: string) => (
+                {col.links.map((link: string, i: number) => (
                   <li key={link}>
-                    <a href="#" className="text-slate-500 hover:text-slate-900 transition-colors">
+                    <a href={col.hrefs[i] || "#/"} className="text-slate-500 hover:text-slate-900 transition-colors">
                       {link}
                     </a>
                   </li>
@@ -77,9 +78,9 @@ export function Footer() {
         <div className="mt-14 pt-8 border-t border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs text-slate-500">
           <p>{t.footer.copyright}</p>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-6">
-            <a href="#" className="hover:text-slate-900 transition-colors">{t.footer.offer}</a>
-            <a href="#" className="hover:text-slate-900 transition-colors">{t.footer.privacy}</a>
-            <a href="#" className="hover:text-slate-900 transition-colors">{t.footer.consent}</a>
+            <a href="#/terms" className="hover:text-slate-900 transition-colors">{t.footer.offer}</a>
+            <a href="#/privacy" className="hover:text-slate-900 transition-colors">{t.footer.privacy}</a>
+            <a href="#/privacy" className="hover:text-slate-900 transition-colors">{t.footer.consent}</a>
           </div>
         </div>
       </div>

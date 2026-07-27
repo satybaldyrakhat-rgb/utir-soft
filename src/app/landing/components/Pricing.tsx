@@ -112,7 +112,7 @@ export function Pricing() {
                 </ul>
 
                 <a
-                  href="#/signup"
+                  href={idx >= 3 ? "mailto:hello@utirsoft.kz?subject=UTIR%20soft%20—%20запрос%20по%20тарифу" : "#/signup"}
                   className={`mt-7 w-full inline-flex items-center justify-center whitespace-nowrap rounded-full py-2.5 text-sm font-medium transition-colors ${
                     isHighlighted
                       ? "bg-[#58c084] text-white hover:bg-[#47a66f] shadow-[0_10px_28px_-12px_rgba(88,192,132,0.7)]"

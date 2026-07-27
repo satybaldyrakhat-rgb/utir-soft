@@ -619,7 +619,12 @@ function LeadsTab() {
           <Glass key={lead.id} className="p-4">
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="min-w-0">
-                <div className="text-sm text-slate-900 font-medium truncate">{lead.name}</div>
+                <div className="text-sm text-slate-900 font-medium truncate flex items-center gap-1.5">
+                  {lead.name}
+                  {lead.source === 'ai_pack'
+                    ? <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 ring-1 ring-violet-100 flex-shrink-0">AI-пакет</span>
+                    : <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 flex-shrink-0">Демо</span>}
+                </div>
                 {lead.company && <div className="text-[11px] text-slate-400 truncate">{lead.company}</div>}
               </div>
               <span className={`text-[10px] px-2 py-0.5 rounded-lg ring-1 flex-shrink-0 ${LEAD_STATUS[lead.status]?.chip || LEAD_STATUS.new.chip}`}>{LEAD_STATUS[lead.status]?.label || lead.status}</span>
@@ -865,7 +870,9 @@ function TeamDrawer({ teamId, onClose, onChanged }: { teamId: string; onClose: (
   const [d, setD] = useState<any | null>(null);
   const [sub, setSub] = useState<Subscription | null>(null);
   const [saving, setSaving] = useState(false);
-  const load = () => api.get<any>(`/api/owner/teams/${teamId}`).then(t => { setD(t); setSub(t.subscription); }).catch(() => {});
+  const [aiU, setAiU] = useState<Record<string, any> | null>(null);
+  const loadAi = () => api.get<Record<string, any>>(`/api/owner/teams/${teamId}/ai-usage`).then(setAiU).catch(() => setAiU(null));
+  const load = () => { api.get<any>(`/api/owner/teams/${teamId}`).then(t => { setD(t); setSub(t.subscription); }).catch(() => {}); loadAi(); };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [teamId]);
 
   const saveSub = async () => {
@@ -903,6 +910,7 @@ function TeamDrawer({ teamId, onClose, onChanged }: { teamId: string; onClose: (
     try {
       await api.post(`/api/owner/teams/${teamId}/ai-pack`, { kind, extra });
       toast(`Начислено: +${extra} ${kind === 'design' ? 'дизайнов' : 'сообщений'} на этот месяц`, 'success');
+      loadAi();
     } catch { toast('Не удалось начислить пакет', 'error'); }
   };
 
@@ -957,6 +965,21 @@ function TeamDrawer({ teamId, onClose, onChanged }: { teamId: string; onClose: (
             {/* AI-пакеты: разовая добавка к месячному лимиту (после оплаты) */}
             <div className="bg-white/60 rounded-2xl p-4 ring-1 ring-white/60 space-y-2">
               <div className="text-xs font-medium text-slate-700 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-violet-500" /> AI-пакеты</div>
+              {aiU && (
+                <div className="grid grid-cols-2 gap-2">
+                  {(['design', 'assistant'] as const).map(k => {
+                    const s = aiU[k]; if (!s) return null;
+                    const label = k === 'design' ? 'Дизайн' : 'Ассистент';
+                    const lim = s.unlimited ? '∞' : s.limit;
+                    return (
+                      <div key={k} className="bg-white/70 rounded-xl px-3 py-2 ring-1 ring-white/60">
+                        <div className="text-[10px] text-slate-400">{label} · {s.window === 'month' ? 'мес' : 'день'}</div>
+                        <div className="text-xs text-slate-800 tabular-nums">{s.used} / {lim}{s.bonus > 0 && <span className="text-violet-500"> (+{s.bonus})</span>}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               <div className="text-[10px] text-slate-400">Разовая добавка к месячному лимиту AI. Сгорает в конце месяца. Начисляйте после оплаты клиентом.</div>
               <div className="flex flex-wrap gap-1.5">
                 {([['design', 20], ['design', 50], ['design', 100], ['assistant', 200], ['assistant', 500]] as const).map(([k, n]) => (

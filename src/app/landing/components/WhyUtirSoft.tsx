@@ -8,7 +8,7 @@ const icons: LucideIcon[] = [Flag, Hammer, Bot, MessagesSquare, Smartphone, Zap]
 export function WhyUtirSoft() {
   const { t } = useLang();
   return (
-    <section className="py-24 sm:py-32">
+    <section id="why" className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <motion.div
           className="max-w-2xl mx-auto text-center"
