@@ -10,7 +10,7 @@ import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
 import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView, createPlatformLead } from './ownerAdmin.js';
 import { runBackup, listBackups, startBackupScheduler } from './backup.js';
 import { exportTeam } from './teamExport.js';
-import { initAiLimitsSchema, aiLimitStatus, consumeAi, limitReason } from './aiLimits.js';
+import { initAiLimitsSchema, aiLimitStatus, consumeAi, limitReason, grantAiPack } from './aiLimits.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
@@ -4058,6 +4058,27 @@ app.get('/api/team/ai-limits', authMiddleware, (req: AuthedRequest, res) => {
   });
 });
 
+// Запрос AI-пакета из приложения (когда месячный лимит исчерпан). Оплата
+// пока офлайн (Kaspi-перевод): заявка падает лидом владельцу, тот после
+// оплаты начисляет пакет в Центре управления.
+app.post('/api/team/ai-pack-request', authMiddleware, rateLimit('lead'), (req: AuthedRequest, res) => {
+  const kind = req.body?.kind === 'assistant' ? 'assistant' : 'design';
+  const kindRu = kind === 'design' ? 'AI-дизайн' : 'AI-ассистент';
+  const team = db.prepare('SELECT name, email FROM users WHERE id = ?').get(req.teamId!) as any;
+  const lead = createPlatformLead(db, {
+    name: team?.name || 'Команда',
+    email: team?.email || '',
+    company: team?.name || '',
+    source: 'ai_pack',
+    message: `Запрос AI-пакета (${kindRu}). Команда исчерпала месячный лимит и хочет докупить.`,
+  });
+  if (isTelegramReady()) {
+    const text = `<b>🎟️ Запрос AI-пакета</b>\n\n<b>${lead.name}</b> (${kindRu})${lead.email ? `\n✉️ ${lead.email}` : ''}\n\nМесячный лимит исчерпан — начислите пакет в Центре управления после оплаты.`;
+    for (const id of superAdminChatIds(db)) tgSendMessage(id, text).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
 // Заявка на демо с лендинга (публичная, rate-limited). Падает лидом в
 // Центр управления + мгновенное уведомление владельцу в Telegram.
 app.post('/api/demo-request', rateLimit('lead'), (req, res) => {
@@ -4095,6 +4116,16 @@ app.post('/api/owner/backup/run', ...ownerGate, async (_req, res) => {
 app.get('/api/owner/backup/download', ...ownerGate, async (_req, res) => {
   const r = await runBackup(db, DB_PATH);
   res.download(r.file, path.basename(r.file));
+});
+
+// Начисление AI-пакета команде (владелец, после оплаты). Регистрируем ДО
+// общего /api/owner-роутера, чтобы точный путь имел приоритет.
+app.post('/api/owner/teams/:id/ai-pack', ...ownerGate, (req, res) => {
+  const kind = req.body?.kind === 'assistant' ? 'assistant' : 'design';
+  const extra = Math.max(0, Math.min(100000, Math.floor(Number(req.body?.extra) || 0)));
+  if (!extra) return res.status(400).json({ error: 'extra required' });
+  const status = grantAiPack(db, req.params.id, kind, extra);
+  res.json({ ok: true, status });
 });
 
 // ─── Дашборд владельца платформы (super-admin) ──────────────────────

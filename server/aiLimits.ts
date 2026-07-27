@@ -69,6 +69,26 @@ export function initAiLimitsSchema(db: Database.Database) {
     team_id TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, count INTEGER DEFAULT 0,
     PRIMARY KEY (team_id, day, kind)
   );`);
+  // Докупленные AI-пакеты: разовая прибавка к месячному лимиту тарифа.
+  // Действует в пределах указанного месяца (сгорает в конце месяца).
+  db.exec(`CREATE TABLE IF NOT EXISTS ai_bonus (
+    team_id TEXT NOT NULL, month TEXT NOT NULL, kind TEXT NOT NULL, extra INTEGER DEFAULT 0,
+    PRIMARY KEY (team_id, month, kind)
+  );`);
+}
+
+// Сколько бонусных единиц (докупленных пакетов) у команды в этом месяце.
+function getBonus(db: Database.Database, teamId: string, kind: AiKind, month: string): number {
+  const row = db.prepare('SELECT extra FROM ai_bonus WHERE team_id = ? AND month = ? AND kind = ?').get(teamId, month, kind) as any;
+  return Number(row?.extra || 0);
+}
+
+// Начислить AI-пакет команде на текущий месяц (владелец после оплаты).
+export function grantAiPack(db: Database.Database, teamId: string, kind: AiKind, extra: number): AiLimitStatus {
+  const add = Math.max(0, Math.floor(extra));
+  db.prepare(`INSERT INTO ai_bonus (team_id, month, kind, extra) VALUES (?, ?, ?, ?)
+              ON CONFLICT(team_id, month, kind) DO UPDATE SET extra = extra + excluded.extra`).run(teamId, monthKey(), kind, add);
+  return aiLimitStatus(db, teamId, kind);
 }
 
 function teamCreatedAt(db: Database.Database, teamId: string): string | undefined {
@@ -106,18 +126,23 @@ export interface AiLimitStatus {
   plan: Plan; kind: AiKind; limit: number | null; used: number;
   remaining: number | null; unlimited: boolean; allowed: boolean;
   window: Window;
+  baseLimit: number | null; // лимит тарифа без бонусов
+  bonus: number;            // докупленные пакеты в этом месяце
 }
 
 export function aiLimitStatus(db: Database.Database, teamId: string, kind: AiKind): AiLimitStatus {
   const { def, plan } = resolveLimit(db, teamId);
-  const limit = def[kind];
+  const base = def[kind];
   const key = periodKey(def.window);
+  // Бонусные пакеты действуют только на месячные (платные) лимиты.
+  const bonus = (def.window === 'month' && base !== null) ? getBonus(db, teamId, kind, key) : 0;
+  const limit = base === null ? null : base + bonus;
   const row = db.prepare('SELECT count FROM ai_usage_daily WHERE team_id = ? AND day = ? AND kind = ?').get(teamId, key, kind) as any;
   const used = Number(row?.count || 0);
   const unlimited = limit === null;
   const remaining = unlimited ? null : Math.max(0, (limit as number) - used);
   const allowed = unlimited || used < (limit as number);
-  return { plan, kind, limit, used, remaining, unlimited, allowed, window: def.window };
+  return { plan, kind, limit, used, remaining, unlimited, allowed, window: def.window, baseLimit: base, bonus };
 }
 
 export function consumeAi(db: Database.Database, teamId: string, kind: AiKind) {
