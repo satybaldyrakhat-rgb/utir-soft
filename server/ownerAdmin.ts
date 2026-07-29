@@ -86,7 +86,49 @@ export function initOwnerSchema(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_billing_payments_team ON billing_payments(team_id);
+    -- Платформенный key-value (одноразовые флаги миграций/сидов и т.п.).
+    CREATE TABLE IF NOT EXISTS platform_kv (
+      k TEXT PRIMARY KEY,
+      v TEXT
+    );
   `);
+}
+
+// ─── Платформенный KV (флаги) ─────────────────────────────────────────
+function kvGet(db: Database.Database, k: string): string | null {
+  const row = db.prepare('SELECT v FROM platform_kv WHERE k = ?').get(k) as any;
+  return row?.v ?? null;
+}
+function kvSet(db: Database.Database, k: string, v: string) {
+  db.prepare(`INSERT INTO platform_kv (k, v) VALUES (?, ?)
+              ON CONFLICT(k) DO UPDATE SET v = excluded.v`).run(k, v);
+}
+
+// Разово добавить в роадмап владельца задачи по онлайн-оплате. Идемпотентно:
+// защищено флагом в platform_kv, поэтому работает и на уже заполненной проде
+// и не возвращает задачи, которые владелец удалил после применения.
+export function ensureBillingRoadmap(db: Database.Database) {
+  if (kvGet(db, 'roadmap_billing_v1') === 'done') return;
+  const now = new Date().toISOString();
+  const tasks: { title: string; description: string; status: OwnerTaskStatus; priority: string }[] = [
+    { title: 'Раздел «Оплата и подписка» в приложении', priority: 'high', status: 'todo',
+      description: 'Отдельная страница для команды: текущий тариф и срок, история платежей, кнопки «Оплатить/Продлить», управление автопродлением. Backend оплаты (CloudPayments + FreedomPay) уже готов — нужен UI-раздел (сейчас есть только баннер + модалка оплаты).' },
+    { title: 'CloudPayments: ключи и webhook в проде', priority: 'high', status: 'todo',
+      description: 'Получить Public ID + API Secret, задать CLOUDPAYMENTS_PUBLIC_ID / CLOUDPAYMENTS_API_SECRET в Railway, прописать webhook https://<APP_URL>/api/billing/webhook/cloudpayments в кабинете. Код готов, ждёт ключей.' },
+    { title: 'CloudPayments: тест оплаты по тест-картам', priority: 'medium', status: 'todo',
+      description: 'В тестовом режиме прогнать оплату тест-картой, проверить активацию подписки через webhook и запись в истории платежей.' },
+    { title: 'FreedomPay: живой тест с мерчантом', priority: 'medium', status: 'todo',
+      description: 'Код по спецификации готов (init_payment + проверка pg_sig), но не проверялся с реальным аккаунтом. Нужен мерчант FreedomPay и тест end-to-end.' },
+  ];
+  const tx = db.transaction(() => {
+    for (const t of tasks) {
+      const id = oid();
+      db.prepare('INSERT INTO owner_tasks (id, data) VALUES (?, ?)')
+        .run(id, JSON.stringify({ ...t, id, createdAt: now, seed: true }));
+    }
+    kvSet(db, 'roadmap_billing_v1', 'done');
+  });
+  tx();
 }
 
 // ─── Подписки ─────────────────────────────────────────────────────────

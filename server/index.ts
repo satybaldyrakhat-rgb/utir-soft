@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary, verifyWebhookSecret, configureWebhookSecret, isWebhookSecretSet } from './telegram.js';
 import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
-import { initOwnerSchema, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView, createPlatformLead } from './ownerAdmin.js';
+import { initOwnerSchema, ensureBillingRoadmap, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView, createPlatformLead } from './ownerAdmin.js';
 import { runBackup, listBackups, startBackupScheduler } from './backup.js';
 import { exportTeam } from './teamExport.js';
 import { initAiLimitsSchema, aiLimitStatus, consumeAi, limitReason, grantAiPack } from './aiLimits.js';
@@ -458,6 +458,8 @@ if (teamIdJustAdded) {
 
 // Схема дашборда владельца: подписки, блокировки, лог ошибок.
 initOwnerSchema(db);
+// Разово добавить в роадмап владельца задачи по онлайн-оплате (идемпотентно).
+ensureBillingRoadmap(db);
 // Схема лимитов AI на пробном периоде.
 initAiLimitsSchema(db);
 

@@ -151,6 +151,15 @@ test('billing: каталог тарифов, валидация checkout, за�
   assert.equal(cp.status, 503);
 });
 
+test('billing: задачи по оплате есть в роадмапе Центра управления', async () => {
+  const owner = await signup('owner@test.kz', 'HQ');
+  const tasks = await api('GET', '/api/owner/tasks', { token: owner });
+  assert.equal(tasks.status, 200);
+  const titles = tasks.json.map(t => t.title);
+  assert.ok(titles.some(t => t.includes('Оплата и подписка')), 'есть задача про раздел оплаты в приложении');
+  assert.ok(titles.some(t => t.includes('CloudPayments')), 'есть задача про CloudPayments');
+});
+
 test('billing: webhook без подписи не активирует подписку (code 13)', async () => {
   const res = await fetch(`${BASE}/api/billing/webhook/cloudpayments`, {
     method: 'POST',
