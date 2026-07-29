@@ -149,6 +149,11 @@ test('billing: каталог тарифов, валидация checkout, за�
   // CloudPayments без ключей → 503 (не 500)
   const cp = await api('POST', '/api/billing/checkout', { token: t, body: { plan: 'pro', period: 'monthly', provider: 'cloudpayments' } });
   assert.equal(cp.status, 503);
+  // страница «Оплата и подписка»: новая команда → пробный период
+  const sub = await api('GET', '/api/billing/subscription', { token: t });
+  assert.equal(sub.status, 200);
+  assert.equal(sub.json.effective, 'trial');
+  assert.equal(sub.json.autoRenew, false);
 });
 
 test('billing: задачи по оплате есть в роадмапе Центра управления', async () => {

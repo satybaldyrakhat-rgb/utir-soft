@@ -80,6 +80,25 @@ export function createBillingRouter(db: Database.Database) {
     return res.json({ provider, invoiceId, amount, redirectUrl: init.redirectUrl });
   });
 
+  // Полный (безопасный) взгляд команды на свою подписку — для страницы
+  // «Оплата и подписка». Секреты (cpToken) НЕ отдаём.
+  r.get('/subscription', (req: AuthedRequest, res) => {
+    const s = getSubscription(db, req.teamId!);
+    const exp = new Date(s.expiresAt).getTime();
+    const daysLeft = isNaN(exp) ? null : Math.ceil((exp - Date.now()) / 86400000);
+    const effective: 'trial' | 'active' | 'expired' =
+      s.status === 'active' ? 'active'
+      : s.status === 'trial' ? (daysLeft !== null && daysLeft >= 0 ? 'trial' : 'expired')
+      : 'expired';
+    res.json({
+      plan: s.plan, status: s.status, effective,
+      amount: s.amount, currency: s.currency, period: s.period,
+      startedAt: s.startedAt, expiresAt: s.expiresAt, daysLeft,
+      autoRenew: !!s.autoRenew, provider: s.provider || null,
+      lastPaymentAt: s.lastPaymentAt || null, suspended: !!s.suspended,
+    });
+  });
+
   // История платежей команды.
   r.get('/payments', (req: AuthedRequest, res) => {
     const rows = db.prepare(

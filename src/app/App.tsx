@@ -17,6 +17,7 @@ const Chats         = lazyNamed(() => import('./components/Chats'), 'Chats');
 const Analytics     = lazyNamed(() => import('./components/Analytics'), 'Analytics');
 const Tasks         = lazyNamed(() => import('./components/Tasks'), 'Tasks');
 const Settings      = lazyNamed(() => import('./components/Settings'), 'Settings');
+const SubscriptionPage = lazyNamed(() => import('./components/SubscriptionPage'), 'SubscriptionPage');
 const CustomModulePage = lazyNamed(() => import('./components/CustomModulePage'), 'CustomModulePage');
 const OwnerDashboard = lazyNamed(() => import('./components/OwnerDashboard'), 'OwnerDashboard');
 const LandingPage = lazyNamed(() => import('./landing/pages/LandingPage'), 'LandingPage');
@@ -307,6 +308,13 @@ function AppContent() {
     if (typeof window !== 'undefined') window.location.hash = '#/dashboard';
   }
 
+  // Лендинг для уже вошедшего пользователя (#/site) — чтобы посмотреть
+  // публичную страницу, не выходя из аккаунта. Хедер лендинга сам покажет
+  // профиль вместо «Войти/Регистрация».
+  if (publicHash.startsWith('#/site')) {
+    return <Suspense fallback={<PageFallback />}><LandingPage /></Suspense>;
+  }
+
   // First-run wizard — shown to brand new teams whose onboarding flag
   // isn't set yet. We wait for the store to load so we don't flash the
   // wizard for a returning user during the (brief) initial fetch.
@@ -355,6 +363,8 @@ function AppContent() {
         return <Tasks language={language} />;
       case 'settings':
         return <Settings language={language} onLanguageChange={setLanguage} currentUserEmail={currentUser?.email} onLogout={handleLogout} />;
+      case 'subscription':
+        return <SubscriptionPage language={language} />;
       default: {
         // Custom modules from Settings → Модули render through the generic page.
         const customMod = dataStore.modules.find(m => m.id === currentPage && m.custom);
@@ -377,6 +387,7 @@ function AppContent() {
       analytics: { kz: 'Аналитика', ru: 'Аналитика', eng: 'Analytics' },
       tasks: { kz: 'Тапсырмалар', ru: 'Задачи', eng: 'Tasks' },
       settings: { kz: 'Баптаулар', ru: 'Настройки', eng: 'Settings' },
+      subscription: { kz: 'Төлем және жазылым', ru: 'Оплата и подписка', eng: 'Billing' },
       logout: { kz: 'Шығу', ru: 'Выйти', eng: 'Logout' },
     };
     return texts[key]?.[language] || texts[key]?.ru || key;
@@ -397,7 +408,8 @@ function AppContent() {
       'chats': 'chats',
       'analytics': 'analytics',
       'tasks': 'tasks',
-      'settings': 'settings'
+      'settings': 'settings',
+      'subscription': 'subscription'
     };
     return getMenuText(pageMap[currentPage] || 'home');
   };
@@ -493,7 +505,11 @@ function AppContent() {
       <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-60'} bg-white/70 backdrop-blur-2xl backdrop-saturate-150 border-r border-white/60 flex flex-col transition-all duration-300
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0 fixed lg:static h-full z-50 mt-[57px] lg:mt-0`}>
-        <div className="px-5 pt-5 pb-4 border-b border-white/60 hidden lg:block">
+        <div
+          className="px-5 pt-5 pb-4 border-b border-white/60 hidden lg:block cursor-pointer"
+          onClick={() => { window.location.hash = '#/site'; }}
+          title={language === 'kz' ? 'Сайтты ашу' : language === 'eng' ? 'Open website' : 'Открыть сайт'}
+        >
           {!isSidebarCollapsed ? (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl flex items-center justify-center overflow-hidden ring-1 ring-emerald-200/60 shadow-[0_4px_12px_-4px_var(--accent-shadow-sm)]">
@@ -618,6 +634,11 @@ function AppContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             );
+            const IconBilling = (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 10V7a2 2 0 012-2h14a2 2 0 012 2v3M3 10v7a2 2 0 002 2h14a2 2 0 002-2v-7M7 15h4" />
+              </svg>
+            );
 
             const aiBadge = currentPage === 'ai-design'
               ? <span className="text-[8px] bg-white/30 text-white px-1.5 py-0.5 rounded font-medium tracking-wide backdrop-blur-xl">AI</span>
@@ -681,6 +702,9 @@ function AppContent() {
                   <>
                     {sectionLabel({ ru: 'Система', kz: 'Жүйе', eng: 'System' })}
                     <NavItem id="settings" icon={IconSettings} label={getMenuText('settings')} />
+                    {role === 'admin' && (
+                      <NavItem id="subscription" icon={IconBilling} label={getMenuText('subscription')} />
+                    )}
                   </>
                 )}
               </>
