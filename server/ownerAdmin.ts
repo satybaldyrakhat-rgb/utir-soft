@@ -57,6 +57,35 @@ export function initOwnerSchema(db: Database.Database) {
       data TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now'))
     );
+    -- Онлайн-оплата подписки: намерение оплаты (создаётся ПЕРЕД показом
+    -- виджета/редиректом, закрывается webhook'ом провайдера).
+    CREATE TABLE IF NOT EXISTS billing_invoices (
+      id TEXT PRIMARY KEY,        -- invoiceId (наш uuid), уходит провайдеру
+      team_id TEXT NOT NULL,
+      plan TEXT NOT NULL,         -- basic | pro | enterprise
+      period TEXT NOT NULL,       -- monthly | semiannual | annual
+      amount INTEGER NOT NULL,    -- ₸
+      currency TEXT DEFAULT 'KZT',
+      provider TEXT NOT NULL,     -- cloudpayments | freedompay
+      status TEXT DEFAULT 'pending', -- pending | paid | failed | cancelled
+      created_at TEXT DEFAULT (datetime('now')),
+      paid_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_billing_invoices_team ON billing_invoices(team_id);
+    -- История платежей (для чека команде и для дашборда владельца).
+    CREATE TABLE IF NOT EXISTS billing_payments (
+      id TEXT PRIMARY KEY,        -- TransactionId провайдера (идемпотентность)
+      invoice_id TEXT,
+      team_id TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      currency TEXT DEFAULT 'KZT',
+      status TEXT NOT NULL,       -- paid | failed | refunded
+      kind TEXT DEFAULT 'payment',-- payment | recurrent | refund
+      raw TEXT,                   -- сырой callback провайдера (для разбора)
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_billing_payments_team ON billing_payments(team_id);
   `);
 }
 
@@ -78,6 +107,13 @@ export interface Subscription {
   // напомнили (чтобы не слать одно и то же каждый день).
   remindedExpiringFor?: string;
   remindedExpiredFor?: string;
+  // ── Онлайн-оплата ─────────────────────────────────────────────
+  provider?: 'cloudpayments' | 'freedompay' | 'manual';
+  autoRenew?: boolean;              // включено ли автопродление
+  cpToken?: string;                 // токен карты CloudPayments для рекуррента
+  cpSubscriptionId?: string;        // id рекуррентной подписки CloudPayments
+  lastPaymentAt?: string;           // ISO дата последнего успешного платежа
+  lastInvoiceId?: string;           // последний оплаченный invoice
 }
 
 function addDays(d: Date, n: number): Date { const x = new Date(d); x.setDate(x.getDate() + n); return x; }

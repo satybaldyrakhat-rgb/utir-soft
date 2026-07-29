@@ -83,6 +83,34 @@
 
 ---
 
+## 7. Онлайн-оплата подписки (CloudPayments / FreedomPay)
+
+Оплата тарифов картой. Способ активируется автоматически, как только заданы
+ключи. Пока ключей нет — на фронте способ показывается недоступным, а сервер
+отвечает `503 *_not_configured` (не падает). Kaspi — в разработке (заглушка).
+
+| Переменная | | Назначение | Без неё |
+|---|---|---|---|
+| `CLOUDPAYMENTS_PUBLIC_ID` | 🟡 | Public ID CloudPayments — для виджета оплаты (безопасно на фронте) | оплата картой недоступна |
+| `CLOUDPAYMENTS_API_SECRET` | 🟡 | **Секрет** CloudPayments — проверка подписи webhook, отмена рекуррента. **Только на сервере** | webhook отклоняется (подпись не проверить) |
+| `CLOUDPAYMENTS_TEST_MODE` | ⚪️ | `1` — тестовый режим (тест-карты) | боевой режим |
+| `VITE_CLOUDPAYMENTS_PUBLIC_ID` | ⚪️ | Тот же Public ID для фронта (Vercel). Сейчас фронт берёт его из ответа checkout, поэтому не обязателен | — |
+| `FREEDOMPAY_MERCHANT_ID` | 🟡 | Merchant ID FreedomPay (второй способ оплаты) | FreedomPay недоступен |
+| `FREEDOMPAY_SECRET_KEY` | 🟡 | **Секрет** FreedomPay — подпись `pg_sig`. Только на сервере | FreedomPay недоступен |
+| `FREEDOMPAY_TEST_MODE` | ⚪️ | `1` — тестовый режим FreedomPay | боевой режим |
+
+> ⚠️ `*_API_SECRET` и `*_SECRET_KEY` — **секреты**, не пишите их с префиксом
+> `VITE_` (иначе попадут в браузер) и не коммитьте в git.
+
+**Webhook-URL в кабинете провайдера** (после деплоя):
+- CloudPayments → Уведомления: `https://<APP_URL>/api/billing/webhook/cloudpayments`
+  (тип Pay/Fail — тот же URL; Recurrent можно на `/cloudpayments-recurrent`).
+- FreedomPay → result_url формируется автоматически: `https://<APP_URL>/api/billing/webhook/freedompay`.
+
+Подробный гайд по внедрению и тест-картам — `docs/PAYMENTS_CLOUDPAYMENTS.md`.
+
+---
+
 ## Минимальный набор для запуска в проде
 
 ```bash

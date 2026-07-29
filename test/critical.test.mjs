@@ -127,3 +127,36 @@ test('блокировка команды закрывает ей доступ, 
   assert.equal((await api('POST', `/api/owner/teams/${v.teamId}/unsuspend`, { token: owner })).status, 200);
   assert.equal((await api('GET', '/api/deals', { token: victim })).status, 200, 'доступ восстановлен');
 });
+
+// ─── Онлайн-оплата подписки ────────────────────────────────────────────
+test('billing: каталог тарифов, валидация checkout, заглушка Kaspi', async () => {
+  const t = await signup('payer@test.kz', 'Payer');
+  // каталог отдаётся, цены считаются сервером
+  const plans = await api('GET', '/api/billing/plans', { token: t });
+  assert.equal(plans.status, 200);
+  const pro = plans.json.plans.find(p => p.plan === 'pro');
+  assert.equal(pro.prices.monthly, 34900, 'цена pro/мес = 34900 ₸');
+  // провайдеры не настроены в тесте (нет env-ключей)
+  assert.equal(plans.json.providers.cloudpayments, false);
+  assert.equal(plans.json.providers.kaspi, false);
+  // Kaspi → 501 «в разработке»
+  const kaspi = await api('POST', '/api/billing/checkout', { token: t, body: { plan: 'pro', period: 'monthly', provider: 'kaspi' } });
+  assert.equal(kaspi.status, 501);
+  assert.equal(kaspi.json.error, 'kaspi_soon');
+  // неизвестный тариф → 400
+  const bad = await api('POST', '/api/billing/checkout', { token: t, body: { plan: 'ultra', period: 'monthly', provider: 'cloudpayments' } });
+  assert.equal(bad.status, 400);
+  // CloudPayments без ключей → 503 (не 500)
+  const cp = await api('POST', '/api/billing/checkout', { token: t, body: { plan: 'pro', period: 'monthly', provider: 'cloudpayments' } });
+  assert.equal(cp.status, 503);
+});
+
+test('billing: webhook без подписи не активирует подписку (code 13)', async () => {
+  const res = await fetch(`${BASE}/api/billing/webhook/cloudpayments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'AccountId=someteam&Amount=34900&Status=Completed&TransactionId=hack1',
+  });
+  const j = await res.json();
+  assert.equal(j.code, 13, 'неверная подпись → отклонено');
+});

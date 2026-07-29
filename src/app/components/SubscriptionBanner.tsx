@@ -5,8 +5,9 @@
 // команд без заведённой подписки — ничего не показываем.
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, X, Clock } from 'lucide-react';
+import { AlertTriangle, X, Clock, CreditCard } from 'lucide-react';
 import { api } from '../utils/api';
+import { BillingModal } from './BillingModal';
 
 interface SubView { managed: boolean; status?: string; plan?: 'trial' | 'active' | 'expired'; expiresAt?: string; daysLeft?: number | null }
 const DISMISS_KEY = 'utir_sub_banner_dismissed';
@@ -15,8 +16,10 @@ export function SubscriptionBanner({ language }: { language: 'kz' | 'ru' | 'eng'
   const l = (ru: string, kz: string, eng: string) => language === 'kz' ? kz : language === 'eng' ? eng : ru;
   const [sub, setSub] = useState<SubView | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [showBilling, setShowBilling] = useState(false);
 
-  useEffect(() => { api.get<SubView>('/api/team/subscription').then(setSub).catch(() => setSub(null)); }, []);
+  const reload = () => api.get<SubView>('/api/team/subscription').then(setSub).catch(() => setSub(null));
+  useEffect(() => { reload(); }, []);
 
   if (!sub) return null;
   const { plan, status, daysLeft, expiresAt } = sub;
@@ -54,16 +57,33 @@ export function SubscriptionBanner({ language }: { language: 'kz' | 'ru' | 'eng'
   const Icon = tone === 'sky' ? Clock : AlertTriangle;
 
   return (
-    <div className={`flex items-center gap-2 px-4 py-2 text-xs border-b ${tones[tone]}`}>
-      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-      <span className="flex-1">{msg}</span>
-      <button
-        onClick={() => { try { localStorage.setItem(DISMISS_KEY, sig); } catch { /* ignore */ } setDismissed(true); }}
-        className="p-1 hover:bg-black/5 rounded-lg"
-        aria-label="dismiss"
-      >
-        <X className="w-3.5 h-3.5" />
-      </button>
-    </div>
+    <>
+      <div className={`flex items-center gap-2 px-4 py-2 text-xs border-b ${tones[tone]}`}>
+        <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+        <span className="flex-1">{msg}</span>
+        <button
+          onClick={() => setShowBilling(true)}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/70 hover:bg-white text-slate-800 font-medium border border-black/5"
+        >
+          <CreditCard className="w-3.5 h-3.5" />
+          {plan === 'trial'
+            ? l('Оформить', 'Рәсімдеу', 'Subscribe')
+            : l('Продлить', 'Ұзарту', 'Renew')}
+        </button>
+        <button
+          onClick={() => { try { localStorage.setItem(DISMISS_KEY, sig); } catch { /* ignore */ } setDismissed(true); }}
+          className="p-1 hover:bg-black/5 rounded-lg"
+          aria-label="dismiss"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <BillingModal
+        language={language}
+        open={showBilling}
+        onClose={() => setShowBilling(false)}
+        onPaid={reload}
+      />
+    </>
   );
 }

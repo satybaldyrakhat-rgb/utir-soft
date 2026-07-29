@@ -24,6 +24,8 @@ import { getPermissionLevel as getPermLevel, canRunTool } from './permissions.js
 import { transcribeAudio, parseAudioDataUrl, isWhisperReady } from './whisper.js';
 import { readClientAI, writeClientAI, runClientAITest, DEFAULT_CLIENT_AI, ALL_CLIENT_AI_MODELS, type ClientAIConfig, type DayKey } from './clientAi.js';
 import { INTEGRATION_CATALOG, getAllStatuses as getIntegrationStatuses, saveConfig as saveIntegrationConfig, disconnect as disconnectIntegration } from './integrations2.js';
+import { createBillingRouter } from './billingRoutes.js';
+import { createBillingWebhookRouter } from './billingWebhooks.js';
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -618,6 +620,12 @@ app.use(cors({
   },
   credentials: true,
 }));
+// Webhook'и платёжных провайдеров монтируем ДО express.json(): им нужен
+// сырой body для проверки подписи (CloudPayments HMAC, FreedomPay pg_sig).
+// Свой raw-парсер внутри роутера. Пути /api/billing/webhook/* не конфликтуют
+// с авторизованным /api/billing (checkout и т.д.), т.к. матчатся раньше.
+app.use('/api/billing/webhook', createBillingWebhookRouter(db));
+
 // Bumped to 25MB because AI-design img2img sends base64 images for the room
 // photo + up to 3 reference shots in one body.
 app.use(express.json({
@@ -2377,6 +2385,10 @@ app.use('/api/products', authMiddleware, requirePermission('production'), makeCr
 // Finance gated by the matrix (was requireRole('manager') — now matrix-driven
 // so admin can hand finance to specific roles without touching code).
 app.use('/api/transactions', authMiddleware, requirePermission('finance'), makeCrud('transactions', 'f', { lockable: true }));
+
+// ─── Онлайн-оплата подписки (CloudPayments / FreedomPay) ──────────
+// Платит владелец команды (admin). Webhook'и — выше, ДО express.json().
+app.use('/api/billing', authMiddleware, requireRole('admin'), createBillingRouter(db));
 
 // ─── Finance period lock (закрытие периода) ───────────────────────
 app.get('/api/team/finance-lock', authMiddleware, (req: AuthedRequest, res) => {

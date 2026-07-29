@@ -10,6 +10,9 @@
 
     <body>
       <div id="root"></div>
+      <!-- Виджет оплаты CloudPayments (карта + автопродление). Грузится лениво,
+           используется в BillingModal. Для боевого RU-домена — .ru вместо .kz. -->
+      <script src="https://widget.cloudpayments.kz/bundles/cloudpayments.js"></script>
       <script type="module" src="/src/main.tsx"></script>
     </body>
   </html>
