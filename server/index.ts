@@ -7,13 +7,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary, verifyWebhookSecret, configureWebhookSecret, isWebhookSecretSet } from './telegram.js';
 import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
-import { initOwnerSchema, ensureBillingRoadmap, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView, createPlatformLead } from './ownerAdmin.js';
+import { initOwnerSchema, ensureBillingRoadmap, ensureWaBotRoadmap, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView, createPlatformLead } from './ownerAdmin.js';
 import { runBackup, listBackups, startBackupScheduler } from './backup.js';
 import { exportTeam } from './teamExport.js';
 import { initAiLimitsSchema, aiLimitStatus, consumeAi, limitReason, grantAiPack } from './aiLimits.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
+import { initWaBotSchema, isWaBotReady, isWaBotPhone, handleWaUpdate, issueWaLinkCode, getWaLinkStatus, unlinkWa, waNotify } from './waBot.js';
 import { sendInstagramText, parseInboundInstagram, instagramConfigured, type InstagramConfig } from './instagram.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
@@ -460,6 +461,10 @@ if (teamIdJustAdded) {
 initOwnerSchema(db);
 // Разово добавить в роадмап владельца задачи по онлайн-оплате (идемпотентно).
 ensureBillingRoadmap(db);
+// Схема WhatsApp-ассистента (привязки номеров команды к аккаунтам).
+initWaBotSchema(db);
+// Разово добавить в роадмап владельца задачи по WhatsApp-боту (идемпотентно).
+ensureWaBotRoadmap(db);
 // Схема лимитов AI на пробном периоде.
 initAiLimitsSchema(db);
 
@@ -2162,6 +2167,19 @@ app.post('/api/webhooks/meta', (req, res) => {
     // WhatsApp (object: whatsapp_business_account)
     const wa = parseInboundWhatsApp(req.body);
     for (const m of wa) {
+      // Наш платформенный бот-номер → ассистент команды (а не клиентский чат).
+      if (isWaBotPhone(m.phoneNumberId)) {
+        void handleWaUpdate(db, { from: m.from, name: m.name, text: m.text, msgId: m.msgId }, (userId, entry) => {
+          try {
+            const id = newId('a_');
+            const data = { id, timestamp: new Date().toISOString(), ...entry };
+            const u = db.prepare('SELECT team_id FROM users WHERE id = ?').get(userId) as any;
+            db.prepare('INSERT INTO activity_logs (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, userId, u?.team_id || userId, JSON.stringify(data));
+          } catch { /* лог активности не критичен */ }
+        }).catch(err => console.warn('[wa-bot] handleWaUpdate failed', err));
+        continue;
+      }
+      // Иначе — входящее сообщение клиента в модуль «Чаты».
       const teamId = m.phoneNumberId ? findTeamByWhatsAppPhone(m.phoneNumberId) : null;
       if (teamId) ingestInboundMessage(teamId, { platform: 'whatsapp', externalId: m.from, name: m.name, text: m.text });
     }
@@ -2322,6 +2340,25 @@ app.post('/api/tasks', authMiddleware, async (req: AuthedRequest, res) => {
     } catch (e) {
       console.warn('[tasks] telegram notify failed', e);
     }
+  }
+
+  // То же уведомление в WhatsApp-ассистент (если номер привязан). Работает
+  // в пределах 24-часового окна WhatsApp; вне окна нужны шаблоны Meta.
+  if (data.assigneeId && isWaBotReady()) {
+    try {
+      const emp = db.prepare('SELECT data FROM employees WHERE id = ? AND team_id = ?').get(data.assigneeId, req.teamId!) as any;
+      if (emp) {
+        const email = String((JSON.parse(emp.data) as any).email || '').toLowerCase();
+        if (email) {
+          const user = db.prepare('SELECT id FROM users WHERE email = ? AND team_id = ?').get(email, req.teamId!) as any;
+          if (user) {
+            const due = data.dueDate ? `\n📅 Срок: ${data.dueDate}` : '';
+            const desc = data.description ? `\n\n${data.description}` : '';
+            void waNotify(db, user.id, `📝 Новая задача\n${data.title}${desc}${due}`);
+          }
+        }
+      }
+    } catch (e) { console.warn('[tasks] whatsapp notify failed', e); }
   }
 
   // Webhook fan-out for integrations.
@@ -4233,6 +4270,27 @@ app.get('/api/telegram/link/status', authMiddleware, (req: AuthedRequest, res) =
 // Detach the Telegram chat from this account.
 app.delete('/api/telegram/link', authMiddleware, (req: AuthedRequest, res) => {
   unlink(db, req.userId!);
+  res.json({ ok: true });
+});
+
+// ─── WhatsApp-ассистент: привязка номера к аккаунту ───────────────
+// Аналог Telegram-привязки, но канал — WhatsApp. Пользователь получает
+// 6-значный код и отправляет его на платформенный бот-номер.
+app.post('/api/whatsapp-bot/link/new', authMiddleware, (req: AuthedRequest, res) => {
+  const { code, expiresAt } = issueWaLinkCode(db, req.userId!);
+  res.json({ code, expiresAt });
+});
+
+app.get('/api/whatsapp-bot/link/status', authMiddleware, (req: AuthedRequest, res) => {
+  res.json({
+    ...getWaLinkStatus(db, req.userId!),
+    serverReady: { whatsapp: isWaBotReady(), claude: isClaudeReady() },
+    botNumber: process.env.WHATSAPP_BOT_DISPLAY_NUMBER || '',
+  });
+});
+
+app.delete('/api/whatsapp-bot/link', authMiddleware, (req: AuthedRequest, res) => {
+  unlinkWa(db, req.userId!);
   res.json({ ok: true });
 });
 

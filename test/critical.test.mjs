@@ -165,6 +165,23 @@ test('billing: задачи по оплате есть в роадмапе Це�
   assert.ok(titles.some(t => t.includes('CloudPayments')), 'есть задача про CloudPayments');
 });
 
+test('whatsapp-бот: привязка по коду (status + новый код)', async () => {
+  const t = await signup('wabot@test.kz', 'WaBot');
+  // без env-ключей бот не готов, номер не привязан
+  const st = await api('GET', '/api/whatsapp-bot/link/status', { token: t });
+  assert.equal(st.status, 200);
+  assert.equal(st.json.paired, false);
+  assert.equal(st.json.serverReady.whatsapp, false);
+  // выдаётся 6-значный код привязки
+  const code = await api('POST', '/api/whatsapp-bot/link/new', { token: t });
+  assert.equal(code.status, 200);
+  assert.match(String(code.json.code), /^[A-Z0-9]{6}$/);
+  // после выдачи кода статус показывает pendingCode, но ещё не paired
+  const st2 = await api('GET', '/api/whatsapp-bot/link/status', { token: t });
+  assert.equal(st2.json.paired, false);
+  assert.equal(st2.json.pendingCode, code.json.code);
+});
+
 test('billing: webhook без подписи не активирует подписку (code 13)', async () => {
   const res = await fetch(`${BASE}/api/billing/webhook/cloudpayments`, {
     method: 'POST',

@@ -131,6 +131,29 @@ export function ensureBillingRoadmap(db: Database.Database) {
   tx();
 }
 
+// Разово добавить задачи по WhatsApp-боту-ассистенту (идемпотентно).
+export function ensureWaBotRoadmap(db: Database.Database) {
+  if (kvGet(db, 'roadmap_wabot_v1') === 'done') return;
+  const now = new Date().toISOString();
+  const tasks: { title: string; description: string; status: OwnerTaskStatus; priority: string }[] = [
+    { title: 'WhatsApp-бот: платформенный номер + ключи', priority: 'high', status: 'todo',
+      description: 'Получить верифицированный WhatsApp Cloud API номер (Meta), задать WHATSAPP_BOT_PHONE_NUMBER_ID / WHATSAPP_BOT_TOKEN / WHATSAPP_BOT_DISPLAY_NUMBER. Код бота-ассистента готов (MVP), ждёт номера. Клиенты смогут выбирать: WhatsApp-бот или Telegram-бот.' },
+    { title: 'WhatsApp-бот: тест привязки и AI-ответов', priority: 'medium', status: 'todo',
+      description: 'После настройки номера: привязать свой WhatsApp кодом, проверить AI-ответы, команды /summary /week /month, подтверждение записей (да/нет).' },
+    { title: 'WhatsApp-бот: фаза 2 (кнопки, мастер дизайна, шаблоны)', priority: 'low', status: 'todo',
+      description: 'Интерактивные кнопки/списки WhatsApp вместо текстовых меню, мастер AI-дизайна, и утверждённые шаблоны Meta для проактивных уведомлений вне 24-часового окна.' },
+  ];
+  const tx = db.transaction(() => {
+    for (const t of tasks) {
+      const id = oid();
+      db.prepare('INSERT INTO owner_tasks (id, data) VALUES (?, ?)')
+        .run(id, JSON.stringify({ ...t, id, createdAt: now, seed: true }));
+    }
+    kvSet(db, 'roadmap_wabot_v1', 'done');
+  });
+  tx();
+}
+
 // ─── Подписки ─────────────────────────────────────────────────────────
 export type SubPeriod = 'monthly' | 'semiannual' | 'annual';
 export type SubStatus = 'trial' | 'active' | 'past_due' | 'churned';

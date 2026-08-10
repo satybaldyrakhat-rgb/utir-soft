@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, Bot, Sparkles, Users, Settings as SettingsIcon, Zap, Activity, Plus, Search, Edit2, Trash2, UserPlus, Star, CheckCircle, X, Shield, Check, Eye, ChevronDown, LayoutGrid, Camera, BookOpen, Send, Download, Brain, Palette, Sliders, Clock, ShieldOff, MessagesSquare, RotateCcw, Loader2, AlertCircle, Briefcase, Smile, Hand, Heart, Gem, Ruler } from 'lucide-react';
 import { ModulesSettings } from './ModulesSettings';
 import { ActivityLog } from './ActivityLog';
-import { TelegramPairing } from './TelegramPairing';
+import { BotChannelPairing } from './BotChannelPairing';
 import { TeamInvitePanel } from './TeamInvitePanel';
 import { TelegramInvitePanel } from './TelegramInvitePanel';
 import { WebhooksPanel } from './WebhooksPanel';
@@ -901,8 +901,8 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
             </div>
           </div>
 
-          {/* Telegram pairing — server-managed; token lives in Railway env, never in the browser. */}
-          <TelegramPairing language={language} />
+          {/* Bot channel pairing — WhatsApp or Telegram. Server-managed; tokens live in env. */}
+          <BotChannelPairing language={language} />
 
           {/* Tone + Language */}
           <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
