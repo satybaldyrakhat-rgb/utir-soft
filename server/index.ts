@@ -14,7 +14,7 @@ import { initAiLimitsSchema, aiLimitStatus, consumeAi, limitReason, grantAiPack 
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
 import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
-import { initWaBotSchema, isWaBotReady, isWaBotPhone, handleWaUpdate, issueWaLinkCode, getWaLinkStatus, unlinkWa, waNotify } from './waBot.js';
+import { initWaBotSchema, isWaBotReady, isWaBotPhone, handleWaUpdate, issueWaLinkCode, getWaLinkStatus, unlinkWa, waNotify, startWaSummaryScheduler } from './waBot.js';
 import { sendInstagramText, parseInboundInstagram, instagramConfigured, type InstagramConfig } from './instagram.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
 import { sendEmail, isEmailReady, otpTemplate, inviteTemplate, passwordResetTemplate } from './email.js';
@@ -4525,4 +4525,7 @@ app.listen(PORT, () => {
     // 09:00 Almaty morning digest to admins/managers.
     startDailySummaryScheduler(db);
   }
+  // WhatsApp-ассистент: своя проактивная сводка (09:00 Almaty), независимо
+  // от Telegram. Стартует только если задан платформенный бот-номер.
+  startWaSummaryScheduler(db);
 });

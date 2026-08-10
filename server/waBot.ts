@@ -39,6 +39,14 @@ export function initWaBotSchema(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_wa_links_code ON whatsapp_links(link_code);
     CREATE INDEX IF NOT EXISTS idx_wa_links_wa ON whatsapp_links(wa_id);
+    -- Отдельная отметка об отправке сводок в WhatsApp (чтобы не конфликтовать
+    -- с Telegram-дедупом — каналы шлют независимо).
+    CREATE TABLE IF NOT EXISTS wa_summary_state (
+      team_id TEXT PRIMARY KEY,
+      last_daily TEXT,
+      last_weekly TEXT,
+      last_monthly TEXT
+    );
   `);
 }
 
@@ -112,6 +120,18 @@ function consumeWaCode(db: Database.Database, code: string, waId: string, name?:
   db.prepare('UPDATE whatsapp_links SET wa_id = ?, name = ?, linked_at = ?, link_code = NULL, code_expires_at = NULL WHERE user_id = ?')
     .run(waId, name || null, new Date().toISOString(), row.user_id);
   return { userId: row.user_id };
+}
+
+// Карточка сотрудника пользователя (по email) — для фильтра «мои задачи».
+function findEmployeeForUser(db: Database.Database, userId: string, teamId: string): { id: string; name: string } | null {
+  const u = db.prepare('SELECT email FROM users WHERE id = ?').get(userId) as any;
+  if (!u?.email) return null;
+  const rows = db.prepare('SELECT id, data FROM employees WHERE team_id = ?').all(teamId) as any[];
+  for (const r of rows) {
+    try { const d = JSON.parse(r.data); if ((d.email || '').toLowerCase() === u.email.toLowerCase()) return { id: r.id, name: d.name || '' }; }
+    catch { /* skip */ }
+  }
+  return null;
 }
 
 interface WaUser { id: string; teamId: string; name: string; teamRole: string }
@@ -212,6 +232,7 @@ export async function handleWaUpdate(
       '',
       'Команды:',
       '/summary — сводка за сегодня',
+      '/tasks — мои открытые задачи',
       '/week — итоги недели',
       '/month — итоги месяца',
       '/unlink — отвязать WhatsApp',
@@ -232,6 +253,18 @@ export async function handleWaUpdate(
   }
   if (lower === '/month' || lower === '/месяц') {
     await send(htmlToWa(buildPeriodSummary(db, user.teamId, 'month')) || 'Нет данных.'); return;
+  }
+  if (lower === '/tasks' || lower === '/задачи' || lower === 'мои задачи') {
+    const emp = findEmployeeForUser(db, user.id, user.teamId);
+    if (!emp) { await send('Ваш профиль ещё не привязан к карточке сотрудника. Попросите админа добавить вас в команду.'); return; }
+    const rows = db.prepare('SELECT data FROM tasks WHERE team_id = ? ORDER BY rowid DESC LIMIT 200').all(user.teamId) as any[];
+    const mine = rows.map(r => { try { return JSON.parse(r.data); } catch { return null; } })
+      .filter((t: any) => t && t.assigneeId === emp.id && t.status !== 'done');
+    if (mine.length === 0) { await send(`${emp.name}, открытых задач нет 🎉`); return; }
+    const icon: Record<string, string> = { new: '🆕', in_progress: '⏳', review: '👀' };
+    const lines = mine.slice(0, 20).map((t: any) => `${icon[t.status] || '•'} *${t.title}*${t.dueDate ? ` · 📅 ${t.dueDate}` : ''}${t.category ? ` · _${t.category}_` : ''}`);
+    await send(`*Ваши задачи (${mine.length}):*\n\n${lines.join('\n')}${mine.length > 20 ? `\n\n…и ещё ${mine.length - 20}` : ''}`);
+    return;
   }
 
   // ── Ожидающее подтверждение (Да/Нет) ────────────────────────────────
@@ -315,4 +348,87 @@ export async function waNotify(db: Database.Database, userId: string, text: stri
   if (!row?.wa_id) return false;
   const r = await sendWaText(row.wa_id, htmlToWa(text));
   return r.ok;
+}
+
+// ─── Проактивные ежедневные/недельные/месячные сводки по WhatsApp ──────
+// Работает в пределах 24-часового окна WhatsApp (получатель писал боту
+// недавно). Вне окна нужны утверждённые шаблоны Meta (фаза 2).
+const TZ = 'Asia/Almaty';
+const SUMMARY_HOUR = 9;
+const almatyToday = () => new Date().toLocaleDateString('en-CA', { timeZone: TZ });          // YYYY-MM-DD
+const almatyHour = () => Number(new Date().toLocaleTimeString('en-GB', { timeZone: TZ, hour12: false }).slice(0, 2));
+const almatyDow = () => ({ Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 } as Record<string, number>)[
+  new Date().toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' })] || 1;
+const almatyDom = () => Number(almatyToday().slice(8, 10));
+
+// Уважаем те же тумблеры отчётов, что и Telegram (team_settings).
+function dailyEnabled(db: Database.Database, teamId: string): boolean {
+  try { const r = db.prepare('SELECT daily_summary FROM team_settings WHERE team_id = ?').get(teamId) as any; if (!r?.daily_summary) return true; return JSON.parse(r.daily_summary).enabled !== false; } catch { return true; }
+}
+function reportKind(db: Database.Database, teamId: string, kind: 'daily' | 'weekly' | 'monthly'): boolean {
+  try { const r = db.prepare('SELECT bot_settings FROM team_settings WHERE team_id = ?').get(teamId) as any; if (!r?.bot_settings) return kind !== 'monthly'; return !!JSON.parse(r.bot_settings)?.reports?.[kind]; } catch { return kind === 'daily'; }
+}
+
+// Получатели = WhatsApp-привязанные admin/manager команды.
+function waRecipients(db: Database.Database, teamId: string): string[] {
+  const rows = db.prepare(`SELECT w.wa_id FROM whatsapp_links w JOIN users u ON u.id = w.user_id
+    WHERE u.team_id = ? AND w.wa_id IS NOT NULL AND u.team_role IN ('admin','manager')`).all(teamId) as any[];
+  return rows.map(r => r.wa_id).filter(Boolean);
+}
+function waStateGet(db: Database.Database, teamId: string): { last_daily?: string; last_weekly?: string; last_monthly?: string } {
+  return (db.prepare('SELECT last_daily, last_weekly, last_monthly FROM wa_summary_state WHERE team_id = ?').get(teamId) as any) || {};
+}
+function waStateSet(db: Database.Database, teamId: string, patch: Record<string, string>) {
+  const cur = waStateGet(db, teamId);
+  const next = { ...cur, ...patch };
+  db.prepare(`INSERT INTO wa_summary_state (team_id, last_daily, last_weekly, last_monthly) VALUES (?, ?, ?, ?)
+              ON CONFLICT(team_id) DO UPDATE SET last_daily=excluded.last_daily, last_weekly=excluded.last_weekly, last_monthly=excluded.last_monthly`)
+    .run(teamId, next.last_daily || null, next.last_weekly || null, next.last_monthly || null);
+}
+
+async function waSummaryTick(db: Database.Database) {
+  if (!isWaBotReady() || almatyHour() < SUMMARY_HOUR) return;
+  const today = almatyToday();
+  const teams = db.prepare(`SELECT DISTINCT u.team_id FROM whatsapp_links w JOIN users u ON u.id = w.user_id
+    WHERE w.wa_id IS NOT NULL AND u.team_role IN ('admin','manager')`).all() as any[];
+  for (const t of teams) {
+    const teamId = t.team_id;
+    if (!teamId) continue;
+    const recipients = waRecipients(db, teamId);
+    if (!recipients.length) continue;
+    const st = waStateGet(db, teamId);
+
+    // Ежедневная (09:00, раз в день)
+    if (dailyEnabled(db, teamId) && st.last_daily !== today && reportKind(db, teamId, 'daily')) {
+      try {
+        const text = htmlToWa(buildDailySummary(db, teamId));
+        for (const wa of recipients) await sendWaText(wa, text);
+        waStateSet(db, teamId, { last_daily: today });
+      } catch (e) { console.warn('[wa daily]', teamId, e); }
+    }
+    // Недельная (понедельник)
+    if (almatyDow() === 1 && st.last_weekly !== today && reportKind(db, teamId, 'weekly')) {
+      try {
+        const text = htmlToWa(buildPeriodSummary(db, teamId, 'week'));
+        for (const wa of recipients) await sendWaText(wa, text);
+        waStateSet(db, teamId, { last_weekly: today });
+      } catch (e) { console.warn('[wa weekly]', teamId, e); }
+    }
+    // Месячная (1-е число)
+    const monthKey = today.slice(0, 7);
+    if (almatyDom() === 1 && st.last_monthly !== monthKey && reportKind(db, teamId, 'monthly')) {
+      try {
+        const text = htmlToWa(buildPeriodSummary(db, teamId, 'month'));
+        for (const wa of recipients) await sendWaText(wa, text);
+        waStateSet(db, teamId, { last_monthly: monthKey });
+      } catch (e) { console.warn('[wa monthly]', teamId, e); }
+    }
+  }
+}
+
+let waTimer: ReturnType<typeof setInterval> | null = null;
+export function startWaSummaryScheduler(db: Database.Database) {
+  if (waTimer || !isWaBotReady()) return;
+  waTimer = setInterval(() => { void waSummaryTick(db); }, 60 * 1000);
+  console.log('[wa-bot] daily summary scheduler started (09:00 Asia/Almaty)');
 }
