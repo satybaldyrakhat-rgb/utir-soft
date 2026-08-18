@@ -1,4 +1,4 @@
-import { ArrowRight, Phone, Star } from "lucide-react";
+import { ArrowRight, Phone } from "lucide-react";
 import { useLang } from "../i18n/LanguageContext";
 
 export function CTA() {
@@ -37,16 +37,9 @@ export function CTA() {
               </a>
             </div>
 
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:text-sm text-emerald-50/90">
-              <span className="inline-flex items-center gap-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="h-3.5 w-3.5 fill-white text-white" />
-                ))}
-              </span>
-              <span>{t.cta.rating}</span>
-              <span className="opacity-60">·</span>
-              <span>{t.cta.socialProof}</span>
-            </div>
+            {/* Блок «4.9 из 5 на основе 47 отзывов · 120+ мебельщиков» убран:
+                это были непроверяемые цифры. Вернём, когда появятся
+                реальные отзывы и счёт клиентов. */}
           </div>
         </div>
       </div>

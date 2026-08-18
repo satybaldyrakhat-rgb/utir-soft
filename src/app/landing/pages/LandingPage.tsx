@@ -11,7 +11,6 @@ import { WhyUtirSoft } from "../components/WhyUtirSoft";
 import { Integrations } from "../components/Integrations";
 import { Pricing } from "../components/Pricing";
 import { Onboarding } from "../components/Onboarding";
-import { Testimonials } from "../components/Testimonials";
 import { FAQ } from "../components/FAQ";
 import { CTA } from "../components/CTA";
 import { Footer } from "../components/Footer";
@@ -77,7 +76,6 @@ export function LandingPage() {
         <Integrations />
         <Pricing />
         <Onboarding />
-        <Testimonials />
         <FAQ />
         <CTA />
       </main>
