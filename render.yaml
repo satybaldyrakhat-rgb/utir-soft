@@ -1,0 +1,68 @@
+# ─── Развёртывание бэкенда на Render ──────────────────────────────────
+# Готовый blueprint на случай переезда с Railway. Render → New → Blueprint →
+# выбрать этот репозиторий: сервис и диск создадутся сами.
+#
+# ГЛАВНОЕ: блок `disk` обязателен. Вся база — один файл SQLite; без
+# постоянного диска Render сотрёт данные при каждом деплое и рестарте.
+# Бесплатный план дисков не даёт — нужен платный (starter).
+#
+# Секреты (sync: false) Render спросит при создании — их не хранят в git.
+# Полный список переменных и что без них ломается: docs/DEPLOY_ENV.md
+
+services:
+  - type: web
+    name: utir-soft-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: frankfurt          # ближе к Казахстану, чем Орегон
+    healthCheckPath: /api/health
+    autoDeploy: true
+
+    disk:
+      name: utir-data
+      mountPath: /data         # совпадает с DATABASE_PATH / BACKUP_DIR
+      sizeGB: 1
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /data/utir.db
+      - key: BACKUP_DIR
+        value: /data/backups
+      # Секрет подписи токенов входа. Render сгенерирует сам.
+      # ВНИМАНИЕ при переезде: если подставить НЕ тот же секрет, что был на
+      # Railway, все текущие сессии разлогинятся (пароли и данные целы).
+      - key: JWT_SECRET
+        generateValue: true
+
+      # ── Заполняются вручную при создании (секреты и адреса) ──
+      - key: APP_URL              # адрес фронтенда на Vercel
+        sync: false
+      - key: PUBLIC_APP_URL
+        sync: false
+      - key: PUBLIC_API_URL       # адрес ЭТОГО сервиса (для PDF в WhatsApp)
+        sync: false
+      - key: CORS_ORIGINS         # домены фронтенда через запятую
+        sync: false
+      - key: SUPER_ADMIN_EMAILS
+        sync: false
+
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+
+      - key: RESEND_API_KEY
+        sync: false
+
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_VERIFY_TOKEN
+        sync: false

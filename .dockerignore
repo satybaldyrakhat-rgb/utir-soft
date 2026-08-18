@@ -1,0 +1,19 @@
+node_modules
+dist
+.git
+.github
+test
+docs
+guidelines
+public
+src
+index.html
+vite.config.ts
+postcss.config.mjs
+vercel.json
+*.md
+# База и бэкапы из дев-окружения в образ не попадают — в проде они на диске.
+server/utir.db
+server/utir.db-shm
+server/utir.db-wal
+server/backups
