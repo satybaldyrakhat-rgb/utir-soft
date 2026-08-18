@@ -24,6 +24,35 @@ export async function sendWhatsAppText(cfg: WhatsAppConfig, toWaId: string, text
   } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
 }
 
+// Отправить клиенту документ (PDF) по публичной ссылке. Meta сама скачает
+// файл по link — поэтому URL должен быть доступен снаружи без авторизации.
+// Вне 24-часового окна переписки Meta отклонит сообщение (нужен шаблон) —
+// возвращаем текст ошибки, чтобы UI предложил отправить вручную.
+export async function sendWhatsAppDocument(
+  cfg: WhatsAppConfig,
+  toWaId: string,
+  link: string,
+  filename: string,
+  caption?: string,
+): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(cfg.phoneNumberId)}/messages`;
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.accessToken}` },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: String(toWaId).replace(/\D/g, ''),
+        type: 'document',
+        document: { link, filename, ...(caption ? { caption } : {}) },
+      }),
+    });
+    const json: any = await resp.json().catch(() => ({}));
+    if (!resp.ok || json?.error) return { ok: false, error: json?.error?.message || `HTTP ${resp.status}` };
+    return { ok: true, id: json?.messages?.[0]?.id };
+  } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
+}
+
 export interface InboundMessage {
   channel: 'whatsapp';
   phoneNumberId: string;   // наш номер (для маппинга на команду)

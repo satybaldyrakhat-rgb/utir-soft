@@ -165,6 +165,62 @@ test('billing: задачи по оплате есть в роадмапе Це�
   assert.ok(titles.some(t => t.includes('CloudPayments')), 'есть задача про CloudPayments');
 });
 
+// ─── Расчёт (КП) по сделке: конвейер и изоляция ────────────────────────
+test('КП: расчёт → подтверждение → нельзя отправить неподтверждённое', async () => {
+  const t = await signup('estimate@test.kz', 'Est');
+  const deal = await api('POST', '/api/deals', { token: t, body: { customerName: 'Айгүл', phone: '+7 777 000 11 22', amount: 0 } });
+  assert.equal(deal.status, 200);
+  const id = deal.json.id;
+
+  // Отправка до расчёта — нечего отправлять
+  const early = await api('POST', `/api/deals/${id}/estimate/send`, { token: t, body: { pdfBase64: 'AAAA' } });
+  assert.equal(early.status, 404);
+
+  // Замерщик создаёт расчёт → сразу «на подтверждении», не «подтверждён»
+  const est = await api('POST', `/api/deals/${id}/estimate`, { token: t, body: {
+    productLabel: 'Кухня', dims: { length: 3, width: 0.6, height: 0.9 }, area: 5.58,
+    lines: [{ name: 'Кухня', qty: 1, unit: 'компл', price: 300000 }],
+    materialsCost: 200000, addonsCost: 18000, servicesCost: 80000,
+    subtotal: 298000, markupPct: 30, markup: 89400, total: 387400,
+  } });
+  assert.equal(est.status, 200);
+  assert.equal(est.json.status, 'pending', 'расчёт создаётся неподтверждённым');
+  assert.equal(est.json.total, 387400);
+
+  // Пока не подтверждён — отправлять клиенту нельзя
+  const notApproved = await api('POST', `/api/deals/${id}/estimate/send`, { token: t, body: { pdfBase64: 'AAAA' } });
+  assert.equal(notApproved.status, 409);
+  assert.equal(notApproved.json.error, 'not_approved');
+
+  // Подтверждение (у админа право есть)
+  const ok = await api('POST', `/api/deals/${id}/estimate/approve`, { token: t });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.status, 'approved');
+  assert.ok(ok.json.approvedAt, 'проставлено время подтверждения');
+
+  // Повторное подтверждение — уже не в статусе pending
+  const twice = await api('POST', `/api/deals/${id}/estimate/approve`, { token: t });
+  assert.equal(twice.status, 409);
+
+  // Сумма сделки подтянулась к расчёту
+  const deals = await api('GET', '/api/deals', { token: t });
+  assert.equal(deals.json.find(d => d.id === id).amount, 387400);
+});
+
+test('КП: чужая команда не может прикрепить расчёт к чужой сделке', async () => {
+  const a = await signup('est-a@test.kz', 'A');
+  const b = await signup('est-b@test.kz', 'B');
+  const deal = await api('POST', '/api/deals', { token: a, body: { customerName: 'Клиент A', amount: 0 } });
+  const id = deal.json.id;
+  const hack = await api('POST', `/api/deals/${id}/estimate`, { token: b, body: { total: 1, lines: [] } });
+  assert.equal(hack.status, 404, 'сделка другой команды не видна');
+});
+
+test('публичный PDF: несуществующий код → 404', async () => {
+  const res = await fetch(`${BASE}/api/public/doc/${'0'.repeat(32)}`);
+  assert.equal(res.status, 404);
+});
+
 test('whatsapp-бот: привязка по коду (status + новый код)', async () => {
   const t = await signup('wabot@test.kz', 'WaBot');
   // без env-ключей бот не готов, номер не привязан

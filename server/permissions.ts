@@ -16,9 +16,13 @@ import Database from 'better-sqlite3';
 export type PermissionLevel = 'full' | 'view' | 'none';
 
 export const DEFAULT_MATRIX: Record<string, Record<string, PermissionLevel>> = {
-  admin:    { orders: 'full', sales: 'full', chats: 'full', finance: 'full', production: 'full', warehouse: 'full', analytics: 'full', settings: 'full', tasks: 'full', 'ai-design': 'full' },
-  manager:  { orders: 'full', sales: 'full', chats: 'full', finance: 'view', production: 'view', warehouse: 'view', analytics: 'view', settings: 'none', tasks: 'full', 'ai-design': 'full' },
-  employee: { orders: 'view', sales: 'view', chats: 'view', finance: 'none', production: 'view', warehouse: 'view', analytics: 'none', settings: 'none', tasks: 'view', 'ai-design': 'view' },
+  // 'pricing' — видеть/создавать расчёт и КП в карточке заказа.
+  // 'pricing-approve' — утвердить цену и отправить КП клиенту. По умолчанию
+  // только у админа: цену подтверждает финансист/владелец, а не тот, кто её
+  // посчитал. Админ может выдать это право нужной роли вручную в матрице.
+  admin:    { orders: 'full', sales: 'full', chats: 'full', finance: 'full', production: 'full', warehouse: 'full', analytics: 'full', settings: 'full', tasks: 'full', 'ai-design': 'full', pricing: 'full', 'pricing-approve': 'full' },
+  manager:  { orders: 'full', sales: 'full', chats: 'full', finance: 'view', production: 'view', warehouse: 'view', analytics: 'view', settings: 'none', tasks: 'full', 'ai-design': 'full', pricing: 'full', 'pricing-approve': 'none' },
+  employee: { orders: 'view', sales: 'view', chats: 'view', finance: 'none', production: 'view', warehouse: 'view', analytics: 'none', settings: 'none', tasks: 'view', 'ai-design': 'view', pricing: 'none', 'pricing-approve': 'none' },
 };
 
 export function getPermissionLevel(

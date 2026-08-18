@@ -90,6 +90,67 @@ export interface Deal {
   // Чек-лист приёмки монтажа — монтажник/прораб отмечает пункты при сдаче
   // объекта клиенту (доставлено, установлено ровно, нет повреждений и т.д.).
   installChecklist?: { label: string; done: boolean }[];
+  // ─── Расчёт замерщика и спецификация дизайнера ──────────────────
+  // Две «бумаги» по сделке (см. DealEstimate / DealSpec ниже).
+  estimate?: DealEstimate;
+  spec?: DealSpec;
+}
+
+// ─── Документооборот по сделке: расчёт (КП) и спецификация ────────────
+// Обе бумаги идут по одному конвейеру:
+//   draft → pending (на подтверждении) → approved → sent (ушла клиенту)
+//   → accepted / rejected (клиент решил)
+// Подтверждает и отправляет ТОЛЬКО тот, у кого есть право
+// 'pricing-approve'. Проверка живёт на сервере — из браузера не обойти.
+export type DocFlowStatus = 'draft' | 'pending' | 'approved' | 'sent' | 'accepted' | 'rejected';
+
+// Строка КП в том виде, в каком её видит клиент. Наценка уже разнесена
+// по строкам — внутреннюю маржу клиенту не показываем.
+export interface EstimateLine { name: string; qty: number; unit: string; price: number }
+
+export interface DealEstimate {
+  id: string;
+  createdAt: string;
+  createdBy?: string;
+  createdByName?: string;
+  // Вход калькулятора — чтобы расчёт можно было открыть и пересчитать.
+  productId: string;
+  productLabel: string;
+  dims: { length: number; width: number; height: number };
+  area: number;
+  materialChoices: { group: string; option: string }[];
+  lines: EstimateLine[];
+  // Внутренние суммы (видны только тем, у кого есть право 'pricing').
+  materialsCost: number;
+  addonsCost: number;
+  servicesCost: number;
+  subtotal: number;
+  markupPct: number;
+  markup: number;
+  total: number;
+  leadDays?: number[];
+  status: DocFlowStatus;
+  approvedBy?: string; approvedByName?: string; approvedAt?: string;
+  sentAt?: string; sentTo?: string; sendError?: string;
+  rejectedReason?: string;
+  docCode?: string;        // код публичной ссылки на PDF
+}
+
+// Спецификация материалов от дизайнера. БЕЗ цен — этот документ ходит
+// по цеху и уходит клиенту, финансовой информации в нём быть не должно.
+export interface SpecLine { name: string; qty: number; unit: string; note?: string }
+
+export interface DealSpec {
+  id: string;
+  createdAt: string;
+  createdBy?: string;
+  createdByName?: string;
+  lines: SpecLine[];
+  note?: string;
+  status: DocFlowStatus;
+  approvedBy?: string; approvedByName?: string; approvedAt?: string;
+  sentAt?: string; sentTo?: string; sendError?: string;
+  docCode?: string;
 }
 
 // RoleKey is now a free-form string id (e.g. 'admin', 'manager', 'accountant').
@@ -115,6 +176,8 @@ export type ModuleKey =
   | 'production' // Производство (warehouse)
   | 'finance'    // Финансы компании
   | 'payments'   // Платежи — tab inside Заказы
+  | 'pricing'         // Расчёт и КП — вкладка цен внутри карточки заказа
+  | 'pricing-approve' // Подтверждение КП и отправка клиенту
   | 'chats'      // Чаты
   | 'tasks'      // Задачи
   | 'analytics'  // Аналитика
@@ -165,21 +228,21 @@ const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   admin: {
     dashboard: 'full', 'ai-design': 'full', orders: 'full', production: 'full',
     finance: 'full', payments: 'full', chats: 'full', tasks: 'full',
-    analytics: 'full', marketing: 'full',
+    analytics: 'full', marketing: 'full', pricing: 'full', 'pricing-approve': 'full',
     settings: 'full', 'settings-catalogs': 'full', 'settings-modules': 'full',
     'settings-integrations': 'full', 'settings-ai': 'full',
   },
   manager: {
     dashboard: 'full', 'ai-design': 'full', orders: 'full', production: 'view',
     finance: 'view', payments: 'full', chats: 'full', tasks: 'full',
-    analytics: 'view', marketing: 'view',
+    analytics: 'view', marketing: 'view', pricing: 'full', 'pricing-approve': 'none',
     settings: 'full', 'settings-catalogs': 'full', 'settings-modules': 'none',
     'settings-integrations': 'none', 'settings-ai': 'none',
   },
   employee: {
     dashboard: 'full', 'ai-design': 'view', orders: 'view', production: 'view',
     finance: 'none', payments: 'none', chats: 'view', tasks: 'full',
-    analytics: 'none', marketing: 'none',
+    analytics: 'none', marketing: 'none', pricing: 'none', 'pricing-approve': 'none',
     settings: 'view', 'settings-catalogs': 'view', 'settings-modules': 'none',
     'settings-integrations': 'none', 'settings-ai': 'none',
   },
@@ -187,6 +250,7 @@ const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
 
 export const ALL_MODULES: ModuleKey[] = [
   'dashboard', 'ai-design', 'orders', 'production', 'finance', 'payments',
+  'pricing', 'pricing-approve',
   'chats', 'tasks', 'analytics', 'marketing',
   'settings', 'settings-catalogs', 'settings-modules', 'settings-integrations', 'settings-ai',
 ];
@@ -196,7 +260,7 @@ export const MODULE_GROUPS: { id: string; ru: string; kz: string; eng: string; m
   {
     id: 'operations',
     ru: 'Рабочие модули', kz: 'Жұмыс модульдері', eng: 'Operations',
-    modules: ['dashboard', 'ai-design', 'orders', 'production', 'finance', 'payments', 'chats', 'tasks', 'analytics', 'marketing'],
+    modules: ['dashboard', 'ai-design', 'orders', 'production', 'finance', 'payments', 'pricing', 'pricing-approve', 'chats', 'tasks', 'analytics', 'marketing'],
   },
   {
     id: 'settings',
@@ -385,7 +449,7 @@ function loadRolePermissions(): RolePermissions {
 const EMPTY_PERMS: Record<ModuleKey, PermissionLevel> = {
   dashboard: 'none', 'ai-design': 'none', orders: 'none', production: 'none',
   finance: 'none', payments: 'none', chats: 'none', tasks: 'none',
-  analytics: 'none', marketing: 'none',
+  analytics: 'none', marketing: 'none', pricing: 'none', 'pricing-approve': 'none',
   settings: 'none', 'settings-catalogs': 'none', 'settings-modules': 'none',
   'settings-integrations': 'none', 'settings-ai': 'none',
 };

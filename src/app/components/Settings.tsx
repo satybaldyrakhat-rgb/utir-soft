@@ -325,6 +325,8 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
     production:              tt('modProduction'),
     finance:                 l('Финансы',             'Қаржы',             'Finance'),
     payments:                l('Платежи',             'Төлемдер',          'Payments'),
+    pricing:                 l('Расчёт и КП',         'Есеп және КҰ',      'Estimate & quote'),
+    'pricing-approve':       l('Подтверждение документов клиенту', 'Клиентке құжат бекіту', 'Approve client documents'),
     chats:                   tt('modChats'),
     tasks:                   l('Задачи',              'Тапсырмалар',       'Tasks'),
     analytics:               tt('modAnalytics'),

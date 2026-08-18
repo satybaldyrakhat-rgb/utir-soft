@@ -13,7 +13,8 @@ import { exportTeam } from './teamExport.js';
 import { initAiLimitsSchema, aiLimitStatus, consumeAi, limitReason, grantAiPack } from './aiLimits.js';
 import { sendCapiEvent, metaCapiConfigured, type CapiConfig, type CapiEvent } from './capi.js';
 import { fetchCreativeInsights, createCustomAudience, addUsersToAudience } from './metaAds.js';
-import { sendWhatsAppText, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
+import { sendWhatsAppText, sendWhatsAppDocument, parseInboundWhatsApp, whatsAppConfigured, type WhatsAppConfig } from './whatsapp.js';
+import { initDealDocsSchema, createDealDocsRouter, createPublicDocRouter } from './dealDocs.js';
 import { initWaBotSchema, isWaBotReady, isWaBotPhone, handleWaUpdate, issueWaLinkCode, getWaLinkStatus, unlinkWa, waNotify, startWaSummaryScheduler } from './waBot.js';
 import { sendInstagramText, parseInboundInstagram, instagramConfigured, type InstagramConfig } from './instagram.js';
 import { isClaudeReady, runAgent as claudeRunAgent } from './claudeAgent.js';
@@ -463,6 +464,8 @@ initOwnerSchema(db);
 ensureBillingRoadmap(db);
 // Схема WhatsApp-ассистента (привязки номеров команды к аккаунтам).
 initWaBotSchema(db);
+// Схема документов по сделке (сгенерированные КП / спецификации).
+initDealDocsSchema(db);
 // Разово добавить в роадмап владельца задачи по WhatsApp-боту (идемпотентно).
 ensureWaBotRoadmap(db);
 // Схема лимитов AI на пробном периоде.
@@ -632,6 +635,11 @@ app.use(cors({
 // Свой raw-парсер внутри роутера. Пути /api/billing/webhook/* не конфликтуют
 // с авторизованным /api/billing (checkout и т.д.), т.к. матчатся раньше.
 app.use('/api/billing/webhook', createBillingWebhookRouter(db));
+
+// Публичная выдача сгенерированных PDF (КП / спецификация) по длинному
+// случайному коду — по этой ссылке файл забирает WhatsApp и открывает клиент.
+// Без авторизации по замыслу; код не угадать (128 бит).
+app.use('/api/public/doc', createPublicDocRouter(db));
 
 // Bumped to 25MB because AI-design img2img sends base64 images for the room
 // photo + up to 3 reference shots in one body.
@@ -2192,6 +2200,23 @@ app.post('/api/webhooks/meta', (req, res) => {
   } catch (e) { console.warn('[webhook/meta] failed', e); }
   res.sendStatus(200);
 });
+
+// Документы по сделке (расчёт/КП и спецификация материалов). Монтируем ДО
+// makeCrud, чтобы /api/deals/:id/estimate не перехватывался общим CRUD.
+// Права здесь свои: считать может замерщик ('pricing'), подтверждать и
+// отправлять клиенту — только 'pricing-approve' (по умолчанию админ).
+app.use('/api/deals', authMiddleware, createDealDocsRouter(db, {
+  canCreateEstimate: requirePermission('pricing'),
+  canCreateSpec: requirePermission('pricing'),
+  canApprove: requirePermission('pricing-approve'),
+  logActivity: (userId, entry) => logActivity(userId, entry),
+  publicBase: (req) => envUrl(process.env.PUBLIC_API_URL) || `${req.protocol}://${req.get('host')}`,
+  sendClientDocument: async (teamId, phone, url, filename, caption) => {
+    const cfg = readWhatsAppConfig(teamId);
+    if (!whatsAppConfigured(cfg)) return { ok: false, error: 'whatsapp_not_configured' };
+    return sendWhatsAppDocument(cfg, phone, url, filename, caption);
+  },
+}));
 
 app.use('/api/deals', authMiddleware, requirePermission('orders'), makeCrud('deals', 'D'));
 
