@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary, verifyWebhookSecret, configureWebhookSecret, isWebhookSecretSet } from './telegram.js';
 import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
-import { initOwnerSchema, ensureBillingRoadmap, ensureWaBotRoadmap, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView, createPlatformLead } from './ownerAdmin.js';
+import { initOwnerSchema, ensureBillingRoadmap, ensureWaBotRoadmap, ensureQuoteRoadmap, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView, createPlatformLead } from './ownerAdmin.js';
 import { runBackup, listBackups, startBackupScheduler } from './backup.js';
 import { exportTeam } from './teamExport.js';
 import { initAiLimitsSchema, aiLimitStatus, consumeAi, limitReason, grantAiPack } from './aiLimits.js';
@@ -468,6 +468,8 @@ initWaBotSchema(db);
 initDealDocsSchema(db);
 // Разово добавить в роадмап владельца задачи по WhatsApp-боту (идемпотентно).
 ensureWaBotRoadmap(db);
+// Разово добавить задачи по расчёту/КП и документам заказа (идемпотентно).
+ensureQuoteRoadmap(db);
 // Схема лимитов AI на пробном периоде.
 initAiLimitsSchema(db);
 

@@ -154,6 +154,31 @@ export function ensureWaBotRoadmap(db: Database.Database) {
   tx();
 }
 
+// Разово добавить задачи по расчёту/КП и документам заказа (идемпотентно).
+export function ensureQuoteRoadmap(db: Database.Database) {
+  if (kvGet(db, 'roadmap_quote_v1') === 'done') return;
+  const now = new Date().toISOString();
+  const tasks: { title: string; description: string; status: OwnerTaskStatus; priority: string }[] = [
+    { title: 'Калькулятор: свои цены вместо зашитых', priority: 'high', status: 'todo',
+      description: 'Сейчас базовые цены за м² (кухня 35 000, шкаф 28 000…), коэффициенты материалов и доп. опции зашиты в код и одинаковы для всех команд. Нужен экран, где админ ведёт свой прайс — иначе расчёт замерщика не совпадает с реальной себестоимостью цеха.' },
+    { title: 'WhatsApp: шаблоны Meta для отправки вне 24 часов', priority: 'high', status: 'todo',
+      description: 'КП и спецификация уходят клиенту автоматически только внутри 24-часового окна переписки. Вне окна Meta требует утверждённый шаблон — сейчас в этом случае показываем кнопку «отправить вручную». Нужно завести и утвердить шаблоны (wabaId в конфиге уже собирается).' },
+    { title: 'Роли: завести «Замерщика» и «Финансиста»', priority: 'medium', status: 'todo',
+      description: 'В Настройки → Команда создать роли и раздать права: замерщику — Заказы «Просмотр» + Расчёт и КП «Полный» (сможет считать, но не создавать лишние карточки и не подтверждать цену); финансисту — Подтверждение документов клиенту «Полный».' },
+    { title: 'Проверить КП и спецификацию на казахском', priority: 'low', status: 'todo',
+      description: 'PDF собирается шрифтом Roboto, который подгружается из интернета. Русский печатается точно; казахские буквы (ә, ғ, қ, ң, ө, ұ, ү, і) нужно проверить глазами на реальном документе.' },
+  ];
+  const tx = db.transaction(() => {
+    for (const t of tasks) {
+      const id = oid();
+      db.prepare('INSERT INTO owner_tasks (id, data) VALUES (?, ?)')
+        .run(id, JSON.stringify({ ...t, id, createdAt: now, seed: true }));
+    }
+    kvSet(db, 'roadmap_quote_v1', 'done');
+  });
+  tx();
+}
+
 // ─── Подписки ─────────────────────────────────────────────────────────
 export type SubPeriod = 'monthly' | 'semiannual' | 'annual';
 export type SubStatus = 'trial' | 'active' | 'past_due' | 'churned';
