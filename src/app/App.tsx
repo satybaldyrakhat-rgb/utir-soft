@@ -249,6 +249,10 @@ function AppContent() {
       if (!getToken()) {
         setIsAuthenticated(false);
         setCurrentUser(null);
+        // Токен пропал (истёк / принудительный логаут) — уводим на чистый
+        // корень к лендингу, чтобы адрес не остался на #/sales и т.п.
+        try { window.history.replaceState(null, '', window.location.pathname); } catch { /* ignore */ }
+        setPublicHash('');
       }
     };
     window.addEventListener('utir:auth-changed', onAuth);
@@ -258,6 +262,15 @@ function AppContent() {
   const handleLogin = (user: { name: string; email: string; teamRole?: string; isSuperAdmin?: boolean }) => {
     setCurrentUser({ name: user.name, email: user.email, teamRole: user.teamRole || 'admin', isSuperAdmin: !!user.isSuperAdmin });
     setIsAuthenticated(true);
+    // Вошли через лендинг (#/login, #/signup), OAuth-возврат или с корня —
+    // уводим в приложение с чистым URL, чтобы в адресе не залипал #/login.
+    // Диплинк на реальную страницу (#/sales и т.п.) сохраняем как есть.
+    try {
+      const h = window.location.hash;
+      if (!h || h === '#' || h === '#/' || h.startsWith('#/login') || h.startsWith('#/signup') || h.startsWith('#oauth')) {
+        setCurrentPage('dashboard');
+      }
+    } catch { setCurrentPage('dashboard'); }
   };
 
   const handleLogout = async () => {
@@ -272,7 +285,10 @@ function AppContent() {
     // Clear persisted last-page so the next user (or re-login) starts fresh
     // on Dashboard instead of bouncing into wherever the previous user was.
     try { localStorage.removeItem(LAST_PAGE_KEY); } catch { /* ignore */ }
-    try { window.history.replaceState(null, '', '#/dashboard'); } catch { /* ignore */ }
+    // Чистый URL → корень сайта → публичный лендинг (а не залипший
+    // #/dashboard, при котором адрес говорит одно, а показывается лендинг).
+    try { window.history.replaceState(null, '', window.location.pathname); } catch { /* ignore */ }
+    setPublicHash('');
   };
 
   if (!authChecked) {
