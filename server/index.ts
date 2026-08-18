@@ -4167,9 +4167,32 @@ activityRouter.get('/', requireRole('admin'), (req: AuthedRequest, res) => {
   res.json(rows.map(r => JSON.parse(r.data)));
 });
 
+// Разрешённые значения — иначе фильтры в UI ломаются о произвольный мусор.
+const ACTIVITY_TYPES = new Set(['create', 'update', 'delete', 'login', 'logout', 'invite', 'permission', 'settings', 'ai']);
+
 activityRouter.post('/', (req: AuthedRequest, res) => {
   const id = newId('a_');
-  const data = { ...req.body, id, timestamp: new Date().toISOString() };
+  const b = req.body || {};
+  const cut = (v: unknown, max: number) => String(v ?? '').slice(0, max);
+  // Кто именно совершил действие, решает СЕРВЕР по токену. Раньше поле
+  // user приходило из тела запроса — то есть любой участник команды мог
+  // записать в журнал строку от чужого имени. Журнал, который может
+  // подделать тот, кого он проверяет, бесполезен.
+  const who = db.prepare('SELECT name, email FROM users WHERE id = ?').get(req.userId!) as any;
+  const data = {
+    id,
+    timestamp: new Date().toISOString(),
+    user: who?.name || who?.email || 'Пользователь',
+    userId: req.userId!,
+    actor: b.actor === 'ai' ? 'ai' : 'human',
+    source: b.source === 'telegram' ? 'telegram' : 'platform',
+    action: cut(b.action, 200),
+    target: cut(b.target, 300),
+    type: ACTIVITY_TYPES.has(b.type) ? b.type : 'update',
+    page: cut(b.page, 60),
+    ...(b.before !== undefined ? { before: cut(b.before, 300) } : {}),
+    ...(b.after !== undefined ? { after: cut(b.after, 300) } : {}),
+  };
   db.prepare('INSERT INTO activity_logs (id, user_id, team_id, data) VALUES (?, ?, ?, ?)').run(id, req.userId!, req.teamId!, JSON.stringify(data));
   // Trim retention to 10000 rows per team.
   db.prepare(`DELETE FROM activity_logs WHERE team_id = ? AND id NOT IN (SELECT id FROM activity_logs WHERE team_id = ? ORDER BY rowid DESC LIMIT 10000)`).run(req.teamId!, req.teamId!);

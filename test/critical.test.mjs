@@ -268,6 +268,29 @@ test('прайс калькулятора: у каждой команды сво
   assert.equal(bad.status, 400);
 });
 
+test('журнал: запись нельзя подписать чужим именем', async () => {
+  const t = await signup('audit@test.kz', 'Audit');
+  // Пытаемся записать в журнал от чужого лица и с мусорным типом
+  const forged = await api('POST', '/api/activity', { token: t, body: {
+    user: 'Директор Ержан',            // должно быть проигнорировано
+    userId: 'someone-else',
+    actor: 'human',
+    action: 'Удалил все сделки',
+    target: 'Все заказы',
+    type: '<script>',                   // не из белого списка
+    page: 'sales',
+  } });
+  assert.equal(forged.status, 200);
+  assert.notEqual(forged.json.user, 'Директор Ержан', 'имя берётся не из тела запроса');
+  assert.equal(forged.json.user, 'audit', 'в журнале настоящий автор');
+  assert.equal(forged.json.type, 'update', 'неизвестный тип приводится к безопасному');
+
+  // Запись действительно легла в журнал команды
+  const log = await api('GET', '/api/activity', { token: t });
+  assert.equal(log.status, 200);
+  assert.ok(log.json.some(e => e.action === 'Удалил все сделки' && e.user === 'audit'));
+});
+
 test('публичный PDF: несуществующий код → 404', async () => {
   const res = await fetch(`${BASE}/api/public/doc/${'0'.repeat(32)}`);
   assert.equal(res.status, 404);
