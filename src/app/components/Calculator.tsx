@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Pencil, Plus, Trash2, Check, X, Loader2, Paperclip } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { api } from '../utils/api';
@@ -83,6 +83,10 @@ export function Calculator({ language }: CalcProps) {
   // Карточка, к которой прикрепится расчёт. Выбирается ДО расчёта.
   const [target, setTarget] = useState<EstimateTargetValue | null>(null);
   const [saving, setSaving] = useState(false);
+  // Если жмут «прикрепить», не выбрав карточку — не молчим и не гасим
+  // кнопку: подсвечиваем выбор карточки и прокручиваем к нему.
+  const targetRef = useRef<HTMLDivElement>(null);
+  const [needTarget, setNeedTarget] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   // price is kept as a raw string while editing so the field can be
   // cleared and retyped freely (a numeric state would snap an empty
@@ -182,7 +186,12 @@ export function Calculator({ language }: CalcProps) {
   // отправить клиенту сможет только тот, у кого есть право подтверждать.
   const attachEstimate = async (replace = false) => {
     if (!target) {
-      toast(l('Сначала выберите карточку клиента', 'Алдымен клиент карточкасын таңдаңыз', 'Pick a client card first'), 'error');
+      // Спрашиваем прямо здесь: подсвечиваем блок выбора и прокручиваем к нему.
+      setNeedTarget(true);
+      targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toast(l('К какой карточке прикрепить расчёт? Выберите клиента вверху.',
+              'Есепті қай карточкаға тіркейміз? Жоғарыдан клиентті таңдаңыз.',
+              'Which card should this estimate go to? Pick a client above.'), 'error');
       return;
     }
     setSaving(true);
@@ -315,7 +324,16 @@ export function Calculator({ language }: CalcProps) {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2 space-y-4">
         {/* Step 0: к какой карточке относится расчёт */}
-        <EstimateTarget language={language} value={target} onChange={setTarget} />
+        <div
+          ref={targetRef}
+          className={needTarget && !target ? 'rounded-2xl ring-2 ring-amber-400 animate-pulse' : ''}
+        >
+          <EstimateTarget
+            language={language}
+            value={target}
+            onChange={v => { setTarget(v); if (v) setNeedTarget(false); }}
+          />
+        </div>
 
         {/* Step 1: Product Type */}
         <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
@@ -468,19 +486,23 @@ export function Calculator({ language }: CalcProps) {
             {l('Срок производства', 'Өндіріс мерзімі', 'Production time')}: {product.days[0]}-{product.days[1]} {l('дней', 'күн', 'days')}
           </div>
           <div className="space-y-2">
+            {/* Кнопка активна всегда: если карточка не выбрана — она сама
+                спросит какая, а не молча погаснет. */}
             <button
               onClick={() => attachEstimate()}
-              disabled={!target || saving}
-              className="w-full px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 disabled:opacity-50 disabled:hover:bg-emerald-600 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all flex items-center justify-center gap-2"
+              disabled={saving}
+              className="w-full px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 disabled:opacity-50 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all flex items-center justify-center gap-2"
             >
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
-              {l('Прикрепить расчёт к карточке', 'Есепті карточкаға тіркеу', 'Attach estimate to card')}
+              {target
+                ? l('Прикрепить расчёт к карточке', 'Есепті карточкаға тіркеу', 'Attach estimate to card')
+                : l('Прикрепить расчёт — выбрать клиента', 'Есепті тіркеу — клиентті таңдау', 'Attach estimate — pick a client')}
             </button>
             {!target && (
               <div className="text-[10px] text-slate-400 text-center px-1">
-                {l('Сначала выберите карточку клиента вверху',
-                   'Алдымен жоғарыдан клиент карточкасын таңдаңыз',
-                   'Pick a client card above first')}
+                {l('Расчёт всегда привязывается к карточке клиента',
+                   'Есеп әрқашан клиент карточкасына байланады',
+                   'An estimate is always tied to a client card')}
               </div>
             )}
             {target && (
