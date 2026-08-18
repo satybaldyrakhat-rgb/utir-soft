@@ -66,7 +66,16 @@ export async function fpInitPayment(o: FpInitOpts): Promise<{ ok: boolean; redir
     pg_result_url: o.resultUrl,
     pg_success_url: o.successUrl,
     pg_failure_url: o.failureUrl,
+    // Как FreedomPay вызывает наши скрипты (result/check URL). Наш вебхук
+    // разбирает form-urlencoded, поэтому POST.
     pg_request_method: 'POST',
+    // А вот пользователя обратно возвращаем ТОЛЬКО через GET: фронтенд —
+    // статика на Vercel, POST на неё просто не отработает.
+    pg_success_url_method: 'GET',
+    pg_failure_url_method: 'GET',
+    // Защита от двойного списания: при повторе запроса (обрыв связи,
+    // ретрай) FreedomPay вернёт тот же платёж, а не создаст новый.
+    pg_idempotency_key: o.orderId,
     // kk — казахский в их списке языков страницы оплаты.
     pg_language: o.language || 'ru',
   };
