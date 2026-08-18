@@ -2207,7 +2207,9 @@ app.post('/api/webhooks/meta', (req, res) => {
 // отправлять клиенту — только 'pricing-approve' (по умолчанию админ).
 app.use('/api/deals', authMiddleware, createDealDocsRouter(db, {
   canCreateEstimate: requirePermission('pricing'),
-  canCreateSpec: requirePermission('pricing'),
+  // Спецификацию материалов ведёт дизайнер/цех — цен в ней нет, поэтому
+  // право на неё производственное, а не финансовое.
+  canCreateSpec: requirePermission('production'),
   canApprove: requirePermission('pricing-approve'),
   logActivity: (userId, entry) => logActivity(userId, entry),
   publicBase: (req) => envUrl(process.env.PUBLIC_API_URL) || `${req.protocol}://${req.get('host')}`,

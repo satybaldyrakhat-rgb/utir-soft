@@ -216,6 +216,26 @@ test('КП: чужая команда не может прикрепить ра�
   assert.equal(hack.status, 404, 'сделка другой команды не видна');
 });
 
+test('спецификация: создаётся неподтверждённой и подтверждается отдельно', async () => {
+  const t = await signup('spec@test.kz', 'Spec');
+  const deal = await api('POST', '/api/deals', { token: t, body: { customerName: 'Дизайн-клиент', phone: '+7 700 111 22 33' } });
+  const id = deal.json.id;
+
+  const spec = await api('POST', `/api/deals/${id}/spec`, { token: t, body: {
+    lines: [{ name: 'ЛДСП Egger White', qty: 3, unit: 'лист' }, { name: 'Петли Blum', qty: 12, unit: 'шт' }],
+    note: 'Цвет по образцу',
+  } });
+  assert.equal(spec.status, 200);
+  assert.equal(spec.json.status, 'pending');
+  assert.equal(spec.json.lines.length, 2);
+  // в спецификации нет цен — это документ для цеха
+  assert.equal(spec.json.lines[0].price, undefined);
+
+  const approved = await api('POST', `/api/deals/${id}/spec/approve`, { token: t });
+  assert.equal(approved.status, 200);
+  assert.equal(approved.json.status, 'approved');
+});
+
 test('публичный PDF: несуществующий код → 404', async () => {
   const res = await fetch(`${BASE}/api/public/doc/${'0'.repeat(32)}`);
   assert.equal(res.status, 404);

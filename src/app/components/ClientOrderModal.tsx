@@ -9,6 +9,7 @@ import { confirmDialog } from '../utils/confirm';
 import { NicheIcon } from './NicheIcon';
 import { LEAD_SOURCES, LOST_REASONS } from '../utils/marketing';
 import { DEFAULT_STAGES_TEMPLATE, type DealStage, type ConsumedMaterial } from './Warehouse';
+import { DealDocsTab } from './DealDocsTab';
 
 type Lang = 'kz' | 'ru' | 'eng';
 
@@ -124,7 +125,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   // True when the team has multi-niche enabled — drives whether we show
   // the niche chip in the header and the "Тип проекта" picker in the form.
   const showNicheChip = store.secondaryNiches.length > 0;
-  const [activeTab, setActiveTab] = useState<'main' | 'progress' | 'related' | 'chat' | 'history'>('main');
+  const [activeTab, setActiveTab] = useState<'main' | 'progress' | 'docs' | 'related' | 'chat' | 'history'>('main');
 
   // History state — populated by the useEffect below once 'l' is defined.
   interface HistoryEntry { id: string; userId: string; userName: string; changes: Record<string, { before: any; after: any }>; createdAt: string }
@@ -635,6 +636,7 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
   const tabs = [
     { id: 'main'     as const, label: l('Информация', 'Ақпарат',  'Info') },
     { id: 'progress' as const, label: l('Сроки · Оплата', 'Мерзім · Төлем', 'Dates · Pay') },
+    { id: 'docs'     as const, label: l('Документы',  'Құжаттар', 'Documents') },
     { id: 'related'  as const, label: l('Связи',      'Байланыс', 'Related') },
     { id: 'chat'     as const, label: l('Чат',        'Чат',      'Chat') },
     { id: 'history'  as const, label: l('История',    'Тарих',    'History') },
@@ -1352,6 +1354,12 @@ export function ClientOrderModal({ isOpen, onClose, deal, language = 'ru' }: Cli
           {/* RELATED TAB — 360° view: production stages, materials,
               tasks, payments, purchases. Pulls from store + lazy-loads
               POs via API since they live outside the store. */}
+          {activeTab === 'docs' && (
+            <div className="p-6">
+              <DealDocsTab deal={deal} language={language} />
+            </div>
+          )}
+
           {activeTab === 'related' && (
             <RelatedView deal={deal} language={language} />
           )}
