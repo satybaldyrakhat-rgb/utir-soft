@@ -669,6 +669,7 @@ function capitalize(s: string): string { return s ? s[0].toUpperCase() + s.slice
 export interface QuoteDeal {
   id: string;
   customerName: string;
+  customerPhone?: string;
   product?: string;
   furnitureType?: string;
   dimensions?: string;   // «3.2 × 0.6 × 0.9 м»
@@ -679,9 +680,22 @@ export interface QuoteDeal {
   prepayPercent?: number;  // по умолчанию 50
   nicheLabel?: string;
   validDays?: number;      // по умолчанию 7
+  // Построчный расчёт для клиента. Цены здесь уже конечные — внутреннюю
+  // наценку в КП не показываем, она разнесена по строкам на стороне
+  // калькулятора. Если items не переданы — печатаем одну строку с итогом.
+  items?: { name: string; qty: number; unit: string; price: number }[];
+  leadDays?: number[];     // [мин, макс] срок изготовления
 }
 
-export async function generateQuotePDF(deal: QuoteDeal, requisites: CompanyRequisites = {}, opts?: { number?: string }) {
+// Результат генерации, когда PDF нужен не «в загрузки», а файлом —
+// например чтобы отправить клиенту в WhatsApp.
+export interface PdfFile { blob: Blob; base64: string; filename: string }
+
+export async function generateQuotePDF(
+  deal: QuoteDeal,
+  requisites: CompanyRequisites = {},
+  opts?: { number?: string; output?: 'save' | 'file' },
+): Promise<PdfFile | void> {
   const doc = await newDoc();
   const pageW = doc.internal.pageSize.getWidth();
   const num = opts?.number || invoiceNumberFor(deal.id);
@@ -690,7 +704,9 @@ export async function generateQuotePDF(deal: QuoteDeal, requisites: CompanyRequi
   if (deal.nicheLabel) { doc.setFontSize(9); doc.setTextColor(100, 116, 139); doc.text(`Направление: ${deal.nicheLabel}`, 14, y); y += 6; doc.setTextColor(15, 23, 42); }
 
   doc.setFontSize(10); doc.setTextColor(120, 120, 120); doc.text('Кому', 14, y); y += 5;
-  doc.setFontSize(11); doc.setTextColor(15, 23, 42); doc.text(deal.customerName, 14, y); y += 8;
+  doc.setFontSize(11); doc.setTextColor(15, 23, 42); doc.text(deal.customerName, 14, y); y += 5;
+  if (deal.customerPhone) { doc.setFontSize(9); doc.setTextColor(100, 116, 139); doc.text(deal.customerPhone, 14, y); y += 5; doc.setTextColor(15, 23, 42); }
+  y += 3;
 
   doc.setFontSize(9.5); doc.setTextColor(60, 60, 60);
   const intro = `Благодарим за интерес к нашей продукции. Ниже — предложение по изготовлению${deal.furnitureType ? ' «' + deal.furnitureType + '»' : ''} по индивидуальным размерам.`;
@@ -715,23 +731,30 @@ export async function generateQuotePDF(deal: QuoteDeal, requisites: CompanyRequi
 
   const prepay = deal.prepayPercent ?? 50;
   const prepayAmount = Math.round(deal.amount * prepay / 100);
+  // Построчный расчёт, если он есть: клиенту так понятнее, за что платит.
+  const itemRows = (deal.items && deal.items.length)
+    ? deal.items.map(it => [it.name, `${it.qty} ${it.unit}`, KZT(it.price)])
+    : [[deal.product || deal.furnitureType || 'Изделие на заказ', '1', KZT(deal.amount)]];
   autoTable(doc, { startY: y, head: [['Наименование', 'Кол-во', 'Стоимость']],
-    body: [[deal.product || deal.furnitureType || 'Изделие на заказ', '1', KZT(deal.amount)]],
+    body: itemRows,
     foot: [['Итого', '', KZT(deal.amount)]],
     styles: { font: 'Roboto', fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
     headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
     footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], font: 'Roboto', fontStyle: 'bold' },
-    columnStyles: { 1: { halign: 'center', cellWidth: 24 }, 2: { halign: 'right', cellWidth: 40 } } });
+    columnStyles: { 1: { halign: 'center', cellWidth: 28 }, 2: { halign: 'right', cellWidth: 40 } } });
   y = (doc as any).lastAutoTable.finalY + 6;
   doc.setFontSize(9); doc.setTextColor(15, 23, 42);
   doc.text(`Сумма прописью: ${kztInWords(deal.amount)}`, 14, y, { maxWidth: pageW - 28 }); y += 9;
 
   doc.setFontSize(10); doc.setTextColor(120, 120, 120); doc.text('Условия', 14, y); y += 6;
   doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+  const lead = deal.leadDays && deal.leadDays.length
+    ? `Срок изготовления: ${deal.leadDays[0]}${deal.leadDays[1] && deal.leadDays[1] !== deal.leadDays[0] ? '–' + deal.leadDays[1] : ''} рабочих дней после предоплаты.`
+    : 'Срок изготовления уточняется после замера.';
   const terms = [
     `Предоплата: ${prepay}% — ${KZT(prepayAmount)}, остаток при готовности.`,
     'Гарантия: 12 месяцев на изделие и фурнитуру.',
-    'Срок изготовления уточняется после замера.',
+    lead,
     `Предложение действительно ${deal.validDays ?? 7} дней с даты формирования.`,
   ];
   terms.forEach(t => { const ls = doc.splitTextToSize('• ' + t, pageW - 28); doc.text(ls, 14, y); y += ls.length * 5; });
@@ -743,7 +766,81 @@ export async function generateQuotePDF(deal: QuoteDeal, requisites: CompanyRequi
   doc.setFontSize(8); doc.setTextColor(120, 120, 120); doc.text('Подпись / М.П.', 14, y + 6);
 
   drawFooter(doc);
-  doc.save(`КП_${deal.customerName}_${num}.pdf`);
+  const filename = `КП_${deal.customerName}_${num}.pdf`;
+  if (opts?.output === 'file') return toPdfFile(doc, filename);
+  doc.save(filename);
+}
+
+// Отдать готовый документ файлом (Blob + base64) вместо скачивания —
+// нужно, чтобы отправить PDF клиенту в WhatsApp через сервер.
+function toPdfFile(doc: any, filename: string): PdfFile {
+  const blob: Blob = doc.output('blob');
+  const uri: string = doc.output('datauristring');
+  const base64 = uri.slice(uri.indexOf(',') + 1);
+  return { blob, base64, filename };
+}
+
+// ─── Спецификация материалов ───────────────────────────────────────
+// Второй документ по заказу: что именно согласовал дизайнер с клиентом.
+// НАМЕРЕННО без цен — этот бланк ходит по цеху и уходит клиенту, финансам
+// в нём места нет (цены живут только в КП, у клиента и у финансиста).
+export interface SpecDoc {
+  id: string;
+  customerName: string;
+  customerPhone?: string;
+  product?: string;
+  nicheLabel?: string;
+  lines: { name: string; qty: number; unit: string; note?: string }[];
+  note?: string;
+}
+
+export async function generateSpecPDF(
+  spec: SpecDoc,
+  requisites: CompanyRequisites = {},
+  opts?: { number?: string; output?: 'save' | 'file' },
+): Promise<PdfFile | void> {
+  const doc = await newDoc();
+  const pageW = doc.internal.pageSize.getWidth();
+  const num = opts?.number || invoiceNumberFor(spec.id);
+  drawHeader(doc, `Спецификация материалов № ${num}`, `от ${fmtDate()}`, requisites.legalName);
+  let y = 38;
+  if (spec.nicheLabel) { doc.setFontSize(9); doc.setTextColor(100, 116, 139); doc.text(`Направление: ${spec.nicheLabel}`, 14, y); y += 6; doc.setTextColor(15, 23, 42); }
+
+  doc.setFontSize(10); doc.setTextColor(120, 120, 120); doc.text('Заказчик', 14, y); y += 5;
+  doc.setFontSize(11); doc.setTextColor(15, 23, 42); doc.text(spec.customerName, 14, y); y += 5;
+  if (spec.customerPhone) { doc.setFontSize(9); doc.setTextColor(100, 116, 139); doc.text(spec.customerPhone, 14, y); y += 5; }
+  if (spec.product) { doc.setFontSize(9); doc.setTextColor(100, 116, 139); doc.text(`Изделие: ${spec.product}`, 14, y); y += 5; }
+  y += 4; doc.setTextColor(15, 23, 42);
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Материал / комплектующие', 'Кол-во', 'Примечание']],
+    body: (spec.lines.length ? spec.lines : [{ name: '—', qty: 0, unit: '', note: '' }])
+      .map(l => [l.name, `${l.qty} ${l.unit}`.trim(), l.note || '']),
+    styles: { font: 'Roboto', fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], font: 'Roboto', fontStyle: 'bold' },
+    columnStyles: { 1: { halign: 'center', cellWidth: 26 }, 2: { cellWidth: 55, textColor: [100, 116, 139] } },
+  });
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  if (spec.note) {
+    doc.setFontSize(10); doc.setTextColor(120, 120, 120); doc.text('Примечание', 14, y); y += 6;
+    doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+    const ls = doc.splitTextToSize(spec.note, pageW - 28);
+    doc.text(ls, 14, y); y += ls.length * 5 + 6;
+  }
+
+  doc.setFontSize(9); doc.setTextColor(15, 23, 42);
+  doc.text('Согласовано с заказчиком:', 14, y); y += 10;
+  doc.setDrawColor(200, 200, 200); doc.line(14, y, 80, y);
+  doc.setFontSize(8); doc.setTextColor(120, 120, 120); doc.text('Подпись заказчика', 14, y + 5);
+  doc.setDrawColor(200, 200, 200); doc.line(pageW - 80, y, pageW - 14, y);
+  doc.text('Подпись исполнителя', pageW - 80, y + 5);
+
+  drawFooter(doc);
+  const filename = `Спецификация_${spec.customerName}_${num}.pdf`;
+  if (opts?.output === 'file') return toPdfFile(doc, filename);
+  doc.save(filename);
 }
 
 // ─── Договор подряда на изготовление мебели ────────────────────────

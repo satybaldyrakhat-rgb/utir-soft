@@ -1,8 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Pencil, Plus, Trash2, Check, X } from 'lucide-react';
+import { Pencil, Plus, Trash2, Check, X, Loader2, Paperclip } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { api } from '../utils/api';
 import { toast } from '../utils/toast';
+import { confirmDialog } from '../utils/confirm';
+import { EstimateTarget, type EstimateTargetValue } from './EstimateTarget';
+import type { EstimateLine } from '../utils/dataStore';
 
 interface CalcProps {
   language: 'kz' | 'ru' | 'eng';
@@ -77,6 +80,9 @@ export function Calculator({ language }: CalcProps) {
     { id: 'install', label: l('Установка', 'Орнату', 'Installation'), price: 35000, checked: true },
   ]);
   const [markupPct, setMarkupPct] = useState(30);
+  // Карточка, к которой прикрепится расчёт. Выбирается ДО расчёта.
+  const [target, setTarget] = useState<EstimateTargetValue | null>(null);
+  const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   // price is kept as a raw string while editing so the field can be
   // cleared and retyped freely (a numeric state would snap an empty
@@ -143,27 +149,83 @@ export function Calculator({ language }: CalcProps) {
     }
   };
 
-  const handleCreateOrder = () => {
-    const productName = `${l(product.ru, product.kz, product.eng)} ${dims.length}×${dims.width}×${dims.height}м`;
-    store.addDeal({
-      customerName: l('Новый клиент', 'Жаңа клиент', 'New client'),
-      phone: '', address: '',
-      product: productName,
-      furnitureType: l(product.ru, product.kz, product.eng),
-      amount: calc.total, paidAmount: 0, status: 'new',
-      icon: 'phone', priority: 'medium',
-      date: new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
-      progress: 5, source: l('Калькулятор', 'Калькулятор', 'Calculator'),
-      measurer: '', designer: '',
-      materials: MATERIAL_GROUPS.map(g => {
-        const opt = g.opts.find(o => o.id === materials[g.id]);
-        return opt?.label || '';
-      }).filter(Boolean).join(', '),
-      measurementDate: '', completionDate: '', installationDate: '',
-      paymentMethods: { cash: false, kaspiGold: false, kaspiQR: false, cardTransfer: false, installment: false },
-      notes: `${l('Расчёт', 'Есеп', 'Estimate')}: ${calc.total.toLocaleString('ru-RU')} ₸`,
-    });
-    toast(l('Заказ создан и добавлен в воронку', 'Тапсырыс жасалды', 'Order created'), 'success');
+  // Название выбранной опции материала с учётом языка.
+  const optLabel = (g: typeof MATERIAL_GROUPS[number]) => {
+    const o: any = g.opts.find(x => x.id === materials[g.id]);
+    if (!o) return '';
+    return o.ru ? l(o.ru, o.kz, o.eng) : o.label;
+  };
+  const productName = () => `${l(product.ru, product.kz, product.eng)} ${dims.length}×${dims.width}×${dims.height} м`;
+
+  // Строки КП в том виде, в каком их увидит клиент. Наценка разносится по
+  // строкам пропорционально: клиенту показываем конечные цены, а не нашу
+  // внутреннюю маржу отдельной строкой.
+  const buildClientLines = (): EstimateLine[] => {
+    const k = 1 + markupPct / 100;
+    const raw = [
+      { name: `${productName()} — ${l('изготовление', 'дайындау', 'manufacturing')}`, unit: l('компл', 'жин', 'set'), base: calc.materialsCost },
+      ...addons.filter(a => a.checked).map(a => ({ name: a.label, unit: l('шт', 'дана', 'pcs'), base: a.price })),
+      ...services.filter(s => s.checked).map(s => ({ name: s.label, unit: l('услуга', 'қызмет', 'service'), base: s.price })),
+    ].filter(r => r.base > 0);
+
+    const lines: EstimateLine[] = raw.map(r => ({ name: r.name, qty: 1, unit: r.unit, price: Math.round(r.base * k) }));
+    // Копейки округления добиваем в последнюю строку, чтобы сумма строк
+    // совпадала с итогом до тенге.
+    if (lines.length) {
+      const sum = lines.reduce((s, x) => s + x.price, 0);
+      lines[lines.length - 1].price += calc.total - sum;
+    }
+    return lines;
+  };
+
+  // Прикрепить расчёт к выбранной карточке. Расчёт уходит «на подтверждение» —
+  // отправить клиенту сможет только тот, у кого есть право подтверждать.
+  const attachEstimate = async (replace = false) => {
+    if (!target) {
+      toast(l('Сначала выберите карточку клиента', 'Алдымен клиент карточкасын таңдаңыз', 'Pick a client card first'), 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post(`/api/deals/${target.dealId}/estimate`, {
+        productId,
+        productLabel: productName(),
+        dims,
+        area: calc.area,
+        materialChoices: MATERIAL_GROUPS.map(g => ({ group: l(g.ru, g.kz, g.eng), option: optLabel(g) })).filter(m => m.option),
+        lines: buildClientLines(),
+        materialsCost: calc.materialsCost,
+        addonsCost: calc.addonsCost,
+        servicesCost: calc.servicesCost,
+        subtotal: calc.subtotal,
+        markupPct,
+        markup: calc.markup,
+        total: calc.total,
+        leadDays: product.days,
+        replace,
+      });
+      await store.reloadAll();
+      toast(l('Расчёт прикреплён к карточке — ждёт подтверждения',
+              'Есеп карточкаға тіркелді — бекітуді күтуде',
+              'Estimate attached to the card — awaiting approval'), 'success');
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (msg === 'estimate_already_sent') {
+        const ok = await confirmDialog({
+          message: l('По этой карточке КП уже отправлено клиенту. Заменить расчёт новым?',
+                     'Бұл карточка бойынша КҰ клиентке жіберілген. Есепті жаңасымен ауыстырасыз ба?',
+                     'A quote was already sent for this card. Replace the estimate?'),
+          danger: true,
+        });
+        if (ok) await attachEstimate(true);
+      } else if (msg.includes('pricing')) {
+        toast(l('Нет прав на расчёты — обратитесь к администратору',
+                'Есеп жасауға құқық жоқ — әкімшіге хабарласыңыз',
+                'No permission for estimates — contact your admin'), 'error');
+      } else {
+        toast(l('Не удалось прикрепить расчёт', 'Есепті тіркеу сәтсіз', 'Failed to attach the estimate'), 'error');
+      }
+    } finally { setSaving(false); }
   };
 
   // Persist the current calculator configuration as a real BOM template
@@ -252,6 +314,9 @@ export function Calculator({ language }: CalcProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2 space-y-4">
+        {/* Step 0: к какой карточке относится расчёт */}
+        <EstimateTarget language={language} value={target} onChange={setTarget} />
+
         {/* Step 1: Product Type */}
         <div className="bg-white/55 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/60 shadow-[0_10px_36px_-14px_rgba(15,23,42,0.16),inset_0_1px_0_0_rgba(255,255,255,0.65)] rounded-3xl p-5">
           <div className="text-[10px] text-slate-400 mb-2">{l('Шаг 1', '1-қадам', 'Step 1')}</div>
@@ -404,25 +469,32 @@ export function Calculator({ language }: CalcProps) {
           </div>
           <div className="space-y-2">
             <button
-              onClick={handleCreateOrder}
-              className="w-full px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all"
+              onClick={() => attachEstimate()}
+              disabled={!target || saving}
+              className="w-full px-3 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs hover:bg-emerald-700 disabled:opacity-50 disabled:hover:bg-emerald-600 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all flex items-center justify-center gap-2"
             >
-              {l('Создать заказ', 'Тапсырыс жасау', 'Create order')}
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
+              {l('Прикрепить расчёт к карточке', 'Есепті карточкаға тіркеу', 'Attach estimate to card')}
             </button>
+            {!target && (
+              <div className="text-[10px] text-slate-400 text-center px-1">
+                {l('Сначала выберите карточку клиента вверху',
+                   'Алдымен жоғарыдан клиент карточкасын таңдаңыз',
+                   'Pick a client card above first')}
+              </div>
+            )}
+            {target && (
+              <div className="text-[10px] text-slate-400 text-center px-1">
+                {l('КП клиенту отправит тот, кто подтверждает цены',
+                   'КҰ-ны клиентке бағаны бекітетін адам жібереді',
+                   'The quote is sent to the client by whoever approves prices')}
+              </div>
+            )}
             <button
               onClick={saveAsTemplate}
               className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors"
             >
               {l('Сохранить как шаблон', 'Шаблон ретінде сақтау', 'Save as template')}
-            </button>
-            <button
-              onClick={() => {
-                const text = `${l('КП', 'КП', 'Quote')}: ${l(product.ru, product.kz, product.eng)} ${dims.length}×${dims.width}×${dims.height}м — ${fmt(calc.total)} ₸`;
-                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-              }}
-              className="w-full px-3 py-2.5 bg-white/60 ring-1 ring-white/60 rounded-xl text-xs hover:bg-white transition-colors"
-            >
-              {l('Отправить КП в WhatsApp', 'WhatsApp-қа КП жіберу', 'Send proposal via WhatsApp')}
             </button>
           </div>
         </div>
