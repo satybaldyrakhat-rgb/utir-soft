@@ -118,6 +118,40 @@ export const translations: Record<Lang, any> = {
       eyebrow: "Как это работает",
       title: "Платформа в действии",
       more: "Подробнее",
+      // Подписи внутри мок-интерфейсов витрины. Раньше были захардкожены
+      // по-русски и не переключались вместе с языком лендинга.
+      mock: {
+        tasks: [
+          { title: "Замер у Алии Б.", tag: "Сегодня", who: "АК" },
+          { title: "Согласовать чертёж кухни №418", tag: "Завтра", who: "МС" },
+          { title: "Заказать петли Blum", tag: "Вт, 14:00", who: "ДЖ" },
+          { title: "Доставка шкафа №401", tag: "Ср, 10:00", who: "АК" },
+        ],
+        tasksTitle: "Мои задачи",
+        stockTitle: "Остатки на складе",
+        stockUpdated: "Обновлено сейчас",
+        aiRequestLabel: "Запрос клиента",
+        aiRequest: "«Кухня в скандинавском стиле, белый дуб, остров с барной стойкой, 12 м²»",
+        aiEstimate: "Предварительная смета",
+        aiRegenerate: "Сгенерировать ещё",
+        materials: [
+          { name: "ЛДСП Egger 18мм", unit: "лист" },
+          { name: "Кромка ПВХ белая", unit: "м" },
+          { name: "Петли Blum", unit: "шт" },
+          { name: "Направляющие 450мм", unit: "пара" },
+        ],
+        prodTitle: "Этапы производства",
+        prodSub: "Сегодня · 6 заказов",
+        inWork: "в работе",
+        stages: [
+          { title: "Распил", cards: ["Кухня №412", "Шкаф №418"] },
+          { title: "Кромка", cards: ["Стол №407"] },
+          { title: "Сборка", cards: ["Гардероб №401", "Тумба №404", "Комод №396"] },
+        ],
+        revenueTitle: "Выручка по неделям",
+        weekShort: "Н",
+        metrics: ["Конверсия", "Загрузка цеха", "Маржа"],
+      },
       items: [
         {
           eyebrow: "01 — Склад",
@@ -466,6 +500,38 @@ export const translations: Record<Lang, any> = {
       eyebrow: "Қалай жұмыс істейді",
       title: "Платформа іс жүзінде",
       more: "Толығырақ",
+      mock: {
+        tasks: [
+          { title: "Әлия Б. өлшеу", tag: "Бүгін", who: "АК" },
+          { title: "Ас үй №418 сызбасын келісу", tag: "Ертең", who: "МС" },
+          { title: "Blum топсаларына тапсырыс", tag: "Сс, 14:00", who: "ДЖ" },
+          { title: "Шкаф №401 жеткізу", tag: "Ср, 10:00", who: "АК" },
+        ],
+        tasksTitle: "Менің тапсырмаларым",
+        stockTitle: "Қоймадағы қалдық",
+        stockUpdated: "Жаңа ғана жаңартылды",
+        aiRequestLabel: "Клиент сұрауы",
+        aiRequest: "«Скандинавия стиліндегі ас үй, ақ емен, бар тұғырлы арал, 12 м²»",
+        aiEstimate: "Алдын ала есеп",
+        aiRegenerate: "Тағы жасау",
+        materials: [
+          { name: "ЛДСП Egger 18мм", unit: "парақ" },
+          { name: "Ақ ПВХ жиегі", unit: "м" },
+          { name: "Blum топсалары", unit: "дана" },
+          { name: "Бағыттауыш 450мм", unit: "жұп" },
+        ],
+        prodTitle: "Өндіріс кезеңдері",
+        prodSub: "Бүгін · 6 тапсырыс",
+        inWork: "жұмыста",
+        stages: [
+          { title: "Кесу", cards: ["Ас үй №412", "Шкаф №418"] },
+          { title: "Жиектеу", cards: ["Үстел №407"] },
+          { title: "Құрастыру", cards: ["Гардероб №401", "Тумба №404", "Комод №396"] },
+        ],
+        revenueTitle: "Апталық түсім",
+        weekShort: "А",
+        metrics: ["Конверсия", "Цех жүктемесі", "Маржа"],
+      },
       items: [
         {
           eyebrow: "01 — Қойма",
@@ -814,6 +880,38 @@ export const translations: Record<Lang, any> = {
       eyebrow: "How it works",
       title: "Platform in action",
       more: "Learn more",
+      mock: {
+        tasks: [
+          { title: "Measurement — Aliya B.", tag: "Today", who: "AK" },
+          { title: "Approve kitchen #418 drawing", tag: "Tomorrow", who: "MS" },
+          { title: "Order Blum hinges", tag: "Tue, 14:00", who: "DJ" },
+          { title: "Wardrobe #401 delivery", tag: "Wed, 10:00", who: "AK" },
+        ],
+        tasksTitle: "My tasks",
+        stockTitle: "Stock levels",
+        stockUpdated: "Updated just now",
+        aiRequestLabel: "Client request",
+        aiRequest: "\u201CScandinavian kitchen, white oak, island with a bar counter, 12 m\u00B2\u201D",
+        aiEstimate: "Preliminary estimate",
+        aiRegenerate: "Generate more",
+        materials: [
+          { name: "MFC Egger 18mm", unit: "sheet" },
+          { name: "White PVC edge", unit: "m" },
+          { name: "Blum hinges", unit: "pcs" },
+          { name: "Slides 450mm", unit: "pair" },
+        ],
+        prodTitle: "Production stages",
+        prodSub: "Today \u00B7 6 orders",
+        inWork: "in progress",
+        stages: [
+          { title: "Cutting", cards: ["Kitchen #412", "Wardrobe #418"] },
+          { title: "Edging", cards: ["Table #407"] },
+          { title: "Assembly", cards: ["Closet #401", "Cabinet #404", "Dresser #396"] },
+        ],
+        revenueTitle: "Revenue by week",
+        weekShort: "W",
+        metrics: ["Conversion", "Workshop load", "Margin"],
+      },
       items: [
         {
           eyebrow: "01 — Warehouse",

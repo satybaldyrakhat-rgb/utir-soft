@@ -1,17 +1,19 @@
 import { ArrowUpRight, Sparkles, Wand2 } from "lucide-react";
-import type { ReactNode } from "react";
 import { useLang } from "../i18n/LanguageContext";
 
-const visuals: ReactNode[] = [];
 const reversed = [false, true, false, true, false];
 
 function TasksVisual() {
-  const tasks = [
-    { title: "Замер у Алии Б.", tag: "Сегодня", who: "АК", done: false, prio: "high" },
-    { title: "Согласовать чертёж кухни №418", tag: "Завтра", who: "МС", done: false, prio: "med" },
-    { title: "Заказать петли Blum", tag: "Вт, 14:00", who: "ДЖ", done: true, prio: "low" },
-    { title: "Доставка шкафа №401", tag: "Ср, 10:00", who: "АК", done: false, prio: "med" },
+  const { t } = useLang();
+  // Флаги (готово / приоритет) — часть картинки, а не текста, поэтому
+  // остаются здесь; из переводов берём только подписи.
+  const meta = [
+    { done: false, prio: "high" },
+    { done: false, prio: "med" },
+    { done: true,  prio: "low" },
+    { done: false, prio: "med" },
   ];
+  const tasks = t.showcase.mock.tasks.map((x: any, i: number) => ({ ...x, ...meta[i] }));
   const prioColor: Record<string, string> = {
     high: "bg-rose-500",
     med: "bg-amber-500",
@@ -20,7 +22,7 @@ function TasksVisual() {
   return (
     <div>
       <div className="flex items-center justify-between text-xs mb-4">
-        <span className="text-slate-500">Мои задачи</span>
+        <span className="text-slate-500">{t.showcase.mock.tasksTitle}</span>
         <span className="text-[#58c084]">3 в работе</span>
       </div>
       <div className="space-y-2.5">
@@ -56,6 +58,7 @@ function TasksVisual() {
 }
 
 function AIDesignVisual() {
+  const { t } = useLang();
   return (
     <div>
       <div className="flex items-center justify-between text-xs mb-4">
@@ -67,9 +70,9 @@ function AIDesignVisual() {
       </div>
 
       <div className="rounded-xl border border-slate-100 p-3 bg-slate-50/50">
-        <div className="text-[11px] text-slate-500 mb-1.5">Запрос клиента</div>
+        <div className="text-[11px] text-slate-500 mb-1.5">{t.showcase.mock.aiRequestLabel}</div>
         <div className="text-sm text-slate-700">
-          «Кухня в скандинавском стиле, белый дуб, остров с барной стойкой, 12 м²»
+          {t.showcase.mock.aiRequest}
         </div>
       </div>
 
@@ -103,12 +106,12 @@ function AIDesignVisual() {
 
       <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-900 text-white px-4 py-3">
         <div>
-          <div className="text-[10px] text-slate-400">Предварительная смета</div>
+          <div className="text-[10px] text-slate-400">{t.showcase.mock.aiEstimate}</div>
           <div className="tracking-tight">1 240 000 ₸</div>
         </div>
         <button className="inline-flex items-center gap-1.5 rounded-full bg-[#58c084] px-3.5 py-2 text-xs">
           <Wand2 className="h-3 w-3" />
-          Сгенерировать ещё
+          {t.showcase.mock.aiRegenerate}
         </button>
       </div>
     </div>
@@ -175,17 +178,18 @@ export function Showcase() {
 }
 
 function WarehouseVisual() {
+  const { t } = useLang();
   const items = [
-    { name: "ЛДСП Egger 18мм", qty: 124, max: 200, unit: "лист", color: "#58c084" },
-    { name: "Кромка ПВХ белая", qty: 38, max: 100, unit: "м", color: "#58c084" },
-    { name: "Петли Blum", qty: 12, max: 80, unit: "шт", color: "#f59e0b" },
-    { name: "Направляющие 450мм", qty: 156, max: 200, unit: "пара", color: "#58c084" },
-  ];
+    { qty: 124, max: 200, color: "#58c084" },
+    { qty: 38,  max: 100, color: "#58c084" },
+    { qty: 12,  max: 80,  color: "#f59e0b" },
+    { qty: 156, max: 200, color: "#58c084" },
+  ].map((m, i) => ({ ...m, ...t.showcase.mock.materials[i] }));
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-500">Остатки на складе</span>
-        <span className="text-[#58c084]">Обновлено сейчас</span>
+        <span className="text-slate-500">{t.showcase.mock.stockTitle}</span>
+        <span className="text-[#58c084]">{t.showcase.mock.stockUpdated}</span>
       </div>
       {items.map((it) => {
         const pct = Math.round((it.qty / it.max) * 100);
@@ -211,16 +215,17 @@ function WarehouseVisual() {
 }
 
 function KanbanVisual() {
+  const { t } = useLang();
   const cols = [
-    { title: "Распил", color: "bg-slate-100 text-slate-600", cards: ["Кухня №412", "Шкаф №418"] },
-    { title: "Кромка", color: "bg-amber-100 text-amber-700", cards: ["Стол №407"] },
-    { title: "Сборка", color: "bg-emerald-100 text-[#58c084]", cards: ["Гардероб №401", "Тумба №404", "Комод №396"] },
-  ];
+    { color: "bg-slate-100 text-slate-600" },
+    { color: "bg-amber-100 text-amber-700" },
+    { color: "bg-emerald-100 text-[#58c084]" },
+  ].map((c, i) => ({ ...c, ...t.showcase.mock.stages[i] }));
   return (
     <div>
       <div className="flex items-center justify-between text-xs mb-4">
-        <span className="text-slate-500">Этапы производства</span>
-        <span className="text-slate-400">Сегодня · 6 заказов</span>
+        <span className="text-slate-500">{t.showcase.mock.prodTitle}</span>
+        <span className="text-slate-400">{t.showcase.mock.prodSub}</span>
       </div>
       <div className="flex flex-col sm:grid sm:grid-cols-3 gap-3">
         {cols.map((col) => (
@@ -234,7 +239,7 @@ function KanbanVisual() {
                   <div className="text-xs text-slate-700">{c}</div>
                   <div className="mt-1.5 flex items-center gap-1">
                     <span className="h-1 w-1 rounded-full bg-[#58c084]" />
-                    <span className="text-[10px] text-slate-400">в работе</span>
+                    <span className="text-[10px] text-slate-400">{t.showcase.mock.inWork}</span>
                   </div>
                 </div>
               ))}
@@ -247,11 +252,12 @@ function KanbanVisual() {
 }
 
 function AnalyticsVisual() {
+  const { t } = useLang();
   const bars = [40, 65, 50, 78, 60, 88, 72];
   return (
     <div>
       <div className="flex items-center justify-between text-xs mb-1">
-        <span className="text-slate-500">Выручка по неделям</span>
+        <span className="text-slate-500">{t.showcase.mock.revenueTitle}</span>
         <span className="text-[#58c084]">+24,5%</span>
       </div>
       <div className="tracking-tight text-2xl text-slate-900">8,7 млн ₸</div>
@@ -265,15 +271,15 @@ function AnalyticsVisual() {
               }`}
               style={{ height: `${h}%` }}
             />
-            <span className="text-[10px] text-slate-400">Н{i + 1}</span>
+            <span className="text-[10px] text-slate-400">{t.showcase.mock.weekShort}{i + 1}</span>
           </div>
         ))}
       </div>
 
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <MiniMetric label="Конверсия" value="32%" trend="+4%" />
-        <MiniMetric label="Загрузка цеха" value="87%" trend="+12%" />
-        <MiniMetric label="Маржа" value="41%" trend="+6%" />
+        <MiniMetric label={t.showcase.mock.metrics[0]} value="32%" trend="+4%" />
+        <MiniMetric label={t.showcase.mock.metrics[1]} value="87%" trend="+12%" />
+        <MiniMetric label={t.showcase.mock.metrics[2]} value="41%" trend="+6%" />
       </div>
     </div>
   );
