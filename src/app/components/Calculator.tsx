@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Pencil, Plus, Trash2, Check, X, Loader2, Paperclip } from 'lucide-react';
 import { useDataStore } from '../utils/dataStore';
 import { api } from '../utils/api';
@@ -6,57 +6,13 @@ import { toast } from '../utils/toast';
 import { confirmDialog } from '../utils/confirm';
 import { EstimateTarget, type EstimateTargetValue } from './EstimateTarget';
 import type { EstimateLine } from '../utils/dataStore';
+import { DEFAULT_PRICING, mergePricing, priceLabel, type PricingConfig, type PriceMaterialGroup } from '../utils/pricingConfig';
 
 interface CalcProps {
   language: 'kz' | 'ru' | 'eng';
 }
 
 type LineItem = { id: string; label: string; price: number; checked: boolean };
-
-const PRODUCT_TYPES = [
-  { id: 'kitchen', ru: 'Кухня', kz: 'Ас үй', eng: 'Kitchen', baseM2: 35000, days: [14, 21] },
-  { id: 'wardrobe', ru: 'Шкаф', kz: 'Шкаф', eng: 'Wardrobe', baseM2: 28000, days: [10, 14] },
-  { id: 'closet', ru: 'Гардероб', kz: 'Гардероб', eng: 'Closet', baseM2: 32000, days: [12, 18] },
-  { id: 'hallway', ru: 'Прихожая', kz: 'Дәліз', eng: 'Hallway', baseM2: 22000, days: [7, 10] },
-  { id: 'kids', ru: 'Детская', kz: 'Балалар', eng: 'Kids', baseM2: 26000, days: [10, 14] },
-  { id: 'bedroom', ru: 'Спальня', kz: 'Жатын', eng: 'Bedroom', baseM2: 30000, days: [12, 16] },
-  { id: 'living', ru: 'Гостиная', kz: 'Қонақ', eng: 'Living', baseM2: 33000, days: [14, 21] },
-];
-
-const MATERIAL_GROUPS = [
-  {
-    id: 'mfc', ru: 'ЛДСП', kz: 'ЛДСП', eng: 'MFC',
-    opts: [
-      { id: 'egger-white', label: 'Egger White', mult: 1.0 },
-      { id: 'egger-wood', label: 'Egger Wood', mult: 1.15 },
-      { id: 'kronospan-oak', label: 'Kronospan Дуб', mult: 1.25 },
-    ],
-  },
-  {
-    id: 'facade', ru: 'Фасады', kz: 'Фасадтар', eng: 'Facades',
-    opts: [
-      { id: 'mdf-matte', label: 'МДФ матовый', mult: 1.0 },
-      { id: 'mdf-gloss', label: 'МДФ глянец', mult: 1.3 },
-      { id: 'massiv', label: 'Массив', mult: 1.8 },
-    ],
-  },
-  {
-    id: 'hardware', ru: 'Фурнитура', kz: 'Фурнитура', eng: 'Hardware',
-    opts: [
-      { id: 'eco', ru: 'Эконом', kz: 'Эконом', eng: 'Economy', label: 'Economy', mult: 0.9 },
-      { id: 'hettich', label: 'Hettich', mult: 1.1 },
-      { id: 'blum', label: 'Blum', mult: 1.25 },
-    ],
-  },
-  {
-    id: 'top', ru: 'Столешница', kz: 'Үстел беті', eng: 'Countertop',
-    opts: [
-      { id: 'postformed', ru: 'ЛДСП пост', kz: 'ЛДСП пост', eng: 'Postformed', label: 'Postformed', mult: 1.0 },
-      { id: 'stoneart', label: 'Stone Art', mult: 1.4 },
-      { id: 'stone', ru: 'Камень', kz: 'Тас', eng: 'Stone', label: 'Stone', mult: 1.7 },
-    ],
-  },
-];
 
 export function Calculator({ language }: CalcProps) {
   const store = useDataStore();
@@ -93,7 +49,34 @@ export function Calculator({ language }: CalcProps) {
   // field back to 0 and block editing). It's parsed on save.
   const [editValue, setEditValue] = useState<{ label: string; price: string }>({ label: '', price: '' });
 
-  const product = PRODUCT_TYPES.find(p => p.id === productId)!;
+  // Прайс команды (Настройки → Справочники → Прайс калькулятора). Пока не
+  // загрузился — или команда его не настраивала — считаем по умолчанию,
+  // ровно так же, как считалось раньше на зашитых константах.
+  const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
+  const productTypes = pricing.products;
+  const materialGroups = pricing.materialGroups;
+
+  useEffect(() => {
+    let alive = true;
+    api.get<any>('/api/team/pricing')
+      .then(raw => {
+        if (!alive || !raw) return;
+        const p = mergePricing(raw);
+        setPricing(p);
+        // Пересеиваем зависимые поля: список товаров и материалов у команды
+        // может быть совсем другим, чем в дефолтах.
+        setProductId(prev => p.products.some(x => x.id === prev) ? prev : (p.products[0]?.id || prev));
+        setMaterials(p.materialGroups.reduce((acc, g) => ({ ...acc, [g.id]: g.opts[0]?.id || '' }), {} as Record<string, string>));
+        setAddons(p.addons.map(a => ({ id: a.id, label: priceLabel(a, language), price: a.price, checked: false })));
+        setServices(p.services.map(s => ({ id: s.id, label: priceLabel(s, language), price: s.price, checked: true })));
+        setMarkupPct(p.defaultMarkupPct);
+      })
+      .catch(() => { /* офлайн или нет доступа — остаёмся на значениях по умолчанию */ });
+    return () => { alive = false; };
+  }, []);
+
+  // Фолбэк на случай, если админ удалил тип, который сейчас выбран.
+  const product = productTypes.find(p => p.id === productId) || productTypes[0] || DEFAULT_PRICING.products[0];
 
   const calc = useMemo(() => {
     const length = Number(dims.length) || 0;
@@ -103,7 +86,7 @@ export function Calculator({ language }: CalcProps) {
     const area = Math.max(0.5, length * height + 2 * width * height + length * width);
 
     const matMult =
-      MATERIAL_GROUPS.reduce((acc, g) => {
+      materialGroups.reduce((acc, g) => {
         const opt = g.opts.find(o => o.id === materials[g.id]);
         return acc * (opt?.mult || 1);
       }, 1);
@@ -154,12 +137,12 @@ export function Calculator({ language }: CalcProps) {
   };
 
   // Название выбранной опции материала с учётом языка.
-  const optLabel = (g: typeof MATERIAL_GROUPS[number]) => {
+  const optLabel = (g: PriceMaterialGroup) => {
     const o: any = g.opts.find(x => x.id === materials[g.id]);
     if (!o) return '';
-    return o.ru ? l(o.ru, o.kz, o.eng) : o.label;
+    return priceLabel(o, language);
   };
-  const productName = () => `${l(product.ru, product.kz, product.eng)} ${dims.length}×${dims.width}×${dims.height} м`;
+  const productName = () => `${priceLabel(product, language)} ${dims.length}×${dims.width}×${dims.height} м`;
 
   // Строки КП в том виде, в каком их увидит клиент. Наценка разносится по
   // строкам пропорционально: клиенту показываем конечные цены, а не нашу
@@ -201,7 +184,7 @@ export function Calculator({ language }: CalcProps) {
         productLabel: productName(),
         dims,
         area: calc.area,
-        materialChoices: MATERIAL_GROUPS.map(g => ({ group: l(g.ru, g.kz, g.eng), option: optLabel(g) })).filter(m => m.option),
+        materialChoices: materialGroups.map(g => ({ group: priceLabel(g, language), option: optLabel(g) })).filter(m => m.option),
         lines: buildClientLines(),
         materialsCost: calc.materialsCost,
         addonsCost: calc.addonsCost,
@@ -248,7 +231,7 @@ export function Calculator({ language }: CalcProps) {
     ];
     const labourCost = services.filter(s => s.checked).reduce((sum, x) => sum + x.price, 0);
     const template = {
-      name: `${l(product.ru, product.kz, product.eng)} ${dims.length}×${dims.width}×${dims.height}м`,
+      name: `${priceLabel(product, language)} ${dims.length}×${dims.width}×${dims.height}м`,
       type: productId,
       width: Math.round(Number(dims.length) * 1000),
       height: Math.round(Number(dims.height) * 1000),
@@ -340,7 +323,7 @@ export function Calculator({ language }: CalcProps) {
           <div className="text-[10px] text-slate-400 mb-2">{l('Шаг 1', '1-қадам', 'Step 1')}</div>
           <div className="text-sm text-slate-900 mb-3">{l('Тип изделия', 'Бұйым түрі', 'Product type')}</div>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {PRODUCT_TYPES.map(p => (
+            {productTypes.map(p => (
               <button
                 key={p.id}
                 onClick={() => setProductId(p.id)}
@@ -350,7 +333,7 @@ export function Calculator({ language }: CalcProps) {
                     : 'bg-white/50 text-slate-700 ring-white/60 hover:bg-white/80'
                 }`}
               >
-                {l(p.ru, p.kz, p.eng)}
+                {priceLabel(p, language)}
               </button>
             ))}
           </div>
@@ -388,9 +371,9 @@ export function Calculator({ language }: CalcProps) {
           <div className="text-[10px] text-slate-400 mb-2">{l('Шаг 3', '3-қадам', 'Step 3')}</div>
           <div className="text-sm text-slate-900 mb-3">{l('Материалы', 'Материалдар', 'Materials')}</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {MATERIAL_GROUPS.map(g => (
+            {materialGroups.map(g => (
               <div key={g.id}>
-                <label className="block text-[11px] text-slate-400 mb-1">{l(g.ru, g.kz, g.eng)}</label>
+                <label className="block text-[11px] text-slate-400 mb-1">{priceLabel(g, language)}</label>
                 <select
                   value={materials[g.id]}
                   onChange={e => setMaterials({ ...materials, [g.id]: e.target.value })}
@@ -398,7 +381,7 @@ export function Calculator({ language }: CalcProps) {
                 >
                   {g.opts.map(o => (
                     <option key={o.id} value={o.id}>
-                      {(o as any).ru ? l((o as any).ru, (o as any).kz, (o as any).eng) : o.label}
+                      {priceLabel(o, language)}
                       {o.mult !== 1 && ` (${o.mult > 1 ? '+' : ''}${Math.round((o.mult - 1) * 100)}%)`}
                     </option>
                   ))}

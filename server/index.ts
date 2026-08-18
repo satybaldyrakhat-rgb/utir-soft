@@ -450,6 +450,9 @@ migrateColumn('team_settings', 'company_profile', 'TEXT');
 // Telegram-bot settings (панель настроек бота): шаблоны клиентам, расписание
 // отчётов директору, алёрты, настройки склада/замерщиков. Team-wide.
 migrateColumn('team_settings', 'bot_settings', 'TEXT');
+// Прайс калькулятора команды (базовые цены за м², коэффициенты материалов,
+// доп. опции и услуги). Пусто → калькулятор берёт значения по умолчанию.
+migrateColumn('team_settings', 'pricing_config', 'TEXT');
 // Meta Conversions API (CAPI) конфиг: pixelId (dataset), capiToken, testEventCode.
 migrateColumn('team_settings', 'meta_capi', 'TEXT');
 if (teamIdJustAdded) {
@@ -3608,6 +3611,66 @@ catalogsRouter.put('/', requireRole('manager'), (req: AuthedRequest, res) => {
 });
 
 app.use('/api/team/catalogs', catalogsRouter);
+
+// ─── Прайс калькулятора команды ───────────────────────────────────
+// GET  → сохранённый прайс или null (тогда фронт берёт дефолты).
+// PUT  → только админ: цены влияют на то, что увидит клиент в КП.
+// Читать может любой в команде — калькулятором пользуется замерщик.
+const pricingRouter = express.Router();
+pricingRouter.use(authMiddleware);
+
+// Санитайзинг: наружу пускаем только известные поля и только конечные
+// неотрицательные числа, чтобы кривой ввод не сломал расчёт.
+const pnum = (v: unknown, max: number, fallback = 0): number => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : fallback;
+};
+const pstr = (v: unknown, max = 120): string => String(v ?? '').slice(0, max);
+const pnamed = (o: any) => ({
+  id: pstr(o?.id, 60) || 'i' + Math.random().toString(36).slice(2, 8),
+  label: pstr(o?.label) || '—',
+  ...(o?.ru ? { ru: pstr(o.ru), kz: pstr(o.kz), eng: pstr(o.eng) } : {}),
+});
+
+pricingRouter.get('/', (req: AuthedRequest, res) => {
+  const row = db.prepare('SELECT pricing_config FROM team_settings WHERE team_id = ?').get(req.teamId!) as any;
+  if (!row?.pricing_config) return res.json(null);
+  try { res.json(JSON.parse(row.pricing_config)); } catch { res.json(null); }
+});
+
+pricingRouter.put('/', requireRole('admin'), (req: AuthedRequest, res) => {
+  const b = req.body || {};
+  const clean = {
+    products: (Array.isArray(b.products) ? b.products : []).slice(0, 50).map((p: any) => ({
+      ...pnamed(p),
+      baseM2: pnum(p?.baseM2, 100_000_000),
+      days: Array.isArray(p?.days) ? p.days.slice(0, 2).map((d: any) => pnum(d, 3650)) : [7, 14],
+    })),
+    materialGroups: (Array.isArray(b.materialGroups) ? b.materialGroups : []).slice(0, 20).map((g: any) => ({
+      ...pnamed(g),
+      opts: (Array.isArray(g?.opts) ? g.opts : []).slice(0, 30).map((o: any) => ({
+        ...pnamed(o),
+        // Множитель: 0 обнулил бы стоимость материалов — не даём уйти ниже 0.01.
+        mult: Math.max(0.01, pnum(o?.mult, 100, 1)),
+      })),
+    })),
+    addons: (Array.isArray(b.addons) ? b.addons : []).slice(0, 50).map((a: any) => ({ ...pnamed(a), price: pnum(a?.price, 100_000_000) })),
+    services: (Array.isArray(b.services) ? b.services : []).slice(0, 50).map((s: any) => ({ ...pnamed(s), price: pnum(s?.price, 100_000_000) })),
+    defaultMarkupPct: pnum(b?.defaultMarkupPct, 1000, 30),
+  };
+  if (!clean.products.length) return res.status(400).json({ error: 'need_at_least_one_product' });
+
+  db.prepare(`
+    INSERT INTO team_settings (team_id, pricing_config, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(team_id) DO UPDATE SET
+      pricing_config = excluded.pricing_config,
+      updated_at = excluded.updated_at
+  `).run(req.teamId!, JSON.stringify(clean));
+  res.json({ ok: true, pricing: clean });
+});
+
+app.use('/api/team/pricing', pricingRouter);
 
 // ─── Niche + onboarding state ─────────────────────────────────────
 // GET  /api/team/profile        → { niche, onboarding }

@@ -236,6 +236,38 @@ test('спецификация: создаётся неподтверждённ�
   assert.equal(approved.json.status, 'approved');
 });
 
+test('прайс калькулятора: у каждой команды свой, кривой ввод чистится', async () => {
+  const a = await signup('price-a@test.kz', 'PriceA');
+  const b = await signup('price-b@test.kz', 'PriceB');
+
+  // Пока не настраивали — сервер отдаёт null, фронт берёт значения по умолчанию
+  const empty = await api('GET', '/api/team/pricing', { token: a });
+  assert.equal(empty.status, 200);
+  assert.equal(empty.json, null);
+
+  const saved = await api('PUT', '/api/team/pricing', { token: a, body: {
+    products: [{ id: 'kitchen', label: 'Кухня', baseM2: 42000, days: [10, 15] }],
+    materialGroups: [{ id: 'mfc', label: 'ЛДСП', opts: [{ id: 'x', label: 'Егер', mult: 0 }] }],
+    addons: [], services: [{ id: 'm', label: 'Замер', price: -500 }],
+    defaultMarkupPct: 25,
+  } });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.json.pricing.products[0].baseM2, 42000);
+  // множитель 0 обнулил бы стоимость материалов — подтягиваем к минимуму
+  assert.equal(saved.json.pricing.materialGroups[0].opts[0].mult, 0.01);
+  // отрицательная цена превращается в 0
+  assert.equal(saved.json.pricing.services[0].price, 0);
+  assert.equal(saved.json.pricing.defaultMarkupPct, 25);
+
+  // Прайс команды A не виден команде B
+  const other = await api('GET', '/api/team/pricing', { token: b });
+  assert.equal(other.json, null, 'у другой команды свой прайс');
+
+  // Без товаров сохранять нельзя — иначе калькулятору нечего считать
+  const bad = await api('PUT', '/api/team/pricing', { token: a, body: { products: [] } });
+  assert.equal(bad.status, 400);
+});
+
 test('публичный PDF: несуществующий код → 404', async () => {
   const res = await fetch(`${BASE}/api/public/doc/${'0'.repeat(32)}`);
   assert.equal(res.status, 404);

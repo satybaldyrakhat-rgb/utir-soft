@@ -8,6 +8,7 @@ import { TelegramInvitePanel } from './TelegramInvitePanel';
 import { WebhooksPanel } from './WebhooksPanel';
 import { IntegrationsPanel } from './IntegrationsPanel';
 import { CatalogsSettings } from './CatalogsSettings';
+import { PricingSettings } from './PricingSettings';
 import { GeneralSettings } from './GeneralSettings';
 import { WhatsAppLogo, TelegramLogo, InstagramLogo, TikTokLogo, KaspiLogo, FreedomLogo, HalykLogo, OneCLogo, ChatGPTLogo, GeminiLogo, GoogleLogo, MetaLogo } from './PlatformLogos';
 import { useDataStore, ALL_MODULES, ALL_ROLES, MODULE_GROUPS, type CatalogKey, type RoleKey, type ModuleKey, type PermissionLevel } from '../utils/dataStore';
@@ -585,7 +586,10 @@ export function Settings({ language, onLanguageChange, currentUserEmail, onLogou
 
       {/* ===== CATALOGS (Справочники) ===== */}
       {activeTab === 'catalogs' && (
-        <CatalogsSettings language={language} />
+        <div className="space-y-4">
+          <PricingSettings language={language} />
+          <CatalogsSettings language={language} />
+        </div>
       )}
 
       {/* ===== EMPLOYEES — invite-only (no manual add until invite flow ships) ===== */}
