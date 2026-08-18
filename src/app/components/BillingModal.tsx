@@ -61,7 +61,7 @@ export function BillingModal({ language, open, onClose, onPaid }: {
   async function pay() {
     setErr(null); setBusy(true);
     try {
-      const c = await api.post<CheckoutResp>('/api/billing/checkout', { plan, period, provider });
+      const c = await api.post<CheckoutResp>('/api/billing/checkout', { plan, period, provider, language });
 
       if (c.provider === 'freedompay' && c.redirectUrl) {
         window.location.href = c.redirectUrl;   // уходим на страницу FreedomPay

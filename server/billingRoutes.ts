@@ -68,8 +68,11 @@ export function createBillingRouter(db: Database.Database) {
     const secret = process.env.FREEDOMPAY_SECRET_KEY || '';
     if (!merchantId || !secret) return res.status(503).json({ error: 'freedompay_not_configured', message: 'FreedomPay не настроен' });
     const appUrl = (process.env.APP_URL || '').replace(/\/$/, '') || `${req.protocol}://${req.get('host')}`;
+    // Язык страницы оплаты: ru / en / kk (казахский у них — 'kk').
+    const langRaw = String(req.body?.language || 'ru');
+    const language = langRaw === 'kz' || langRaw === 'kk' ? 'kk' : langRaw === 'eng' || langRaw === 'en' ? 'en' : 'ru';
     const init = await fpInitPayment({
-      merchantId, secret, amount, orderId: invoiceId,
+      merchantId, secret, amount, orderId: invoiceId, language,
       description: `Utir Soft подписка ${plan}`,
       resultUrl: `${appUrl}/api/billing/webhook/freedompay`,
       successUrl: `${appUrl}/#/billing/success`,
