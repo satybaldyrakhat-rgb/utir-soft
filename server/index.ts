@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleUpdate, issueLinkCode, getLinkStatus, unlink, isTelegramReady, sendMessage as tgSendMessage, registerBotCommands, getOrCreateTeamInviteCode, rotateTeamInviteCode, teamInviteLink, notifyAssignment, ensureTrackCode, trackLink, orderLink, chatsLink, warehouseLink, appLink, startDailySummaryScheduler, buildDailySummary, buildPeriodSummary, verifyWebhookSecret, configureWebhookSecret, isWebhookSecretSet } from './telegram.js';
-import { seedDemoData, clearDemoData, demoStatus } from './demoSeed.js';
+import { seedDemoData, clearDemoData, demoStatus, isDemoPreset } from './demoSeed.js';
 import { initOwnerSchema, ensureBillingRoadmap, ensureWaBotRoadmap, ensureQuoteRoadmap, makeRequireSuperAdmin, createOwnerRouter, isTeamSuspended, isSuperAdminEmail, logError as logOwnerError, buildRenewalDigest, superAdminChatIds, teamSubscriptionView, createPlatformLead } from './ownerAdmin.js';
 import { runBackup, listBackups, startBackupScheduler } from './backup.js';
 import { exportTeam } from './teamExport.js';
@@ -4208,8 +4208,10 @@ app.get('/api/team/demo/status', authMiddleware, (req: AuthedRequest, res) => {
   res.json(demoStatus(db, req.teamId!));
 });
 app.post('/api/team/demo/seed', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
-  const counts = seedDemoData(db, req.teamId!, req.userId!);
-  res.json({ ok: true, counts });
+  // Профиль данных под нишу команды; неизвестное значение → набор по умолчанию.
+  const preset = isDemoPreset(req.body?.preset) ? req.body.preset : 'furniture';
+  const counts = seedDemoData(db, req.teamId!, req.userId!, preset);
+  res.json({ ok: true, counts, preset });
 });
 app.post('/api/team/demo/clear', authMiddleware, requireRole('admin'), (req: AuthedRequest, res) => {
   const removed = clearDemoData(db, req.teamId!);

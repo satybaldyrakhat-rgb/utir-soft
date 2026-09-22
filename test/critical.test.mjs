@@ -291,6 +291,32 @@ test('журнал: запись нельзя подписать чужим им
   assert.ok(log.json.some(e => e.action === 'Удалил все сделки' && e.user === 'audit'));
 });
 
+test('демо-данные: профиль «двери и лестницы» наполняет аккаунт', async () => {
+  const t = await signup('demo-doors@test.kz', 'Demo');
+  const seeded = await api('POST', '/api/team/demo/seed', { token: t, body: { preset: 'doors' } });
+  assert.equal(seeded.status, 200);
+  assert.equal(seeded.json.preset, 'doors');
+  assert.ok(seeded.json.counts.total > 40, 'аккаунт наполнен');
+
+  const deals = await api('GET', '/api/deals', { token: t });
+  const products = deals.status === 200 ? await api('GET', '/api/products', { token: t }) : null;
+  assert.equal(deals.json.length, 14, 'вся воронка на месте');
+  assert.ok(deals.json.some(d => /двер/i.test(d.product)), 'есть заказы на двери');
+  assert.ok(deals.json.some(d => /лестниц/i.test(d.product)), 'есть заказы на лестницы');
+  assert.ok(deals.json.every(d => d.address === 'г. Шымкент'), 'город профиля');
+  assert.ok(products.json.some(p => p.status === 'low'), 'есть низкие остатки для алёртов');
+
+  // Неизвестный профиль не роняет сервер, а откатывается к набору по умолчанию
+  const bad = await api('POST', '/api/team/demo/seed', { token: t, body: { preset: 'хакер' } });
+  assert.equal(bad.status, 200);
+  assert.equal(bad.json.preset, 'furniture');
+
+  // Очистка сносит только демо
+  const cleared = await api('POST', '/api/team/demo/clear', { token: t });
+  assert.equal(cleared.status, 200);
+  assert.equal((await api('GET', '/api/deals', { token: t })).json.length, 0);
+});
+
 test('публичный PDF: несуществующий код → 404', async () => {
   const res = await fetch(`${BASE}/api/public/doc/${'0'.repeat(32)}`);
   assert.equal(res.status, 404);

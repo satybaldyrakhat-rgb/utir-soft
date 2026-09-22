@@ -47,6 +47,8 @@ function DemoDataPanel({ language }: { language: 'kz' | 'ru' | 'eng' }) {
   const store = useDataStore();
   const [total, setTotal] = useState<number | null>(null);
   const [busy, setBusy] = useState<'seed' | 'clear' | null>(null);
+  // Профиль демо-данных под нишу: кухни/шкафы или двери/лестницы.
+  const [preset, setPreset] = useState<'furniture' | 'doors'>('furniture');
 
   const refresh = async () => {
     try { const s = await api.get<{ total: number }>('/api/team/demo/status'); setTotal(s.total); }
@@ -57,7 +59,7 @@ function DemoDataPanel({ language }: { language: 'kz' | 'ru' | 'eng' }) {
   const seed = async () => {
     setBusy('seed');
     try {
-      const r = await api.post<{ counts: { total: number } }>('/api/team/demo/seed', {});
+      const r = await api.post<{ counts: { total: number } }>('/api/team/demo/seed', { preset });
       await store.reloadAll();
       setTotal(r.counts.total);
       toast(l(`Демо-данные добавлены: ${r.counts.total} записей`, `Демо-деректер қосылды: ${r.counts.total}`, `Demo data added: ${r.counts.total} records`), 'success');
@@ -98,6 +100,25 @@ function DemoDataPanel({ language }: { language: 'kz' | 'ru' | 'eng' }) {
           {l(`Сейчас загружено демо-записей: ${total}`, `Қазір жүктелген демо-жазбалар: ${total}`, `Demo records loaded: ${total}`)}
         </div>
       )}
+
+      {/* Профиль данных — чтобы демо совпадало с нишей компании. */}
+      <div className="mb-3">
+        <div className="text-[11px] text-slate-400 mb-1.5">{l('Профиль данных', 'Деректер профилі', 'Data profile')}</div>
+        <div className="inline-flex p-1 bg-slate-100 rounded-xl gap-1">
+          {([
+            { id: 'furniture' as const, label: l('Кухни и шкафы', 'Ас үй және шкаф', 'Kitchens & wardrobes') },
+            { id: 'doors' as const,     label: l('Двери и лестницы', 'Есік және баспалдақ', 'Doors & stairs') },
+          ]).map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => setPreset(opt.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs transition ${preset === opt.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={seed}
