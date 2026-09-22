@@ -4336,6 +4336,37 @@ app.post('/api/owner/demo-account', ...ownerGate, async (req: AuthedRequest, res
 
   res.json({ ok: true, email, password, company, preset, counts, loginUrl: envUrl(process.env.APP_URL) || '' });
 });
+// ─── Демо-данные в уже существующую команду ───────────────────────
+// Аккаунт мог быть заведён вручную — тогда создавать второй смысла нет,
+// нужно лишь наполнить его. То же самое доступно самой команде в
+// Настройках, но владельцу платформы не надо ради этого выходить из
+// своего аккаунта и входить под клиентским.
+// Записи демо-набора имеют фиксированные id `demo_…` и пишутся через
+// INSERT OR REPLACE — повторный засев не плодит дублей, а реальные
+// данные команды не затрагивает (очистка тоже трогает только `demo_…`).
+app.post('/api/owner/teams/:id/seed-demo', ...ownerGate, (req: AuthedRequest, res) => {
+  const teamId = String(req.params.id);
+  const preset = isDemoPreset(req.body?.preset) ? req.body.preset : 'furniture';
+
+  // Владелец записей — админ команды; без него данные повиснут без автора.
+  const owner = db.prepare(
+    `SELECT id, company, name FROM users
+      WHERE team_id = ? AND disabled_at IS NULL
+      ORDER BY CASE team_role WHEN 'admin' THEN 0 ELSE 1 END, rowid
+      LIMIT 1`
+  ).get(teamId) as any;
+  if (!owner) return res.status(404).json({ error: 'team_not_found' });
+
+  const counts = seedDemoData(db, teamId, owner.id, preset);
+
+  logActivity(req.userId!, {
+    user: 'Владелец', type: 'create', page: 'team',
+    action: 'Наполнил команду демо-данными', target: owner.company || owner.name || teamId,
+  });
+
+  res.json({ ok: true, teamId, preset, counts });
+});
+
 app.get('/api/owner/backup/status', ...ownerGate, (_req, res) => res.json({ backups: listBackups(DB_PATH) }));
 app.post('/api/owner/backup/run', ...ownerGate, async (_req, res) => {
   const r = await runBackup(db, DB_PATH);

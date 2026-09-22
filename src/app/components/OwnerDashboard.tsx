@@ -1011,6 +1011,23 @@ function TeamDrawer({ teamId, onClose, onChanged }: { teamId: string; onClose: (
 
   const roleLabel = (r: string) => r === 'admin' ? 'Админ' : r === 'manager' ? 'Менеджер' : r === 'employee' ? 'Сотрудник' : r;
 
+  // Наполнение уже заведённой команды демо-данными — для аккаунтов,
+  // созданных вручную (там данных нет, показывать клиенту нечего).
+  const [demoPreset, setDemoPreset] = useState<'furniture' | 'doors'>('doors');
+  const [demoBusy, setDemoBusy] = useState(false);
+  const seedDemo = async () => {
+    if (!(await confirmDialog({ message: `Наполнить «${d?.name || ''}» демо-данными? Сделки, финансы, склад и задачи под выбранную нишу. Реальные данные команды не затрагиваются.` }))) return;
+    setDemoBusy(true);
+    try {
+      const r = await api.post<{ counts: { total: number } }>(`/api/owner/teams/${teamId}/seed-demo`, { preset: demoPreset });
+      toast(`Добавлено демо-записей: ${r.counts.total}`, 'success');
+      onChanged(); load();
+    } catch (e: any) {
+      const m = String(e?.message || '');
+      toast(m === '404' ? 'Сервер ещё обновляется после деплоя — попробуйте через пару минут' : 'Не удалось наполнить', 'error');
+    } finally { setDemoBusy(false); }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" />
@@ -1054,6 +1071,29 @@ function TeamDrawer({ teamId, onClose, onChanged }: { teamId: string; onClose: (
               <div className="flex gap-2 pt-1">
                 <button onClick={saveSub} disabled={saving} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs hover:bg-indigo-700 disabled:opacity-50">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Сохранить</button>
                 <button onClick={toggleSuspend} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs ${d.subscription.suspended ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}`}>{d.subscription.suspended ? <ShieldCheck className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}{d.subscription.suspended ? 'Разблок.' : 'Блок'}</button>
+              </div>
+            </div>
+
+            {/* Демо-данные: сделать из команды готовую демо-версию для показа */}
+            <div className="bg-white/60 rounded-2xl p-4 ring-1 ring-white/60 space-y-2">
+              <div className="text-xs font-medium text-slate-700 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-emerald-500" /> Демо-данные</div>
+              <div className="text-[10px] text-slate-400 leading-relaxed">Заполнит команду связанными между собой сделками, платежами, складом и задачами под нишу — клиент войдёт и увидит живую платформу. Повторный запуск не плодит дубли, реальные данные не трогает.</div>
+              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                <div className="inline-flex p-1 bg-white/70 ring-1 ring-slate-200 rounded-xl gap-1">
+                  {([
+                    { id: 'doors' as const, label: 'Двери и лестницы' },
+                    { id: 'furniture' as const, label: 'Кухни и шкафы' },
+                  ]).map(o => (
+                    <button key={o.id} onClick={() => setDemoPreset(o.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] transition ${demoPreset === o.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={seedDemo} disabled={demoBusy}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
+                  {demoBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Наполнить
+                </button>
               </div>
             </div>
 

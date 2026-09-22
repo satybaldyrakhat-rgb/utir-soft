@@ -346,6 +346,37 @@ test('демо-аккаунт: владелец создаёт готовый л
   assert.notEqual(again.json.email, made.json.email);
 });
 
+test('демо-данные: владелец наполняет уже заведённую вручную команду', async () => {
+  const owner = await signup('owner@test.kz', 'HQ');
+  const client = await signup('manual@test.kz', 'Manual Doors');
+
+  // До наполнения у команды пусто
+  assert.equal((await api('GET', '/api/deals', { token: client })).json.length, 0);
+
+  const teams = await api('GET', '/api/owner/teams', { token: owner });
+  const team = teams.json.find(t => t.email === 'manual@test.kz');
+  assert.ok(team, 'команда видна владельцу');
+
+  // Обычной команде ручка недоступна
+  assert.equal((await api('POST', `/api/owner/teams/${team.teamId}/seed-demo`, { token: client, body: { preset: 'doors' } })).status, 403);
+
+  const seeded = await api('POST', `/api/owner/teams/${team.teamId}/seed-demo`, { token: owner, body: { preset: 'doors' } });
+  assert.equal(seeded.status, 200);
+  assert.ok(seeded.json.counts.total > 40, 'демо-данные засеяны');
+
+  // Клиент видит их у себя, и это именно дверная ниша
+  const deals = await api('GET', '/api/deals', { token: client });
+  assert.equal(deals.json.length, 14);
+  assert.ok(deals.json.some(d => /двер/i.test(d.product)));
+
+  // Повторный засев не плодит дубли
+  assert.equal((await api('POST', `/api/owner/teams/${team.teamId}/seed-demo`, { token: owner, body: { preset: 'doors' } })).status, 200);
+  assert.equal((await api('GET', '/api/deals', { token: client })).json.length, 14);
+
+  // Несуществующая команда → 404, а не пустой засев
+  assert.equal((await api('POST', '/api/owner/teams/nope/seed-demo', { token: owner, body: {} })).status, 404);
+});
+
 test('публичный PDF: несуществующий код → 404', async () => {
   const res = await fetch(`${BASE}/api/public/doc/${'0'.repeat(32)}`);
   assert.equal(res.status, 404);
