@@ -363,12 +363,100 @@ function KanbanTab({ teams, reload, onOpen }: { teams: TeamSummary[] | null; rel
 }
 
 // ─── Команды ──────────────────────────────────────────────────────────
+
+// ─── Демо-аккаунт для клиента ─────────────────────────────────────────
+// Продажнику нужен готовый логин+пароль, который можно отправить клиенту:
+// человек входит и видит платформу, заполненную под его нишу. Почта в
+// этом пути не участвует — подтверждать нечего.
+function DemoAccountCard() {
+  const [company, setCompany] = useState('');
+  const [preset, setPreset] = useState<'furniture' | 'doors'>('doors');
+  const [busy, setBusy] = useState(false);
+  const [made, setMade] = useState<{ email: string; password: string; company: string } | null>(null);
+  const [err, setErr] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const create = async () => {
+    if (!company.trim()) { setErr('Укажите название компании'); return; }
+    setBusy(true); setErr('');
+    try {
+      const r = await api.post<{ email: string; password: string; company: string }>('/api/owner/demo-account', { company, preset });
+      setMade(r); setCompany('');
+    } catch (e: any) {
+      setErr(String(e?.message || 'Не удалось создать'));
+    } finally { setBusy(false); }
+  };
+
+  const text = made ? `Демо-доступ Utir Soft\n\nЛогин: ${made.email}\nПароль: ${made.password}` : '';
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* ignore */ }
+  };
+
+  return (
+    <Glass className="p-5 mb-4">
+      <div className="flex items-center gap-2 mb-1">
+        <Zap className="w-4 h-4 text-indigo-500" />
+        <div className="text-sm text-slate-900">Демо-аккаунт для клиента</div>
+      </div>
+      <div className="text-[11px] text-slate-400 mb-4">
+        Создаёт готовый аккаунт с данными под нишу. Отправьте клиенту логин и пароль — он войдёт и увидит платформу как свою.
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={company}
+          onChange={e => setCompany(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') create(); }}
+          placeholder="Название компании клиента"
+          className="flex-1 min-w-[200px] px-3 py-2 bg-white/60 ring-1 ring-white/70 rounded-xl text-xs focus:outline-none focus:ring-indigo-200 placeholder:text-slate-300"
+        />
+        <div className="inline-flex p-1 bg-white/50 ring-1 ring-white/70 rounded-xl gap-1">
+          {([
+            { id: 'doors' as const, label: 'Двери и лестницы' },
+            { id: 'furniture' as const, label: 'Кухни и шкафы' },
+          ]).map(o => (
+            <button key={o.id} onClick={() => setPreset(o.id)}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] transition ${preset === o.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={create} disabled={busy}
+          className="px-4 py-2 rounded-xl text-xs bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 flex items-center gap-1.5">
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+          Создать
+        </button>
+      </div>
+
+      {err && <div className="mt-3 text-[11px] text-rose-600">{err}</div>}
+
+      {made && (
+        <div className="mt-4 rounded-xl bg-emerald-50 ring-1 ring-emerald-100 p-4">
+          <div className="text-[11px] text-emerald-700 mb-2">Готово — {made.company}. Отправьте это клиенту:</div>
+          <div className="font-mono text-xs text-emerald-900 leading-relaxed break-all">
+            <div>Логин: {made.email}</div>
+            <div>Пароль: {made.password}</div>
+          </div>
+          <button onClick={copy} className="mt-3 px-3 py-1.5 rounded-lg text-[11px] bg-white ring-1 ring-emerald-200 text-emerald-700 hover:bg-emerald-50">
+            {copied ? 'Скопировано' : 'Скопировать'}
+          </button>
+          <div className="text-[10px] text-emerald-700/70 mt-2">
+            Пароль показан один раз — сохраните его. Аккаунт обычный: удаляется и блокируется как любая команда.
+          </div>
+        </div>
+      )}
+    </Glass>
+  );
+}
+
 function TeamsTab({ teams, onOpen }: { teams: TeamSummary[] | null; onOpen: (id: string) => void }) {
   const [q, setQ] = useState('');
   if (!teams) return <Skeleton />;
   const filtered = teams.filter(t => !q || t.name.toLowerCase().includes(q.toLowerCase()) || t.email.toLowerCase().includes(q.toLowerCase()));
 
   return (
+    <>
+    <DemoAccountCard />
     <Glass className="p-5">
       <div className="flex items-center gap-2 mb-4">
         <div className="relative flex-1 max-w-sm">
@@ -415,6 +503,7 @@ function TeamsTab({ teams, onOpen }: { teams: TeamSummary[] | null; onOpen: (id:
         {filtered.length === 0 && <div className="text-center text-slate-300 text-xs py-10">Ничего не найдено</div>}
       </div>
     </Glass>
+    </>
   );
 }
 

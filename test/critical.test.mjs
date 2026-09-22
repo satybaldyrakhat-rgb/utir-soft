@@ -317,6 +317,35 @@ test('демо-данные: профиль «двери и лестницы» �
   assert.equal((await api('GET', '/api/deals', { token: t })).json.length, 0);
 });
 
+test('демо-аккаунт: владелец создаёт готовый логин+пароль для клиента', async () => {
+  const owner = await signup('owner@test.kz', 'HQ');
+  const client = await signup('nosuper@test.kz', 'Client');
+
+  // Обычной команде это недоступно
+  assert.equal((await api('POST', '/api/owner/demo-account', { token: client, body: { company: 'X' } })).status, 403);
+
+  const made = await api('POST', '/api/owner/demo-account', { token: owner, body: { company: 'Sapa Group', preset: 'doors' } });
+  assert.equal(made.status, 200);
+  assert.match(made.json.email, /^sapa-group\.demo@/);
+  assert.ok(made.json.password.length >= 8, 'пароль выдан');
+  assert.ok(made.json.counts.total > 40, 'демо-данные засеяны');
+
+  // Выданными реквизитами реально можно войти, без подтверждения почты
+  const login = await api('POST', '/api/auth/login', { body: { email: made.json.email, password: made.json.password } });
+  assert.equal(login.status, 200, 'вход по выданным реквизитам работает');
+  assert.equal(login.json.user.emailVerified, true, 'почта не требует подтверждения');
+
+  // Клиент видит именно свои демо-заказы
+  const deals = await api('GET', '/api/deals', { token: login.json.token });
+  assert.equal(deals.json.length, 14);
+  assert.ok(deals.json.some(d => /двер/i.test(d.product)));
+
+  // Повторный вызов с тем же названием не падает — выдаёт другой email
+  const again = await api('POST', '/api/owner/demo-account', { token: owner, body: { company: 'Sapa Group' } });
+  assert.equal(again.status, 200);
+  assert.notEqual(again.json.email, made.json.email);
+});
+
 test('публичный PDF: несуществующий код → 404', async () => {
   const res = await fetch(`${BASE}/api/public/doc/${'0'.repeat(32)}`);
   assert.equal(res.status, 404);

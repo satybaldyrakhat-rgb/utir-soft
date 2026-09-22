@@ -4281,6 +4281,61 @@ app.get('/api/team/export', authMiddleware, requireRole('admin'), (req: AuthedRe
 // Регистрируем ДО общего /api/owner-роутера, чтобы точные пути имели
 // приоритет. Скачивание генерирует свежую консистентную копию БД.
 const ownerGate = [authMiddleware, makeRequireSuperAdmin(db)];
+
+// ─── Демо-аккаунт для показа клиенту ──────────────────────────────
+// Создаёт готовый аккаунт с логином, паролем и демо-данными под нишу.
+// Почта не задействована вовсе: аккаунт сразу подтверждён, код никуда
+// не отправляется — продажнику нужно отдать клиенту пару логин/пароль,
+// а не гонять его через подтверждение email.
+// Только владелец платформы (super-admin).
+const DEMO_PWD_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789'; // без похожих 0/o/1/l
+function readablePassword(len = 10): string {
+  const bytes = randomBytes(len);
+  let out = '';
+  for (let i = 0; i < len; i++) out += DEMO_PWD_ALPHABET[bytes[i] % DEMO_PWD_ALPHABET.length];
+  return out;
+}
+function emailSlug(company: string): string {
+  const s = company.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return s.slice(0, 24) || 'demo';
+}
+
+app.post('/api/owner/demo-account', ...ownerGate, async (req: AuthedRequest, res) => {
+  const company = String(req.body?.company || '').trim().slice(0, 120);
+  if (!company) return res.status(400).json({ error: 'company_required' });
+  const preset = isDemoPreset(req.body?.preset) ? req.body.preset : 'furniture';
+  const name = String(req.body?.name || '').trim().slice(0, 120) || `${company} (демо)`;
+
+  // Свободный email: <slug>.demo@utir-soft.kz, при занятости — с номером.
+  const base = emailSlug(company);
+  const domain = String(process.env.DEMO_EMAIL_DOMAIN || 'utir-soft.kz');
+  let email = `${base}.demo@${domain}`;
+  for (let i = 2; i <= 50; i++) {
+    const taken = db.prepare('SELECT 1 FROM users WHERE email = ?').get(email);
+    if (!taken) break;
+    email = `${base}.demo${i}@${domain}`;
+  }
+  if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) {
+    return res.status(409).json({ error: 'cannot_allocate_email' });
+  }
+
+  const password = String(req.body?.password || '').trim() || readablePassword();
+  if (password.length < 6) return res.status(400).json({ error: 'password_too_short' });
+
+  const userId = provisionOwnerUser({
+    name, email, company,
+    passwordHash: await bcrypt.hash(password, 10),
+    emailVerified: true,          // почта не участвует — подтверждать нечего
+  });
+  const counts = seedDemoData(db, userId, userId, preset);
+
+  logActivity(req.userId!, {
+    user: 'Владелец', type: 'create', page: 'team',
+    action: 'Создал демо-аккаунт для клиента', target: company,
+  });
+
+  res.json({ ok: true, email, password, company, preset, counts, loginUrl: envUrl(process.env.APP_URL) || '' });
+});
 app.get('/api/owner/backup/status', ...ownerGate, (_req, res) => res.json({ backups: listBackups(DB_PATH) }));
 app.post('/api/owner/backup/run', ...ownerGate, async (_req, res) => {
   const r = await runBackup(db, DB_PATH);

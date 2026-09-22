@@ -35,6 +35,8 @@ export function Auth({ onLogin, language, onLanguageChange, initialMode }: AuthP
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [phone, setPhone] = useState('');
   const [dialCode, setDialCode] = useState('+7');
+  // Ушло ли письмо с кодом. false → показываем «Продолжить без подтверждения».
+  const [emailDelivered, setEmailDelivered] = useState(true);
   // Which flow the OTP screen is verifying — email confirmation or phone login.
   const [otpFor, setOtpFor] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
@@ -279,7 +281,7 @@ export function Auth({ onLogin, language, onLanguageChange, initialMode }: AuthP
     if (!agreeTerms) { setError(l('Необходимо принять условия использования', 'Пайдалану шарттарын қабылдау керек', 'You must accept the terms of use')); return; }
     setIsLoading(true); setError('');
     try {
-      const data = await api.post<{ token: string; user: { id: string; name: string; email: string; company: string; emailVerified: boolean }; verificationCode?: string }>(
+      const data = await api.post<{ token: string; user: { id: string; name: string; email: string; company: string; emailVerified: boolean }; verificationCode?: string; emailSent?: boolean }>(
         '/api/auth/signup',
         // inviteCode (if present) tells the backend to join an existing team
         // rather than create a new one. Backend then ignores the `company` field
@@ -290,6 +292,10 @@ export function Auth({ onLogin, language, onLanguageChange, initialMode }: AuthP
       // and stash the dev-mode code so the OTP screen can show it (no real email is sent).
       setToken(data.token);
       setDevVerificationCode(data.verificationCode || '');
+      // Если письмо не ушло (почта на сервере не настроена), код взять
+      // неоткуда — тогда предлагаем войти и подтвердить позже, иначе
+      // человек навсегда застрянет на этом экране.
+      setEmailDelivered(data.emailSent !== false);
       setStep('otp');
     } catch (err: any) {
       const msg = String(err?.message || '');
@@ -713,6 +719,21 @@ export function Auth({ onLogin, language, onLanguageChange, initialMode }: AuthP
             <button onClick={handleOtpVerify} disabled={isLoading || otp.join('').length < 6} className="w-full py-3 bg-emerald-600 text-white rounded-2xl text-sm hover:bg-emerald-700 shadow-[0_8px_24px_-8px_var(--accent-shadow)] ring-1 ring-white/10 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{l('Подтвердить', 'Растау', 'Verify')} <Check className="w-4 h-4" /></>}
             </button>
+
+            {/* Письмо не ушло (почта на сервере не настроена) — взять код
+                неоткуда. Аккаунт уже создан и токен есть, поэтому пускаем
+                внутрь: иначе человек навсегда заперт на этом экране. */}
+            {otpFor === 'email' && !emailDelivered && (
+              <button
+                type="button"
+                onClick={() => { window.dispatchEvent(new Event('utir:auth-changed')); onLogin({ name, email }); }}
+                className="w-full mt-4 text-xs text-slate-500 hover:text-slate-900 underline underline-offset-2"
+              >
+                {l('Письмо не пришло — продолжить и подтвердить позже',
+                   'Хат келмеді — кейін растау',
+                   'No email — continue and verify later')}
+              </button>
+            )}
           </div>
         );
 
