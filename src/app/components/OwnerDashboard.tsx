@@ -383,7 +383,13 @@ function DemoAccountCard() {
       const r = await api.post<{ email: string; password: string; company: string }>('/api/owner/demo-account', { company, preset });
       setMade(r); setCompany('');
     } catch (e: any) {
-      setErr(String(e?.message || 'Не удалось создать'));
+      const m = String(e?.message || '');
+      // Фронтенд (Vercel) обновляется за секунды, бэкенд (Docker на Railway)
+      // собирается несколько минут. В это окно ручка ещё не существует —
+      // голый 404 выглядит как поломка, поэтому объясняем, что происходит.
+      setErr(m === '404'
+        ? 'Сервер ещё обновляется после деплоя — подождите пару минут и нажмите «Создать» снова.'
+        : (m || 'Не удалось создать'));
     } finally { setBusy(false); }
   };
 
