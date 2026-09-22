@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sapa Group в Utir Soft — демонстрация</title>
+<meta name="description" content="Как выглядит мебельное производство в Utir Soft: заказы, цех, склад и деньги за один месяц. Демонстрация на примере Sapa Group.">
+<meta name="robots" content="noindex">
+
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#16a34a">
+
+<!-- Превью ссылки в WhatsApp и Telegram -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Sapa Group в Utir Soft">
+<meta property="og:description" content="Заказы, цех, склад и деньги мебельного производства на одном экране. Демонстрация.">
+<meta property="og:image" content="/icon-512.png">
+<meta name="twitter:card" content="summary">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+
+<style>
+  :root{
+    color-scheme:light;
+    --ground:#f6f8f5;
+    --surface:#ffffff;
+    --surface-2:#f0f4f0;
+    --line:#dfe6e0;
+    --ink:#14201a;
+    --muted:#65766c;
+    --faint:#8b9a90;
+    --accent:#2f9e63;
+    --accent-ink:#1d7347;
+    --accent-soft:#e7f4ec;
+    --warn:#b06f00;
+    --warn-soft:#fdf1dd;
+    --danger:#b23b2e;
+    --danger-soft:#fbeae7;
+    --shadow:0 1px 2px rgba(20,32,26,.05),0 8px 24px -16px rgba(20,32,26,.25);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      color-scheme:dark;
+      --ground:#0e1310; --surface:#161d18; --surface-2:#1d2620; --line:#2b352e;
+      --ink:#e6ede8; --muted:#9aaaa0; --faint:#7d8d83;
+      --accent:#52c489; --accent-ink:#7ad4a5; --accent-soft:#16301f;
+      --warn:#e5ab4e; --warn-soft:#332615; --danger:#e8806f; --danger-soft:#38201c;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.8);
+    }
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  img{max-width:100%}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,"Noto Sans",sans-serif;
+    font-size:15px; line-height:1.5;
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  h1,h2,h3{font-family:Manrope,"IBM Plex Sans",system-ui,sans-serif; margin:0; text-wrap:balance}
+  .num{font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+  .wrap{max-width:1040px; margin:0 auto; padding-inline:16px; padding-block:0 56px}
+
+  .top{background:var(--surface); border-bottom:1px solid var(--line); padding-top:env(safe-area-inset-top,0px)}
+  .topin{max-width:1040px; margin:0 auto; padding:14px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+  .mark{width:30px;height:30px;border-radius:9px;background:var(--accent);display:grid;place-items:center;flex:0 0 auto}
+  .mark span{color:#fff;font-family:Manrope,sans-serif;font-weight:800;font-size:15px;line-height:1}
+  .brand{font-family:Manrope,sans-serif;font-weight:800;font-size:15px;letter-spacing:-.01em}
+  .acct{margin-left:auto;display:flex;align-items:center;gap:8px;background:var(--surface-2);
+        border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 8px;font-size:13px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+
+  .demo{background:var(--warn-soft);border-bottom:1px solid var(--line);color:var(--warn)}
+  .demo div{max-width:1040px;margin:0 auto;padding:9px 16px;font-size:12.5px;line-height:1.45}
+  .demo b{font-weight:600}
+
+  .lede{padding-block:28px 22px}
+  .eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .lede h1{font-size:clamp(23px,4.4vw,32px);font-weight:800;letter-spacing:-.02em;margin-top:8px}
+  .lede p{color:var(--muted);max-width:60ch;margin:10px 0 0;font-size:14.5px}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:12px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
+  .kpi .k{font-size:12px;color:var(--muted)}
+  .kpi .v{font-size:23px;font-weight:600;margin-top:7px;letter-spacing:-.02em}
+  .kpi .s{font-size:12px;color:var(--faint);margin-top:5px}
+  .kpi.lead .v{color:var(--accent-ink)}
+
+  section{margin-top:34px}
+  .shead{display:flex;align-items:baseline;gap:10px;margin-bottom:13px;flex-wrap:wrap}
+  .shead h2{font-size:16px;font-weight:600;letter-spacing:-.01em}
+  .shead span{font-size:12.5px;color:var(--faint);margin-left:auto}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+
+  .funnel{display:flex;flex-wrap:wrap;gap:1px;background:var(--line);border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+  .stage{background:var(--surface);flex:1 1 138px;padding:13px 14px}
+  .stage b{display:block;font-size:22px;font-weight:600;letter-spacing:-.02em}
+  .stage i{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:3px}
+  .stage em{display:block;font-style:normal;font-size:11.5px;color:var(--faint);margin-top:6px}
+  .bar{height:3px;border-radius:2px;background:var(--accent);margin-top:9px;opacity:.85}
+
+  .scroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;min-width:660px;font-size:13.5px}
+  th{text-align:left;font-weight:600;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;
+     color:var(--faint);padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  td.r,th.r{text-align:right}
+  .who{font-weight:500}
+  .what{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .pill{display:inline-block;font-size:11.5px;padding:3px 9px;border-radius:999px;white-space:nowrap;
+        background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+  .pill.go{background:var(--accent-soft);color:var(--accent-ink);border-color:transparent}
+  .pill.wa{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+  .owe{color:var(--danger);font-size:12px;margin-top:2px}
+  .paid{color:var(--accent-ink);font-size:12px;margin-top:2px}
+
+  .board{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .col{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px;box-shadow:var(--shadow)}
+  .col h3{font-size:12px;font-weight:600;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+  .col h3 u{text-decoration:none;font-size:11px;color:var(--faint)}
+  .card{margin-top:9px;background:var(--surface-2);border-radius:10px;padding:10px 11px;font-size:13px}
+  .card em{display:block;font-style:normal;font-size:11.5px;color:var(--faint);margin-top:3px}
+
+  .stock{display:grid;gap:11px;padding:15px}
+  .row{display:grid;grid-template-columns:1fr auto;gap:5px 12px;align-items:baseline}
+  .row .nm{font-size:13.5px}
+  .row .qt{font-size:13px;color:var(--muted)}
+  .track{grid-column:1/-1;height:5px;border-radius:3px;background:var(--surface-2);overflow:hidden}
+  .fill{height:100%;border-radius:3px;background:var(--accent)}
+  .fill.low{background:var(--warn)}
+  .fill.crit{background:var(--danger)}
+  .tag{font-size:11px;padding:2px 7px;border-radius:999px;margin-left:7px}
+  .tag.low{background:var(--warn-soft);color:var(--warn)}
+
+  .chart{padding:18px 15px 13px}
+  .bars{display:flex;align-items:flex-end;gap:14px;height:140px}
+  .cb{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:7px;text-align:center}
+  .cb .amt{font-size:12px;color:var(--muted)}
+  .cb .stem{border-radius:7px 7px 3px 3px;background:var(--accent);opacity:.5}
+  .cb.max .stem{opacity:1}
+  .cb .wk{font-size:11.5px;color:var(--faint)}
+
+  .task{display:flex;gap:11px;align-items:flex-start;padding:12px 15px;border-bottom:1px solid var(--line)}
+  .task:last-child{border-bottom:none}
+  .tick{width:15px;height:15px;border-radius:5px;border:1.5px solid var(--line);flex:0 0 auto;margin-top:2px}
+  .task .tx{flex:1;min-width:0}
+  .task .tt{font-size:13.5px}
+  .task .tm{font-size:11.5px;color:var(--faint);margin-top:2px}
+  .prio{width:6px;height:6px;border-radius:50%;margin-top:7px;flex:0 0 auto;background:var(--line)}
+  .prio.hi{background:var(--danger)} .prio.md{background:var(--warn)}
+
+  .end{margin-top:38px;background:var(--surface);border:1px solid var(--line);border-radius:16px;
+       padding:24px;box-shadow:var(--shadow)}
+  .end h2{font-size:19px;font-weight:800;letter-spacing:-.02em}
+  .end p{color:var(--muted);margin:10px 0 0;max-width:58ch;font-size:14.5px}
+  .end ul{margin:15px 0 0;padding-left:19px;color:var(--muted);font-size:14px}
+  .end li{margin-top:6px}
+  .cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+  .btn{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:10px 18px;
+       font-size:14px;text-decoration:none;font-weight:500}
+  .btn.p{background:var(--accent);color:#fff}
+  .btn.s{background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
+  .btn:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px}
+  .foot{margin-top:22px;color:var(--faint);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="topin">
+    <div class="mark"><span>U</span></div>
+    <div class="brand">Utir&nbsp;Soft</div>
+    <div class="acct"><span class="dot"></span> SAPA GROUP · Шымкент</div>
+  </div>
+</div>
+
+<div class="demo">
+  <div><b>Демонстрация.</b> Это показ возможностей Utir Soft на примере вашего профиля — двери, лестницы, мебель.
+  Все заказы, клиенты и суммы здесь <b>вымышленные</b> и подобраны для наглядности. Ваши реальные данные в систему пока не загружались.</div>
+</div>
+
+<div class="wrap">
+
+  <div class="lede">
+    <div class="eyebrow">Рабочий стол руководителя · сентябрь 2026</div>
+    <h1>Весь цех на одном экране</h1>
+    <p>Так выглядит производство, когда заявки, замеры, цех, склад и деньги ведутся в одной системе,
+       а не в переписках и таблицах. Ниже — один месяц работы условной компании вашего профиля.</p>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi lead">
+      <div class="k">Поступило за сентябрь</div>
+      <div class="v num">17 312 000 ₸</div>
+      <div class="s">из 33 285 000 ₸ законтрактовано</div>
+    </div>
+    <div class="kpi">
+      <div class="k">Дебиторка</div>
+      <div class="v num">15 973 000 ₸</div>
+      <div class="s">по 9 заказам в работе</div>
+    </div>
+    <div class="kpi">
+      <div class="k">Средний чек</div>
+      <div class="v num">2 773 750 ₸</div>
+      <div class="s">12 сделок в воронке</div>
+    </div>
+    <div class="kpi">
+      <div class="k">Конверсия заявок</div>
+      <div class="v num">35 %</div>
+      <div class="s">12 сделок из 34 обращений</div>
+    </div>
+  </div>
+
+  <section>
+    <div class="shead"><h2>Воронка заказов</h2><span>12 активных сделок</span></div>
+    <div class="funnel">
+      <div class="stage"><b class="num">2</b><i>Новая заявка</i><em class="num">2 840 000 ₸</em><div class="bar" style="width:17%"></div></div>
+      <div class="stage"><b class="num">1</b><i>Замер</i><em class="num">3 850 000 ₸</em><div class="bar" style="width:8%"></div></div>
+      <div class="stage"><b class="num">1</b><i>Дизайн-проект</i><em class="num">2 340 000 ₸</em><div class="bar" style="width:8%"></div></div>
+      <div class="stage"><b class="num">3</b><i>Производство</i><em class="num">15 040 000 ₸</em><div class="bar" style="width:25%"></div></div>
+      <div class="stage"><b class="num">2</b><i>Монтаж</i><em class="num">4 100 000 ₸</em><div class="bar" style="width:17%"></div></div>
+      <div class="stage"><b class="num">3</b><i>Завершён</i><em class="num">5 115 000 ₸</em><div class="bar" style="width:25%"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>Заказы</h2><span>сумма · оплачено · остаток</span></div>
+    <div class="panel scroll">
+      <table>
+        <thead>
+          <tr><th>Клиент</th><th>Этап</th><th class="r">Сумма</th><th class="r">Оплата</th><th>Ответственный</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="who">ЖК «Алтын Орда»</div><div class="what">Двери межкомнатные, 42 шт</div></td>
+            <td><span class="pill wa">Производство</span></td>
+            <td class="r num">9 660 000</td>
+            <td class="r"><div class="num">4 830 000</div><div class="owe num">−4 830 000</div></td>
+            <td>Гүлназ А.</td>
+          </tr>
+          <tr>
+            <td><div class="who">ТОО «Шымкент Құрылыс»</div><div class="what">Двери входные, 18 шт</div></td>
+            <td><span class="pill wa">Производство</span></td>
+            <td class="r num">4 140 000</td>
+            <td class="r"><div class="num">2 070 000</div><div class="owe num">−2 070 000</div></td>
+            <td>Гүлназ А.</td>
+          </tr>
+          <tr>
+            <td><div class="who">Айгүл С.</div><div class="what">Кухня с островом, 12 м²</div></td>
+            <td><span class="pill">Замер</span></td>
+            <td class="r num">3 850 000</td>
+            <td class="r"><div class="num">1 925 000</div><div class="owe num">−1 925 000</div></td>
+            <td>Айдос К.</td>
+          </tr>
+          <tr>
+            <td><div class="who">Дәурен А.</div><div class="what">Лестница дуб + перила</div></td>
+            <td><span class="pill go">Монтаж</span></td>
+            <td class="r num">3 420 000</td>
+            <td class="r"><div class="num">1 710 000</div><div class="owe num">−1 710 000</div></td>
+            <td>Ержан Б.</td>
+          </tr>
+          <tr>
+            <td><div class="who">Мадина Ж.</div><div class="what">Лестница, массив дуба</div></td>
+            <td><span class="pill go">Завершён</span></td>
+            <td class="r num">2 780 000</td>
+            <td class="r"><div class="num">2 780 000</div><div class="paid">оплачен полностью</div></td>
+            <td>Ержан Б.</td>
+          </tr>
+          <tr>
+            <td><div class="who">Асхат М.</div><div class="what">Кухня прямая, 4,2 м</div></td>
+            <td><span class="pill">Дизайн-проект</span></td>
+            <td class="r num">2 340 000</td>
+            <td class="r"><div class="num">702 000</div><div class="owe num">−1 638 000</div></td>
+            <td>Мөлдір Т.</td>
+          </tr>
+          <tr>
+            <td><div class="who">Бекзат Ө.</div><div class="what">Лестница бетон + отделка дубом</div></td>
+            <td><span class="pill">Новая заявка</span></td>
+            <td class="r num">1 950 000</td>
+            <td class="r"><div class="num">0</div><div class="owe num">−1 950 000</div></td>
+            <td>Мөлдір Т.</td>
+          </tr>
+          <tr>
+            <td><div class="who">Гүлнар Б.</div><div class="what">Гардеробная комната</div></td>
+            <td><span class="pill go">Завершён</span></td>
+            <td class="r num">1 560 000</td>
+            <td class="r"><div class="num">1 560 000</div><div class="paid">оплачен полностью</div></td>
+            <td>Сапарбек Ә.</td>
+          </tr>
+          <tr>
+            <td><div class="who">Ерлан Т.</div><div class="what">Двери межкомнатные, 8 шт</div></td>
+            <td><span class="pill wa">Производство</span></td>
+            <td class="r num">1 240 000</td>
+            <td class="r"><div class="num">620 000</div><div class="owe num">−620 000</div></td>
+            <td>Сапарбек Ә.</td>
+          </tr>
+          <tr>
+            <td><div class="who">Нұрлан К.</div><div class="what">Шкаф-купе, 2,4 м</div></td>
+            <td><span class="pill">Новая заявка</span></td>
+            <td class="r num">890 000</td>
+            <td class="r"><div class="num">0</div><div class="owe num">−890 000</div></td>
+            <td>Айдос К.</td>
+          </tr>
+          <tr>
+            <td><div class="who">Сәуле Н.</div><div class="what">Двери межкомнатные, 5 шт</div></td>
+            <td><span class="pill go">Завершён</span></td>
+            <td class="r num">775 000</td>
+            <td class="r"><div class="num">775 000</div><div class="paid">оплачен полностью</div></td>
+            <td>Гүлназ А.</td>
+          </tr>
+          <tr>
+            <td><div class="who">Жанна Р.</div><div class="what">Прихожая с зеркалом</div></td>
+            <td><span class="pill go">Монтаж</span></td>
+            <td class="r num">680 000</td>
+            <td class="r"><div class="num">340 000</div><div class="owe num">−340 000</div></td>
+            <td>Ержан Б.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>Цех сегодня</h2><span>22 сентября · 3 заказа в работе</span></div>
+    <div class="board">
+      <div class="col">
+        <h3>Распил <u>1</u></h3>
+        <div class="card">ЖК «Алтын Орда»<em>Двери, 42 шт · Сапарбек Ә.</em></div>
+      </div>
+      <div class="col">
+        <h3>Покраска <u>1</u></h3>
+        <div class="card">Ерлан Т.<em>Двери, 8 шт · срок 26 сент.</em></div>
+      </div>
+      <div class="col">
+        <h3>Сборка <u>1</u></h3>
+        <div class="card">ТОО «Шымкент Құрылыс»<em>Двери, 18 шт · срок 2 окт.</em></div>
+      </div>
+      <div class="col">
+        <h3>На монтаже <u>2</u></h3>
+        <div class="card">Дәурен А.<em>Перила · ср, 10:00</em></div>
+        <div class="card">Жанна Р.<em>Прихожая · чт, 14:00</em></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>Склад</h2><span>3 позиции ниже минимума</span></div>
+    <div class="panel stock">
+      <div class="row">
+        <div class="nm">МДФ фасадная плита 18 мм</div>
+        <div class="qt num">240 / 400 лист</div>
+        <div class="track"><div class="fill" style="width:60%"></div></div>
+      </div>
+      <div class="row">
+        <div class="nm">ЛДСП Egger H1145, 18 мм</div>
+        <div class="qt num">186 / 300 лист</div>
+        <div class="track"><div class="fill" style="width:62%"></div></div>
+      </div>
+      <div class="row">
+        <div class="nm">Массив дуба, ступени</div>
+        <div class="qt num">62 / 120 м²</div>
+        <div class="track"><div class="fill" style="width:52%"></div></div>
+      </div>
+      <div class="row">
+        <div class="nm">Петли Blum <span class="tag low">мало</span></div>
+        <div class="qt num">84 / 200 шт</div>
+        <div class="track"><div class="fill low" style="width:42%"></div></div>
+      </div>
+      <div class="row">
+        <div class="nm">Балясины точёные <span class="tag low">мало</span></div>
+        <div class="qt num">38 / 150 шт</div>
+        <div class="track"><div class="fill crit" style="width:25%"></div></div>
+      </div>
+      <div class="row">
+        <div class="nm">Лак полиуретановый <span class="tag low">мало</span></div>
+        <div class="qt num">24 / 60 л</div>
+        <div class="track"><div class="fill crit" style="width:40%"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>Поступления по неделям</h2><span>всего 17 312 000 ₸</span></div>
+    <div class="panel chart">
+      <div class="bars">
+        <div class="cb"><div class="amt num">3,18 млн</div><div class="stem" style="height:54%"></div><div class="wk">1–7 сент.</div></div>
+        <div class="cb"><div class="amt num">4,64 млн</div><div class="stem" style="height:79%"></div><div class="wk">8–14 сент.</div></div>
+        <div class="cb max"><div class="amt num">5,89 млн</div><div class="stem" style="height:100%"></div><div class="wk">15–21 сент.</div></div>
+        <div class="cb"><div class="amt num">3,60 млн</div><div class="stem" style="height:61%"></div><div class="wk">22–28 сент.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>Задачи на сегодня</h2><span>4 открытых</span></div>
+    <div class="panel">
+      <div class="task">
+        <span class="prio hi"></span><span class="tick"></span>
+        <div class="tx"><div class="tt">Заказать петли Blum — на складе 84 шт при минимуме 200</div>
+        <div class="tm">Сапарбек Ә. · просрочено на 1 день</div></div>
+      </div>
+      <div class="task">
+        <span class="prio md"></span><span class="tick"></span>
+        <div class="tx"><div class="tt">Замер у Нұрлана К. — шкаф-купе 2,4 м</div>
+        <div class="tm">Айдос К. · сегодня 15:00</div></div>
+      </div>
+      <div class="task">
+        <span class="prio md"></span><span class="tick"></span>
+        <div class="tx"><div class="tt">Согласовать чертёж лестницы — Бекзат Ө.</div>
+        <div class="tm">Мөлдір Т. · завтра</div></div>
+      </div>
+      <div class="task">
+        <span class="prio"></span><span class="tick"></span>
+        <div class="tx"><div class="tt">Монтаж перил — Дәурен А.</div>
+        <div class="tm">Ержан Б. · среда 10:00</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="end">
+    <h2>Что это даёт на практике</h2>
+    <p>Каждая цифра выше собирается сама, из работы менеджера, замерщика и цеха. Никто не сводит отчёт вручную.</p>
+    <ul>
+      <li>Замерщик считает заказ на объекте — расчёт сразу прикрепляется к карточке клиента.</li>
+      <li>Коммерческое предложение уходит клиенту в WhatsApp после подтверждения цены руководителем.</li>
+      <li>Цены и дебиторку видят только директор и финансист — мастер и монтажник их не видят.</li>
+      <li>Остатки списываются при сборке, и система сама напоминает о закупке.</li>
+      <li>Утром в 9:00 сводка за вчера приходит в WhatsApp или Telegram.</li>
+    </ul>
+    <!-- Подставьте свой номер вместо 77000000000 — кнопка откроет чат с вами. -->
+    <div class="cta">
+      <a class="btn p" href="https://wa.me/77000000000">Обсудить в WhatsApp</a>
+      <a class="btn s" href="/">Смотреть Utir Soft</a>
+    </div>
+  </div>
+
+  <div class="foot">Utir Soft · демонстрация для Sapa Group · данные вымышленные</div>
+</div>
+
+</body>
+</html>
