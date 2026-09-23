@@ -4357,7 +4357,20 @@ app.post('/api/owner/teams/:id/seed-demo', ...ownerGate, (req: AuthedRequest, re
   ).get(teamId) as any;
   if (!owner) return res.status(404).json({ error: 'team_not_found' });
 
-  const counts = seedDemoData(db, teamId, owner.id, preset);
+  // Засев идёт одной транзакцией по многим таблицам. Если он упадёт,
+  // express по умолчанию отдаст HTML со стектрейсом, и до интерфейса
+  // доедет безликое «500» — разбирать такую ошибку не по чему.
+  let counts;
+  try {
+    counts = seedDemoData(db, teamId, owner.id, preset);
+  } catch (e: any) {
+    logOwnerError(db, {
+      source: 'owner/seed-demo', teamId, userId: req.userId!,
+      method: 'POST', url: req.originalUrl,
+      message: String(e?.message || e), stack: String(e?.stack || ''),
+    });
+    return res.status(500).json({ error: `seed_failed: ${String(e?.message || e).slice(0, 200)}` });
+  }
 
   logActivity(req.userId!, {
     user: 'Владелец', type: 'create', page: 'team',
